@@ -26,13 +26,17 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
 func NewTreeLoader() kubebuilderx.TreeLoader {
@@ -55,7 +59,7 @@ func (r *treeLoader) Load(ctx context.Context, reader client.Reader, req ctrl.Re
 		return nil, err
 	}
 
-	tree.Context = ctx
+	tree.Context = context.WithValue(ctx, dataResultReaderKey{}, reader)
 	tree.EventRecorder = recorder
 	tree.Logger = logger
 
@@ -99,4 +103,27 @@ func loadAssistantObjects(ctx context.Context, reader client.Reader, tree *kubeb
 		}
 	}
 	return nil
+}
+
+type dataResultReaderKey struct{}
+
+// Result PVCs can be external volumes without Instance ownership labels.
+func readDataResultPVC(tree *kubebuilderx.ObjectTree, result *proto.DataLoadResult) (*corev1.PersistentVolumeClaim, error) {
+	if tree.Context != nil {
+		if reader, ok := tree.Context.Value(dataResultReaderKey{}).(client.Reader); ok {
+			inst := tree.GetRoot().(*workloads.Instance)
+			ctx := multicluster.IntoContext(tree.Context, inst.Annotations[constant.KBAppMultiClusterPlacementKey])
+			pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: result.PVCName, Namespace: result.Namespace, Annotations: inst.Annotations}}
+			err := reader.Get(ctx, client.ObjectKeyFromObject(pvc), pvc, multicluster.InDataContext())
+			if errors.IsNotFound(err) {
+				return nil, nil
+			}
+			return pvc, err
+		}
+	}
+	obj, err := tree.Get(&corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: result.PVCName, Namespace: result.Namespace}})
+	if err != nil || obj == nil {
+		return nil, err
+	}
+	return obj.(*corev1.PersistentVolumeClaim), nil
 }

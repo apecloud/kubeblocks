@@ -498,6 +498,16 @@ func (in *InstanceStatus) DeepCopyInto(out *InstanceStatus) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.DataLoaded != nil {
+		in, out := &in.DataLoaded, &out.DataLoaded
+		*out = new(bool)
+		**out = **in
+	}
+	if in.MemberJoined != nil {
+		in, out := &in.MemberJoined, &out.MemberJoined
+		*out = new(bool)
+		**out = **in
+	}
 	if in.Configs != nil {
 		in, out := &in.Configs, &out.Configs
 		*out = make([]InstanceConfigStatus, len(*in))
@@ -645,6 +655,31 @@ func (in *LifecycleActions) DeepCopyInto(out *LifecycleActions) {
 	if in.Reconfigure != nil {
 		in, out := &in.Reconfigure, &out.Reconfigure
 		*out = new(Action)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.MemberJoin != nil {
+		in, out := &in.MemberJoin, &out.MemberJoin
+		*out = new(Action)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.MemberLeave != nil {
+		in, out := &in.MemberLeave, &out.MemberLeave
+		*out = new(Action)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.DataDump != nil {
+		in, out := &in.DataDump, &out.DataDump
+		*out = new(Action)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.DataLoad != nil {
+		in, out := &in.DataLoad, &out.DataLoad
+		*out = new(Action)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.Worker != nil {
+		in, out := &in.Worker, &out.Worker
+		*out = new(corev1.Container)
 		(*in).DeepCopyInto(*out)
 	}
 }

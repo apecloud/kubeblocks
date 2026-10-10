@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset2
 
 import (
+	"fmt"
+	"time"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -29,6 +32,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -82,6 +86,16 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 		inst, _ := object.(*workloads.Instance)
 		oldInstanceMap[object.GetName()] = inst
 	}
+	for _, inst := range oldInstanceMap {
+		if newNameSet.Has(inst.Name) && ptr.Deref(inst.Spec.ScaledDown, false) && inst.DeletionTimestamp.IsZero() {
+			copy := inst.DeepCopy()
+			copy.Spec.ScaledDown = nil
+			if err := tree.Update(copy); err != nil {
+				return kubebuilderx.Continue, err
+			}
+			return kubebuilderx.RetryAfter(time.Second), nil
+		}
+	}
 	createNameSet := newNameSet.Difference(oldNameSet)
 	deleteNameSet := oldNameSet.Difference(newNameSet)
 
@@ -132,6 +146,9 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
+		if err := configureInstance(tree, its, newInst, true); err != nil {
+			return lifecycleWait(tree, its, err)
+		}
 		if err := tree.Add(newInst); err != nil {
 			return kubebuilderx.Continue, err
 		}
@@ -158,6 +175,11 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 				its.Namespace,
 				its.Name,
 				inst.Name)
+		}
+		if workloadlifecycle.Enabled(its) && !ptr.Deref(its.Spec.Stop, false) {
+			if status := instanceLifecycleStatus(its, inst.Name); status != nil && status.EffectiveDesiredState() == workloads.InstanceDesiredStateReleased && workloadlifecycle.NeedsLeave(its, status) {
+				return lifecycleWait(tree, its, fmt.Errorf("waiting for member %s to leave", inst.Name))
+			}
 		}
 		if ptr.Deref(inst.Spec.ScaledDown, false) {
 			if err := tree.Delete(inst); err != nil {

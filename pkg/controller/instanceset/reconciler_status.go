@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
@@ -542,6 +543,8 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	syncObservationPVCStatus(tree, observations)
 
 	statuses, err := instancestatus.Build(instancestatus.Input{
+		RequireMemberLeave: its.Spec.LifecycleActions != nil && its.Spec.LifecycleActions.MemberLeave != nil,
+		Resources:          cleanupResourceObservations(tree, its),
 		Previous:           its.Status.InstanceStatus,
 		DesiredAssignments: desiredTemplateAssignments,
 		Offline:            offlineNames,
@@ -554,6 +557,25 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	}
 	its.Status.InstanceStatus = statuses
 	return nil
+}
+
+func cleanupResourceObservations(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) []instancestatus.ResourceObservation {
+	if tree == nil {
+		return nil
+	}
+	var resources []instancestatus.ResourceObservation
+	retain := its.Spec.PersistentVolumeClaimRetentionPolicy != nil &&
+		its.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled == kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType
+	for _, object := range tree.List(&corev1.PersistentVolumeClaim{}) {
+		pvc := object.(*corev1.PersistentVolumeClaim)
+		owner := metav1.GetControllerOf(pvc)
+		name := pvc.Labels[constant.KBAppPodNameLabelKey]
+		if owner == nil || owner.UID != its.UID || name == "" || (retain && pvc.DeletionTimestamp.IsZero()) {
+			continue
+		}
+		resources = append(resources, instancestatus.ResourceObservation{InstanceName: name, StorageCleanup: true})
+	}
+	return resources
 }
 
 func podObservationNames(observations []instancestatus.Observation) []string {

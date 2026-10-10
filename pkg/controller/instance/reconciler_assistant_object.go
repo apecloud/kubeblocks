@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instance
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -36,6 +37,9 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
+	kbagt "github.com/apecloud/kubeblocks/pkg/kbagent"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
 const (
@@ -62,7 +66,17 @@ func (r *assistantObjectReconciler) PreCondition(tree *kubebuilderx.ObjectTree) 
 
 func (r *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	inst := tree.GetRoot().(*workloads.Instance)
+	result, err := completedDataResult(tree, inst)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
 	for _, obj := range inst.Spec.InstanceAssistantObjects {
+		if result != nil && obj.ConfigMap != nil {
+			obj.ConfigMap = obj.ConfigMap.DeepCopy()
+			if _, err := workloadlifecycle.CleanTaskConfigMap(obj.ConfigMap, result); err != nil {
+				return kubebuilderx.Continue, err
+			}
+		}
 		if err := r.createOrUpdate(tree, inst, obj); err != nil {
 			return kubebuilderx.Continue, err
 		}
@@ -307,4 +321,30 @@ func copyAndMergeAssistantObject(oldObj, newObj client.Object, equal func(o, n c
 	objCopy.SetAnnotations(newObj.GetAnnotations())
 	set(objCopy, newObj)
 	return objCopy
+}
+
+// Sanitize stale assistant snapshots using the same runtime result as the startup guard.
+func completedDataResult(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) (*proto.DataLoadResult, error) {
+	for _, worker := range inst.Spec.Template.Spec.InitContainers {
+		if worker.Name != kbagt.ContainerName4Worker {
+			continue
+		}
+		for _, env := range worker.Env {
+			if env.Name != "KB_AGENT_DATA_LOAD_RESULT" || env.Value == "" {
+				continue
+			}
+			var result proto.DataLoadResult
+			if err := json.Unmarshal([]byte(env.Value), &result); err != nil {
+				return nil, err
+			}
+			pvc, err := readDataResultPVC(tree, &result)
+			if err != nil {
+				return nil, err
+			}
+			if pvc != nil && pvc.Annotations[proto.DataLoadedAnnotationKey] == "true" {
+				return &result, nil
+			}
+		}
+	}
+	return nil, nil
 }

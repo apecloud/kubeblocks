@@ -21,6 +21,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"net"
 
 	"github.com/go-logr/logr"
@@ -56,9 +57,13 @@ func New(logger logr.Logger, actions []proto.Action, probes []proto.Probe, strea
 }
 
 func RunTasks(logger logr.Logger, service Service, tasks []proto.Task) error {
+	actions, ok := service.(*actionService)
+	if !ok {
+		return fmt.Errorf("worker action service is required")
+	}
 	st := &taskService{
 		logger:        logger,
-		actionService: service.(*actionService),
+		actionService: actions,
 		tasks:         tasks,
 	}
 	return st.runTasks(context.Background())

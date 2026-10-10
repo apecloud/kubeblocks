@@ -24,7 +24,9 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,6 +34,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 )
 
 type treeLoader struct{}
@@ -46,6 +49,10 @@ func (r *treeLoader) Load(ctx context.Context, reader client.Reader, req ctrl.Re
 
 	// load compressed instance templates if present
 	if err = loadCompressedInstanceTemplates(ctx, reader, tree); err != nil {
+		return nil, err
+	}
+
+	if err = loadDataPVCs(ctx, reader, tree); err != nil {
 		return nil, err
 	}
 
@@ -92,3 +99,48 @@ func NewTreeLoader() kubebuilderx.TreeLoader {
 }
 
 var _ kubebuilderx.TreeLoader = &treeLoader{}
+
+// Direct PVC references are observations, not resources owned by this controller.
+func loadDataPVCs(ctx context.Context, reader client.Reader, tree *kubebuilderx.ObjectTree) error {
+	if tree.GetRoot() == nil {
+		return nil
+	}
+	its := tree.GetRoot().(*workloads.InstanceSet)
+	if !workloadlifecycle.HasData(its) {
+		return nil
+	}
+	names := sets.New[string]()
+	collect := func(volumes []corev1.Volume) {
+		for _, volume := range volumes {
+			if volume.Name == its.Spec.LifecycleActions.DataVolume && volume.PersistentVolumeClaim != nil {
+				names.Insert(volume.PersistentVolumeClaim.ClaimName)
+			}
+		}
+	}
+	collect(its.Spec.Template.Spec.Volumes)
+	for _, obj := range tree.List(&corev1.Pod{}) {
+		collect(obj.(*corev1.Pod).Spec.Volumes)
+	}
+	for name := range names {
+		pvc := &corev1.PersistentVolumeClaim{}
+		pvc.Namespace = its.Namespace
+		pvc.Name = name
+		old, err := tree.Get(pvc)
+		if err != nil {
+			return err
+		}
+		if old != nil {
+			continue
+		}
+		if err := reader.Get(ctx, client.ObjectKeyFromObject(pvc), pvc); err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			return err
+		}
+		if err := tree.AddWithOption(pvc, kubebuilderx.SkipToReconcile(true)); err != nil {
+			return err
+		}
+	}
+	return nil
+}

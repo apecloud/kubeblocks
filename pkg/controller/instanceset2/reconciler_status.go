@@ -408,10 +408,18 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		desiredTemplateAssignments = nil
 	}
 
+	resources := make([]instancestatus.ResourceObservation, 0, len(instances))
 	observations := make([]instancestatus.Observation, 0, len(instances))
 	seenInstances := make(map[string]struct{}, len(instances))
 	roleMap := composeRoleMap(*its)
 	for _, inst := range instances {
+		owner := metav1.GetControllerOf(inst)
+		owned := owner != nil && owner.UID == its.UID
+		associated := owner == nil && shouldCloneInstanceAssistantObjects(its) &&
+			inst.Spec.InstanceSetName == its.Name && inst.Labels[WorkloadsInstanceLabelKey] == its.Name
+		if owned || associated {
+			resources = append(resources, instancestatus.ResourceObservation{InstanceName: inst.Name, InstancePresent: true})
+		}
 		if _, ok := seenInstances[inst.Name]; ok {
 			return fmt.Errorf("duplicate Instance object for %q", inst.Name)
 		}
@@ -459,7 +467,16 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		}
 	}
 
+	for _, pod := range lifecyclePods(tree) {
+		resources = append(resources, instancestatus.ResourceObservation{InstanceName: pod.Name, InstancePresent: true})
+		if previous := instanceLifecycleStatus(its, pod.Name); previous != nil {
+			previous.Provisioned = true
+		}
+	}
+	requireLeave := its.Spec.LifecycleActions != nil && its.Spec.LifecycleActions.MemberLeave != nil
 	statuses, err := instancestatus.Build(instancestatus.Input{
+		RequireMemberLeave: requireLeave,
+		Resources:          resources,
 		Previous:           its.Status.InstanceStatus,
 		DesiredAssignments: desiredTemplateAssignments,
 		Offline:            offlineNames,

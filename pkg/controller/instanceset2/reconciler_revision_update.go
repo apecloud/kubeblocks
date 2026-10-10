@@ -28,6 +28,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
 	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancestatus"
+	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 )
 
 func NewRevisionUpdateReconciler() kubebuilderx.Reconciler {
@@ -104,7 +105,10 @@ func (r *revisionUpdateReconciler) invalidateAffectedInstanceStatus(its *workloa
 			status.UpToDate = false
 			continue
 		}
-		podApplied := equality.Semantic.DeepEqual(current.Spec.Template, desired.Spec.Template)
+		currentTemplate, desiredTemplate := current.Spec.Template.DeepCopy(), desired.Spec.Template.DeepCopy()
+		workloadlifecycle.FilterTransient(&currentTemplate.Spec)
+		workloadlifecycle.FilterTransient(&desiredTemplate.Spec)
+		podApplied := equality.Semantic.DeepEqual(currentTemplate, desiredTemplate)
 		configsApplied := instancestatus.ConfigsApplied(desired.Spec.Configs, current.Status.Configs)
 		pvcApplied := volumeExpansionTargetsApplied(current, desired) && !current.Status.VolumeExpansion
 		if !podApplied || !configsApplied || !pvcApplied {

@@ -105,6 +105,9 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
+		if err := configureInstance(tree, its, desired, true); err != nil {
+			return lifecycleWait(tree, its, err)
+		}
 		desiredInstanceMap[inst.Name] = desired
 	}
 

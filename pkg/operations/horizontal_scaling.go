@@ -70,6 +70,14 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 		return intctrlutil.NewFatalError("please start the cluster before scaling the cluster horizontally")
 	}
 	compOpsSet := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
+	for _, target := range opsRes.OpsRequest.Spec.HorizontalScalingList {
+		if !isBackupScaling(target) {
+			continue
+		}
+		if _, err := hs.getBackupObj(reqCtx, cli, opsRes, *target.ScaleOut.FromBackup); err != nil {
+			return err
+		}
+	}
 	// abort earlier running horizontal scaling opsRequest.
 	if err := abortEarlierOpsRequestWithSameKind(reqCtx, cli, opsRes, []opsv1alpha1.OpsType{opsv1alpha1.HorizontalScalingType, opsv1alpha1.StartType},
 		func(earlierOps *opsv1alpha1.OpsRequest) (bool, error) {
@@ -119,14 +127,12 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 		if err != nil {
 			return err
 		}
-		if horizontalScaling.ScaleOut != nil && horizontalScaling.ScaleOut.FromBackup != nil {
-			// The backup path submits this configuration from restoreDataFromBackup
-			// only after all persistent volumes have been restored.
-			return nil
-		}
 		compSpec.Replicas = replicas
 		compSpec.Instances = instances
 		compSpec.OfflineInstances = offlineInstances
+		if isBackupScaling(horizontalScaling) {
+			compSpec.ReplicaRestore = buildReplicaRestoreIntent(opsRes.Cluster, *horizontalScaling.ScaleOut.FromBackup)
+		}
 		return nil
 	}); err != nil {
 		return err
@@ -234,21 +240,16 @@ func (hs horizontalScalingOpsHandler) observeReplicaScaling(reqCtx intctrlutil.R
 		resource := &resources[i]
 		if isBackupScaling(target) {
 			status := opsRes.OpsRequest.Status.Components[target.ComponentName]
-			timeout := opsRes.OpsRequest.Spec.TimeoutSeconds
-			if opsRes.OpsRequest.Status.Phase != opsv1alpha1.OpsCancellingPhase &&
-				status.Message != "Restore Data Completed" && timeout != nil && *timeout > 0 &&
-				!time.Now().Before(opsRes.OpsRequest.Status.StartTimestamp.Add(time.Duration(*timeout)*time.Second)) {
-				progress.observationsComplete = false
-				return progress, nil
-			}
-			last := opsRes.OpsRequest.Status.LastConfiguration.Components[target.ComponentName]
-			if err := hs.restoreDataFromBackup(reqCtx, cli, opsRes, resource.fullComponentName,
-				resource.clusterComponent.DeepCopy(), target, last, &status); err != nil {
-				return progress, err
-			}
-			opsRes.OpsRequest.Status.Components[target.ComponentName] = status
-			if status.Message != "Restore Data Completed" {
-				return hs.observeBackupPreparation(reqCtx, cli, opsRes, target.ComponentName)
+			if status.Message != replicaRestoreCompletedMessage {
+				restoreProgress, err := hs.observeReplicaRestore(reqCtx, cli, opsRes, resource, target, &status)
+				if err != nil {
+					return progress, err
+				}
+				opsRes.OpsRequest.Status.Components[target.ComponentName] = status
+				if status.Message != replicaRestoreCompletedMessage {
+					return restoreProgress, nil
+				}
+				progress = restoreProgress
 			}
 		}
 		its := &workloads.InstanceSet{}
@@ -432,9 +433,6 @@ func (hs horizontalScalingOpsHandler) getReplicaScalingChanges(opsRes *OpsResour
 	lastCompConfiguration opsv1alpha1.LastComponentConfiguration,
 	horizontalScaling opsv1alpha1.HorizontalScaling,
 	fullCompName string) (map[string]string, map[string]string, error) {
-	if isBackupScaling(horizontalScaling) {
-		return hs.getBackupReplicaScalingChanges(opsRes, lastCompConfiguration, horizontalScaling, fullCompName)
-	}
 	clusterName := opsRes.Cluster.Name
 	runtime, err := opsRes.GetRuntime(horizontalScaling.ComponentName)
 	if err != nil {
@@ -482,6 +480,7 @@ func (hs horizontalScalingOpsHandler) Cancel(reqCtx intctrlutil.RequestCtx, cli 
 		comp.Replicas = *lastConfig.Replicas
 		comp.Instances = lastConfig.InstanceTemplates
 		comp.OfflineInstances = lastConfig.OfflineInstances
+		comp.ReplicaRestore = nil
 	}); err != nil {
 		return err
 	}
@@ -732,11 +731,7 @@ func (hs horizontalScalingOpsHandler) validateHorizontalScaling(
 		return nil
 	}
 	if horizontalScaling.ScaleIn != nil {
-		validateOnline := hs.validateOnlineInstancesToOffline
-		if isBackupScaling(horizontalScaling) {
-			validateOnline = hs.validateBackupOnlineInstancesToOffline
-		}
-		if err := validateOnline(lastCompConfiguration,
+		if err := hs.validateOnlineInstancesToOffline(lastCompConfiguration,
 			horizontalScaling.ScaleIn.OnlineInstancesToOffline, opsRes, horizontalScaling.ComponentName); err != nil {
 			return err
 		}

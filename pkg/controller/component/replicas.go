@@ -37,6 +37,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/replicarestore"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
@@ -212,9 +213,32 @@ func GetReplicasStatusFunc(its *workloads.InstanceSet, f func(ReplicaStatus) boo
 	return replicas, nil
 }
 
-// GetReplicaRestoreReplicas identifies replicas with Backup-initialized PVCs,
+// GetReplicaRestoreReplicas identifies replicas with restore-initialized PVCs,
 // and replicas waiting for restore PVC creation or completion.
 func GetReplicaRestoreReplicas(ctx context.Context, cli client.Reader, its *workloads.InstanceSet, replicas []string) (restored, pending sets.Set[string], err error) {
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	nameTemplateMap, err := nameBuilder.BuildInstanceName2TemplateMap()
+	if err != nil {
+		return nil, nil, err
+	}
+	volumesByReplica := make(map[string]sets.Set[string], len(replicas))
+	for _, name := range replicas {
+		if template, ok := nameTemplateMap[name]; ok {
+			volumes := sets.New[string]()
+			for _, vct := range template.VolumeClaimTemplates {
+				volumes.Insert(vct.Name)
+			}
+			volumesByReplica[name] = volumes
+		}
+	}
+
 	pvcs := &corev1.PersistentVolumeClaimList{}
 	if err := cli.List(ctx, pvcs, client.InNamespace(its.Namespace), client.MatchingLabels{
 		constant.AppInstanceLabelKey:    its.Labels[constant.AppInstanceLabelKey],
@@ -223,26 +247,22 @@ func GetReplicaRestoreReplicas(ctx context.Context, cli client.Reader, its *work
 		return nil, nil, err
 	}
 	names := sets.New(replicas...)
-	volumes := sets.New[string]()
-	for _, vct := range its.Spec.VolumeClaimTemplates {
-		volumes.Insert(vct.Name)
-	}
 	restored = sets.New[string]()
 	pending = sets.New[string]()
-	existing := map[string]sets.Set[string]{}
+	restoredVolumes := map[string]sets.Set[string]{}
 	for i := range pvcs.Items {
 		pvc := &pvcs.Items[i]
 		name := pvc.Labels[constant.KBAppPodNameLabelKey]
 		volume := pvc.Labels[constant.VolumeClaimTemplateNameLabelKey]
-		if !names.Has(name) || !volumes.Has(volume) {
+		volumes, ok := volumesByReplica[name]
+		if !names.Has(name) || !ok || !volumes.Has(volume) {
 			continue
 		}
-		if existing[name] == nil {
-			existing[name] = sets.New[string]()
-		}
-		existing[name].Insert(volume)
 		if replicarestore.IsReplicaPVC(pvc) {
-			restored.Insert(name)
+			if restoredVolumes[name] == nil {
+				restoredVolumes[name] = sets.New[string]()
+			}
+			restoredVolumes[name].Insert(volume)
 			completed := slices.ContainsFunc(pvc.Status.Conditions, func(condition corev1.PersistentVolumeClaimCondition) bool {
 				return condition.Type == corev1.PersistentVolumeClaimConditionType(appsv1.ConditionTypeRestore) && condition.Status == corev1.ConditionTrue
 			})
@@ -251,9 +271,14 @@ func GetReplicaRestoreReplicas(ctx context.Context, cli client.Reader, its *work
 			}
 		}
 	}
+	for name, volumes := range volumesByReplica {
+		if volumes.Len() > 0 && restoredVolumes[name].Len() == volumes.Len() {
+			restored.Insert(name)
+		}
+	}
 	if its.Spec.ReplicaRestore != nil {
-		for name := range names {
-			if existing[name].Len() < volumes.Len() {
+		for name, volumes := range volumesByReplica {
+			if restoredVolumes[name].Len() < volumes.Len() {
 				pending.Insert(name)
 			}
 		}

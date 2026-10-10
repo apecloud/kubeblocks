@@ -42,8 +42,8 @@ func applyClusterRestoreIntent(cluster *appsv1.Cluster, components []*appsv1.Clu
 		}
 	}
 	for _, sharding := range shardings {
-		if sharding.Template.ReplicaRestore != nil {
-			return fmt.Errorf("sharding %q does not support replicaRestore", sharding.Name)
+		if err := validateReplicaRestoreIntent(cluster, &sharding.Template); err != nil {
+			return err
 		}
 		if cluster.Spec.Restore == nil {
 			continue
@@ -51,6 +51,12 @@ func applyClusterRestoreIntent(cluster *appsv1.Cluster, components []*appsv1.Clu
 		applyRestoreIntentToComponent(cluster, sharding.Name, sharding.Template.VolumeClaimTemplates, sharding.Template.Instances, completed)
 		for i := range sharding.ShardTemplates {
 			template := &sharding.ShardTemplates[i]
+			if err := validateReplicaRestoreIntent(cluster, &appsv1.ClusterComponentSpec{
+				Name:           template.Name,
+				ReplicaRestore: sharding.Template.ReplicaRestore,
+			}); err != nil {
+				return err
+			}
 			applyRestoreIntentToComponent(cluster, template.Name, template.VolumeClaimTemplates, template.Instances, completed)
 		}
 	}
@@ -64,9 +70,6 @@ func validateReplicaRestoreIntent(cluster *appsv1.Cluster, comp *appsv1.ClusterC
 	}
 	if cluster.Spec.Restore != nil && !isClusterRestoreCompleted(cluster) {
 		return fmt.Errorf("component %q replicaRestore requires initial Cluster restore to complete", comp.Name)
-	}
-	if len(comp.Instances) != 0 || len(comp.Ordinals.Ranges) != 0 || len(comp.Ordinals.Discrete) != 0 || comp.FlatInstanceOrdinal || len(comp.OfflineInstances) != 0 {
-		return fmt.Errorf("component %q replicaRestore only supports default contiguous instances", comp.Name)
 	}
 	return nil
 }

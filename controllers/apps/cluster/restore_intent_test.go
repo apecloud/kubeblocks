@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/yaml"
 
@@ -283,15 +284,36 @@ func TestReplicaRestoreWaitsForInitialClusterRestore(t *testing.T) {
 	}
 }
 
-func TestValidateReplicaRestoreIntentRejectsUnsupportedComponent(t *testing.T) {
+func TestValidateReplicaRestoreIntentAcceptsInstanceAllocationForms(t *testing.T) {
 	cluster := &appsv1.Cluster{}
 	spec := &appsv1.ClusterComponentSpec{
-		Name: "mysql", Replicas: 5, OfflineInstances: []string{"mysql-0"},
+		Name:      "mysql",
+		Replicas:  5,
+		Instances: []appsv1.InstanceTemplate{{Name: "fast", Replicas: ptr.To[int32](1)}},
+		Ordinals: appsv1.Ordinals{
+			Ranges:   []appsv1.Range{{Start: 3, End: 4}},
+			Discrete: []int32{8},
+		},
+		FlatInstanceOrdinal: true,
+		OfflineInstances:    []string{"mysql-0"},
 		ReplicaRestore: &appsv1.ClusterRestore{Source: appsv1.ClusterRestoreSource{
 			APIGroup: testRestoreSourceAPIGroup, Kind: testRestoreSourceKind, Name: "restore",
 		}},
 	}
-	require.ErrorContains(t, validateReplicaRestoreIntent(cluster, spec), "default contiguous instances")
+	require.NoError(t, validateReplicaRestoreIntent(cluster, spec))
+}
+
+func TestApplyClusterRestoreIntentAcceptsShardingReplicaRestore(t *testing.T) {
+	cluster := &appsv1.Cluster{}
+	shardings := []*appsv1.ClusterSharding{{
+		Name: "shard",
+		Template: appsv1.ClusterComponentSpec{
+			ReplicaRestore: &appsv1.ClusterRestore{Source: appsv1.ClusterRestoreSource{
+				APIGroup: testRestoreSourceAPIGroup, Kind: testRestoreSourceKind, Name: "restore",
+			}},
+		},
+	}}
+	require.NoError(t, applyClusterRestoreIntent(cluster, nil, shardings))
 }
 
 func TestSetRestoreConditionSucceedsWhenNoRestorePVCsExist(t *testing.T) {

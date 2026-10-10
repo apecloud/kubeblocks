@@ -121,6 +121,9 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	// treat old and Pending pod as a special case, as they can be updated without a consequence
 	// PodUpdatePolicy is ignored here since in-place update for a pending pod doesn't make much sense.
 	for i, pod := range oldPodList {
+		if isTerminating(pod) {
+			continue
+		}
 		if i >= rollingUpdateQuota {
 			break
 		}
@@ -142,6 +145,9 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	isBlocked := false
 	needRetry := false
 	for _, pod := range oldPodList {
+		if isTerminating(pod) {
+			continue
+		}
 		if updatedPods >= rollingUpdateQuota {
 			break
 		}

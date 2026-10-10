@@ -100,14 +100,7 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 	}
 
 	createSet := newPVCNameSet.Difference(oldPVCNameSet)
-	deleteSet := oldPVCNameSet.Difference(newPVCNameSet)
 	updateSet := newPVCNameSet.Intersection(oldPVCNameSet)
-
-	for pvcName := range deleteSet {
-		if err = tree.Delete(oldPVCs[pvcName]); err != nil {
-			return kubebuilderx.Continue, err
-		}
-	}
 	for pvcName := range createSet {
 		if err = tree.Add(newPVCs[pvcName]); err != nil {
 			return kubebuilderx.Continue, err

@@ -21,9 +21,11 @@ package instanceset2
 
 import (
 	"fmt"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -83,6 +85,28 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		oldInstanceList = append(oldInstanceList, inst)
 	}
 	updateNameSet := oldNameSet.Intersection(newNameSet)
+	for _, inst := range oldInstanceList {
+		if !ptr.Deref(inst.Spec.Stop, false) || model.IsObjectDeleting(inst) || !newNameSet.Has(inst.Name) {
+			continue
+		}
+		desired, err := buildInstanceByTemplate(tree, inst.Name, nameToTemplateMap[inst.Name], its)
+		if err != nil {
+			return kubebuilderx.Continue, err
+		}
+		if merged := copyAndMergeInstance(inst, desired); merged != nil {
+			if err := tree.Update(merged); err != nil {
+				return kubebuilderx.Continue, err
+			}
+		}
+	}
+	if isStopRequested(its) {
+		for _, obj := range tree.List(&workloads.Instance{}) {
+			if inst := obj.(*workloads.Instance); !model.IsObjectDeleting(inst) && !hasObservedStoppedRuntime(inst) {
+				return kubebuilderx.RetryAfter(time.Second), nil
+			}
+		}
+		return kubebuilderx.Continue, nil
+	}
 	if len(updateNameSet) != len(oldNameSet) || len(updateNameSet) != len(newNameSet) {
 		tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s instances are not aligned", its.Namespace, its.Name))
 		return kubebuilderx.Continue, nil
@@ -159,6 +183,9 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	for _, inst := range oldInstanceList {
+		if ptr.Deref(inst.Spec.Stop, false) {
+			continue
+		}
 		if updatedInstances >= replicas {
 			break
 		}

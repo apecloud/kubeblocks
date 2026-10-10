@@ -115,7 +115,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			replicas++
 			template2TemplatesStatus[templateName].Replicas++
 		}
-		if isImageMatched(pod) && intctrlutil.IsPodReady(pod) {
+		if !isTerminating(pod) && isImageMatched(pod) && intctrlutil.IsPodReady(pod) {
 			readyReplicas++
 			template2TemplatesStatus[templateName].ReadyReplicas++
 			notReadyNames.Delete(pod.Name)
@@ -127,9 +127,13 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			}
 		}
 		if isCreated(pod) && !isTerminating(pod) {
-			updated, err1 := isPodUpdated(its, pod)
-			if err1 != nil {
-				return kubebuilderx.Continue, err1
+			updated := false
+			if !isStopRequested(its) {
+				var err1 error
+				updated, err1 = isPodUpdated(its, pod)
+				if err1 != nil {
+					return kubebuilderx.Continue, err1
+				}
 			}
 			switch _, ok := updateRevisions[pod.Name]; {
 			case !ok, !updated:
@@ -205,7 +209,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.Continue, err
 	}
 
-	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
+	if !isStopRequested(its) && its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 
@@ -502,7 +506,7 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 			}
 		}
 		configs, err := configsFromPod(pod)
-		if err != nil {
+		if err != nil && !isStopRequested(its) && state != workloads.InstanceCurrentStateTerminating {
 			return err
 		}
 		for _, config := range configs {

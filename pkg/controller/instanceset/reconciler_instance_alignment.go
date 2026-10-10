@@ -74,35 +74,24 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	}
 
 	// 2. find the create and delete set
-	configuredNames := sets.KeySet(nameToTemplateMap)
-	runtimeNames := configuredNames
+	newNameSet := sets.New[string]()
 	stopping := isStopRequested(its)
-	if stopping {
-		runtimeNames = sets.New[string]()
+	if !stopping {
+		for name := range nameToTemplateMap {
+			newNameSet.Insert(name)
+		}
 	}
-	observedNames := sets.New[string]()
+	oldNameSet := sets.New[string]()
 	oldInstanceMap := make(map[string]*corev1.Pod)
 	oldInstanceList := tree.List(&corev1.Pod{})
 	oldPVCList := tree.List(&corev1.PersistentVolumeClaim{})
 	for _, object := range oldInstanceList {
-		observedNames.Insert(object.GetName())
+		oldNameSet.Insert(object.GetName())
 		pod, _ := object.(*corev1.Pod)
 		oldInstanceMap[object.GetName()] = pod
 	}
-	createNameSet := runtimeNames.Difference(observedNames)
-	deleteNameSet := observedNames.Difference(runtimeNames)
-
-	policy := its.Spec.PersistentVolumeClaimRetentionPolicy
-	retireClaims := !stopping && (policy == nil || policy.WhenScaled != kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType)
-	retiredNames := sets.New[string]()
-	if retireClaims {
-		for _, obj := range oldPVCList {
-			name := obj.GetLabels()[constant.KBAppPodNameLabelKey]
-			if name != "" && !runtimeNames.Has(name) && !observedNames.Has(name) {
-				retiredNames.Insert(name)
-			}
-		}
-	}
+	createNameSet := newNameSet.Difference(oldNameSet)
+	deleteNameSet := oldNameSet.Difference(newNameSet)
 
 	// default OrderedReady policy
 	isOrderedReady := true
@@ -118,7 +107,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 
 	// 3. handle alignment (create new instances and delete useless instances)
 	// create new instances
-	newNameList := sets.List(runtimeNames)
+	newNameList := sets.List(newNameSet)
 	baseSort(newNameList, func(i int) (string, int) {
 		return parseParentNameAndOrdinal(newNameList[i])
 	}, nil, true)
@@ -198,6 +187,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	}
 
 	// delete useless instances
+	retiredNames := sets.New[string]()
 	priorities := make(map[string]int)
 	sortObjects(oldInstanceList, priorities, false)
 	for _, object := range oldInstanceList {
@@ -225,9 +215,15 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		concurrency--
 	}
 
+	retentionPolicy := its.Spec.PersistentVolumeClaimRetentionPolicy
+	retireClaims := !stopping && (retentionPolicy == nil || retentionPolicy.WhenScaled != kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType)
 	if retireClaims {
 		for _, obj := range oldPVCList {
-			if retiredNames.Has(obj.GetLabels()[constant.KBAppPodNameLabelKey]) {
+			name := obj.GetLabels()[constant.KBAppPodNameLabelKey]
+			if name != "" && !newNameSet.Has(name) && !oldNameSet.Has(name) {
+				retiredNames.Insert(name)
+			}
+			if retiredNames.Has(name) {
 				if err := tree.Delete(obj); err != nil {
 					return kubebuilderx.Continue, err
 				}

@@ -20146,7 +20146,7 @@ string
 <td>
 <em>(Optional)</em>
 <p>Represents the latest available observations of an instanceset&rsquo;s current state.
-Known .status.conditions.type are: &ldquo;InstanceFailure&rdquo;, &ldquo;InstanceReady&rdquo;, &ldquo;Restore&rdquo;</p>
+Known .status.conditions.type are: &ldquo;InstanceFailure&rdquo;, &ldquo;InstanceReady&rdquo;, &ldquo;Restore&rdquo;, &ldquo;InstanceLifecycle&rdquo;</p>
 </td>
 </tr>
 <tr>
@@ -20557,7 +20557,7 @@ InstanceDesiredState
 <em>(Optional)</em>
 <p>DesiredState describes whether the instance should be running (Active), is retained without running (Offline),
 or is no longer allocated and is kept while its runtime is observed, owned resources require cleanup,
-or recorded membership is joined (Released).
+membership is joined, or provisioned bootstrap membership still needs a configured Leave (Released).
 An empty value from an older object is treated as Active.</p>
 </td>
 </tr>
@@ -21155,6 +21155,8 @@ indicated by UpdateRevisions.</p>
 (<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSpec">InstanceSpec</a>)
 </p>
 <div>
+<p>LifecycleActions configures parent InstanceSet lifecycle execution. Instance carries
+its worker inputs but does not decide or execute MemberJoin or MemberLeave.</p>
 </div>
 <table>
 <thead>
@@ -21216,7 +21218,8 @@ Action
 <td>
 <em>(Optional)</em>
 <p>MemberJoin and MemberLeave opt in to workload-owned membership changes.
-Initial engine bootstrap keeps membership unknown until an action records a result.</p>
+Initial engine bootstrap keeps membership unknown until an action records a result.
+Workload-owned member actions must use blocking execution and Immediately or unset preconditions.</p>
 </td>
 </tr>
 <tr>

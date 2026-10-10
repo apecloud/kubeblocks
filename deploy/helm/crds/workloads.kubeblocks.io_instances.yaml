@@ -2467,6 +2467,7 @@ spec:
                     description: |-
                       MemberJoin and MemberLeave opt in to workload-owned membership changes.
                       Initial engine bootstrap keeps membership unknown until an action records a result.
+                      Workload-owned member actions must use blocking execution and Immediately or unset preconditions.
                     properties:
                       exec:
                         description: |-

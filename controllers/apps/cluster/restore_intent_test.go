@@ -286,21 +286,39 @@ func TestReplicaRestoreWaitsForInitialClusterRestore(t *testing.T) {
 
 func TestValidateReplicaRestoreIntentAcceptsInstanceAllocationForms(t *testing.T) {
 	cluster := &appsv1.Cluster{}
-	spec := &appsv1.ClusterComponentSpec{
-		Name:      "mysql",
-		Replicas:  5,
-		Instances: []appsv1.InstanceTemplate{{Name: "fast", Replicas: ptr.To[int32](1)}},
-		Ordinals: appsv1.Ordinals{
-			Ranges:   []appsv1.Range{{Start: 3, End: 4}},
-			Discrete: []int32{8},
-		},
-		FlatInstanceOrdinal: true,
-		OfflineInstances:    []string{"mysql-0"},
+	base := &appsv1.ClusterComponentSpec{
+		Name: "mysql", Replicas: 5,
 		ReplicaRestore: &appsv1.ClusterRestore{Source: appsv1.ClusterRestoreSource{
 			APIGroup: testRestoreSourceAPIGroup, Kind: testRestoreSourceKind, Name: "restore",
 		}},
 	}
-	require.NoError(t, validateReplicaRestoreIntent(cluster, spec))
+	tests := []struct {
+		name   string
+		mutate func(*appsv1.ClusterComponentSpec)
+	}{
+		{name: "instance template", mutate: func(spec *appsv1.ClusterComponentSpec) {
+			spec.Instances = []appsv1.InstanceTemplate{{Name: "fast", Replicas: ptr.To[int32](1)}}
+		}},
+		{name: "range ordinals", mutate: func(spec *appsv1.ClusterComponentSpec) {
+			spec.Ordinals.Ranges = []appsv1.Range{{Start: 3, End: 4}}
+		}},
+		{name: "discrete ordinals", mutate: func(spec *appsv1.ClusterComponentSpec) {
+			spec.Ordinals.Discrete = []int32{8}
+		}},
+		{name: "flat ordinals", mutate: func(spec *appsv1.ClusterComponentSpec) {
+			spec.FlatInstanceOrdinal = true
+		}},
+		{name: "offline instances", mutate: func(spec *appsv1.ClusterComponentSpec) {
+			spec.OfflineInstances = []string{"mysql-0"}
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			spec := base.DeepCopy()
+			test.mutate(spec)
+			require.NoError(t, validateReplicaRestoreIntent(cluster, spec))
+		})
+	}
 }
 
 func TestApplyClusterRestoreIntentAcceptsShardingReplicaRestore(t *testing.T) {

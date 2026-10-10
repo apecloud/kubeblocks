@@ -18784,6 +18784,19 @@ LifecycleActions
 </tr>
 <tr>
 <td>
+<code>stop</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Stop the Instance.
+If set, all the computing resources will be released.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>configs</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1.ConfigTemplate">
@@ -18820,19 +18833,6 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Indicate whether the instance is scaled down.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>stop</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Stop the Instance.
-If set, all the computing resources will be released.</p>
 </td>
 </tr>
 </tbody>
@@ -20479,6 +20479,19 @@ LifecycleActions
 </tr>
 <tr>
 <td>
+<code>stop</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Stop the Instance.
+If set, all the computing resources will be released.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>configs</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1.ConfigTemplate">
@@ -20515,19 +20528,6 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Indicate whether the instance is scaled down.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>stop</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Stop the Instance.
-If set, all the computing resources will be released.</p>
 </td>
 </tr>
 </tbody>

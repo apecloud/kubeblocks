@@ -459,6 +459,11 @@ func (in *InstanceSpec) DeepCopyInto(out *InstanceSpec) {
 		*out = new(LifecycleActions)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.Stop != nil {
+		in, out := &in.Stop, &out.Stop
+		*out = new(bool)
+		**out = **in
+	}
 	if in.Configs != nil {
 		in, out := &in.Configs, &out.Configs
 		*out = make([]ConfigTemplate, len(*in))
@@ -475,11 +480,6 @@ func (in *InstanceSpec) DeepCopyInto(out *InstanceSpec) {
 	}
 	if in.ScaledDown != nil {
 		in, out := &in.ScaledDown, &out.ScaledDown
-		*out = new(bool)
-		**out = **in
-	}
-	if in.Stop != nil {
-		in, out := &in.Stop, &out.Stop
 		*out = new(bool)
 		**out = **in
 	}

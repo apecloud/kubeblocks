@@ -22,6 +22,7 @@ package workloads
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -46,6 +47,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -1322,7 +1324,7 @@ func instanceStatusWithoutRevisionAndHealth(status workloads.InstanceStatus) wor
 	return status
 }
 
-func legacyStopRecoveryFixture(t *testing.T, replicas int32, minReadySeconds int32) client.Client {
+func legacyStopRecoveryFixture(t *testing.T, replicas int32, minReadySeconds int32) client.WithWatch {
 	t.Helper()
 	scheme := runtime.NewScheme()
 	if err := clientgoscheme.AddToScheme(scheme); err != nil {
@@ -1615,5 +1617,236 @@ func TestLegacyInstanceSetStopRecoveryRetiresAbsentClaims(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestLegacyInstanceSetStopRecoveryPartialCommit(t *testing.T) {
+	for _, failStatus := range []bool{false, true} {
+		t.Run(fmt.Sprintf("failStatus=%t", failStatus), func(t *testing.T) {
+			cli := legacyStopRecoveryFixture(t, 3, 0)
+			legacyStopRecoveryReady(t, cli)
+			claims := legacyStopRecoveryClaims(t, cli)
+			legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(true) })
+			failure := errors.New("injected legacy Stop commit failure")
+			fired, attempts, deleted := false, 0, 0
+			faulty := interceptor.NewClient(cli, interceptor.Funcs{
+				Delete: func(ctx context.Context, delegate client.WithWatch, obj client.Object, opts ...client.DeleteOption) error {
+					if _, ok := obj.(*corev1.Pod); ok {
+						attempts++
+						if !failStatus && !fired && attempts == 2 {
+							fired = true
+							return failure
+						}
+						err := delegate.Delete(ctx, obj, opts...)
+						if err == nil {
+							deleted++
+						}
+						return err
+					}
+					return delegate.Delete(ctx, obj, opts...)
+				},
+				SubResourceUpdate: func(ctx context.Context, delegate client.Client, name string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+					if _, ok := obj.(*workloads.InstanceSet); ok && name == "status" && failStatus && !fired {
+						fired = true
+						return failure
+					}
+					return delegate.SubResource(name).Update(ctx, obj, opts...)
+				},
+			})
+			controller := &InstanceSetReconciler{Client: faulty, Recorder: record.NewFakeRecorder(1000)}
+			_, err := controller.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKey{Namespace: "default", Name: "legacy-stop"}})
+			if !errors.Is(err, failure) || !fired {
+				t.Fatalf("expected injected Stop failure, got %v", err)
+			}
+			wantDeleted := 1
+			if failStatus {
+				wantDeleted = 3
+			}
+			if deleted != wantDeleted || len(legacyStopRecoveryPods(t, cli)) != 3-wantDeleted {
+				t.Fatalf("failure did not follow persisted Pod removal: deleted=%d", deleted)
+			}
+			if legacyStopRecoverySet(t, cli).Status.ObservedGeneration == legacyStopRecoverySet(t, cli).Generation {
+				t.Fatal("failed commit unexpectedly persisted current root status")
+			}
+			if !reflect.DeepEqual(claims, legacyStopRecoveryClaims(t, cli)) {
+				t.Fatal("partial Stop changed storage")
+			}
+			legacyStopRecoveryReconcile(t, faulty, 6)
+			its := legacyStopRecoverySet(t, cli)
+			if deleted != 3 || len(legacyStopRecoveryPods(t, cli)) != 0 || its.Status.Replicas != 0 || its.Status.ObservedGeneration != its.Generation {
+				t.Fatal("fresh Stop retries did not converge from persisted resources")
+			}
+			if !reflect.DeepEqual(claims, legacyStopRecoveryClaims(t, cli)) {
+				t.Fatal("Stop retry changed storage")
+			}
+		})
+	}
+}
+
+func TestLegacyInstanceSetStopRecoveryResumeAfterPVCCommit(t *testing.T) {
+	cli := legacyStopRecoveryFixture(t, 1, 0)
+	legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(true) })
+	legacyStopRecoveryReconcile(t, cli, 3)
+	claim := legacyStopRecoveryClaims(t, cli)[0]
+	claim.UID = "retained-claim-uid"
+	claim.Spec.VolumeName = "retained-volume"
+	if err := cli.Update(context.Background(), &claim); err != nil {
+		t.Fatal(err)
+	}
+	before := legacyStopRecoveryClaims(t, cli)[0]
+	legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) {
+		its.Spec.Stop = ptr.To(false)
+		its.Spec.Template.Spec.Containers[0].Image = "db:latest"
+		its.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
+	})
+	failure := errors.New("injected legacy resume Pod create failure")
+	fired, created := false, 0
+	faulty := interceptor.NewClient(cli, interceptor.Funcs{
+		Create: func(ctx context.Context, delegate client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+			if _, ok := obj.(*corev1.Pod); ok {
+				if !fired {
+					fired = true
+					return failure
+				}
+				err := delegate.Create(ctx, obj, opts...)
+				if err == nil {
+					created++
+				}
+				return err
+			}
+			return delegate.Create(ctx, obj, opts...)
+		},
+	})
+	controller := &InstanceSetReconciler{Client: faulty, Recorder: record.NewFakeRecorder(1000)}
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKey{Namespace: "default", Name: "legacy-stop"}})
+	if !errors.Is(err, failure) || !fired {
+		t.Fatalf("expected injected resume failure, got %v", err)
+	}
+	committed := legacyStopRecoveryClaims(t, cli)[0]
+	if len(legacyStopRecoveryPods(t, cli)) != 0 || created != 0 || committed.UID != before.UID || !reflect.DeepEqual(committed.OwnerReferences, before.OwnerReferences) || committed.Spec.VolumeName != before.Spec.VolumeName || committed.Spec.Resources.Requests.Storage().Cmp(resource.MustParse("2Gi")) != 0 {
+		t.Fatal("failure did not follow an actual update of the retained PVC")
+	}
+	legacyStopRecoveryReconcile(t, faulty, 4)
+	pods := legacyStopRecoveryPods(t, cli)
+	if created != 1 || len(pods) != 1 || pods[0].Spec.Containers[0].Image != "db:latest" || !reflect.DeepEqual(committed, legacyStopRecoveryClaims(t, cli)[0]) {
+		t.Fatal("fresh resume retry changed retained storage or failed to create exactly one latest Pod")
+	}
+}
+
+func TestLegacyInstanceSetStopRecoveryRetirementAfterPartialPVCCommit(t *testing.T) {
+	cli := legacyStopRecoveryFixture(t, 3, 0)
+	legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) {
+		its.Spec.Stop = ptr.To(true)
+		its.Spec.Replicas = ptr.To(int32(1))
+		its.Spec.PersistentVolumeClaimRetentionPolicy = &kbappsv1.PersistentVolumeClaimRetentionPolicy{WhenScaled: kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType}
+	})
+	legacyStopRecoveryReconcile(t, cli, 6)
+	allocated := &corev1.PersistentVolumeClaim{}
+	if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "data-legacy-stop-0"}, allocated); err != nil {
+		t.Fatal(err)
+	}
+	legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(false) })
+	failure := errors.New("injected retired PVC delete failure")
+	fired, attempts, deleted := false, 0, 0
+	faulty := interceptor.NewClient(cli, interceptor.Funcs{
+		Delete: func(ctx context.Context, delegate client.WithWatch, obj client.Object, opts ...client.DeleteOption) error {
+			if _, ok := obj.(*corev1.PersistentVolumeClaim); ok {
+				attempts++
+				if !fired && attempts == 2 {
+					fired = true
+					return failure
+				}
+				err := delegate.Delete(ctx, obj, opts...)
+				if err == nil {
+					deleted++
+				}
+				return err
+			}
+			return delegate.Delete(ctx, obj, opts...)
+		},
+	})
+	controller := &InstanceSetReconciler{Client: faulty, Recorder: record.NewFakeRecorder(1000)}
+	_, err := controller.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKey{Namespace: "default", Name: "legacy-stop"}})
+	if !errors.Is(err, failure) || !fired || attempts != 2 || deleted != 1 || len(legacyStopRecoveryClaims(t, cli)) != 2 || len(legacyStopRecoveryPods(t, cli)) != 0 {
+		t.Fatalf("expected one persisted retired-claim deletion before failure, got %v", err)
+	}
+	current := &corev1.PersistentVolumeClaim{}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(allocated), current); err != nil || !reflect.DeepEqual(allocated, current) {
+		t.Fatal("partial retirement changed allocated storage")
+	}
+	legacyStopRecoveryReconcile(t, faulty, 5)
+	if deleted != 2 || len(legacyStopRecoveryClaims(t, cli)) != 1 || len(legacyStopRecoveryPods(t, cli)) != 1 {
+		t.Fatal("fresh retry did not complete retirement and resume")
+	}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(allocated), current); err != nil || !reflect.DeepEqual(allocated, current) {
+		t.Fatal("retirement retry changed allocated storage")
+	}
+}
+
+func TestLegacyInstanceSetStopRecoveryMixedRetirement(t *testing.T) {
+	for _, policy := range []kbappsv1.PersistentVolumeClaimRetentionPolicyType{kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType, kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType} {
+		t.Run(string(policy), func(t *testing.T) {
+			cli := legacyStopRecoveryFixture(t, 4, 0)
+			legacyStopRecoveryReady(t, cli)
+			orphan := &corev1.Pod{}
+			if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "legacy-stop-3"}, orphan); err != nil {
+				t.Fatal(err)
+			}
+			if err := cli.Delete(context.Background(), orphan); err != nil {
+				t.Fatal(err)
+			}
+			claims := legacyStopRecoveryClaims(t, cli)
+			unknown := claims[0].DeepCopy()
+			unknown.Name = "unassigned-claim"
+			unknown.ResourceVersion = ""
+			unknown.UID = "unassigned-claim-uid"
+			unknown.Labels[constant.KBAppPodNameLabelKey] = ""
+			if err := cli.Create(context.Background(), unknown); err != nil {
+				t.Fatal(err)
+			}
+			if err := cli.Get(context.Background(), client.ObjectKeyFromObject(unknown), unknown); err != nil {
+				t.Fatal(err)
+			}
+			legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) {
+				its.Spec.Replicas = ptr.To(int32(1))
+				its.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
+				its.Spec.PersistentVolumeClaimRetentionPolicy = &kbappsv1.PersistentVolumeClaimRetentionPolicy{WhenScaled: policy}
+			})
+			legacyStopRecoveryReconcile(t, cli, 1)
+			pods := legacyStopRecoveryPods(t, cli)
+			if len(pods) != 2 {
+				t.Fatalf("expected exactly one admitted Pod retirement, got %d", len(pods))
+			}
+			for _, pod := range pods {
+				if pod.Name == "legacy-stop-2" {
+					t.Fatal("highest live ordinal was not retired")
+				}
+			}
+			actual := map[string]corev1.PersistentVolumeClaim{}
+			for _, claim := range legacyStopRecoveryClaims(t, cli) {
+				actual[claim.Name] = claim
+			}
+			expectedCount := 5
+			if policy == kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType {
+				expectedCount = 3
+			}
+			if len(actual) != expectedCount {
+				t.Fatalf("unexpected claim selection: %#v", actual)
+			}
+			for _, claim := range claims {
+				current, found := actual[claim.Name]
+				retired := claim.Name == "data-legacy-stop-2" || claim.Name == "data-legacy-stop-3"
+				if policy == kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType && retired {
+					if found {
+						t.Fatalf("retired claim survived: %s", claim.Name)
+					}
+				} else if !found || !reflect.DeepEqual(claim, current) {
+					t.Fatalf("non-admitted or retained claim changed: %s", claim.Name)
+				}
+			}
+			if current, found := actual[unknown.Name]; !found || !reflect.DeepEqual(*unknown, current) {
+				t.Fatal("blank identity claim changed")
+			}
+		})
 	}
 }

@@ -119,7 +119,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 	})
 
 	Context("Data Replication Operations", func() {
-		DescribeTable("keeps Backup initialization exclusive with data replication", func(from int32, restore bool) {
+		DescribeTable("keeps restore initialization exclusive with data replication", func(from int32, restore bool) {
 			synthesizeComp.Replicas = from + 2
 			synthesizeComp.FullCompName = "test-its"
 			synthesizeComp.Generation = "2"
@@ -203,8 +203,8 @@ var _ = Describe("Component Workload Operations Test", func() {
 				Expect(tasks[0].NewReplica.Replicas).Should(ContainSubstring(newNames[1]))
 			}
 		},
-			Entry("Backup scale-out from zero does not require a donor", int32(0), true),
-			Entry("Backup does not copy from an available donor", int32(3), true),
+			Entry("restore scale-out from zero does not require a donor", int32(0), true),
+			Entry("restore does not copy from an available donor", int32(3), true),
 			Entry("ordinary scale-out uses live data replication", int32(3), false),
 		)
 

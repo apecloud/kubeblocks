@@ -104,7 +104,7 @@ func IsReplicaPVC(pvc *corev1.PersistentVolumeClaim) bool {
 }
 
 // ValidatePVCReuse rejects existing volumes with a different initialization input.
-// Call it when allocating a Backup replica, before merging any PVC metadata.
+// Call it when allocating a restore replica, before merging any PVC metadata.
 func ValidatePVCReuse(existing, desired *corev1.PersistentVolumeClaim) error {
 	if !IsReplicaPVC(desired) {
 		return nil

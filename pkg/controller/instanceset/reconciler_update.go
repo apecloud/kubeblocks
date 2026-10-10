@@ -145,9 +145,6 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	isBlocked := false
 	needRetry := false
 	for _, pod := range oldPodList {
-		if isTerminating(pod) {
-			continue
-		}
 		if updatedPods >= rollingUpdateQuota {
 			break
 		}

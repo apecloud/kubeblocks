@@ -81,14 +81,18 @@ func stopTestClient(t *testing.T, inst *workloads.Instance) client.Client {
 	return fake.NewClientBuilder().WithScheme(s).WithStatusSubresource(&workloads.Instance{}, &corev1.Pod{}, &corev1.PersistentVolumeClaim{}).WithObjects(inst).Build()
 }
 
-func reconcileStopEntry(t *testing.T, cli client.Client, count int) {
+func reconcileStopEntry(t *testing.T, cli client.Client, count int) ctrl.Result {
 	t.Helper()
+	var result ctrl.Result
 	for i := 0; i < count; i++ {
 		reconciler := &InstanceReconciler{Client: cli, Scheme: cli.Scheme(), Recorder: record.NewFakeRecorder(1000)}
-		if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKey{Namespace: "default", Name: "demo-0"}}); err != nil {
+		var err error
+		result, err = reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKey{Namespace: "default", Name: "demo-0"}})
+		if err != nil {
 			t.Fatal(err)
 		}
 	}
+	return result
 }
 
 func readStopInstance(t *testing.T, cli client.Client) *workloads.Instance {
@@ -203,13 +207,25 @@ func TestInstanceStopSuspendsPVCsAndResumesLatestTemplate(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := readStopInstance(t, cli)
-	got.Spec.Stop = ptr.To(true)
 	got.Spec.MinReadySeconds = 3600
 	got.Generation++
 	if err := cli.Update(context.Background(), got); err != nil {
 		t.Fatal(err)
 	}
-	reconcileStopEntry(t, cli, 1)
+	result := reconcileStopEntry(t, cli, 1)
+	if result.RequeueAfter != time.Second || readStopPod(t, cli).UID != "pod-old" {
+		t.Fatalf("running readiness wait lost its earlier retry or deleted the Pod: %#v", result)
+	}
+	got = readStopInstance(t, cli)
+	got.Spec.Stop = ptr.To(true)
+	got.Generation++
+	if err := cli.Update(context.Background(), got); err != nil {
+		t.Fatal(err)
+	}
+	result = reconcileStopEntry(t, cli, 1)
+	if result.RequeueAfter != time.Second {
+		t.Fatalf("stop deletion did not schedule a retry: %#v", result)
+	}
 	assertStopPodAbsent(t, cli)
 	observed := readStopInstance(t, cli)
 	if observed.Status.CurrentState != workloads.InstanceCurrentStatePresent || observed.Status.UpToDate {
@@ -291,7 +307,10 @@ func TestInstanceStopWaitsForTerminatingPodOnEarlyResume(t *testing.T) {
 	if err := cli.Update(context.Background(), got); err != nil {
 		t.Fatal(err)
 	}
-	reconcileStopEntry(t, cli, 3)
+	result := reconcileStopEntry(t, cli, 3)
+	if result.RequeueAfter != time.Second {
+		t.Fatalf("stopped terminating Pod has no retry: %#v", result)
+	}
 	terminating := readStopPod(t, cli)
 	if terminating.DeletionTimestamp.IsZero() {
 		t.Fatal("stop did not request deletion")
@@ -307,7 +326,10 @@ func TestInstanceStopWaitsForTerminatingPodOnEarlyResume(t *testing.T) {
 	if err := cli.Update(context.Background(), got); err != nil {
 		t.Fatal(err)
 	}
-	reconcileStopEntry(t, cli, 2)
+	result = reconcileStopEntry(t, cli, 2)
+	if result.RequeueAfter != time.Second {
+		t.Fatalf("early resume did not schedule a terminating Pod retry: %#v", result)
+	}
 	if readStopPod(t, cli).UID != "pod-held" || readStopPod(t, cli).Spec.Containers[0].Image != "db:v1" {
 		t.Fatal("early resume replaced or modified terminating Pod")
 	}
@@ -563,6 +585,7 @@ func TestInstanceStopRetriesAfterPodDeletedBeforeStatusCommit(t *testing.T) {
 type failResumePodClient struct {
 	client.Client
 	remaining int
+	created   int
 }
 
 func (c *failResumePodClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
@@ -570,7 +593,11 @@ func (c *failResumePodClient) Create(ctx context.Context, obj client.Object, opt
 		c.remaining--
 		return errors.New("injected resume Pod create failure")
 	}
-	return c.Client.Create(ctx, obj, opts...)
+	err := c.Client.Create(ctx, obj, opts...)
+	if _, ok := obj.(*corev1.Pod); ok && err == nil {
+		c.created++
+	}
+	return err
 }
 
 func TestInstanceStopResumeRetriesAfterPVCCommit(t *testing.T) {
@@ -606,5 +633,66 @@ func TestInstanceStopResumeRetriesAfterPVCCommit(t *testing.T) {
 	reconcileStopEntry(t, cli, 3)
 	if readStopPod(t, cli).Spec.Containers[0].Image != "db:v2" || readStopPVC(t, cli).UID != pvc.UID {
 		t.Fatal("resume retry did not converge with the original PVC")
+	}
+}
+
+func TestInstanceStopResumeRetriesAfterPodCreatedBeforeStatusCommit(t *testing.T) {
+	for _, minReadySeconds := range []int32{0, 3600} {
+		t.Run(fmt.Sprintf("minReadySeconds=%d", minReadySeconds), func(t *testing.T) {
+			inst := stopTestInstance()
+			cli := stopTestClient(t, inst)
+			reconcileStopEntry(t, cli, 3)
+			pvc := bindStopPVC(t, cli)
+			got := readStopInstance(t, cli)
+			got.Spec.Stop = ptr.To(true)
+			got.Generation++
+			if err := cli.Update(context.Background(), got); err != nil {
+				t.Fatal(err)
+			}
+			reconcileStopEntry(t, cli, 2)
+			got = readStopInstance(t, cli)
+			got.Spec.Stop = ptr.To(false)
+			got.Spec.MinReadySeconds = minReadySeconds
+			got.Spec.Template.Spec.Containers[0].Image = "db:v2"
+			got.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
+			got.Generation++
+			if err := cli.Update(context.Background(), got); err != nil {
+				t.Fatal(err)
+			}
+			counting := &failResumePodClient{Client: cli}
+			faulty := &failStopStatusClient{Client: counting, remaining: 1}
+			controller := &InstanceReconciler{Client: faulty, Recorder: record.NewFakeRecorder(1000)}
+			if _, err := controller.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(inst)}); err == nil {
+				t.Fatal("expected status failure after the resumed Pod was created")
+			}
+			pod := readStopPod(t, cli)
+			if counting.created != 1 || pod.Spec.Containers[0].Image != "db:v2" || readStopInstance(t, cli).Status.CurrentState != workloads.InstanceCurrentStateAbsent {
+				t.Fatal("expected the new Pod to commit while Instance status remained stale")
+			}
+			committedClaim := readStopPVC(t, cli)
+			if committedClaim.UID != pvc.UID || !reflect.DeepEqual(committedClaim.OwnerReferences, pvc.OwnerReferences) || committedClaim.Spec.Resources.Requests.Storage().Cmp(resource.MustParse("2Gi")) != 0 {
+				t.Fatal("expected the PVC expansion to commit with its original identity and owner")
+			}
+			pod.Status.Phase = corev1.PodPending
+			if err := cli.Status().Update(context.Background(), pod); err != nil {
+				t.Fatal(err)
+			}
+			pod = readStopPod(t, cli)
+			result := reconcileStopEntry(t, counting, 3)
+			status := readStopInstance(t, cli).Status
+			if status.CurrentState != workloads.InstanceCurrentStatePresent || status.ObservedGeneration != got.Generation || status.Ready || status.Available {
+				t.Fatalf("restart did not observe the resumed unready Pod: %#v", status)
+			}
+			if counting.created != 1 || !reflect.DeepEqual(readStopPod(t, cli), pod) {
+				t.Fatal("retry changed or recreated the already committed Pod")
+			}
+			claim := readStopPVC(t, cli)
+			if !reflect.DeepEqual(claim, committedClaim) {
+				t.Fatal("retry changed the already committed PVC")
+			}
+			if minReadySeconds > 0 && result.RequeueAfter != time.Second {
+				t.Fatalf("retry lost the earlier readiness wait: %#v", result)
+			}
+		})
 	}
 }

@@ -32,6 +32,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 )
 
 type treeLoader struct{}
@@ -49,7 +50,7 @@ func (r *treeLoader) Load(ctx context.Context, reader client.Reader, req ctrl.Re
 		return nil, err
 	}
 
-	tree.Context = ctx
+	tree.Context = multicluster.ObservationContext(ctx, reader)
 	tree.EventRecorder = recorder
 	tree.Logger = logger
 	tree.SetFinalizer(finalizer)

@@ -50,7 +50,7 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
-	if model.IsReconciliationPaused(tree.GetRoot()) {
+	if isStopRequested(tree.GetRoot().(*workloads.Instance)) || model.IsReconciliationPaused(tree.GetRoot()) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
 	return kubebuilderx.ConditionSatisfied

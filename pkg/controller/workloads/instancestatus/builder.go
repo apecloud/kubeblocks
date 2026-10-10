@@ -58,6 +58,8 @@ type Input struct {
 	Observations       []Observation
 	TemplateHints      []TemplateAssignment
 	UpdateRevisions    map[string]string
+	Resources          []ResourceObservation
+	Lifecycle          []LifecycleObservation
 }
 
 // ConfigsApplied reports whether every desired config hash has been observed for an instance.
@@ -79,8 +81,7 @@ func ConfigsApplied(desired []workloads.ConfigTemplate, observed []workloads.Ins
 	return true
 }
 
-// Build merges InstanceStatus by PodName. It carries only retained template identity from Previous;
-// all observed revision, health, and runtime fields are rebuilt from Observations.
+// Build merges actual resources and lifecycle facts by PodName. Runtime health is rebuilt from current observations.
 func Build(input Input) ([]workloads.InstanceStatus, error) {
 	previousByName, err := indexPrevious(input.Previous)
 	if err != nil {
@@ -124,6 +125,35 @@ func Build(input Input) ([]workloads.InstanceStatus, error) {
 		observationsByName[observation.InstanceName] = observation
 	}
 
+	resourcesByName := make(map[string]ResourceObservation, len(input.Resources))
+	for _, resource := range input.Resources {
+		if resource.InstanceName == "" {
+			return nil, fmt.Errorf("resource has an empty instance name")
+		}
+		if _, exists := resourcesByName[resource.InstanceName]; exists {
+			return nil, fmt.Errorf("duplicate resources for %q", resource.InstanceName)
+		}
+		resourcesByName[resource.InstanceName] = resource
+	}
+	lifecycleByName := make(map[string]LifecycleObservation, len(input.Lifecycle))
+	for _, observation := range input.Lifecycle {
+		if observation.InstanceName == "" {
+			return nil, fmt.Errorf("lifecycle has an empty instance name")
+		}
+		if _, exists := lifecycleByName[observation.InstanceName]; exists {
+			return nil, fmt.Errorf("duplicate lifecycle for %q", observation.InstanceName)
+		}
+		lifecycleByName[observation.InstanceName] = observation
+	}
+	mergedByName := make(map[string]LifecycleObservation)
+	for name, old := range previousByName {
+		mergedByName[name] = MergeLifecycle(LifecycleObservation{Membership: old.Membership, Data: old.Data, Execution: old.Execution}, lifecycleByName[name], resourcesByName[name].Storage)
+	}
+	for name, observed := range lifecycleByName {
+		if _, exists := mergedByName[name]; !exists {
+			mergedByName[name] = MergeLifecycle(LifecycleObservation{}, observed, resourcesByName[name].Storage)
+		}
+	}
 	names := make(map[string]struct{}, len(desiredByName)+len(offlineNames)+len(observationsByName))
 	for name := range desiredByName {
 		names[name] = struct{}{}
@@ -135,15 +165,28 @@ func Build(input Input) ([]workloads.InstanceStatus, error) {
 		names[name] = struct{}{}
 	}
 
-	// Previous is intentionally excluded from the output identity set. It may retain template identity for a
-	// desired or observed instance, but must not keep a fully released and disappeared instance alive forever.
+	for name, resource := range resourcesByName {
+		if resource.InstancePresent || resource.StorageCleanup {
+			names[name] = struct{}{}
+		}
+	}
+	for name, lifecycle := range mergedByName {
+		if lifecycleUnresolved(lifecycle) {
+			names[name] = struct{}{}
+		}
+	}
 	statuses := make([]workloads.InstanceStatus, 0, len(names))
 	for name := range names {
 		status := workloads.InstanceStatus{PodName: name, CurrentState: workloads.InstanceCurrentStateAbsent}
+		resource := resourcesByName[name]
+		status.Storage = resource.Storage.DeepCopy()
+		lifecycle := mergedByName[name]
+		status.Membership, status.Data, status.Execution = lifecycle.Membership, lifecycle.Data, lifecycle.Execution
 		observation := observationsByName[name]
 		if observation != nil {
 			status.CurrentState = observation.State
 			status.CurrentRevision = observation.Revision
+			status.Pod = resource.Pod.DeepCopy()
 		}
 
 		switch {

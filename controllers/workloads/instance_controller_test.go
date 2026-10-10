@@ -107,6 +107,93 @@ var _ = Describe("Instance Controller", func() {
 		})).Should(Succeed())
 	}
 
+	It("stop preserves API storage identity and resume replaces the actual Pod UID", func() {
+		createInstObj(instName, func(f *testapps.MockInstanceFactory) {
+			f.SetMinReadySeconds(3600)
+			f.AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "data"}, Spec: corev1.PersistentVolumeClaimSpec{AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}, Resources: corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}}}})
+		})
+		podKey := client.ObjectKeyFromObject(instObj)
+		pod := &corev1.Pod{}
+		Eventually(func() error { return k8sClient.Get(ctx, podKey, pod) }).Should(Succeed())
+		oldPodUID := pod.UID
+		pvcKey := client.ObjectKey{Namespace: instObj.Namespace, Name: "data-" + instObj.Name}
+		claim := &corev1.PersistentVolumeClaim{}
+		Eventually(func() error { return k8sClient.Get(ctx, pvcKey, claim) }).Should(Succeed())
+		pvcUID := claim.UID
+		claim.Spec.VolumeName = "pv-step1"
+		Expect(k8sClient.Update(ctx, claim)).Should(Succeed())
+		Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
+			g.Expect(inst.Status.Pod).ShouldNot(BeNil())
+			g.Expect(inst.Status.Pod.UID).Should(Equal(oldPodUID))
+			g.Expect(inst.Status.Pod.Cluster).ShouldNot(BeNil())
+			g.Expect(*inst.Status.Pod.Cluster).Should(BeEmpty())
+			g.Expect(inst.Status.Storage).ShouldNot(BeNil())
+			g.Expect(inst.Status.Storage.Complete).Should(BeTrue())
+			g.Expect(inst.Status.Storage.Volumes[0].Claim.UID).Should(Equal(pvcUID))
+			g.Expect(inst.Status.Storage.Volumes[0].OwnerUID).Should(Equal(inst.UID))
+		})).Should(Succeed())
+		Eventually(testapps.GetAndChangeObj(&testCtx, instKey, func(inst *workloads.Instance) { inst.Spec.Stop = ptr.To(true) })).Should(Succeed())
+		Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, false)).Should(Succeed())
+		Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
+			g.Expect(ptr.Deref(inst.Spec.Stop, false)).Should(BeTrue())
+			g.Expect(inst.Status.CurrentState).Should(Equal(workloads.InstanceCurrentStateAbsent))
+			g.Expect(inst.Status.Pod).Should(BeNil())
+			g.Expect(inst.Status.UpToDate).Should(BeFalse())
+			g.Expect(inst.Status.Storage.Volumes[0].Claim.UID).Should(Equal(pvcUID))
+		})).Should(Succeed())
+		Eventually(testapps.GetAndChangeObj(&testCtx, instKey, func(inst *workloads.Instance) {
+			inst.Spec.Template.Spec.Containers[0].Image = "bar:v2"
+			inst.Spec.MinReadySeconds = 0
+			inst.Spec.Stop = ptr.To(false)
+		})).Should(Succeed())
+		Eventually(func(g Gomega) {
+			resumed := &corev1.Pod{}
+			g.Expect(k8sClient.Get(ctx, podKey, resumed)).Should(Succeed())
+			g.Expect(resumed.UID).ShouldNot(Equal(oldPodUID))
+			g.Expect(resumed.Spec.Containers[0].Image).Should(Equal("bar:v2"))
+			retained := &corev1.PersistentVolumeClaim{}
+			g.Expect(k8sClient.Get(ctx, pvcKey, retained)).Should(Succeed())
+			g.Expect(retained.UID).Should(Equal(pvcUID))
+		}).Should(Succeed())
+
+		parent := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: instObj.Name + "-facts", Namespace: instObj.Namespace}, Spec: workloads.InstanceSetSpec{Replicas: ptr.To[int32](0), Paused: true, Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "schema-facts"}}, Template: corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "schema-facts"}}, Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "db", Image: "bar:v1"}}}}}}
+		Expect(k8sClient.Create(ctx, parent)).Should(Succeed())
+		DeferCleanup(func() {
+			Eventually(func() error {
+				current := &workloads.InstanceSet{}
+				if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(parent), current); err != nil {
+					return client.IgnoreNotFound(err)
+				}
+				current.Spec.Paused = false
+				return k8sClient.Update(ctx, current)
+			}).Should(Succeed())
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, parent))).Should(Succeed())
+		})
+		local := ""
+		ref := workloads.InstanceObjectReference{Name: instObj.Name, Namespace: instObj.Namespace, UID: oldPodUID, Cluster: &local}
+		storage := workloads.InstanceStorageIdentity{Complete: true, Volumes: []workloads.InstanceVolumeIdentity{{Name: "data", Claim: &workloads.InstanceObjectReference{Name: pvcKey.Name, Namespace: pvcKey.Namespace, UID: pvcUID, Cluster: &local}, VolumeName: "pv-step1"}}}
+		Eventually(func() error {
+			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(parent), parent); err != nil {
+				return err
+			}
+			parent.Status.InstanceStatus = []workloads.InstanceStatus{{PodName: instObj.Name, DesiredState: workloads.InstanceDesiredStateReleased, CurrentState: workloads.InstanceCurrentStateAbsent, Membership: &workloads.InstanceMembershipStatus{State: workloads.InstanceMembershipPresent, Identity: &workloads.InstanceMemberIdentity{Group: "actual-group", Member: "actual-member"}}, Data: &workloads.InstanceDataStatus{State: workloads.InstanceDataUnknown, Identity: &workloads.InstanceDataIdentity{Storage: storage, Dataset: "actual-dataset"}}, Execution: &workloads.InstanceExecutionObservation{State: workloads.InstanceExecutionRunning, Action: "join", Executor: ref}}}
+			return k8sClient.Status().Update(ctx, parent)
+		}).Should(Succeed())
+		persisted := &workloads.InstanceSet{}
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(parent), persisted)).Should(Succeed())
+		facts := persisted.FindInstanceStatus(instObj.Name)
+		Expect(facts).ShouldNot(BeNil())
+		Expect(facts.Membership.Identity.Member).Should(Equal("actual-member"))
+		Expect(facts.Data.Identity.Dataset).Should(Equal("actual-dataset"))
+		Expect(facts.Data.Identity.Storage.Volumes[0].Claim.UID).Should(Equal(pvcUID))
+		Expect(facts.Execution.Executor.UID).Should(Equal(oldPodUID))
+		facts.Membership.State = workloads.InstanceMembershipState("Invalid")
+		Expect(k8sClient.Status().Update(ctx, persisted)).ShouldNot(Succeed())
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(parent), persisted)).Should(Succeed())
+		persisted.FindInstanceStatus(instObj.Name).Execution.Reason = strings.Repeat("x", 129)
+		Expect(k8sClient.Status().Update(ctx, persisted)).ShouldNot(Succeed())
+	})
+
 	Context("provision", func() {
 		var (
 			pvc = corev1.PersistentVolumeClaim{

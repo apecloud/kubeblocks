@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset2
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -35,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
 	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancestatus"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -408,6 +411,7 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		desiredTemplateAssignments = nil
 	}
 
+	resources := make([]instancestatus.ResourceObservation, 0, len(instances))
 	observations := make([]instancestatus.Observation, 0, len(instances))
 	seenInstances := make(map[string]struct{}, len(instances))
 	roleMap := composeRoleMap(*its)
@@ -416,6 +420,7 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 			return fmt.Errorf("duplicate Instance object for %q", inst.Name)
 		}
 		seenInstances[inst.Name] = struct{}{}
+		resources = append(resources, childResourceObservation(tree.Context, inst))
 		templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: inst.Name, TemplateName: inst.Spec.InstanceTemplateName})
 		if templateName, ok := instancetemplate.TemplateNameFromLabels(inst.Labels); ok {
 			templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: inst.Name, TemplateName: templateName})
@@ -460,6 +465,7 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	}
 
 	statuses, err := instancestatus.Build(instancestatus.Input{
+		Resources:          resources,
 		Previous:           its.Status.InstanceStatus,
 		DesiredAssignments: desiredTemplateAssignments,
 		Offline:            offlineNames,
@@ -480,4 +486,34 @@ func observationNames(observations []instancestatus.Observation) []string {
 		names = append(names, observation.InstanceName)
 	}
 	return names
+}
+
+func childResourceObservation(ctx context.Context, inst *workloads.Instance) instancestatus.ResourceObservation {
+	resource := instancestatus.ResourceObservation{InstanceName: inst.Name, InstancePresent: true, Pod: inst.Status.Pod.DeepCopy(), Storage: inst.Status.Storage.DeepCopy()}
+	location, known := multicluster.ObjectLocation(ctx, inst)
+	normalize := func(ref *workloads.InstanceObjectReference) {
+		if ref == nil || ref.Cluster == nil || *ref.Cluster != "" {
+			return
+		}
+		ref.Cluster = nil
+		if known {
+			ref.Cluster = ptr.To(location)
+		}
+	}
+	normalize(resource.Pod)
+	if resource.Storage != nil {
+		normalize(resource.Storage.EphemeralPod)
+		for i := range resource.Storage.Volumes {
+			normalize(resource.Storage.Volumes[i].Claim)
+		}
+		if ref := resource.Storage.EphemeralPod; ref != nil && (ref.Cluster == nil || ref.UID == "") {
+			resource.Storage.Complete = false
+		}
+		for _, volume := range resource.Storage.Volumes {
+			if volume.Claim == nil || volume.Claim.Cluster == nil || volume.Claim.UID == "" || volume.VolumeName == "" {
+				resource.Storage.Complete = false
+			}
+		}
+	}
+	return resource
 }

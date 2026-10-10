@@ -405,3 +405,7 @@ var newLifecycleAction = func(inst *workloads.Instance, pods []*corev1.Pod, pod 
 	return lifecycle.New(inst.Namespace, clusterName, compName,
 		lifecycleActions, inst.Spec.LifecycleActions.TemplateVars, pod, pods)
 }
+
+func isStopRequested(inst *workloads.Instance) bool {
+	return inst.Spec.Stop != nil && *inst.Spec.Stop
+}

@@ -21,6 +21,7 @@ package workloads
 
 import (
 	"context"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -75,6 +76,7 @@ type InstanceSetReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *InstanceSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	status := instanceset.NewStatusReconciler(r.Client)
 	logger := log.FromContext(ctx).WithValues("InstanceSet", req.NamespacedName)
 
 	res, err := kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
@@ -83,7 +85,7 @@ func (r *InstanceSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		Do(instanceset.NewFixMetaReconciler()).
 		Do(instanceset.NewDeletionReconciler()).
 		Do(instanceset.NewValidationReconciler()).
-		Do(instanceset.NewStatusReconciler()).
+		Do(status).
 		Do(instanceset.NewRevisionUpdateReconciler()).
 		Do(instanceset.NewAssistantObjectReconciler()).
 		Do(instanceset.NewReplicasAlignmentReconciler()).
@@ -92,6 +94,9 @@ func (r *InstanceSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// TODO(free6om): handle error based on ErrorCode (after defined)
 
+	if err == nil && status.ObservationPending() && ((res.RequeueAfter == 0 && !res.Requeue) || res.RequeueAfter > 5*time.Second) {
+		res.RequeueAfter = 5 * time.Second
+	}
 	return res, err
 }
 

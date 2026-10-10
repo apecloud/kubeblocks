@@ -108,7 +108,7 @@ func TestStatusReconcilerPublishesInstanceCurrentState(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+			if _, err := NewStatusReconciler(nil).Reconcile(tree); err != nil {
 				t.Fatal(err)
 			}
 			if inst.Status.CurrentState != tt.want {
@@ -171,7 +171,7 @@ func TestStatusReconcilerAggregatesRestorePVCConditionsWithoutPod(t *testing.T) 
 
 	t.Run("waits for the PVC before the Pod exists", func(t *testing.T) {
 		inst, tree, _ := newFixture()
-		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+		if _, err := NewStatusReconciler(nil).Reconcile(tree); err != nil {
 			t.Fatal(err)
 		}
 		cond := meta.FindStatusCondition(inst.Status.Conditions, string(workloads.InstanceRestore))
@@ -183,7 +183,7 @@ func TestStatusReconcilerAggregatesRestorePVCConditionsWithoutPod(t *testing.T) 
 	t.Run("publishes completed", func(t *testing.T) {
 		inst, tree, pvcName := newFixture()
 		addPVC(t, tree, pvcName, corev1.ConditionTrue)
-		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+		if _, err := NewStatusReconciler(nil).Reconcile(tree); err != nil {
 			t.Fatal(err)
 		}
 		cond := meta.FindStatusCondition(inst.Status.Conditions, string(workloads.InstanceRestore))
@@ -195,7 +195,7 @@ func TestStatusReconcilerAggregatesRestorePVCConditionsWithoutPod(t *testing.T) 
 	t.Run("publishes failure first", func(t *testing.T) {
 		inst, tree, pvcName := newFixture()
 		addPVC(t, tree, pvcName, corev1.ConditionFalse)
-		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+		if _, err := NewStatusReconciler(nil).Reconcile(tree); err != nil {
 			t.Fatal(err)
 		}
 		cond := meta.FindStatusCondition(inst.Status.Conditions, string(workloads.InstanceRestore))
@@ -252,7 +252,7 @@ func TestStatusReconcilerKeepsUpToDateFalseUntilPVCExpansionCompletes(t *testing
 		t.Fatal(err)
 	}
 
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+	if _, err := NewStatusReconciler(nil).Reconcile(tree); err != nil {
 		t.Fatal(err)
 	}
 	if inst.Status.UpToDate || inst.Status.VolumeExpansion {
@@ -260,7 +260,7 @@ func TestStatusReconcilerKeepsUpToDateFalseUntilPVCExpansionCompletes(t *testing
 	}
 
 	pvc.Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+	if _, err := NewStatusReconciler(nil).Reconcile(tree); err != nil {
 		t.Fatal(err)
 	}
 	if inst.Status.UpToDate || !inst.Status.VolumeExpansion {
@@ -268,7 +268,7 @@ func TestStatusReconcilerKeepsUpToDateFalseUntilPVCExpansionCompletes(t *testing
 	}
 
 	pvc.Status.Capacity[corev1.ResourceStorage] = resource.MustParse("2Gi")
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+	if _, err := NewStatusReconciler(nil).Reconcile(tree); err != nil {
 		t.Fatal(err)
 	}
 	if !inst.Status.UpToDate || inst.Status.VolumeExpansion {
@@ -283,7 +283,7 @@ func TestStatusReconcilerKeepsUpToDateFalseUntilPVCExpansionCompletes(t *testing
 					capacity.Sub(resource.MustParse("1Gi"))
 				}
 				pvc.Status.Capacity = corev1.ResourceList{corev1.ResourceStorage: capacity}
-				if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+				if _, err := NewStatusReconciler(nil).Reconcile(tree); err != nil {
 					t.Fatal(err)
 				}
 				if inst.Status.UpToDate != previous {
@@ -297,7 +297,7 @@ func TestStatusReconcilerKeepsUpToDateFalseUntilPVCExpansionCompletes(t *testing
 				} else {
 					pvc.Status.Capacity = nil
 				}
-				if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+				if _, err := NewStatusReconciler(nil).Reconcile(tree); err != nil {
 					t.Fatal(err)
 				}
 				if inst.Status.UpToDate != previous {
@@ -310,7 +310,7 @@ func TestStatusReconcilerKeepsUpToDateFalseUntilPVCExpansionCompletes(t *testing
 				if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 					t.Fatal(err)
 				}
-				if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+				if _, err := NewStatusReconciler(nil).Reconcile(tree); err != nil {
 					t.Fatal(err)
 				}
 				if inst.Status.UpToDate {
@@ -322,7 +322,7 @@ func TestStatusReconcilerKeepsUpToDateFalseUntilPVCExpansionCompletes(t *testing
 				if err := tree.Add(pvc); err != nil {
 					t.Fatal(err)
 				}
-				if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+				if _, err := NewStatusReconciler(nil).Reconcile(tree); err != nil {
 					t.Fatal(err)
 				}
 				if !inst.Status.UpToDate {

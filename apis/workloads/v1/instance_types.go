@@ -61,6 +61,12 @@ func init() {
 
 // InstanceSpec defines the desired state of Instance
 type InstanceSpec struct {
+	// Stop removes the actual Pod and prevents its recreation while retaining this Instance and every existing PVC.
+	// Nil or false runs the Instance. While true, PVC creation, removal, metadata changes and expansion are suspended;
+	// assistant objects continue to reconcile. Resume applies the latest templates. Actual deletion follows the PVC retention policy.
+	// +optional
+	Stop *bool `json:"stop,omitempty"`
+
 	Template corev1.PodTemplateSpec `json:"template"`
 
 	// Represents a label query over pods that should match the desired replica count indicated by the `replica` field.
@@ -146,6 +152,14 @@ type InstanceSpec struct {
 
 // InstanceStatus2 defines the observed state of Instance
 type InstanceStatus2 struct {
+
+	// Pod identifies the actual Pod while Present or Terminating. It is nil when Absent.
+	// +optional
+	Pod *InstanceObjectReference `json:"pod,omitempty"`
+	// Storage describes actual claims and ephemeral storage independently of Pod presence.
+	// +optional
+	Storage *InstanceStorageIdentity `json:"storage,omitempty"`
+
 	// observedGeneration is the most recent generation observed for this Instance. It corresponds to the
 	// Instance's generation, which is updated on mutation by the API Server.
 	//

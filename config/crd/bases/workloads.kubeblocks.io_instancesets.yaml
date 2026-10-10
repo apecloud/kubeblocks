@@ -11707,21 +11707,379 @@ spec:
                       - Terminating
                       - Absent
                       type: string
+                    data:
+                      description: Data is an actual data observation; nil means unobserved.
+                      properties:
+                        identity:
+                          description: InstanceDataIdentity identifies the storage
+                            and optional engine dataset marker covered by a data observation.
+                          properties:
+                            dataset:
+                              description: Dataset is an actual engine dataset marker,
+                                when supplied by its observer.
+                              type: string
+                            storage:
+                              description: InstanceStorageIdentity describes actual
+                                storage independently of Pod health and desired revisions.
+                              properties:
+                                complete:
+                                  description: |-
+                                    Complete means every referenced claim UID, binding and location, and any ephemeral Pod identity, is known.
+                                    False does not imply empty storage or missing data.
+                                  type: boolean
+                                ephemeralPod:
+                                  description: |-
+                                    EphemeralPod binds nonpersistent data to the actual Pod UID. Pod replacement invalidates that data.
+                                    It remains diagnostic for an unresolved generic ephemeral claim, whose Complete is false.
+                                  properties:
+                                    cluster:
+                                      description: Cluster is the known cluster location.
+                                        An empty string means the local cluster; nil
+                                        means unknown.
+                                      type: string
+                                    name:
+                                      description: Name is the observed object name.
+                                      type: string
+                                    namespace:
+                                      description: Namespace is the observed object
+                                        namespace.
+                                      type: string
+                                    uid:
+                                      description: UID distinguishes replacements
+                                        with the same name.
+                                      type: string
+                                  required:
+                                  - name
+                                  - namespace
+                                  - uid
+                                  type: object
+                                volumes:
+                                  description: |-
+                                    Volumes contains actual mounted claims while a Pod exists, and declared or retained claims while absent.
+                                    When Complete is false, a previously observed owned claim may remain for verifying cleanup; its current presence is unknown.
+                                    Generic ephemeral claims, unsupported persistent storage and unknown locations leave Complete false;
+                                    specification and runtime events refresh them. Generic ephemeral claim names are not inferred from Pod names.
+                                  items:
+                                    description: InstanceVolumeIdentity identifies
+                                      one actual PVC and its persistent volume binding.
+                                    properties:
+                                      claim:
+                                        description: Claim identifies the actual PVC.
+                                          Nil means the claim has not been observed.
+                                        properties:
+                                          cluster:
+                                            description: Cluster is the known cluster
+                                              location. An empty string means the
+                                              local cluster; nil means unknown.
+                                            type: string
+                                          name:
+                                            description: Name is the observed object
+                                              name.
+                                            type: string
+                                          namespace:
+                                            description: Namespace is the observed
+                                              object namespace.
+                                            type: string
+                                          uid:
+                                            description: UID distinguishes replacements
+                                              with the same name.
+                                            type: string
+                                        required:
+                                        - name
+                                        - namespace
+                                        - uid
+                                        type: object
+                                      name:
+                                        description: Name is the volume name used
+                                          by the Pod or claim template.
+                                        type: string
+                                      ownerUID:
+                                        description: |-
+                                          OwnerUID is the observed controller owner of the PVC. It identifies whose retention policy can require cleanup;
+                                          it is not part of data identity and does not request deletion.
+                                        type: string
+                                      volumeName:
+                                        description: VolumeName is the observed PVC
+                                          binding, independent of capacity and readiness.
+                                        type: string
+                                    required:
+                                    - name
+                                    type: object
+                                  type: array
+                              required:
+                              - complete
+                              type: object
+                          required:
+                          - storage
+                          type: object
+                        message:
+                          maxLength: 1024
+                          type: string
+                        observedAt:
+                          format: date-time
+                          type: string
+                        reason:
+                          maxLength: 128
+                          type: string
+                        state:
+                          description: InstanceDataState describes an actual data
+                            observation. Storage binding and runtime health do not
+                            establish initialization.
+                          enum:
+                          - Unknown
+                          - Empty
+                          - Partial
+                          - Initializing
+                          - Initialized
+                          type: string
+                      required:
+                      - state
+                      type: object
                     desiredState:
                       description: |-
                         DesiredState describes whether the instance should be running (Active), is retained without running (Offline),
-                        or is no longer allocated and is kept only while its runtime is still observed (Released).
+                        or is no longer allocated but still has actual resources or unresolved member or execution observations (Released).
                         An empty value from an older object is treated as Active.
                       enum:
                       - Active
                       - Offline
                       - Released
                       type: string
+                    execution:
+                      description: Execution is an actual action observation; nil
+                        means unobserved, not permission to execute an action.
+                      properties:
+                        action:
+                          description: Action identifies the observed action.
+                          maxLength: 128
+                          minLength: 1
+                          type: string
+                        data:
+                          description: InstanceDataIdentity identifies the storage
+                            and optional engine dataset marker covered by a data observation.
+                          properties:
+                            dataset:
+                              description: Dataset is an actual engine dataset marker,
+                                when supplied by its observer.
+                              type: string
+                            storage:
+                              description: InstanceStorageIdentity describes actual
+                                storage independently of Pod health and desired revisions.
+                              properties:
+                                complete:
+                                  description: |-
+                                    Complete means every referenced claim UID, binding and location, and any ephemeral Pod identity, is known.
+                                    False does not imply empty storage or missing data.
+                                  type: boolean
+                                ephemeralPod:
+                                  description: |-
+                                    EphemeralPod binds nonpersistent data to the actual Pod UID. Pod replacement invalidates that data.
+                                    It remains diagnostic for an unresolved generic ephemeral claim, whose Complete is false.
+                                  properties:
+                                    cluster:
+                                      description: Cluster is the known cluster location.
+                                        An empty string means the local cluster; nil
+                                        means unknown.
+                                      type: string
+                                    name:
+                                      description: Name is the observed object name.
+                                      type: string
+                                    namespace:
+                                      description: Namespace is the observed object
+                                        namespace.
+                                      type: string
+                                    uid:
+                                      description: UID distinguishes replacements
+                                        with the same name.
+                                      type: string
+                                  required:
+                                  - name
+                                  - namespace
+                                  - uid
+                                  type: object
+                                volumes:
+                                  description: |-
+                                    Volumes contains actual mounted claims while a Pod exists, and declared or retained claims while absent.
+                                    When Complete is false, a previously observed owned claim may remain for verifying cleanup; its current presence is unknown.
+                                    Generic ephemeral claims, unsupported persistent storage and unknown locations leave Complete false;
+                                    specification and runtime events refresh them. Generic ephemeral claim names are not inferred from Pod names.
+                                  items:
+                                    description: InstanceVolumeIdentity identifies
+                                      one actual PVC and its persistent volume binding.
+                                    properties:
+                                      claim:
+                                        description: Claim identifies the actual PVC.
+                                          Nil means the claim has not been observed.
+                                        properties:
+                                          cluster:
+                                            description: Cluster is the known cluster
+                                              location. An empty string means the
+                                              local cluster; nil means unknown.
+                                            type: string
+                                          name:
+                                            description: Name is the observed object
+                                              name.
+                                            type: string
+                                          namespace:
+                                            description: Namespace is the observed
+                                              object namespace.
+                                            type: string
+                                          uid:
+                                            description: UID distinguishes replacements
+                                              with the same name.
+                                            type: string
+                                        required:
+                                        - name
+                                        - namespace
+                                        - uid
+                                        type: object
+                                      name:
+                                        description: Name is the volume name used
+                                          by the Pod or claim template.
+                                        type: string
+                                      ownerUID:
+                                        description: |-
+                                          OwnerUID is the observed controller owner of the PVC. It identifies whose retention policy can require cleanup;
+                                          it is not part of data identity and does not request deletion.
+                                        type: string
+                                      volumeName:
+                                        description: VolumeName is the observed PVC
+                                          binding, independent of capacity and readiness.
+                                        type: string
+                                    required:
+                                    - name
+                                    type: object
+                                  type: array
+                              required:
+                              - complete
+                              type: object
+                          required:
+                          - storage
+                          type: object
+                        executor:
+                          description: InstanceObjectReference identifies an observed
+                            Kubernetes object, independently of its logical instance
+                            name.
+                          properties:
+                            cluster:
+                              description: Cluster is the known cluster location.
+                                An empty string means the local cluster; nil means
+                                unknown.
+                              type: string
+                            name:
+                              description: Name is the observed object name.
+                              type: string
+                            namespace:
+                              description: Namespace is the observed object namespace.
+                              type: string
+                            uid:
+                              description: UID distinguishes replacements with the
+                                same name.
+                              type: string
+                          required:
+                          - name
+                          - namespace
+                          - uid
+                          type: object
+                        member:
+                          description: Member and Data identify actual targets when
+                            provided by the action observer.
+                          properties:
+                            group:
+                              type: string
+                            member:
+                              type: string
+                          required:
+                          - group
+                          - member
+                          type: object
+                        message:
+                          maxLength: 1024
+                          type: string
+                        observedAt:
+                          format: date-time
+                          type: string
+                        reason:
+                          maxLength: 128
+                          type: string
+                        state:
+                          description: InstanceExecutionState describes an observed
+                            action execution, not a request or replay token.
+                          enum:
+                          - Unknown
+                          - Running
+                          - Succeeded
+                          - Failed
+                          type: string
+                      required:
+                      - action
+                      - executor
+                      - state
+                      type: object
                     failed:
                       description: |-
                         Failed indicates whether the instance reports a terminal failure when CurrentState is Present. It is independent of
                         desired-state convergence.
                       type: boolean
+                    membership:
+                      description: Membership is an actual member observation; nil
+                        means unobserved.
+                      properties:
+                        identity:
+                          description: Identity is the last observed member. Unknown
+                            preserves an unresolved binding until its absence is confirmed.
+                          properties:
+                            group:
+                              type: string
+                            member:
+                              type: string
+                          required:
+                          - group
+                          - member
+                          type: object
+                        message:
+                          maxLength: 1024
+                          type: string
+                        observedAt:
+                          format: date-time
+                          type: string
+                        reason:
+                          maxLength: 128
+                          type: string
+                        state:
+                          description: InstanceMembershipState describes the observation
+                            of an actual member binding.
+                          enum:
+                          - Unknown
+                          - Present
+                          - Absent
+                          type: string
+                      required:
+                      - state
+                      type: object
+                    pod:
+                      description: Pod identifies the actual Pod while Present or
+                        Terminating. It is nil when Absent.
+                      properties:
+                        cluster:
+                          description: Cluster is the known cluster location. An empty
+                            string means the local cluster; nil means unknown.
+                          type: string
+                        name:
+                          description: Name is the observed object name.
+                          type: string
+                        namespace:
+                          description: Namespace is the observed object namespace.
+                          type: string
+                        uid:
+                          description: UID distinguishes replacements with the same
+                            name.
+                          type: string
+                      required:
+                      - name
+                      - namespace
+                      - uid
+                      type: object
                     podName:
                       default: Unknown
                       description: PodName is the stable name of the instance allocated
@@ -11736,6 +12094,95 @@ spec:
                       description: Represents the role observed for the instance when
                         CurrentState is Present.
                       type: string
+                    storage:
+                      description: Storage describes actual claims and ephemeral storage
+                        independently of Pod presence.
+                      properties:
+                        complete:
+                          description: |-
+                            Complete means every referenced claim UID, binding and location, and any ephemeral Pod identity, is known.
+                            False does not imply empty storage or missing data.
+                          type: boolean
+                        ephemeralPod:
+                          description: |-
+                            EphemeralPod binds nonpersistent data to the actual Pod UID. Pod replacement invalidates that data.
+                            It remains diagnostic for an unresolved generic ephemeral claim, whose Complete is false.
+                          properties:
+                            cluster:
+                              description: Cluster is the known cluster location.
+                                An empty string means the local cluster; nil means
+                                unknown.
+                              type: string
+                            name:
+                              description: Name is the observed object name.
+                              type: string
+                            namespace:
+                              description: Namespace is the observed object namespace.
+                              type: string
+                            uid:
+                              description: UID distinguishes replacements with the
+                                same name.
+                              type: string
+                          required:
+                          - name
+                          - namespace
+                          - uid
+                          type: object
+                        volumes:
+                          description: |-
+                            Volumes contains actual mounted claims while a Pod exists, and declared or retained claims while absent.
+                            When Complete is false, a previously observed owned claim may remain for verifying cleanup; its current presence is unknown.
+                            Generic ephemeral claims, unsupported persistent storage and unknown locations leave Complete false;
+                            specification and runtime events refresh them. Generic ephemeral claim names are not inferred from Pod names.
+                          items:
+                            description: InstanceVolumeIdentity identifies one actual
+                              PVC and its persistent volume binding.
+                            properties:
+                              claim:
+                                description: Claim identifies the actual PVC. Nil
+                                  means the claim has not been observed.
+                                properties:
+                                  cluster:
+                                    description: Cluster is the known cluster location.
+                                      An empty string means the local cluster; nil
+                                      means unknown.
+                                    type: string
+                                  name:
+                                    description: Name is the observed object name.
+                                    type: string
+                                  namespace:
+                                    description: Namespace is the observed object
+                                      namespace.
+                                    type: string
+                                  uid:
+                                    description: UID distinguishes replacements with
+                                      the same name.
+                                    type: string
+                                required:
+                                - name
+                                - namespace
+                                - uid
+                                type: object
+                              name:
+                                description: Name is the volume name used by the Pod
+                                  or claim template.
+                                type: string
+                              ownerUID:
+                                description: |-
+                                  OwnerUID is the observed controller owner of the PVC. It identifies whose retention policy can require cleanup;
+                                  it is not part of data identity and does not request deletion.
+                                type: string
+                              volumeName:
+                                description: VolumeName is the observed PVC binding,
+                                  independent of capacity and readiness.
+                                type: string
+                            required:
+                            - name
+                            type: object
+                          type: array
+                      required:
+                      - complete
+                      type: object
                     templateName:
                       description: |-
                         TemplateName is the instance template assigned to this instance.

@@ -18612,6 +18612,20 @@ InstanceSpec
 <tbody>
 <tr>
 <td>
+<code>stop</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Stop removes the actual Pod and prevents its recreation while retaining this Instance and every existing PVC.
+Nil or false runs the Instance. While true, PVC creation, removal, metadata changes and expansion are suspended;
+assistant objects continue to reconcile. Resume applies the latest templates. Actual deletion follows the PVC retention policy.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>template</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podtemplatespec-v1-core">
@@ -19598,6 +19612,153 @@ string
 <td></td>
 </tr></tbody>
 </table>
+<h3 id="workloads.kubeblocks.io/v1.InstanceDataIdentity">InstanceDataIdentity
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceDataStatus">InstanceDataStatus</a>, <a href="#workloads.kubeblocks.io/v1.InstanceExecutionObservation">InstanceExecutionObservation</a>)
+</p>
+<div>
+<p>InstanceDataIdentity identifies the storage and optional engine dataset marker covered by a data observation.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>storage</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceStorageIdentity">
+InstanceStorageIdentity
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>dataset</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Dataset is an actual engine dataset marker, when supplied by its observer.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.InstanceDataState">InstanceDataState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceDataStatus">InstanceDataStatus</a>)
+</p>
+<div>
+<p>InstanceDataState describes an actual data observation. Storage binding and runtime health do not establish initialization.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Empty&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Initialized&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Initializing&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Partial&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Unknown&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.InstanceDataStatus">InstanceDataStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceStatus">InstanceStatus</a>)
+</p>
+<div>
+<p>InstanceDataStatus is nil until data is observed. Unknown may retain an old identity for diagnostics, not as usable success.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>state</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceDataState">
+InstanceDataState
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>identity</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceDataIdentity">
+InstanceDataIdentity
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>observedAt</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>reason</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="workloads.kubeblocks.io/v1.InstanceDesiredState">InstanceDesiredState
 (<code>string</code> alias)</h3>
 <p>
@@ -19620,6 +19781,351 @@ string
 </tr><tr><td><p>&#34;Released&#34;</p></td>
 <td></td>
 </tr></tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.InstanceExecutionObservation">InstanceExecutionObservation
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceStatus">InstanceStatus</a>)
+</p>
+<div>
+<p>InstanceExecutionObservation is nil until an executor is observed. This contract does not create or recover actions.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>state</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceExecutionState">
+InstanceExecutionState
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>action</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Action identifies the observed action.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>executor</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceObjectReference">
+InstanceObjectReference
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>member</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceMemberIdentity">
+InstanceMemberIdentity
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Member and Data identify actual targets when provided by the action observer.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>data</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceDataIdentity">
+InstanceDataIdentity
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>observedAt</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>reason</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.InstanceExecutionState">InstanceExecutionState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceExecutionObservation">InstanceExecutionObservation</a>)
+</p>
+<div>
+<p>InstanceExecutionState describes an observed action execution, not a request or replay token.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Failed&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Running&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Succeeded&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Unknown&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.InstanceMemberIdentity">InstanceMemberIdentity
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceExecutionObservation">InstanceExecutionObservation</a>, <a href="#workloads.kubeblocks.io/v1.InstanceMembershipStatus">InstanceMembershipStatus</a>)
+</p>
+<div>
+<p>InstanceMemberIdentity identifies an actual database member rather than a desired role or Pod name.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>group</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>member</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.InstanceMembershipState">InstanceMembershipState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceMembershipStatus">InstanceMembershipStatus</a>)
+</p>
+<div>
+<p>InstanceMembershipState describes the observation of an actual member binding.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Absent&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Present&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Unknown&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.InstanceMembershipStatus">InstanceMembershipStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceStatus">InstanceStatus</a>)
+</p>
+<div>
+<p>InstanceMembershipStatus is nil until membership is observed. Pod absence never proves member absence.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>state</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceMembershipState">
+InstanceMembershipState
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>identity</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceMemberIdentity">
+InstanceMemberIdentity
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Identity is the last observed member. Unknown preserves an unresolved binding until its absence is confirmed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>observedAt</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>reason</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.InstanceObjectReference">InstanceObjectReference
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceExecutionObservation">InstanceExecutionObservation</a>, <a href="#workloads.kubeblocks.io/v1.InstanceStatus">InstanceStatus</a>, <a href="#workloads.kubeblocks.io/v1.InstanceStatus2">InstanceStatus2</a>, <a href="#workloads.kubeblocks.io/v1.InstanceStorageIdentity">InstanceStorageIdentity</a>, <a href="#workloads.kubeblocks.io/v1.InstanceVolumeIdentity">InstanceVolumeIdentity</a>)
+</p>
+<div>
+<p>InstanceObjectReference identifies an observed Kubernetes object, independently of its logical instance name.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name is the observed object name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>namespace</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Namespace is the observed object namespace.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>uid</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#UID">
+k8s.io/apimachinery/pkg/types.UID
+</a>
+</em>
+</td>
+<td>
+<p>UID distinguishes replacements with the same name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>cluster</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Cluster is the known cluster location. An empty string means the local cluster; nil means unknown.</p>
+</td>
+</tr>
+</tbody>
 </table>
 <h3 id="workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec
 </h3>
@@ -20260,7 +20766,7 @@ key is the pod name, value is the revision.</p>
 <code>assignedOrdinals</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.Ordinals">
-map[string]github.com/apecloud/kubeblocks/apis/workloads/v1.Ordinals
+map[string]github.com/apecloud/kubeblocks/apis/apps/v1.Ordinals
 </a>
 </em>
 </td>
@@ -20291,6 +20797,20 @@ to allocate next during scaling up, or which identity is preserved during a rest
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<code>stop</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Stop removes the actual Pod and prevents its recreation while retaining this Instance and every existing PVC.
+Nil or false runs the Instance. While true, PVC creation, removal, metadata changes and expansion are suspended;
+assistant objects continue to reconcile. Resume applies the latest templates. Actual deletion follows the PVC retention policy.</p>
+</td>
+</tr>
 <tr>
 <td>
 <code>template</code><br/>
@@ -20522,6 +21042,76 @@ bool
 <tbody>
 <tr>
 <td>
+<code>pod</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceObjectReference">
+InstanceObjectReference
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Pod identifies the actual Pod while Present or Terminating. It is nil when Absent.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>storage</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceStorageIdentity">
+InstanceStorageIdentity
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Storage describes actual claims and ephemeral storage independently of Pod presence.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>membership</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceMembershipStatus">
+InstanceMembershipStatus
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Membership is an actual member observation; nil means unobserved.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>data</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceDataStatus">
+InstanceDataStatus
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Data is an actual data observation; nil means unobserved.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>execution</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceExecutionObservation">
+InstanceExecutionObservation
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Execution is an actual action observation; nil means unobserved, not permission to execute an action.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>podName</code><br/>
 <em>
 string
@@ -20556,7 +21146,7 @@ InstanceDesiredState
 <td>
 <em>(Optional)</em>
 <p>DesiredState describes whether the instance should be running (Active), is retained without running (Offline),
-or is no longer allocated and is kept only while its runtime is still observed (Released).
+or is no longer allocated but still has actual resources or unresolved member or execution observations (Released).
 An empty value from an older object is treated as Active.</p>
 </td>
 </tr>
@@ -20713,6 +21303,34 @@ bool
 <tbody>
 <tr>
 <td>
+<code>pod</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceObjectReference">
+InstanceObjectReference
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Pod identifies the actual Pod while Present or Terminating. It is nil when Absent.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>storage</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceStorageIdentity">
+InstanceStorageIdentity
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Storage describes actual claims and ephemeral storage independently of Pod presence.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>observedGeneration</code><br/>
 <em>
 int64
@@ -20850,6 +21468,68 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Represents the config status observed from the running pod of this instance.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.InstanceStorageIdentity">InstanceStorageIdentity
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceDataIdentity">InstanceDataIdentity</a>, <a href="#workloads.kubeblocks.io/v1.InstanceStatus">InstanceStatus</a>, <a href="#workloads.kubeblocks.io/v1.InstanceStatus2">InstanceStatus2</a>)
+</p>
+<div>
+<p>InstanceStorageIdentity describes actual storage independently of Pod health and desired revisions.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>complete</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<p>Complete means every referenced claim UID, binding and location, and any ephemeral Pod identity, is known.
+False does not imply empty storage or missing data.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumes</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceVolumeIdentity">
+[]InstanceVolumeIdentity
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Volumes contains actual mounted claims while a Pod exists, and declared or retained claims while absent.
+When Complete is false, a previously observed owned claim may remain for verifying cleanup; its current presence is unknown.
+Generic ephemeral claims, unsupported persistent storage and unknown locations leave Complete false;
+specification and runtime events refresh them. Generic ephemeral claim names are not inferred from Pod names.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ephemeralPod</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceObjectReference">
+InstanceObjectReference
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>EphemeralPod binds nonpersistent data to the actual Pod UID. Pod replacement invalidates that data.
+It remains diagnostic for an unresolved generic ephemeral claim, whose Complete is false.</p>
 </td>
 </tr>
 </tbody>
@@ -21102,6 +21782,76 @@ int32
 <em>(Optional)</em>
 <p>UpdatedReplicas is the number of Pods created by the InstanceSet controller from the InstanceSet version
 indicated by UpdateRevisions.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.InstanceVolumeIdentity">InstanceVolumeIdentity
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceStorageIdentity">InstanceStorageIdentity</a>)
+</p>
+<div>
+<p>InstanceVolumeIdentity identifies one actual PVC and its persistent volume binding.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ownerUID</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#UID">
+k8s.io/apimachinery/pkg/types.UID
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>OwnerUID is the observed controller owner of the PVC. It identifies whose retention policy can require cleanup;
+it is not part of data identity and does not request deletion.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name is the volume name used by the Pod or claim template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>claim</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceObjectReference">
+InstanceObjectReference
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Claim identifies the actual PVC. Nil means the claim has not been observed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>VolumeName is the observed PVC binding, independent of capacity and readiness.</p>
 </td>
 </tr>
 </tbody>

@@ -2579,6 +2579,12 @@ spec:
                     type: object
                 type: object
                 x-kubernetes-map-type: atomic
+              stop:
+                description: |-
+                  Stop removes the actual Pod and prevents its recreation while retaining this Instance and every existing PVC.
+                  Nil or false runs the Instance. While true, PVC creation, removal, metadata changes and expansion are suspended;
+                  assistant objects continue to reconcile. Resume applies the latest templates. Actual deletion follows the PVC retention policy.
+                type: boolean
               template:
                 description: PodTemplateSpec describes the data a pod should have
                   when created from a template
@@ -10365,6 +10371,28 @@ spec:
                   Instance's generation, which is updated on mutation by the API Server.
                 format: int64
                 type: integer
+              pod:
+                description: Pod identifies the actual Pod while Present or Terminating.
+                  It is nil when Absent.
+                properties:
+                  cluster:
+                    description: Cluster is the known cluster location. An empty string
+                      means the local cluster; nil means unknown.
+                    type: string
+                  name:
+                    description: Name is the observed object name.
+                    type: string
+                  namespace:
+                    description: Namespace is the observed object namespace.
+                    type: string
+                  uid:
+                    description: UID distinguishes replacements with the same name.
+                    type: string
+                required:
+                - name
+                - namespace
+                - uid
+                type: object
               ready:
                 description: Represents whether the instance is in ready condition,
                   independent of desired-state convergence.
@@ -10372,6 +10400,93 @@ spec:
               role:
                 description: Represents the role of the instance observed.
                 type: string
+              storage:
+                description: Storage describes actual claims and ephemeral storage
+                  independently of Pod presence.
+                properties:
+                  complete:
+                    description: |-
+                      Complete means every referenced claim UID, binding and location, and any ephemeral Pod identity, is known.
+                      False does not imply empty storage or missing data.
+                    type: boolean
+                  ephemeralPod:
+                    description: |-
+                      EphemeralPod binds nonpersistent data to the actual Pod UID. Pod replacement invalidates that data.
+                      It remains diagnostic for an unresolved generic ephemeral claim, whose Complete is false.
+                    properties:
+                      cluster:
+                        description: Cluster is the known cluster location. An empty
+                          string means the local cluster; nil means unknown.
+                        type: string
+                      name:
+                        description: Name is the observed object name.
+                        type: string
+                      namespace:
+                        description: Namespace is the observed object namespace.
+                        type: string
+                      uid:
+                        description: UID distinguishes replacements with the same
+                          name.
+                        type: string
+                    required:
+                    - name
+                    - namespace
+                    - uid
+                    type: object
+                  volumes:
+                    description: |-
+                      Volumes contains actual mounted claims while a Pod exists, and declared or retained claims while absent.
+                      When Complete is false, a previously observed owned claim may remain for verifying cleanup; its current presence is unknown.
+                      Generic ephemeral claims, unsupported persistent storage and unknown locations leave Complete false;
+                      specification and runtime events refresh them. Generic ephemeral claim names are not inferred from Pod names.
+                    items:
+                      description: InstanceVolumeIdentity identifies one actual PVC
+                        and its persistent volume binding.
+                      properties:
+                        claim:
+                          description: Claim identifies the actual PVC. Nil means
+                            the claim has not been observed.
+                          properties:
+                            cluster:
+                              description: Cluster is the known cluster location.
+                                An empty string means the local cluster; nil means
+                                unknown.
+                              type: string
+                            name:
+                              description: Name is the observed object name.
+                              type: string
+                            namespace:
+                              description: Namespace is the observed object namespace.
+                              type: string
+                            uid:
+                              description: UID distinguishes replacements with the
+                                same name.
+                              type: string
+                          required:
+                          - name
+                          - namespace
+                          - uid
+                          type: object
+                        name:
+                          description: Name is the volume name used by the Pod or
+                            claim template.
+                          type: string
+                        ownerUID:
+                          description: |-
+                            OwnerUID is the observed controller owner of the PVC. It identifies whose retention policy can require cleanup;
+                            it is not part of data identity and does not request deletion.
+                          type: string
+                        volumeName:
+                          description: VolumeName is the observed PVC binding, independent
+                            of capacity and readiness.
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                required:
+                - complete
+                type: object
               upToDate:
                 description: |-
                   UpToDate indicates that the Instance controller has observed the Pod, dynamic configs, and PVC expansion

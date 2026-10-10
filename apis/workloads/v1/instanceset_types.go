@@ -569,6 +569,23 @@ type ConfigTemplate struct {
 
 // InstanceStatus describes the desired allocation and observed runtime state of an instance identity.
 type InstanceStatus struct {
+
+	// Pod identifies the actual Pod while Present or Terminating. It is nil when Absent.
+	// +optional
+	Pod *InstanceObjectReference `json:"pod,omitempty"`
+	// Storage describes actual claims and ephemeral storage independently of Pod presence.
+	// +optional
+	Storage *InstanceStorageIdentity `json:"storage,omitempty"`
+	// Membership is an actual member observation; nil means unobserved.
+	// +optional
+	Membership *InstanceMembershipStatus `json:"membership,omitempty"`
+	// Data is an actual data observation; nil means unobserved.
+	// +optional
+	Data *InstanceDataStatus `json:"data,omitempty"`
+	// Execution is an actual action observation; nil means unobserved, not permission to execute an action.
+	// +optional
+	Execution *InstanceExecutionObservation `json:"execution,omitempty"`
+
 	// PodName is the stable name of the instance allocated by the InstanceSet.
 	//
 	// +kubebuilder:validation:Required
@@ -582,7 +599,7 @@ type InstanceStatus struct {
 	TemplateName *string `json:"templateName,omitempty"`
 
 	// DesiredState describes whether the instance should be running (Active), is retained without running (Offline),
-	// or is no longer allocated and is kept only while its runtime is still observed (Released).
+	// or is no longer allocated but still has actual resources or unresolved member or execution observations (Released).
 	// An empty value from an older object is treated as Active.
 	//
 	// +optional
@@ -854,7 +871,12 @@ func (r *InstanceSet) OfflineInstanceStatuses() []*InstanceStatus {
 	return r.instanceStatusesByDesiredState(InstanceDesiredStateOffline)
 }
 
-// RetainedInstanceStatuses returns all instances whose identity is retained by the InstanceSet.
+// ReleasedInstanceStatuses returns instances no longer allocated but retained for actual resources or unresolved lifecycle observations.
+func (r *InstanceSet) ReleasedInstanceStatuses() []*InstanceStatus {
+	return r.instanceStatusesByDesiredState(InstanceDesiredStateReleased)
+}
+
+// RetainedInstanceStatuses returns the Active and Offline allocations retained by the InstanceSet, excluding Released records.
 func (r *InstanceSet) RetainedInstanceStatuses() []*InstanceStatus {
 	if r == nil {
 		return nil

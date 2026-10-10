@@ -210,11 +210,12 @@ func TestValidationRejectsUnownedPreconditionsAndNonblockingMembers(t *testing.T
 	}
 	for _, name := range []string{"join", "leave", "switch"} {
 		its := dataWorkload()
-		if name == "join" {
+		switch name {
+		case "join":
 			its.Spec.LifecycleActions.MemberJoin.NonBlocking = true
-		} else if name == "leave" {
+		case "leave":
 			its.Spec.LifecycleActions.MemberLeave.NonBlocking = true
-		} else {
+		default:
 			its.Spec.LifecycleActions.Switchover = testAction("true")
 			its.Spec.LifecycleActions.Switchover.NonBlocking = true
 		}

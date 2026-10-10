@@ -1703,7 +1703,7 @@ func TestInstanceSetLifecycleRecoversDataResultAcrossStatusFailureAndPodRecreati
 		t.Fatal("replacement data PVC inherited historical result")
 	}
 	for i := 0; i < 4; i++ {
-		its = step()
+		step()
 	}
 	if err := cli.Get(ctx, targetKey, target); err != nil {
 		t.Fatal(err)
@@ -2162,9 +2162,10 @@ func TestInstanceSetLifecycleReexpandRetainedDataRestoresResultAndJoins(t *testi
 	var joins, leaves int
 	agent := kbacli.NewMockClient(gomock.NewController(t))
 	agent.EXPECT().Action(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, req kbaproto.ActionRequest) (kbaproto.ActionResponse, error) {
-		if req.Action == "memberJoin" {
+		switch req.Action {
+		case "memberJoin":
 			joins++
-		} else if req.Action == "memberLeave" {
+		case "memberLeave":
 			leaves++
 		}
 		return kbaproto.ActionResponse{}, nil

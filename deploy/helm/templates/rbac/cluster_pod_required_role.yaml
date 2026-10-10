@@ -28,3 +28,11 @@ rules:
   - create
   - get
   - update
+# new workload data-loading workers record completion on their target data PVC
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  verbs:
+  - get
+  - update

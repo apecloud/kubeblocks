@@ -25,8 +25,14 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"time"
 
 	"github.com/go-logr/logr"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/util/retry"
+	ctlruntime "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
@@ -48,6 +54,24 @@ type newReplicaTask struct {
 var _ task = &newReplicaTask{}
 
 func (s *newReplicaTask) run(ctx context.Context) (chan error, error) {
+	var pvcClient typedcorev1.PersistentVolumeClaimInterface
+	if s.task.DataLoadResult != nil {
+		var err error
+		pvcClient, err = dataLoadPVCClient(s.task.DataLoadResult)
+		if err != nil {
+			return nil, err
+		}
+		loaded, err := dataLoadCompleted(ctx, pvcClient, s.task.DataLoadResult.PVCName)
+		if err != nil {
+			return nil, err
+		}
+		if loaded {
+			return nil, nil
+		}
+	}
+	if s.actionService == nil {
+		return nil, fmt.Errorf("worker action service is required")
+	}
 	action, ok := s.actionService.actions[newReplicaDataLoad]
 	if !ok {
 		return nil, fmt.Errorf("%s is not supported", newReplicaDataLoad)
@@ -58,7 +82,81 @@ func (s *newReplicaTask) run(ctx context.Context) (chan error, error) {
 		return nil, err
 	}
 
-	return nonBlockingCallActionX(ctx, action, s.task.Parameters, nil, &action.TimeoutSeconds, conn, nil, nil)
+	ch, err := nonBlockingCallActionX(ctx, action, s.task.Parameters, nil, &action.TimeoutSeconds, conn, nil, nil)
+	if err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+	result := make(chan error, 1)
+	go func() {
+		defer conn.Close()
+		err, ok := <-ch
+		if !ok {
+			err = fmt.Errorf("runtime error: error chan closed unexpectedly")
+		}
+		if err == nil && pvcClient != nil {
+			err = s.saveDataLoadResult(ctx, pvcClient)
+		}
+		result <- err
+	}()
+	return result, nil
+}
+
+// DataLoadCompleted reads the actual data PVC before allowing the database to start.
+func DataLoadCompleted(ctx context.Context, result *proto.DataLoadResult) (bool, error) {
+	pvcClient, err := dataLoadPVCClient(result)
+	if err != nil {
+		return false, err
+	}
+	return dataLoadCompleted(ctx, pvcClient, result.PVCName)
+}
+
+func dataLoadPVCClient(result *proto.DataLoadResult) (typedcorev1.PersistentVolumeClaimInterface, error) {
+	if result == nil || result.Namespace == "" || result.PVCName == "" {
+		return nil, fmt.Errorf("data load result namespace and PVC name are required")
+	}
+	config, err := ctlruntime.GetConfig()
+	if err != nil {
+		return nil, err
+	}
+	client, err := typedcorev1.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+	return client.PersistentVolumeClaims(result.Namespace), nil
+}
+
+func dataLoadCompleted(ctx context.Context, pvcClient typedcorev1.PersistentVolumeClaimInterface, name string) (bool, error) {
+	pvc, err := pvcClient.Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return false, fmt.Errorf("read data PVC %s: %w", name, err)
+	}
+	return pvc.Annotations[proto.DataLoadedAnnotationKey] == "true", nil
+}
+
+func (s *newReplicaTask) saveDataLoadResult(ctx context.Context, pvcClient typedcorev1.PersistentVolumeClaimInterface) error {
+	// Keep the loaded data in this worker while retrying only the result write.
+	return wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
+		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			pvc, err := pvcClient.Get(ctx, s.task.DataLoadResult.PVCName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if pvc.Annotations[proto.DataLoadedAnnotationKey] == "true" {
+				return nil
+			}
+			if pvc.Annotations == nil {
+				pvc.Annotations = make(map[string]string)
+			}
+			pvc.Annotations[proto.DataLoadedAnnotationKey] = "true"
+			_, err = pvcClient.Update(ctx, pvc, metav1.UpdateOptions{})
+			return err
+		})
+		if err != nil {
+			s.logger.Error(err, "save data load result failed; retrying without reloading data", "PVC", s.task.DataLoadResult.PVCName)
+		}
+		return err == nil, nil
+	})
 }
 
 func (s *newReplicaTask) status(ctx context.Context, event *proto.TaskEvent) {
@@ -73,6 +171,12 @@ func (s *newReplicaTask) handshake(ctx context.Context) (net.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
+	ok := false
+	defer func() {
+		if !ok {
+			_ = conn.Close()
+		}
+	}()
 
 	// reuse the action request as the handshake packet, define a new one when needed
 	req := proto.ActionRequest{
@@ -99,6 +203,7 @@ func (s *newReplicaTask) handshake(ctx context.Context) (net.Conn, error) {
 		return nil, fmt.Errorf("write streaming handshake request to remote error")
 	}
 
+	ok = true
 	return conn, nil
 }
 
@@ -112,5 +217,5 @@ func (s *newReplicaTask) connectToRemote(ctx context.Context) (net.Conn, error) 
 	dialer := &net.Dialer{
 		Timeout: defaultConnectTimeout,
 	}
-	return dialer.Dial("tcp", net.JoinHostPort(s.task.Remote, strconv.Itoa(int(s.task.Port))))
+	return dialer.DialContext(ctx, "tcp", net.JoinHostPort(s.task.Remote, strconv.Itoa(int(s.task.Port))))
 }

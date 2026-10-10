@@ -1,0 +1,85 @@
+apiVersion: workloads.kubeblocks.io/v1
+kind: InstanceSet
+metadata:
+  name: data-copy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: data-copy
+  podManagementPolicy: Parallel
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  lifecycleActions:
+    dataVolume: data
+    dataDump:
+      exec:
+        command: ["/bin/sh", "-ec", "cat /data/payload"]
+    dataLoad:
+      exec:
+        command: ["/bin/sh", "-ec", "cat > /data/payload"]
+    worker:
+      # Container.name is required by the CRD. The controller assigns the
+      # kbagent server and init worker names when constructing each Pod.
+      name: data-loader
+      # Build this image from the current implementation; it includes /bin/kbagent.
+      image: kubeblocks-tools:its-lifecycle
+      imagePullPolicy: IfNotPresent
+      volumeMounts:
+      - name: data
+        mountPath: /data
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: ["ALL"]
+  template:
+    metadata:
+      labels:
+        app: data-copy
+    spec:
+      serviceAccountName: workloads-data-loader
+      automountServiceAccountToken: true
+      securityContext:
+        runAsUser: 65532
+        runAsGroup: 65532
+        runAsNonRoot: true
+        fsGroup: 65532
+      containers:
+      - name: store
+        image: alpine:3.22
+        command:
+        - /bin/sh
+        - -ec
+        - |
+          # Initial instances bootstrap their own data. Expansion data is
+          # already present because the init worker completed before this runs.
+          if [ ! -s /data/payload ]; then
+            printf '%s:seed\n' "$POD_NAME" > /data/payload
+          fi
+          while true; do sleep 3600; done
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        readinessProbe:
+          exec:
+            command: ["/bin/sh", "-ec", "test -s /data/payload"]
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 1Gi

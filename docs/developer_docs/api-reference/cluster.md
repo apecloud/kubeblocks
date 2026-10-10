@@ -20260,7 +20260,7 @@ key is the pod name, value is the revision.</p>
 <code>assignedOrdinals</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.Ordinals">
-map[string]github.com/apecloud/kubeblocks/apis/workloads/v1.Ordinals
+map[string]github.com/apecloud/kubeblocks/apis/apps/v1.Ordinals
 </a>
 </em>
 </td>
@@ -21202,6 +21202,91 @@ Action
 <td>
 <em>(Optional)</em>
 <p>Defines the procedure that update replicas with new configuration.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberJoin</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>MemberJoin and MemberLeave opt in to workload-owned membership changes.
+Initial engine bootstrap keeps membership unknown until an action records a result.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberLeave</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>dataDump</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>DataDump and DataLoad opt in to copying data into newly allocated replicas.
+Both actions, DataVolume, and Worker must be provided together.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dataLoad</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>dataVolume</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>DataVolume names the Pod volume that contains the persistent loaded data.
+It must resolve to a PVC; the controller never guesses from mount order.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>worker</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#container-v1-core">
+Kubernetes core/v1.Container
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Worker supplies the agent image, execution environment, mounts, and security context.
+Its command defaults to /bin/kbagent. The Pod template must specify a ServiceAccount
+authorized to get and update the data PVC and provide Kubernetes API credentials.</p>
 </td>
 </tr>
 </tbody>

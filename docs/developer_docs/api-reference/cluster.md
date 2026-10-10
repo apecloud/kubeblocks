@@ -20260,7 +20260,7 @@ key is the pod name, value is the revision.</p>
 <code>assignedOrdinals</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.Ordinals">
-map[string]github.com/apecloud/kubeblocks/apis/apps/v1.Ordinals
+map[string]github.com/apecloud/kubeblocks/apis/workloads/v1.Ordinals
 </a>
 </em>
 </td>

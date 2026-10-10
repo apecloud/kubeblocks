@@ -234,12 +234,8 @@ type InstanceSetSpec struct {
 	// +optional
 	Paused bool `json:"paused,omitempty"`
 
-	// Stop releases the InstanceSet's Pods without deleting its PVCs or assistant objects.
-	// While true, PVC reconciliation and changes to the allocated instance names are suspended.
-	// With enableInstanceAPI, existing Instance objects remain allocated and observe the Pod removal.
-	// When nil or false, Pods resume from the latest templates under podManagementPolicy.
-	// Removed instance names then follow the whenScaled PVC retention policy.
-	// Removing a claim template alone does not delete an allocated PVC.
+	// Stop the InstanceSet.
+	// If set, all the computing resources will be released.
 	//
 	// +optional
 	Stop *bool `json:"stop,omitempty"`

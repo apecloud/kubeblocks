@@ -144,10 +144,8 @@ type InstanceSpec struct {
 	// +optional
 	ScaledDown *bool `json:"scaledDown,omitempty"`
 
-	// Stop requests removal of the Pod without deleting the Instance. While true, the controller
-	// does not create a Pod or create, delete, or update PVCs. Assistant objects continue to reconcile.
-	// Nil or false runs the Instance with the latest templates and reuses existing PVCs.
-	// Deleting the Instance still applies its persistentVolumeClaimRetentionPolicy.
+	// Stop the Instance.
+	// If set, all the computing resources will be released.
 	//
 	// +optional
 	Stop *bool `json:"stop,omitempty"`

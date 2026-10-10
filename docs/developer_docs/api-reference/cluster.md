@@ -18831,10 +18831,8 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Stop requests removal of the Pod without deleting the Instance. While true, the controller
-does not create a Pod or create, delete, or update PVCs. Assistant objects continue to reconcile.
-Nil or false runs the Instance with the latest templates and reuses existing PVCs.
-Deleting the Instance still applies its persistentVolumeClaimRetentionPolicy.</p>
+<p>Stop the Instance.
+If set, all the computing resources will be released.</p>
 </td>
 </tr>
 </tbody>
@@ -19229,12 +19227,8 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Stop releases the InstanceSet&rsquo;s Pods without deleting its PVCs or assistant objects.
-While true, PVC reconciliation and changes to the allocated instance names are suspended.
-With enableInstanceAPI, existing Instance objects remain allocated and observe the Pod removal.
-When nil or false, Pods resume from the latest templates under podManagementPolicy.
-Removed instance names then follow the whenScaled PVC retention policy.
-Removing a claim template alone does not delete an allocated PVC.</p>
+<p>Stop the InstanceSet.
+If set, all the computing resources will be released.</p>
 </td>
 </tr>
 <tr>
@@ -19973,12 +19967,8 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Stop releases the InstanceSet&rsquo;s Pods without deleting its PVCs or assistant objects.
-While true, PVC reconciliation and changes to the allocated instance names are suspended.
-With enableInstanceAPI, existing Instance objects remain allocated and observe the Pod removal.
-When nil or false, Pods resume from the latest templates under podManagementPolicy.
-Removed instance names then follow the whenScaled PVC retention policy.
-Removing a claim template alone does not delete an allocated PVC.</p>
+<p>Stop the InstanceSet.
+If set, all the computing resources will be released.</p>
 </td>
 </tr>
 <tr>
@@ -20536,10 +20526,8 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Stop requests removal of the Pod without deleting the Instance. While true, the controller
-does not create a Pod or create, delete, or update PVCs. Assistant objects continue to reconcile.
-Nil or false runs the Instance with the latest templates and reuses existing PVCs.
-Deleting the Instance still applies its persistentVolumeClaimRetentionPolicy.</p>
+<p>Stop the Instance.
+If set, all the computing resources will be released.</p>
 </td>
 </tr>
 </tbody>

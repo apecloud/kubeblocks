@@ -1486,7 +1486,8 @@ func TestInstanceSetTransferredIdentityCleanup(t *testing.T) {
 							its.Spec.Instances[0].Replicas = ptr.To(int32(1))
 						}
 						wantDesired = workloads.InstanceDesiredStateOffline
-						wantClaims = 1
+						// Both the Active and Offline identities still own their allocated storage.
+						wantClaims = 2
 					} else {
 						its.Spec.Replicas = ptr.To(int32(0))
 						its.Spec.Instances = nil
@@ -1522,7 +1523,7 @@ func TestInstanceSetTransferredIdentityCleanup(t *testing.T) {
 					}
 					for _, claim := range claims.Items {
 						original := originalClaims[claim.Name]
-						if original == nil || claim.UID != original.UID || claim.Spec.VolumeName != original.Spec.VolumeName || !reflect.DeepEqual(claim.OwnerReferences, original.OwnerReferences) {
+						if original == nil || claim.UID != original.UID || !reflect.DeepEqual(claim.Spec, original.Spec) || !reflect.DeepEqual(claim.OwnerReferences, original.OwnerReferences) {
 							t.Fatalf("retained PVC identity changed: %#v", claim)
 						}
 					}
@@ -1543,6 +1544,38 @@ func TestInstanceSetTransferredIdentityCleanup(t *testing.T) {
 						}
 					} else if status != nil {
 						t.Fatalf("released identity survived deletion: %#v", status)
+					}
+					if err := cli.List(context.Background(), claims); err != nil {
+						t.Fatal(err)
+					}
+					if len(claims.Items) != wantClaims {
+						t.Fatalf("PVC policy changed after Pod disappearance: got %d, want %d", len(claims.Items), wantClaims)
+					}
+					if offline {
+						its.Spec.OfflineInstances = nil
+						if len(its.Spec.Instances) > 0 {
+							its.Spec.Instances[0].Ordinals.Discrete = []int32{1}
+						} else {
+							its.Spec.Ordinals.Discrete = []int32{1}
+						}
+						its.Generation++
+						if err := cli.Update(context.Background(), its); err != nil {
+							t.Fatal(err)
+						}
+						for i := 0; i < 4; i++ {
+							run()
+						}
+						for name, original := range originalClaims {
+							current := &corev1.PersistentVolumeClaim{}
+							err := cli.Get(context.Background(), client.ObjectKey{Namespace: key.Namespace, Name: name}, current)
+							if !retain && name == "data-"+podKey.Name {
+								if !apierrors.IsNotFound(err) {
+									t.Fatalf("released Offline storage was not retired: %v", err)
+								}
+							} else if err != nil || current.UID != original.UID || !reflect.DeepEqual(current.Spec, original.Spec) {
+								t.Fatalf("allocated or retained storage changed after Offline release: %v", err)
+							}
+						}
 					}
 				})
 			}
@@ -2560,7 +2593,7 @@ func TestInstanceSetPVCAbsentOwnership(t *testing.T) {
 	}
 }
 
-func TestInstanceSetPVCIncompleteAllocation(t *testing.T) {
+func TestInstanceSetPVCAbsentClaimDuringFlatTransfer(t *testing.T) {
 	cli := pvcLifecycleFixture(t, 2)
 	pvcLifecycleReady(t, cli)
 	pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {

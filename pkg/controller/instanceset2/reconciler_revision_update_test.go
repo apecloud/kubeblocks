@@ -24,7 +24,6 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -66,9 +65,8 @@ func TestRevisionUpdatePublishesRevisionsBeforeInstanceStatus(t *testing.T) {
 	}
 }
 
-func TestTransientFlatOrdinalReassignmentPreservesViewAndAllowsAlignment(t *testing.T) {
-	its := transientFlatReassignmentInstanceSet()
-	previous := its.DeepCopy().Status.InstanceStatus
+func TestFlatOrdinalReassignmentPublishesTargetsAndPreservesInstances(t *testing.T) {
+	its := flatReassignmentInstanceSet()
 	tree := kubebuilderx.NewObjectTree()
 	tree.SetRoot(its)
 	for ordinal, templateName := range []string{"a", "b"} {
@@ -90,20 +88,19 @@ func TestTransientFlatOrdinalReassignmentPreservesViewAndAllowsAlignment(t *test
 		}
 	}
 
-	res, err := NewStatusReconciler().Reconcile(tree)
+	res, err := NewRevisionUpdateReconciler().Reconcile(tree)
 	if err != nil || res != kubebuilderx.Continue {
-		t.Fatalf("status reconcile blocked transient allocation: result=%v err=%v", res, err)
+		t.Fatalf("revision update failed: %v, %v", res, err)
 	}
-	if !equality.Semantic.DeepEqual(its.Status.InstanceStatus, previous) {
-		t.Fatalf("status reconcile published a partial view: %#v", its.Status)
+	if its.Status.ObservedGeneration != its.Generation {
+		t.Fatal("revision update did not publish the generation")
 	}
-
-	res, err = NewRevisionUpdateReconciler().Reconcile(tree)
-	if err != nil || res != kubebuilderx.Continue {
-		t.Fatalf("revision reconcile blocked transient allocation: result=%v err=%v", res, err)
+	revisions, err := revisionmap.Decode(its.Status.UpdateRevisions)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if its.Status.ObservedGeneration != its.Generation || !equality.Semantic.DeepEqual(its.Status.InstanceStatus, previous) {
-		t.Fatalf("revision reconcile advanced an incomplete view: %#v", its.Status)
+	if len(revisions) != 2 || revisions["demo-0"] == "" || revisions["demo-1"] == "" {
+		t.Fatalf("incomplete revision targets: %#v", revisions)
 	}
 
 	res, err = NewAlignmentReconciler().Reconcile(tree)
@@ -116,8 +113,17 @@ func TestTransientFlatOrdinalReassignmentPreservesViewAndAllowsAlignment(t *test
 			scaledDown++
 		}
 	}
-	if scaledDown != 1 {
-		t.Fatalf("expected alignment to release one temporary assignment, got %d", scaledDown)
+	if scaledDown != 0 || len(tree.List(&workloads.Instance{})) != 2 {
+		t.Fatalf("alignment retired a transferred instance: %d", scaledDown)
+	}
+	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	for name, template := range map[string]string{"demo-0": "b", "demo-1": "a"} {
+		status := its.FindInstanceStatus(name)
+		if status == nil || status.TemplateName == nil || *status.TemplateName != template || status.DesiredState != workloads.InstanceDesiredStateActive || status.UpToDate {
+			t.Fatalf("incorrect transferred status: %#v", status)
+		}
 	}
 }
 
@@ -131,7 +137,7 @@ func revisionTestInstanceSet() *workloads.InstanceSet {
 	}
 }
 
-func transientFlatReassignmentInstanceSet() *workloads.InstanceSet {
+func flatReassignmentInstanceSet() *workloads.InstanceSet {
 	replicas, templateReplicas := int32(2), int32(1)
 	templateA, templateB := "a", "b"
 	return &workloads.InstanceSet{

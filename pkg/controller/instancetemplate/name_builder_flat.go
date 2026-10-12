@@ -32,7 +32,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
-// ErrOrdinalsNotEnough is considered temporary, e.g. some old ordinals are being deleted
+// ErrOrdinalsNotEnough indicates that available explicit ordinals cannot satisfy the requested replicas.
 var ErrOrdinalsNotEnough = errors.New("available ordinals are not enough")
 
 type flatNameBuilder struct {
@@ -153,7 +153,6 @@ func (c *flatNameBuilder) Validate() error {
 // template ordinals are assumed to be valid at this time
 func generateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Set[int32], error) {
 	its := itsExt.InstanceSet
-	// globalUsedOrdinalSet won't decrease, so that one ordinal couldn't suddenly change its template
 	globalUsedOrdinalSet := sets.New[int32]()
 	defaultTemplateUnavailableOrdinalSet := sets.New[int32]()
 	template2OrdinalSetMap := map[string]sets.Set[int32]{}
@@ -208,42 +207,18 @@ func generateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 			return current, nil
 		}
 
-		// move from the default instance template to a named instance template
-		isTakeOver := func(ordinal int32) bool {
-			return instanceTemplate.Name != DefaultTemplateName &&
-				template2OrdinalSetMap[DefaultTemplateName].Has(ordinal)
+		availableList := convertOrdinalSetToSortedList(available.Difference(current))
+		for _, ordinal := range availableList {
+			if len(current) == int(*instanceTemplate.Replicas) {
+				break
+			}
+			globalUsedOrdinalSet.Insert(ordinal)
+			current.Insert(ordinal)
+		}
+		if len(current) < int(*instanceTemplate.Replicas) {
+			return current, ErrOrdinalsNotEnough
 		}
 
-		// move from a named instance template to the default instance template
-		isTakeBack := func(ordinal int32) bool {
-			if instanceTemplate.Name == DefaultTemplateName {
-				for name, ordinals := range template2OrdinalSetMap {
-					if name != DefaultTemplateName && ordinals.Has(ordinal) {
-						return true
-					}
-				}
-			}
-			return false
-		}
-
-		// if current is too little, add some
-		availableWithoutCurrent := available.Difference(current)
-		availableList := convertOrdinalSetToSortedList(availableWithoutCurrent)
-		cur := 0
-		for i := 0; i < diff; i++ {
-			for {
-				if cur >= len(availableWithoutCurrent) {
-					return current, ErrOrdinalsNotEnough
-				}
-				ordinal := availableList[cur]
-				if !globalUsedOrdinalSet.Has(ordinal) || (!current.Has(ordinal) && (isTakeOver(ordinal) || isTakeBack(ordinal))) {
-					globalUsedOrdinalSet.Insert(ordinal)
-					current.Insert(ordinal)
-					break
-				}
-				cur++
-			}
-		}
 		return current, nil
 	}
 

@@ -1155,7 +1155,7 @@ func TestInstanceSetStopDuringFlatOrdinalTransfer(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "stop-transfer", Namespace: "default", UID: "its-uid", Generation: 1}, Spec: workloads.InstanceSetSpec{
+	its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "stop-transfer", Namespace: "default", UID: "its-uid", Generation: 1, Annotations: map[string]string{constant.CRDAPIVersionAnnotationKey: workloads.GroupVersion.String()}}, Spec: workloads.InstanceSetSpec{
 		Replicas: ptr.To(int32(2)), FlatInstanceOrdinal: true, PodManagementPolicy: appsv1.ParallelPodManagement,
 		InstanceUpdateStrategy: &workloads.InstanceUpdateStrategy{Type: kbappsv1.OnDeleteStrategyType},
 		Selector:               &metav1.LabelSelector{MatchLabels: map[string]string{"app": "stop-transfer"}},
@@ -1253,7 +1253,7 @@ func TestInstanceAPIStopRetainsTransferredIdentity(t *testing.T) {
 	}
 	model.AddScheme(workloads.AddToScheme)
 	its := &workloads.InstanceSet{
-		ObjectMeta: metav1.ObjectMeta{Name: "instance-stop-transfer", Namespace: "default", UID: "its-uid", Generation: 1},
+		ObjectMeta: metav1.ObjectMeta{Name: "instance-stop-transfer", Namespace: "default", UID: "its-uid", Generation: 1, Annotations: map[string]string{constant.CRDAPIVersionAnnotationKey: workloads.GroupVersion.String()}},
 		Spec: workloads.InstanceSetSpec{
 			EnableInstanceAPI: ptr.To(true), Replicas: ptr.To(int32(1)), FlatInstanceOrdinal: true,
 			PodManagementPolicy: appsv1.ParallelPodManagement,

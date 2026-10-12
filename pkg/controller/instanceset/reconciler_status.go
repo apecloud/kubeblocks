@@ -56,6 +56,7 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	stopping := isStopRequested(its)
 	// 1. get all pods
 	pods := tree.List(&corev1.Pod{})
 	var podList []*corev1.Pod
@@ -125,12 +126,16 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			}
 		}
 		if isCreated(pod) && !isTerminating(pod) {
-			isPodUpdated, err := isPodUpdated(its, pod)
-			if err != nil {
-				return kubebuilderx.Continue, err
+			updated := false
+			if !stopping {
+				var err1 error
+				updated, err1 = isPodUpdated(its, pod)
+				if err1 != nil {
+					return kubebuilderx.Continue, err1
+				}
 			}
 			switch _, ok := updateRevisions[pod.Name]; {
-			case !ok, !isPodUpdated:
+			case !ok, !updated:
 				currentReplicas++
 				template2TemplatesStatus[templateName].CurrentReplicas++
 			default:
@@ -199,7 +204,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.Continue, err
 	}
 
-	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
+	if !stopping && its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 

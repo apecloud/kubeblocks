@@ -1324,7 +1324,7 @@ func instanceStatusWithoutRevisionAndHealth(status workloads.InstanceStatus) wor
 	return status
 }
 
-func pvcLifecycleFixture(t *testing.T, replicas int32, minReadySeconds int32) client.WithWatch {
+func pvcLifecycleFixture(t *testing.T, replicas int32) client.WithWatch {
 	t.Helper()
 	scheme := runtime.NewScheme()
 	if err := clientgoscheme.AddToScheme(scheme); err != nil {
@@ -1337,7 +1337,7 @@ func pvcLifecycleFixture(t *testing.T, replicas int32, minReadySeconds int32) cl
 	its := &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "pvc-lifecycle", Namespace: "default", UID: "its-uid", Generation: 1},
 		Spec: workloads.InstanceSetSpec{
-			Replicas: ptr.To(replicas), MinReadySeconds: minReadySeconds, PodManagementPolicy: appsv1.ParallelPodManagement,
+			Replicas: ptr.To(replicas), PodManagementPolicy: appsv1.ParallelPodManagement,
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "pvc-lifecycle"}},
 			Template: corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "pvc-lifecycle"}}, Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "db", Image: "db:v1"}}}},
 			VolumeClaimTemplates: []corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "data"}, Spec: corev1.PersistentVolumeClaimSpec{
@@ -1349,6 +1349,13 @@ func pvcLifecycleFixture(t *testing.T, replicas int32, minReadySeconds int32) cl
 	pvcLifecycleReconcile(t, cli, 4)
 	if len(pvcLifecyclePods(t, cli)) != int(replicas) {
 		t.Fatal("fixture did not provision running identities")
+	}
+	for _, claim := range pvcLifecycleClaims(t, cli) {
+		claim.UID = types.UID(claim.Name + "-uid")
+		claim.Spec.VolumeName = claim.Name + "-volume"
+		if err := cli.Update(context.Background(), &claim); err != nil {
+			t.Fatal(err)
+		}
 	}
 	return cli
 }
@@ -1437,7 +1444,7 @@ func pvcLifecycleHold(t *testing.T, cli client.Client) {
 }
 
 func TestInstanceSetRetainedClaimsAfterRecreation(t *testing.T) {
-	cli := pvcLifecycleFixture(t, 2, 0)
+	cli := pvcLifecycleFixture(t, 2)
 	pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
 		its.Spec.PersistentVolumeClaimRetentionPolicy = &workloads.PersistentVolumeClaimRetentionPolicy{
 			WhenDeleted: kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType,
@@ -1484,14 +1491,19 @@ func TestInstanceSetRetainedClaimsAfterRecreation(t *testing.T) {
 	pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) { its.Spec.Replicas = ptr.To(int32(1)) })
 	pvcLifecycleReconcile(t, cli, 4)
 	for _, claim := range pvcLifecycleClaims(t, cli) {
-		if claim.Name == "data-pvc-lifecycle-0" {
+		switch claim.Name {
+		case "data-pvc-lifecycle-0":
 			if !metav1.IsControlledBy(&claim, replacement) || !reflect.DeepEqual(claim.Spec, claims[0].Spec) {
 				t.Fatal("active claim was not adopted with its storage preserved")
 			}
-		} else if claim.Name == extra.Name && !reflect.DeepEqual(claim, claims[2]) {
-			t.Fatal("adoption changed the detached sibling claim")
-		} else if claim.Name != extra.Name && !reflect.DeepEqual(claim, claims[1]) {
-			t.Fatal("adoption changed the unused retained claim")
+		case extra.Name:
+			if !reflect.DeepEqual(claim, claims[2]) {
+				t.Fatal("adoption changed the detached sibling claim")
+			}
+		default:
+			if !reflect.DeepEqual(claim, claims[1]) {
+				t.Fatal("adoption changed the unused retained claim")
+			}
 		}
 	}
 	pods := pvcLifecyclePods(t, cli)
@@ -1519,7 +1531,7 @@ func TestInstanceSetPVCAllocationAndRetirement(t *testing.T) {
 	for _, tc := range cases {
 		policy, replicas := tc.policy, tc.replicas
 		t.Run(fmt.Sprintf("%s/replicas=%d", policy, replicas), func(t *testing.T) {
-			cli := pvcLifecycleFixture(t, 2, 0)
+			cli := pvcLifecycleFixture(t, 2)
 			pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
 				its.Spec.Stop = ptr.To(true)
 				its.Spec.Replicas = ptr.To(replicas)
@@ -1551,7 +1563,7 @@ func TestInstanceSetPVCAllocationAndRetirement(t *testing.T) {
 		})
 	}
 	t.Run("Offline", func(t *testing.T) {
-		cli := pvcLifecycleFixture(t, 3, 0)
+		cli := pvcLifecycleFixture(t, 3)
 		pvcLifecycleReady(t, cli)
 		pvcLifecycleHold(t, cli)
 		pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(true) })
@@ -1622,7 +1634,7 @@ func TestInstanceSetPVCAllocationAndRetirement(t *testing.T) {
 		}
 	})
 	t.Run("LiveOffline", func(t *testing.T) {
-		cli := pvcLifecycleFixture(t, 1, 0)
+		cli := pvcLifecycleFixture(t, 1)
 		pvcLifecycleReady(t, cli)
 		offline := pvcLifecycleClaims(t, cli)[0]
 		ready := pvcLifecyclePods(t, cli)[0].Status
@@ -1650,7 +1662,7 @@ func TestInstanceSetPVCAllocationAndRetirement(t *testing.T) {
 }
 
 func TestInstanceSetPVCRetirementAfterPartialCommit(t *testing.T) {
-	cli := pvcLifecycleFixture(t, 4, 0)
+	cli := pvcLifecycleFixture(t, 4)
 	for _, pod := range pvcLifecyclePods(t, cli) {
 		if err := cli.Delete(context.Background(), &pod); err != nil {
 			t.Fatal(err)
@@ -1721,7 +1733,7 @@ func TestInstanceSetPVCMixedRetirement(t *testing.T) {
 	} {
 		t.Run(string(tc.management)+"/"+string(tc.policy), func(t *testing.T) {
 			management, policy := tc.management, tc.policy
-			cli := pvcLifecycleFixture(t, 4, 0)
+			cli := pvcLifecycleFixture(t, 4)
 			pvcLifecycleReady(t, cli)
 			orphan := &corev1.Pod{}
 			if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "pvc-lifecycle-3"}, orphan); err != nil {
@@ -1788,7 +1800,7 @@ func TestInstanceSetPVCMixedRetirement(t *testing.T) {
 }
 
 func TestInstanceSetPVCAbsentOwnership(t *testing.T) {
-	cli := pvcLifecycleFixture(t, 1, 0)
+	cli := pvcLifecycleFixture(t, 1)
 	owned := pvcLifecycleClaims(t, cli)[0]
 	claims := map[string]corev1.PersistentVolumeClaim{}
 	for _, ownership := range []string{"detached", "previous-root", "noncontroller"} {

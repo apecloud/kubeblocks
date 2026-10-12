@@ -52,7 +52,9 @@ type ClusterRestoreReconciler struct {
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restores,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch
 
-func (r *ClusterRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *ClusterRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (reconcileResult ctrl.Result, reconcileErr error) {
+	finish := intctrlutil.LogReconcile(ctx, req, "ClusterRestoreReconciler")
+	defer func() { finish(reconcileResult, reconcileErr) }()
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx: ctx, Req: req,
 		Log:      log.FromContext(ctx).WithValues("cluster-restore", req.NamespacedName),

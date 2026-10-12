@@ -71,7 +71,9 @@ type BackupPolicyDriverReconciler struct {
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the backuppolicy closer to the desired state.
-func (r *BackupPolicyDriverReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *BackupPolicyDriverReconciler) Reconcile(ctx context.Context, req ctrl.Request) (reconcileResult ctrl.Result, reconcileErr error) {
+	finish := intctrlutil.LogReconcile(ctx, req, "BackupPolicyDriverReconciler")
+	defer func() { finish(reconcileResult, reconcileErr) }()
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,

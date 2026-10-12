@@ -22,6 +22,8 @@ package graph
 import (
 	"context"
 	"errors"
+	"fmt"
+	"time"
 
 	"github.com/go-logr/logr"
 	"k8s.io/client-go/tools/record"
@@ -54,7 +56,20 @@ var ErrPrematureStop = errors.New("Premature-Stop")
 func (r TransformerChain) ApplyTo(ctx TransformContext, dag *DAG) error {
 	var delayedError error
 	for _, transformer := range r {
-		if err := transformer.Transform(ctx, dag); err != nil {
+		logger := ctx.GetLogger().WithValues("transformer", fmt.Sprintf("%T", transformer))
+		started := time.Now()
+		logger.V(1).Info("Transformer started")
+		err := transformer.Transform(ctx, dag)
+		logger = logger.WithValues("duration", time.Since(started))
+		if err != nil {
+			switch {
+			case err == ErrPrematureStop:
+				logger.V(1).Info("Transformer chain stopped")
+			case intctrlutil.IsRequeueError(err):
+				logger.V(1).Info("Transformer requested retry", "reason", err.Error())
+			default:
+				logger.Error(err, "Transformer failed")
+			}
 			if intctrlutil.IsDelayedRequeueError(err) {
 				if delayedError == nil {
 					delayedError = err
@@ -63,6 +78,7 @@ func (r TransformerChain) ApplyTo(ctx TransformContext, dag *DAG) error {
 			}
 			return ignoredIfPrematureStop(err)
 		}
+		logger.V(1).Info("Transformer completed")
 	}
 	return delayedError
 }

@@ -48,7 +48,9 @@ type InstanceSetReconciler2 struct {
 	Recorder record.EventRecorder
 }
 
-func (r *InstanceSetReconciler2) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *InstanceSetReconciler2) Reconcile(ctx context.Context, req ctrl.Request) (reconcileResult ctrl.Result, reconcileErr error) {
+	finish := intctrlutil.LogReconcile(ctx, req, "InstanceSetReconciler2")
+	defer func() { finish(reconcileResult, reconcileErr) }()
 	logger := log.FromContext(ctx).WithValues("InstanceSet2", req.NamespacedName)
 	return kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
 		Prepare(instanceset2.NewTreeLoader()).

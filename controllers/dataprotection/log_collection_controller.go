@@ -65,7 +65,9 @@ type LogCollectionReconciler struct {
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the backup closer to the desired state.
-func (r *LogCollectionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *LogCollectionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (reconcileResult ctrl.Result, reconcileErr error) {
+	finish := intctrlutil.LogReconcile(ctx, req, "LogCollectionReconciler")
+	defer func() { finish(reconcileResult, reconcileErr) }()
 	// setup common request context
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      ctx,

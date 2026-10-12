@@ -86,7 +86,9 @@ type InstanceReconciler struct {
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
-func (r *InstanceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *InstanceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (reconcileResult ctrl.Result, reconcileErr error) {
+	finish := intctrlutil.LogReconcile(ctx, req, "InstanceReconciler")
+	defer func() { finish(reconcileResult, reconcileErr) }()
 	logger := log.FromContext(ctx).WithValues("Instance", req.NamespacedName)
 
 	return kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).

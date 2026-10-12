@@ -36,6 +36,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -266,4 +267,24 @@ func CheckResourceExists(
 	}
 	// if found, return true
 	return true, nil
+}
+
+// LogReconcile records the outcome without logging resource contents. Call the
+// returned function in a defer so it observes the final result and error.
+func LogReconcile(ctx context.Context, req ctrl.Request, controller string) func(ctrl.Result, error) {
+	logger := log.FromContext(ctx).WithValues("controllerType", controller, "resource", req.NamespacedName)
+	started := time.Now()
+	logger.V(1).Info("Reconciliation started")
+	return func(result ctrl.Result, err error) {
+		fields := []interface{}{"duration", time.Since(started), "requeue", result.Requeue, "requeueAfter", result.RequeueAfter}
+		if err != nil {
+			if apierrors.IsConflict(err) || IsRequeueError(err) {
+				logger.V(1).Info("Reconciliation will retry", append(fields, "reason", err.Error())...)
+			} else {
+				logger.Error(err, "Reconciliation failed", fields...)
+			}
+			return
+		}
+		logger.V(1).Info("Reconciliation completed", fields...)
+	}
 }

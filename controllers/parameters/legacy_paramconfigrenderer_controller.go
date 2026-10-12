@@ -44,7 +44,9 @@ type LegacyParamConfigRendererReconciler struct {
 // +kubebuilder:rbac:groups=parameters.kubeblocks.io,resources=paramconfigrenderers,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=parameters.kubeblocks.io,resources=paramconfigrenderers/finalizers,verbs=update
 
-func (r *LegacyParamConfigRendererReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *LegacyParamConfigRendererReconciler) Reconcile(ctx context.Context, req ctrl.Request) (reconcileResult ctrl.Result, reconcileErr error) {
+	finish := intctrlutil.LogReconcile(ctx, req, "LegacyParamConfigRendererReconciler")
+	defer func() { finish(reconcileResult, reconcileErr) }()
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,

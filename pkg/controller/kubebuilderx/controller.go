@@ -22,6 +22,7 @@ package kubebuilderx
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -72,6 +73,7 @@ type controller struct {
 }
 
 func (c *controller) Prepare(reader TreeLoader) Controller {
+	c.logger.V(1).Info("Loading object tree", "loader", fmt.Sprintf("%T", reader))
 	c.oldTree, c.err = reader.Load(c.ctx, c.cli, c.req, c.recorder, c.logger)
 	if c.err != nil {
 		return c
@@ -99,14 +101,23 @@ func (c *controller) Do(reconciler Reconciler) Controller {
 	if c.res.Next != cntn {
 		return c
 	}
+	logger := c.logger.WithValues("reconciler", fmt.Sprintf("%T", reconciler))
 	switch result := reconciler.PreCondition(c.tree); {
 	case result.Err != nil:
+		logger.Error(result.Err, "Reconciler precondition failed")
 		c.err = result.Err
 		return c
 	case !result.Satisfied:
+		logger.V(1).Info("Reconciler skipped: precondition not satisfied")
 		return c
 	}
+	started := time.Now()
 	c.res, c.err = reconciler.Reconcile(c.tree)
+	if c.err != nil {
+		logger.Error(c.err, "Reconciler failed", "duration", time.Since(started))
+	} else {
+		logger.V(1).Info("Reconciler completed", "duration", time.Since(started), "next", c.res.Next, "retryAfter", c.res.RetryAfter)
+	}
 	return c
 }
 
@@ -167,7 +178,7 @@ func NewController(ctx context.Context, cli client.Client, req ctrl.Request, rec
 		cli:      cli,
 		req:      req,
 		recorder: recorder,
-		logger:   logger,
+		logger:   logger.WithValues("resource", req.NamespacedName),
 		res:      Continue,
 	}
 }

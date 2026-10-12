@@ -30,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
@@ -244,7 +245,7 @@ func (p *Plan) Execute() error {
 
 // Do the real works
 
-func (b *PlanBuilder) defaultWalkFunc(v graph.Vertex) error {
+func (b *PlanBuilder) defaultWalkFunc(v graph.Vertex) (err error) {
 	vertex, ok := v.(*model.ObjectVertex)
 	if !ok {
 		return fmt.Errorf("wrong vertex type %v", v)
@@ -252,7 +253,17 @@ func (b *PlanBuilder) defaultWalkFunc(v graph.Vertex) error {
 	if vertex.Action == nil {
 		return errors.New("vertex action can't be nil")
 	}
-	b.transCtx.logger.V(5).Info("action for vertex", "vertex", vertex.String())
+	logger := b.transCtx.logger.WithValues("action", *vertex.Action, "kind", fmt.Sprintf("%T", vertex.Obj),
+		"namespace", vertex.Obj.GetNamespace(), "name", vertex.Obj.GetName(), "subResource", vertex.SubResource)
+	defer func() {
+		if apierrors.IsConflict(err) {
+			logger.V(1).Info("Resource operation conflicted; will retry")
+		} else if err != nil {
+			logger.Error(err, "Resource operation failed")
+		} else {
+			logger.Info("Resource operation completed")
+		}
+	}()
 	ctx := b.transCtx.ctx
 	switch *vertex.Action {
 	case model.CREATE:

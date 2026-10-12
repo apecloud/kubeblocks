@@ -70,7 +70,9 @@ type StorageProviderReconciler struct {
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
-func (r *StorageProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *StorageProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (reconcileResult ctrl.Result, reconcileErr error) {
+	finish := intctrlutil.LogReconcile(ctx, req, "StorageProviderReconciler")
+	defer func() { finish(reconcileResult, reconcileErr) }()
 	logger := log.FromContext(ctx).WithValues("storageprovider", req.NamespacedName)
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      ctx,

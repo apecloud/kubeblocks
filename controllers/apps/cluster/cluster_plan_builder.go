@@ -248,18 +248,19 @@ func newClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client) graph.
 
 func (c *clusterPlanBuilder) defaultWalkFuncWithLogging(vertex graph.Vertex) error {
 	node, ok := vertex.(*model.ObjectVertex)
+	logger := c.transCtx.Logger
+	if ok && node.Action != nil && node.Obj != nil {
+		logger = logger.WithValues("action", *node.Action, "kind", fmt.Sprintf("%T", node.Obj),
+			"namespace", node.Obj.GetNamespace(), "name", node.Obj.GetName())
+	}
 	err := c.defaultWalkFunc(vertex)
 	switch {
-	case err == nil:
-		return err
-	case !ok:
-		c.transCtx.Logger.Error(err, "")
-	case node.Action == nil:
-		c.transCtx.Logger.Error(err, fmt.Sprintf("%T", node))
 	case apierrors.IsConflict(err):
-		return err
+		logger.V(1).Info("Resource operation conflicted; will retry")
+	case err != nil:
+		logger.Error(err, "Resource operation failed")
 	default:
-		c.transCtx.Logger.Error(err, fmt.Sprintf("%s %T error", *node.Action, node.Obj))
+		logger.Info("Resource operation completed")
 	}
 	return err
 }

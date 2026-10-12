@@ -48,7 +48,9 @@ type OpsDefinitionReconciler struct {
 // +kubebuilder:rbac:groups=operations.kubeblocks.io,resources=opsdefinitions/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=operations.kubeblocks.io,resources=opsdefinitions/finalizers,verbs=update
 
-func (r *OpsDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *OpsDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (reconcileResult ctrl.Result, reconcileErr error) {
+	finish := intctrlutil.LogReconcile(ctx, req, "OpsDefinitionReconciler")
+	defer func() { finish(reconcileResult, reconcileErr) }()
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx: ctx,
 		Req: req,

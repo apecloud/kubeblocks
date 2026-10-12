@@ -1353,7 +1353,7 @@ func TestInstanceSetTransferredIdentityCleanup(t *testing.T) {
 							t.Fatal(err)
 						}
 					}
-					its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "cleanup-transfer", Namespace: "default", UID: "its-uid", Generation: 1}, Spec: workloads.InstanceSetSpec{
+					its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "cleanup-transfer", Namespace: "default", UID: "its-uid", Generation: 1, Annotations: map[string]string{constant.CRDAPIVersionAnnotationKey: workloads.GroupVersion.String()}}, Spec: workloads.InstanceSetSpec{
 						Replicas: ptr.To(int32(2)), FlatInstanceOrdinal: true, PodManagementPolicy: appsv1.ParallelPodManagement,
 						InstanceUpdateStrategy: &workloads.InstanceUpdateStrategy{Type: kbappsv1.OnDeleteStrategyType},
 						Selector:               &metav1.LabelSelector{MatchLabels: map[string]string{"app": "cleanup-transfer"}},
@@ -1518,7 +1518,7 @@ func TestInstanceAPITransferredIdentityCleanup(t *testing.T) {
 				}
 			}
 			model.AddScheme(workloads.AddToScheme)
-			its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "instance-cleanup", Namespace: "default", UID: "its-uid", Generation: 1}, Spec: workloads.InstanceSetSpec{
+			its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "instance-cleanup", Namespace: "default", UID: "its-uid", Generation: 1, Annotations: map[string]string{constant.CRDAPIVersionAnnotationKey: workloads.GroupVersion.String()}}, Spec: workloads.InstanceSetSpec{
 				EnableInstanceAPI: ptr.To(true), Replicas: ptr.To(int32(1)), FlatInstanceOrdinal: true, PodManagementPolicy: appsv1.ParallelPodManagement,
 				Selector:  &metav1.LabelSelector{MatchLabels: map[string]string{"app": "instance-cleanup"}},
 				Template:  corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "instance-cleanup"}}, Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "db", Image: "db:v1"}}}},

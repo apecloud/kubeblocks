@@ -21,8 +21,11 @@ package workloads
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"reflect"
 	"strings"
+	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -33,16 +36,23 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	kbaproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
@@ -974,4 +984,167 @@ func instanceStatusWithoutRevisionAndHealth(status workloads.InstanceStatus) wor
 	status.Available = false
 	status.Failed = false
 	return status
+}
+
+func TestInstanceSetFlatOrdinalTransfer(t *testing.T) {
+	for _, swap := range []bool{false, true} {
+		for _, failStatus := range []bool{false, true} {
+			t.Run(fmt.Sprintf("swap=%t/statusFailure=%t", swap, failStatus), func(t *testing.T) {
+				scheme := runtime.NewScheme()
+				for _, add := range []func(*runtime.Scheme) error{clientgoscheme.AddToScheme, workloads.AddToScheme} {
+					if err := add(scheme); err != nil {
+						t.Fatal(err)
+					}
+				}
+				model.AddScheme(workloads.AddToScheme)
+				its := &workloads.InstanceSet{
+					ObjectMeta: metav1.ObjectMeta{Name: "flat-transfer", Namespace: "default", UID: "its-uid", Generation: 1, Annotations: map[string]string{constant.CRDAPIVersionAnnotationKey: workloads.GroupVersion.String()}},
+					Spec: workloads.InstanceSetSpec{
+						Replicas: ptr.To(int32(1)), FlatInstanceOrdinal: true,
+						PodManagementPolicy:    appsv1.ParallelPodManagement,
+						InstanceUpdateStrategy: &workloads.InstanceUpdateStrategy{Type: kbappsv1.OnDeleteStrategyType},
+						Selector:               &metav1.LabelSelector{MatchLabels: map[string]string{"app": "flat-transfer"}},
+						Template:               corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "flat-transfer"}}, Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "db", Image: "db:v1"}}}},
+						Instances:              []workloads.InstanceTemplate{{Name: "a", Replicas: ptr.To(int32(1)), Ordinals: workloads.Ordinals{Discrete: []int32{0}}}},
+						VolumeClaimTemplates:   []corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "data"}, Spec: corev1.PersistentVolumeClaimSpec{AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}, Resources: corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}}}}},
+					},
+				}
+				if swap {
+					its.Spec.Replicas = ptr.To(int32(2))
+					its.Spec.Instances = append(its.Spec.Instances, workloads.InstanceTemplate{Name: "b", Replicas: ptr.To(int32(1)), Ordinals: workloads.Ordinals{Discrete: []int32{1}}})
+					its.Spec.InstanceUpdateStrategy = nil
+				}
+				cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&workloads.InstanceSet{}, &corev1.Pod{}, &corev1.PersistentVolumeClaim{}).WithObjects(its).Build()
+				key := client.ObjectKeyFromObject(its)
+				reconcile := func(c client.Client) error {
+					_, err := (&InstanceSetReconciler{Client: c, Scheme: scheme, Recorder: record.NewFakeRecorder(100)}).Reconcile(context.Background(), ctrl.Request{NamespacedName: key})
+					return err
+				}
+				run := func() {
+					t.Helper()
+					if err := reconcile(cli); err != nil {
+						t.Fatal(err)
+					}
+				}
+				for i := 0; i < 3; i++ {
+					run()
+				}
+				pod := &corev1.Pod{}
+				if err := cli.Get(context.Background(), client.ObjectKey{Namespace: key.Namespace, Name: its.Name + "-0"}, pod); err != nil {
+					t.Fatal(err)
+				}
+				pod.Status.Phase = corev1.PodRunning
+				pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: metav1.Now()}}
+				if err := cli.Status().Update(context.Background(), pod); err != nil {
+					t.Fatal(err)
+				}
+				pod.Finalizers = []string{"test/hold"}
+				if err := cli.Update(context.Background(), pod); err != nil {
+					t.Fatal(err)
+				}
+				if err := cli.Delete(context.Background(), pod); err != nil {
+					t.Fatal(err)
+				}
+				claim := &corev1.PersistentVolumeClaim{}
+				if err := cli.Get(context.Background(), client.ObjectKey{Namespace: key.Namespace, Name: "data-" + pod.Name}, claim); err != nil {
+					t.Fatal(err)
+				}
+				claim.UID = "claim-uid"
+				claim.Spec.VolumeName = "bound-volume"
+				if err := cli.Update(context.Background(), claim); err != nil {
+					t.Fatal(err)
+				}
+				if err := cli.Get(context.Background(), key, its); err != nil {
+					t.Fatal(err)
+				}
+				if swap {
+					its.Spec.Instances[0].Ordinals.Discrete = []int32{1}
+					its.Spec.Instances[1].Ordinals.Discrete = []int32{0}
+				} else {
+					its.Spec.Instances[0].Name = "b"
+				}
+				its.Generation++
+				if err := cli.Update(context.Background(), its); err != nil {
+					t.Fatal(err)
+				}
+				if failStatus {
+					injected := errors.New("injected status failure")
+					faulty := interceptor.NewClient(cli, interceptor.Funcs{SubResourceUpdate: func(ctx context.Context, c client.Client, sub string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+						if _, ok := obj.(*workloads.InstanceSet); ok && sub == "status" {
+							return injected
+						}
+						return c.SubResource(sub).Update(ctx, obj, opts...)
+					}})
+					if err := reconcile(faulty); !errors.Is(err, injected) {
+						t.Fatalf("expected status failure, got %v", err)
+					}
+					persisted := &workloads.InstanceSet{}
+					if err := cli.Get(context.Background(), key, persisted); err != nil {
+						t.Fatal(err)
+					}
+					if persisted.Status.ObservedGeneration == its.Generation {
+						t.Fatal("status failure was not persisted as an incomplete commit")
+					}
+					persistedClaim := &corev1.PersistentVolumeClaim{}
+					if err := cli.Get(context.Background(), client.ObjectKeyFromObject(claim), persistedClaim); err != nil {
+						t.Fatal(err)
+					}
+					if persistedClaim.Labels[constant.KBAppInstanceTemplateLabelKey] != "b" {
+						t.Fatal("fixture did not commit PVC transfer before status failure")
+					}
+				}
+				for i := 0; i < 3; i++ {
+					run()
+				}
+				current := &corev1.PersistentVolumeClaim{}
+				if err := cli.Get(context.Background(), client.ObjectKeyFromObject(claim), current); err != nil {
+					t.Fatalf("allocated claim was deleted: %v", err)
+				}
+				if current.UID != claim.UID || current.Spec.VolumeName != claim.Spec.VolumeName || !reflect.DeepEqual(current.OwnerReferences, claim.OwnerReferences) || !current.DeletionTimestamp.IsZero() {
+					t.Fatal("allocated storage identity changed")
+				}
+				if err := cli.Get(context.Background(), key, its); err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(its.Status.AssignedOrdinals["b"].Discrete, []int32{0}) || len(its.Status.AssignedOrdinals) != len(its.Spec.Instances) {
+					t.Fatalf("ordinal did not transfer: %#v", its.Status.AssignedOrdinals)
+				}
+				if err := cli.Get(context.Background(), client.ObjectKeyFromObject(pod), pod); err != nil {
+					t.Fatal(err)
+				}
+				if pod.DeletionTimestamp.IsZero() {
+					t.Fatal("fixture did not retain terminating Pod")
+				}
+				expectedTemplate := "b"
+				if failStatus && !swap {
+					its.Spec.Instances[0].Name = "c"
+					its.Generation++
+					if err := cli.Update(context.Background(), its); err != nil {
+						t.Fatal(err)
+					}
+					run()
+					expectedTemplate = "c"
+				}
+				pod.Finalizers = nil
+				if err := cli.Update(context.Background(), pod); err != nil {
+					t.Fatal(err)
+				}
+				for i := 0; i < 3; i++ {
+					run()
+				}
+				if err := cli.Get(context.Background(), client.ObjectKeyFromObject(pod), pod); err != nil {
+					t.Fatalf("Pod did not recover: %v", err)
+				}
+				if !pod.DeletionTimestamp.IsZero() || pod.Labels[instancetemplate.TemplateNameLabelKey] != expectedTemplate {
+					t.Fatal("replacement Pod did not use desired template")
+				}
+				if err := cli.Get(context.Background(), client.ObjectKeyFromObject(claim), current); err != nil {
+					t.Fatal(err)
+				}
+				if current.UID != claim.UID || current.Spec.VolumeName != claim.Spec.VolumeName || !reflect.DeepEqual(current.OwnerReferences, claim.OwnerReferences) {
+					t.Fatal("replacement lost retained storage")
+				}
+			})
+		}
+	}
 }

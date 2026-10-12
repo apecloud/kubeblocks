@@ -358,8 +358,8 @@ var _ = Describe("flat name builder tests", func() {
 				},
 			},
 		}, map[string]sets.Set[int32]{
-			"t1": sets.New[int32](0),
-			"t2": sets.New[int32](3),
+			"t1": sets.New[int32](0, 2),
+			"t2": sets.New[int32](1, 3),
 		}, false),
 
 		Entry("with offline instances", &workloads.InstanceSet{

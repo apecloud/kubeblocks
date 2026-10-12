@@ -1167,3 +1167,91 @@ func TestInstanceSetPVCReusedClaimAfterIdentityChange(t *testing.T) {
 		t.Fatalf("Active claim lost storage or identity: %#v", current)
 	}
 }
+
+func TestInstanceSetPVCReusedClaimBeforePodAdmission(t *testing.T) {
+	for _, management := range []appsv1.PodManagementPolicyType{appsv1.OrderedReadyPodManagement, appsv1.ParallelPodManagement} {
+		t.Run(string(management), func(t *testing.T) {
+			cli := pvcLifecycleFixture(t, 2)
+			for _, pod := range pvcLifecyclePods(t, cli) {
+				if err := cli.Delete(context.Background(), &pod); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for _, claim := range pvcLifecycleClaims(t, cli) {
+				if err := cli.Delete(context.Background(), &claim); err != nil {
+					t.Fatal(err)
+				}
+			}
+			pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
+				its.Spec.Instances = []workloads.InstanceTemplate{{Name: "a-pvc-lifecycle", Replicas: ptr.To(int32(2))}}
+			})
+			pvcLifecycleReconcile(t, cli, 1)
+			pvcLifecycleReady(t, cli)
+			claims := pvcLifecycleClaims(t, cli)
+			pods := pvcLifecyclePods(t, cli)
+			if len(claims) != 2 || len(pods) != 2 {
+				t.Fatalf("invalid fixture claims=%#v pods=%#v", claims, pods)
+			}
+			for i := range claims {
+				claims[i].UID = types.UID(claims[i].Name + "-original-uid")
+				claims[i].Spec.VolumeName = claims[i].Name + "-original-volume"
+				if err := cli.Update(context.Background(), &claims[i]); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for _, pod := range pods {
+				if err := cli.Delete(context.Background(), &pod); err != nil {
+					t.Fatal(err)
+				}
+			}
+			pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
+				its.Spec.Instances = nil
+				its.Spec.VolumeClaimTemplates[0].Name = "data-pvc-lifecycle-a"
+				its.Spec.PodManagementPolicy = management
+				its.Spec.ParallelPodManagementConcurrency = ptr.To(intstr.FromInt(1))
+			})
+			pvcLifecycleReconcile(t, cli, 1)
+			actualPods := pvcLifecyclePods(t, cli)
+			if len(actualPods) != 1 || actualPods[0].Name != "pvc-lifecycle-0" {
+				t.Fatalf("expected only first Active Pod admitted, got %#v", actualPods)
+			}
+			for _, claim := range claims {
+				current := &corev1.PersistentVolumeClaim{}
+				if err := cli.Get(context.Background(), client.ObjectKeyFromObject(&claim), current); err != nil {
+					t.Fatalf("desired Active claim deleted before its Pod was admitted: %s: %v", claim.Name, err)
+				}
+				if current.UID != claim.UID || !reflect.DeepEqual(current.Spec, claim.Spec) {
+					t.Fatalf("claim storage changed: %#v", current)
+				}
+			}
+
+			pvcLifecycleReady(t, cli)
+			pvcLifecycleReconcile(t, cli, 1)
+			if len(pvcLifecyclePods(t, cli)) != 2 {
+				t.Fatal("deferred Pod did not resume after readiness restored admission")
+			}
+			for _, claim := range claims {
+				current := &corev1.PersistentVolumeClaim{}
+				if err := cli.Get(context.Background(), client.ObjectKeyFromObject(&claim), current); err != nil {
+					t.Fatal(err)
+				}
+				if current.UID != claim.UID || !reflect.DeepEqual(current.Spec, claim.Spec) {
+					t.Fatal("resumed Pod did not reuse its original storage")
+				}
+				expectedPod := "pvc-lifecycle-0"
+				if claim.Name == "data-pvc-lifecycle-a-pvc-lifecycle-1" {
+					expectedPod = "pvc-lifecycle-1"
+				}
+				if current.Labels[constant.KBAppPodNameLabelKey] != expectedPod {
+					t.Fatalf("resumed claim identity = %q, want %q", current.Labels[constant.KBAppPodNameLabelKey], expectedPod)
+				}
+			}
+			pvcLifecycleReady(t, cli)
+			pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) { its.Spec.Replicas = ptr.To(int32(0)) })
+			pvcLifecycleReconcile(t, cli, 6)
+			if len(pvcLifecyclePods(t, cli)) != 0 || len(pvcLifecycleClaims(t, cli)) != 0 {
+				t.Fatal("previously reused claims survived final retirement")
+			}
+		})
+	}
+}

@@ -315,7 +315,13 @@ func (b *PlanBuilder) deleteObject(ctx context.Context, vertex *model.ObjectVert
 		}
 	}
 	if !model.IsObjectDeleting(vertex.Obj) {
-		err := b.cli.Delete(ctx, vertex.Obj, clientOption(vertex))
+		options := []client.DeleteOption{clientOption(vertex)}
+		if _, ok := vertex.Obj.(*corev1.PersistentVolumeClaim); ok {
+			// Protect storage if the claim changed ownership or was replaced after planning.
+			uid, resourceVersion := vertex.Obj.GetUID(), vertex.Obj.GetResourceVersion()
+			options = append(options, client.Preconditions{UID: &uid, ResourceVersion: &resourceVersion})
+		}
+		err := b.cli.Delete(ctx, vertex.Obj, options...)
 		if err != nil {
 			return fmt.Errorf("delete %T %s failed: %w", vertex.Obj, klog.KObj(vertex.Obj), err)
 		}

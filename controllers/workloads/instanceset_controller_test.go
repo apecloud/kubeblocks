@@ -1833,18 +1833,25 @@ func TestLegacyInstanceSetStopRecoveryPartialCommit(t *testing.T) {
 }
 
 func TestLegacyInstanceSetStopRecoveryRetirementAfterPartialPVCCommit(t *testing.T) {
-	cli := legacyStopRecoveryFixture(t, 3, 0)
+	cli := legacyStopRecoveryFixture(t, 4, 0)
 	legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) {
 		its.Spec.Stop = ptr.To(true)
 		its.Spec.Replicas = ptr.To(int32(1))
 		its.Spec.PersistentVolumeClaimRetentionPolicy = &kbappsv1.PersistentVolumeClaimRetentionPolicy{WhenScaled: kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType}
 	})
 	legacyStopRecoveryReconcile(t, cli, 6)
-	allocated := &corev1.PersistentVolumeClaim{}
-	if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "data-legacy-stop-0"}, allocated); err != nil {
-		t.Fatal(err)
+	allocated := []corev1.PersistentVolumeClaim{}
+	for _, name := range []string{"data-legacy-stop-0", "data-legacy-stop-3"} {
+		claim := &corev1.PersistentVolumeClaim{}
+		if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: name}, claim); err != nil {
+			t.Fatal(err)
+		}
+		allocated = append(allocated, *claim)
 	}
-	legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(false) })
+	legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) {
+		its.Spec.OfflineInstances = []string{"legacy-stop-3"}
+		its.Spec.Stop = ptr.To(false)
+	})
 	failure := errors.New("injected retired PVC delete failure")
 	fired, attempts, deleted := false, 0, 0
 	faulty := interceptor.NewClient(cli, interceptor.Funcs{
@@ -1866,19 +1873,24 @@ func TestLegacyInstanceSetStopRecoveryRetirementAfterPartialPVCCommit(t *testing
 	})
 	controller := &InstanceSetReconciler{Client: faulty, Recorder: record.NewFakeRecorder(1000)}
 	_, err := controller.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKey{Namespace: "default", Name: "legacy-stop"}})
-	if !errors.Is(err, failure) || !fired || attempts != 2 || deleted != 1 || len(legacyStopRecoveryClaims(t, cli)) != 2 || len(legacyStopRecoveryPods(t, cli)) != 0 {
+	if !errors.Is(err, failure) || !fired || attempts != 2 || deleted != 1 || len(legacyStopRecoveryClaims(t, cli)) != 3 || len(legacyStopRecoveryPods(t, cli)) != 0 {
 		t.Fatalf("expected one persisted retired-claim deletion before failure, got %v", err)
 	}
-	current := &corev1.PersistentVolumeClaim{}
-	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(allocated), current); err != nil || !reflect.DeepEqual(allocated, current) {
-		t.Fatal("partial retirement changed allocated storage")
+	for _, claim := range allocated {
+		current := &corev1.PersistentVolumeClaim{}
+		if err := cli.Get(context.Background(), client.ObjectKeyFromObject(&claim), current); err != nil || !reflect.DeepEqual(claim, *current) {
+			t.Fatal("partial retirement changed Active or Offline storage")
+		}
 	}
 	legacyStopRecoveryReconcile(t, faulty, 5)
-	if deleted != 2 || len(legacyStopRecoveryClaims(t, cli)) != 1 || len(legacyStopRecoveryPods(t, cli)) != 1 {
+	if deleted != 2 || len(legacyStopRecoveryClaims(t, cli)) != 2 || len(legacyStopRecoveryPods(t, cli)) != 1 {
 		t.Fatal("fresh retry did not complete retirement and resume")
 	}
-	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(allocated), current); err != nil || !reflect.DeepEqual(allocated, current) {
-		t.Fatal("retirement retry changed allocated storage")
+	for _, claim := range allocated {
+		current := &corev1.PersistentVolumeClaim{}
+		if err := cli.Get(context.Background(), client.ObjectKeyFromObject(&claim), current); err != nil || !reflect.DeepEqual(claim, *current) {
+			t.Fatal("retirement retry changed Active or Offline storage")
+		}
 	}
 }
 

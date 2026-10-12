@@ -342,25 +342,24 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	}
 	offlineNames := append([]string(nil), its.Spec.OfflineInstances...)
 	templateHints := make([]instancestatus.TemplateAssignment, 0, len(desiredTemplateAssignments)+len(pods)+len(offlineNames))
+	retainedTemplates := make(map[string]string, len(pods)+len(its.Status.InstanceStatus))
+	for _, pod := range pods {
+		if template, ok := instancetemplate.TemplateNameFromLabels(pod.Labels); ok {
+			retainedTemplates[pod.Name] = template
+		}
+	}
+	for _, status := range its.Status.InstanceStatus {
+		if status.TemplateName != nil {
+			retainedTemplates[status.PodName] = *status.TemplateName
+		}
+	}
 	stopped := isStopRequested(its)
 	if stopped {
-		retainedTemplates := make(map[string]string, len(pods)+len(its.Status.InstanceStatus))
-		for _, pod := range pods {
-			if template, ok := instancetemplate.TemplateNameFromLabels(pod.Labels); ok {
-				retainedTemplates[pod.Name] = template
-			}
-		}
-		for _, status := range its.Status.InstanceStatus {
-			if status.TemplateName != nil {
-				retainedTemplates[status.PodName] = *status.TemplateName
-			}
-		}
 		for _, assignment := range desiredTemplateAssignments {
 			offlineNames = append(offlineNames, assignment.InstanceName)
-			if template, ok := retainedTemplates[assignment.InstanceName]; ok {
-				assignment.TemplateName = template
+			if _, known := retainedTemplates[assignment.InstanceName]; !known {
+				retainedTemplates[assignment.InstanceName] = assignment.TemplateName
 			}
-			templateHints = append(templateHints, assignment)
 		}
 		desiredTemplateAssignments = nil
 	}
@@ -374,11 +373,6 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		state := workloads.InstanceCurrentStatePresent
 		if !pod.DeletionTimestamp.IsZero() {
 			state = workloads.InstanceCurrentStateTerminating
-		}
-		if templateName, ok := instancetemplate.TemplateNameFromLabels(pod.Labels); ok {
-			if _, allocated := desiredNames[pod.Name]; !stopped || !allocated {
-				templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: pod.Name, TemplateName: templateName})
-			}
 		}
 		ready := state == workloads.InstanceCurrentStatePresent && isImageMatched(pod) && intctrlutil.IsPodReady(pod)
 		observation := instancestatus.Observation{
@@ -412,7 +406,11 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	}
 
 	for _, name := range append(append([]string(nil), offlineNames...), podObservationNames(observations)...) {
-		if _, ok := desiredNames[name]; ok {
+		if _, ok := desiredNames[name]; !stopped && ok {
+			continue
+		}
+		if templateName, ok := retainedTemplates[name]; ok {
+			templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: name, TemplateName: templateName})
 			continue
 		}
 		if templateName, ok, err := instancetemplate.ResolveHistoricalTemplate(its, name, templateNames); err != nil {

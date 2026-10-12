@@ -307,23 +307,22 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	}
 	offlineNames := append([]string(nil), its.Spec.OfflineInstances...)
 	templateHints := make([]instancestatus.TemplateAssignment, 0, len(desiredTemplateAssignments)+len(instances)+len(offlineNames))
+	retainedTemplates := make(map[string]string, len(instances)+len(its.Status.InstanceStatus))
+	for _, inst := range instances {
+		retainedTemplates[inst.Name] = inst.Spec.InstanceTemplateName
+	}
+	for _, status := range its.Status.InstanceStatus {
+		if status.TemplateName != nil {
+			retainedTemplates[status.PodName] = *status.TemplateName
+		}
+	}
 	stopped := its.Spec.Stop != nil && *its.Spec.Stop
 	if stopped {
-		retainedTemplates := make(map[string]string, len(instances)+len(its.Status.InstanceStatus))
-		for _, inst := range instances {
-			retainedTemplates[inst.Name] = inst.Spec.InstanceTemplateName
-		}
-		for _, status := range its.Status.InstanceStatus {
-			if status.TemplateName != nil {
-				retainedTemplates[status.PodName] = *status.TemplateName
-			}
-		}
 		for _, assignment := range desiredTemplateAssignments {
 			offlineNames = append(offlineNames, assignment.InstanceName)
-			if template, ok := retainedTemplates[assignment.InstanceName]; ok {
-				assignment.TemplateName = template
+			if _, known := retainedTemplates[assignment.InstanceName]; !known {
+				retainedTemplates[assignment.InstanceName] = assignment.TemplateName
 			}
-			templateHints = append(templateHints, assignment)
 		}
 		desiredTemplateAssignments = nil
 	}
@@ -336,12 +335,6 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 			return fmt.Errorf("duplicate Instance object for %q", inst.Name)
 		}
 		seenInstances[inst.Name] = struct{}{}
-		if _, allocated := desiredNames[inst.Name]; !stopped || !allocated {
-			templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: inst.Name, TemplateName: inst.Spec.InstanceTemplateName})
-			if templateName, ok := instancetemplate.TemplateNameFromLabels(inst.Labels); ok {
-				templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: inst.Name, TemplateName: templateName})
-			}
-		}
 		switch inst.Status.CurrentState {
 		case workloads.InstanceCurrentStatePresent, workloads.InstanceCurrentStateTerminating:
 			// InstanceSet revisions identify desired Instance specs, while Instance CurrentRevision identifies the
@@ -371,7 +364,11 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	}
 
 	for _, name := range append(append([]string(nil), offlineNames...), observationNames(observations)...) {
-		if _, ok := desiredNames[name]; ok {
+		if _, ok := desiredNames[name]; !stopped && ok {
+			continue
+		}
+		if templateName, ok := retainedTemplates[name]; ok {
+			templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: name, TemplateName: templateName})
 			continue
 		}
 		if templateName, ok, err := instancetemplate.ResolveHistoricalTemplate(its, name, templateNames); err != nil {

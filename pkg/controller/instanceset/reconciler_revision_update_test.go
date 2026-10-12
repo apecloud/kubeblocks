@@ -83,9 +83,8 @@ var _ = Describe("revision update reconciler test", func() {
 			Expect(newITS.Status.InstanceStatus).Should(BeEmpty())
 		})
 
-		It("preserves the published view and allows alignment during a transient flat ordinal reassignment", func() {
-			its = transientFlatReassignmentInstanceSet()
-			previous := its.DeepCopy().Status.InstanceStatus
+		It("publishes complete targets without retiring Pods during a flat ordinal reassignment", func() {
+			its = flatReassignmentInstanceSet()
 			tree := kubebuilderx.NewObjectTree()
 			tree.SetRoot(its)
 			for ordinal := 0; ordinal < 2; ordinal++ {
@@ -94,26 +93,28 @@ var _ = Describe("revision update reconciler test", func() {
 				Expect(tree.Add(pod)).Should(Succeed())
 			}
 
-			res, err := NewStatusReconciler().Reconcile(tree)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(res).Should(Equal(kubebuilderx.Continue))
-			Expect(its.Status.InstanceStatus).Should(Equal(previous))
-
-			res, err = NewRevisionUpdateReconciler().Reconcile(tree)
+			res, err := NewRevisionUpdateReconciler().Reconcile(tree)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 			Expect(its.Status.ObservedGeneration).Should(Equal(its.Generation))
-			Expect(its.Status.InstanceStatus).Should(Equal(previous))
+			Expect(its.Status.AssignedOrdinals).Should(Equal(map[string]workloads.Ordinals{
+				"a": {Discrete: []int32{1}}, "b": {Discrete: []int32{0}},
+			}))
+			revisions, err := GetRevisions(its.Status.UpdateRevisions)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(revisions).Should(HaveLen(2))
+			Expect(revisions).Should(HaveKey("demo-0"))
+			Expect(revisions).Should(HaveKey("demo-1"))
 
 			res, err = NewReplicasAlignmentReconciler().Reconcile(tree)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
-			Expect(tree.List(&corev1.Pod{})).Should(HaveLen(1))
+			Expect(tree.List(&corev1.Pod{})).Should(HaveLen(2))
 		})
 	})
 })
 
-func transientFlatReassignmentInstanceSet() *workloads.InstanceSet {
+func flatReassignmentInstanceSet() *workloads.InstanceSet {
 	replicas, templateReplicas := int32(2), int32(1)
 	templateA, templateB := "a", "b"
 	return &workloads.InstanceSet{

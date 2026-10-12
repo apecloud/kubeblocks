@@ -1728,6 +1728,45 @@ func TestLegacyInstanceSetStopRecoveryRetiresAbsentClaims(t *testing.T) {
 			}
 		})
 	}
+	t.Run("Offline", func(t *testing.T) {
+		cli := legacyStopRecoveryFixture(t, 3, 0)
+		legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(true) })
+		legacyStopRecoveryReconcile(t, cli, 6)
+		if len(legacyStopRecoveryPods(t, cli)) != 0 || len(legacyStopRecoveryClaims(t, cli)) != 3 {
+			t.Fatal("Stop did not remove Pods while retaining their claims")
+		}
+		offline := &corev1.PersistentVolumeClaim{}
+		if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "data-legacy-stop-0"}, offline); err != nil {
+			t.Fatal(err)
+		}
+		legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) {
+			its.Spec.OfflineInstances = []string{"legacy-stop-0"}
+			its.Spec.Replicas = ptr.To(int32(1))
+			its.Spec.Stop = ptr.To(false)
+		})
+		legacyStopRecoveryReconcile(t, cli, 3)
+		if pods := legacyStopRecoveryPods(t, cli); len(pods) != 1 || pods[0].Name != "legacy-stop-1" {
+			t.Fatalf("resume did not replace the Offline identity: %#v", pods)
+		}
+		current := &corev1.PersistentVolumeClaim{}
+		if err := cli.Get(context.Background(), client.ObjectKeyFromObject(offline), current); err != nil || !reflect.DeepEqual(offline, current) {
+			t.Fatalf("resume changed Offline storage: %v", err)
+		}
+		if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "data-legacy-stop-2"}, current); !apierrors.IsNotFound(err) {
+			t.Fatalf("resume retained a retired identity's claim: %v", err)
+		}
+		if len(legacyStopRecoveryClaims(t, cli)) != 2 {
+			t.Fatal("resume did not retain exactly the Active and Offline claims")
+		}
+		legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) {
+			its.Spec.OfflineInstances = nil
+			its.Spec.Replicas = ptr.To(int32(0))
+		})
+		legacyStopRecoveryReconcile(t, cli, 3)
+		if len(legacyStopRecoveryPods(t, cli)) != 0 || len(legacyStopRecoveryClaims(t, cli)) != 0 {
+			t.Fatal("removing the Offline allocation did not retire its claim")
+		}
+	})
 }
 
 func TestLegacyInstanceSetStopRecoveryPartialCommit(t *testing.T) {

@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instancetemplate
 
 import (
-	"errors"
+	"reflect"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -32,7 +32,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
 
-func TestBuildAssignmentsReportsTransientFlatOrdinalReassignment(t *testing.T) {
+func TestBuildAssignmentsTransfersExplicitFlatOrdinals(t *testing.T) {
 	its := &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
 		Spec: workloads.InstanceSetSpec{
@@ -48,9 +48,13 @@ func TestBuildAssignmentsReportsTransientFlatOrdinalReassignment(t *testing.T) {
 	}
 	tree := kubebuilderx.NewObjectTree()
 	tree.SetRoot(its)
-	_, _, err := BuildAssignments(tree, its)
-	if !errors.Is(err, ErrAssignmentIncomplete) {
-		t.Fatalf("expected a temporary incomplete allocation, got %v", err)
+	assignments, _, err := BuildAssignments(tree, its)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := []Assignment{{InstanceName: "demo-0", TemplateName: "b"}, {InstanceName: "demo-1", TemplateName: "a"}}
+	if !reflect.DeepEqual(assignments, expected) {
+		t.Fatalf("explicit ordinal transfer is incomplete: %#v", assignments)
 	}
 }
 

@@ -34,6 +34,7 @@ import (
 	"github.com/golang/mock/gomock"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -984,6 +985,683 @@ func instanceStatusWithoutRevisionAndHealth(status workloads.InstanceStatus) wor
 	status.Available = false
 	status.Failed = false
 	return status
+}
+
+func TestInstanceSetFlatOrdinalTransfer(t *testing.T) {
+	for _, swap := range []bool{false, true} {
+		for _, failStatus := range []bool{false, true} {
+			t.Run(fmt.Sprintf("swap=%t/statusFailure=%t", swap, failStatus), func(t *testing.T) {
+				scheme := runtime.NewScheme()
+				for _, add := range []func(*runtime.Scheme) error{clientgoscheme.AddToScheme, workloads.AddToScheme} {
+					if err := add(scheme); err != nil {
+						t.Fatal(err)
+					}
+				}
+				model.AddScheme(workloads.AddToScheme)
+				its := &workloads.InstanceSet{
+					ObjectMeta: metav1.ObjectMeta{Name: "flat-transfer", Namespace: "default", UID: "its-uid", Generation: 1, Annotations: map[string]string{constant.CRDAPIVersionAnnotationKey: workloads.GroupVersion.String()}},
+					Spec: workloads.InstanceSetSpec{
+						Replicas: ptr.To(int32(1)), FlatInstanceOrdinal: true,
+						PodManagementPolicy:    appsv1.ParallelPodManagement,
+						InstanceUpdateStrategy: &workloads.InstanceUpdateStrategy{Type: kbappsv1.OnDeleteStrategyType},
+						Selector:               &metav1.LabelSelector{MatchLabels: map[string]string{"app": "flat-transfer"}},
+						Template:               corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "flat-transfer"}}, Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "db", Image: "db:v1"}}}},
+						Instances:              []workloads.InstanceTemplate{{Name: "a", Replicas: ptr.To(int32(1)), Ordinals: workloads.Ordinals{Discrete: []int32{0}}}},
+						VolumeClaimTemplates:   []corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "data"}, Spec: corev1.PersistentVolumeClaimSpec{AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}, Resources: corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}}}}},
+					},
+				}
+				if swap {
+					its.Spec.Replicas = ptr.To(int32(2))
+					its.Spec.Instances = append(its.Spec.Instances, workloads.InstanceTemplate{Name: "b", Replicas: ptr.To(int32(1)), Ordinals: workloads.Ordinals{Discrete: []int32{1}}})
+					its.Spec.InstanceUpdateStrategy = nil
+				}
+				cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&workloads.InstanceSet{}, &corev1.Pod{}, &corev1.PersistentVolumeClaim{}).WithObjects(its).Build()
+				key := client.ObjectKeyFromObject(its)
+				reconcile := func(c client.Client) error {
+					_, err := (&InstanceSetReconciler{Client: c, Scheme: scheme, Recorder: record.NewFakeRecorder(100)}).Reconcile(context.Background(), ctrl.Request{NamespacedName: key})
+					return err
+				}
+				run := func() {
+					t.Helper()
+					if err := reconcile(cli); err != nil {
+						t.Fatal(err)
+					}
+				}
+				for i := 0; i < 3; i++ {
+					run()
+				}
+				pod := &corev1.Pod{}
+				if err := cli.Get(context.Background(), client.ObjectKey{Namespace: key.Namespace, Name: its.Name + "-0"}, pod); err != nil {
+					t.Fatal(err)
+				}
+				pod.Status.Phase = corev1.PodRunning
+				pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: metav1.Now()}}
+				if err := cli.Status().Update(context.Background(), pod); err != nil {
+					t.Fatal(err)
+				}
+				pod.Finalizers = []string{"test/hold"}
+				if err := cli.Update(context.Background(), pod); err != nil {
+					t.Fatal(err)
+				}
+				if err := cli.Delete(context.Background(), pod); err != nil {
+					t.Fatal(err)
+				}
+				claim := &corev1.PersistentVolumeClaim{}
+				if err := cli.Get(context.Background(), client.ObjectKey{Namespace: key.Namespace, Name: "data-" + pod.Name}, claim); err != nil {
+					t.Fatal(err)
+				}
+				claim.UID = "claim-uid"
+				claim.Spec.VolumeName = "bound-volume"
+				if err := cli.Update(context.Background(), claim); err != nil {
+					t.Fatal(err)
+				}
+				if err := cli.Get(context.Background(), key, its); err != nil {
+					t.Fatal(err)
+				}
+				if swap {
+					its.Spec.Instances[0].Ordinals.Discrete = []int32{1}
+					its.Spec.Instances[1].Ordinals.Discrete = []int32{0}
+				} else {
+					its.Spec.Instances[0].Name = "b"
+				}
+				its.Generation++
+				if err := cli.Update(context.Background(), its); err != nil {
+					t.Fatal(err)
+				}
+				expectedTemplate := "b"
+				if failStatus {
+					injected := errors.New("injected status failure")
+					faulty := interceptor.NewClient(cli, interceptor.Funcs{SubResourceUpdate: func(ctx context.Context, c client.Client, sub string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+						if _, ok := obj.(*workloads.InstanceSet); ok && sub == "status" {
+							return injected
+						}
+						return c.SubResource(sub).Update(ctx, obj, opts...)
+					}})
+					if err := reconcile(faulty); !errors.Is(err, injected) {
+						t.Fatalf("expected status failure, got %v", err)
+					}
+					persisted := &workloads.InstanceSet{}
+					if err := cli.Get(context.Background(), key, persisted); err != nil {
+						t.Fatal(err)
+					}
+					if persisted.Status.ObservedGeneration == its.Generation {
+						t.Fatal("status failure was not persisted as an incomplete commit")
+					}
+					persistedClaim := &corev1.PersistentVolumeClaim{}
+					if err := cli.Get(context.Background(), client.ObjectKeyFromObject(claim), persistedClaim); err != nil {
+						t.Fatal(err)
+					}
+					if !reflect.DeepEqual(persistedClaim, claim) {
+						t.Fatal("status failure changed a terminating Pod's PVC")
+					}
+					if !swap {
+						its.Spec.Instances[0].Name = "c"
+						its.Generation++
+						if err := cli.Update(context.Background(), its); err != nil {
+							t.Fatal(err)
+						}
+						expectedTemplate = "c"
+					}
+				}
+				for i := 0; i < 3; i++ {
+					run()
+				}
+				current := &corev1.PersistentVolumeClaim{}
+				if err := cli.Get(context.Background(), client.ObjectKeyFromObject(claim), current); err != nil {
+					t.Fatalf("allocated claim was deleted: %v", err)
+				}
+				if current.UID != claim.UID || current.Spec.VolumeName != claim.Spec.VolumeName || !reflect.DeepEqual(current.OwnerReferences, claim.OwnerReferences) || !current.DeletionTimestamp.IsZero() {
+					t.Fatal("allocated storage identity changed")
+				}
+				if err := cli.Get(context.Background(), key, its); err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(its.Status.AssignedOrdinals[expectedTemplate].Discrete, []int32{0}) || len(its.Status.AssignedOrdinals) != len(its.Spec.Instances) {
+					t.Fatalf("ordinal did not transfer: %#v", its.Status.AssignedOrdinals)
+				}
+				if err := cli.Get(context.Background(), client.ObjectKeyFromObject(pod), pod); err != nil {
+					t.Fatal(err)
+				}
+				if pod.DeletionTimestamp.IsZero() {
+					t.Fatal("fixture did not retain terminating Pod")
+				}
+				if !reflect.DeepEqual(current, claim) {
+					t.Fatal("transfer changed storage while the old Pod was terminating")
+				}
+				pod.Finalizers = nil
+				if err := cli.Update(context.Background(), pod); err != nil {
+					t.Fatal(err)
+				}
+				if failStatus {
+					injected := errors.New("injected replacement Pod create failure")
+					faulty := interceptor.NewClient(cli, interceptor.Funcs{Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+						if replacement, ok := obj.(*corev1.Pod); ok && replacement.Name == pod.Name {
+							return injected
+						}
+						return c.Create(ctx, obj, opts...)
+					}})
+					if err := reconcile(faulty); !errors.Is(err, injected) {
+						t.Fatalf("expected replacement create failure, got %v", err)
+					}
+					if err := cli.Get(context.Background(), client.ObjectKeyFromObject(claim), current); err != nil {
+						t.Fatal(err)
+					}
+					if current.Labels[constant.KBAppInstanceTemplateLabelKey] != expectedTemplate || current.UID != claim.UID || current.Spec.VolumeName != claim.Spec.VolumeName || !reflect.DeepEqual(current.OwnerReferences, claim.OwnerReferences) {
+						t.Fatal("fixture did not commit the retained PVC transfer before Pod create failure")
+					}
+					if err := cli.Get(context.Background(), client.ObjectKeyFromObject(pod), &corev1.Pod{}); !apierrors.IsNotFound(err) {
+						t.Fatalf("failed replacement unexpectedly exists: %v", err)
+					}
+					if !swap {
+						if err := cli.Get(context.Background(), key, its); err != nil {
+							t.Fatal(err)
+						}
+						its.Spec.Instances[0].Name = "d"
+						its.Generation++
+						if err := cli.Update(context.Background(), its); err != nil {
+							t.Fatal(err)
+						}
+						expectedTemplate = "d"
+					}
+				}
+				for i := 0; i < 3; i++ {
+					run()
+				}
+				if err := cli.Get(context.Background(), client.ObjectKeyFromObject(pod), pod); err != nil {
+					t.Fatalf("Pod did not recover: %v", err)
+				}
+				if !pod.DeletionTimestamp.IsZero() || pod.Labels[instancetemplate.TemplateNameLabelKey] != expectedTemplate {
+					t.Fatal("replacement Pod did not use desired template")
+				}
+				if err := cli.Get(context.Background(), client.ObjectKeyFromObject(claim), current); err != nil {
+					t.Fatal(err)
+				}
+				if current.UID != claim.UID || current.Spec.VolumeName != claim.Spec.VolumeName || !reflect.DeepEqual(current.OwnerReferences, claim.OwnerReferences) || current.Labels[constant.KBAppInstanceTemplateLabelKey] != expectedTemplate {
+					t.Fatal("replacement lost retained storage or its latest template assignment")
+				}
+				if err := cli.Get(context.Background(), key, its); err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(its.Status.AssignedOrdinals[expectedTemplate].Discrete, []int32{0}) {
+					t.Fatal("recovery did not publish the latest ordinal assignment")
+				}
+			})
+		}
+	}
+}
+
+func TestInstanceSetStopDuringFlatOrdinalTransfer(t *testing.T) {
+	scheme := runtime.NewScheme()
+	for _, add := range []func(*runtime.Scheme) error{clientgoscheme.AddToScheme, workloads.AddToScheme} {
+		if err := add(scheme); err != nil {
+			t.Fatal(err)
+		}
+	}
+	its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "stop-transfer", Namespace: "default", UID: "its-uid", Generation: 1, Annotations: map[string]string{constant.CRDAPIVersionAnnotationKey: workloads.GroupVersion.String()}}, Spec: workloads.InstanceSetSpec{
+		Replicas: ptr.To(int32(2)), FlatInstanceOrdinal: true, PodManagementPolicy: appsv1.ParallelPodManagement,
+		InstanceUpdateStrategy: &workloads.InstanceUpdateStrategy{Type: kbappsv1.OnDeleteStrategyType},
+		Selector:               &metav1.LabelSelector{MatchLabels: map[string]string{"app": "stop-transfer"}},
+		Template:               corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "stop-transfer"}}, Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "db", Image: "db:v1"}}}},
+		Instances:              []workloads.InstanceTemplate{{Name: "a", Replicas: ptr.To(int32(2)), Ordinals: workloads.Ordinals{Discrete: []int32{0, 1}}}},
+		VolumeClaimTemplates:   []corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "data"}, Spec: corev1.PersistentVolumeClaimSpec{AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}, Resources: corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}}}}},
+	}}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&workloads.InstanceSet{}, &corev1.Pod{}, &corev1.PersistentVolumeClaim{}).WithObjects(its).Build()
+	key := client.ObjectKeyFromObject(its)
+	reconcile := func() error {
+		_, err := (&InstanceSetReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(100)}).Reconcile(context.Background(), ctrl.Request{NamespacedName: key})
+		return err
+	}
+	for i := 0; i < 3; i++ {
+		if err := reconcile(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	claimsBefore := &corev1.PersistentVolumeClaimList{}
+	if err := cli.List(context.Background(), claimsBefore); err != nil {
+		t.Fatal(err)
+	}
+	if err := cli.Get(context.Background(), key, its); err != nil {
+		t.Fatal(err)
+	}
+	its.Spec.Instances[0].Name = "b"
+	its.Spec.Stop = ptr.To(true)
+	its.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
+	its.Generation++
+	if err := cli.Update(context.Background(), its); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		if err := reconcile(); err != nil {
+			pod := &corev1.Pod{}
+			podErr := cli.Get(context.Background(), client.ObjectKey{Namespace: key.Namespace, Name: "stop-transfer-0"}, pod)
+			t.Fatalf("Stop round %d failed; remaining Pod get=%v deletion=%v: %v", i, podErr, pod.DeletionTimestamp, err)
+		}
+	}
+	pods := &corev1.PodList{}
+	if err := cli.List(context.Background(), pods); err != nil {
+		t.Fatal(err)
+	}
+	if len(pods.Items) != 0 {
+		t.Fatalf("Stop did not drain all Pods: %#v", pods.Items)
+	}
+	claimsAfter := &corev1.PersistentVolumeClaimList{}
+	if err := cli.List(context.Background(), claimsAfter); err != nil {
+		t.Fatal(err)
+	}
+	if len(claimsBefore.Items) != 2 || !reflect.DeepEqual(claimsBefore.Items, claimsAfter.Items) {
+		t.Fatal("Stop changed retained storage")
+	}
+	if err := cli.Get(context.Background(), key, its); err != nil {
+		t.Fatal(err)
+	}
+	if len(its.Status.InstanceStatus) != 2 {
+		t.Fatalf("incomplete stopped identities: %#v", its.Status)
+	}
+	for _, status := range its.Status.InstanceStatus {
+		if status.TemplateName == nil || *status.TemplateName != "a" || status.DesiredState != workloads.InstanceDesiredStateOffline || status.CurrentState != workloads.InstanceCurrentStateAbsent {
+			t.Fatalf("Stop lost historical template identity: %#v", status)
+		}
+	}
+	its.Spec.Stop = ptr.To(false)
+	its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+	its.Generation++
+	if err := cli.Update(context.Background(), its); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		if err := reconcile(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := cli.List(context.Background(), pods); err != nil {
+		t.Fatal(err)
+	}
+	if len(pods.Items) != 2 {
+		t.Fatal("resume did not recreate both transferred identities")
+	}
+	for _, pod := range pods.Items {
+		if pod.Labels[instancetemplate.TemplateNameLabelKey] != "b" {
+			t.Fatal("resume used obsolete template")
+		}
+	}
+}
+
+func TestInstanceAPIStopRetainsTransferredIdentity(t *testing.T) {
+	scheme := runtime.NewScheme()
+	for _, add := range []func(*runtime.Scheme) error{clientgoscheme.AddToScheme, workloads.AddToScheme} {
+		if err := add(scheme); err != nil {
+			t.Fatal(err)
+		}
+	}
+	model.AddScheme(workloads.AddToScheme)
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "instance-stop-transfer", Namespace: "default", UID: "its-uid", Generation: 1, Annotations: map[string]string{constant.CRDAPIVersionAnnotationKey: workloads.GroupVersion.String()}},
+		Spec: workloads.InstanceSetSpec{
+			EnableInstanceAPI: ptr.To(true), Replicas: ptr.To(int32(1)), FlatInstanceOrdinal: true,
+			PodManagementPolicy: appsv1.ParallelPodManagement,
+			Selector:            &metav1.LabelSelector{MatchLabels: map[string]string{"app": "instance-stop-transfer"}},
+			Template:            corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "instance-stop-transfer"}}, Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "db", Image: "db:v1"}}}},
+			Instances:           []workloads.InstanceTemplate{{Name: "a", Replicas: ptr.To(int32(1)), Ordinals: workloads.Ordinals{Discrete: []int32{0}}}},
+		},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&workloads.InstanceSet{}, &workloads.Instance{}).WithObjects(its).Build()
+	key := client.ObjectKeyFromObject(its)
+	run := func() {
+		t.Helper()
+		_, err := (&InstanceSetReconciler2{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(100)}).Reconcile(context.Background(), ctrl.Request{NamespacedName: key})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := 0; i < 3; i++ {
+		run()
+	}
+	inst := &workloads.Instance{}
+	instKey := client.ObjectKey{Namespace: key.Namespace, Name: its.Name + "-0"}
+	if err := cli.Get(context.Background(), instKey, inst); err != nil {
+		t.Fatal(err)
+	}
+	inst.UID = "retained-instance-uid"
+	if err := cli.Update(context.Background(), inst); err != nil {
+		t.Fatal(err)
+	}
+	inst.Status.ObservedGeneration = inst.Generation
+	inst.Status.CurrentState = workloads.InstanceCurrentStatePresent
+	inst.Status.Ready, inst.Status.Available = true, true
+	inst.Status.Conditions = []metav1.Condition{
+		{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue},
+		{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue},
+	}
+	if err := cli.Status().Update(context.Background(), inst); err != nil {
+		t.Fatal(err)
+	}
+	run()
+	if err := cli.Get(context.Background(), key, its); err != nil {
+		t.Fatal(err)
+	}
+	its.Spec.Instances[0].Name = "b"
+	its.Spec.Stop = ptr.To(true)
+	its.Generation++
+	if err := cli.Update(context.Background(), its); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		run()
+	}
+	if err := cli.Get(context.Background(), key, its); err != nil {
+		t.Fatal(err)
+	}
+	status := its.FindInstanceStatus(instKey.Name)
+	if status == nil || status.TemplateName == nil || *status.TemplateName != "a" || status.DesiredState != workloads.InstanceDesiredStateOffline || status.CurrentState != workloads.InstanceCurrentStatePresent || status.UpToDate {
+		t.Fatalf("Stop lost retained parent status: %#v", status)
+	}
+	if err := cli.Get(context.Background(), instKey, inst); err != nil {
+		t.Fatal(err)
+	}
+	if inst.UID != "retained-instance-uid" || !inst.DeletionTimestamp.IsZero() || ptr.Deref(inst.Spec.ScaledDown, false) {
+		t.Fatal("Stop replaced or retired allocated Instance")
+	}
+	its.Spec.Stop = ptr.To(false)
+	its.Generation++
+	if err := cli.Update(context.Background(), its); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		run()
+	}
+	if err := cli.Get(context.Background(), key, its); err != nil {
+		t.Fatal(err)
+	}
+	status = its.FindInstanceStatus(instKey.Name)
+	if status == nil || status.TemplateName == nil || *status.TemplateName != "b" || status.DesiredState != workloads.InstanceDesiredStateActive || status.CurrentState != workloads.InstanceCurrentStatePresent {
+		t.Fatalf("resume lost desired parent status: %#v", status)
+	}
+	if err := cli.Get(context.Background(), instKey, inst); err != nil {
+		t.Fatal(err)
+	}
+	if inst.UID != "retained-instance-uid" || inst.Spec.InstanceTemplateName != "b" {
+		t.Fatal("resume replaced identity or missed desired template")
+	}
+}
+
+func TestInstanceSetTransferredIdentityCleanup(t *testing.T) {
+	for _, transfer := range []string{"none", "named", "default"} {
+		for _, offline := range []bool{false, true} {
+			for _, retain := range []bool{false, true} {
+				t.Run(fmt.Sprintf("transfer=%s/offline=%t/retain=%t", transfer, offline, retain), func(t *testing.T) {
+					scheme := runtime.NewScheme()
+					for _, add := range []func(*runtime.Scheme) error{clientgoscheme.AddToScheme, workloads.AddToScheme} {
+						if err := add(scheme); err != nil {
+							t.Fatal(err)
+						}
+					}
+					its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "cleanup-transfer", Namespace: "default", UID: "its-uid", Generation: 1, Annotations: map[string]string{constant.CRDAPIVersionAnnotationKey: workloads.GroupVersion.String()}}, Spec: workloads.InstanceSetSpec{
+						Replicas: ptr.To(int32(2)), FlatInstanceOrdinal: true, PodManagementPolicy: appsv1.ParallelPodManagement,
+						InstanceUpdateStrategy: &workloads.InstanceUpdateStrategy{Type: kbappsv1.OnDeleteStrategyType},
+						Selector:               &metav1.LabelSelector{MatchLabels: map[string]string{"app": "cleanup-transfer"}},
+						Template:               corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "cleanup-transfer"}}, Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "db", Image: "db:v1"}}}},
+						Instances:              []workloads.InstanceTemplate{{Name: "a", Replicas: ptr.To(int32(2)), Ordinals: workloads.Ordinals{Discrete: []int32{0, 1}}}},
+						VolumeClaimTemplates:   []corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "data"}, Spec: corev1.PersistentVolumeClaimSpec{AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}, Resources: corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}}}}},
+					}}
+					if retain {
+						its.Spec.PersistentVolumeClaimRetentionPolicy = &workloads.PersistentVolumeClaimRetentionPolicy{WhenScaled: kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType}
+					}
+					cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&workloads.InstanceSet{}, &corev1.Pod{}, &corev1.PersistentVolumeClaim{}).WithObjects(its).Build()
+					key := client.ObjectKeyFromObject(its)
+					run := func() {
+						t.Helper()
+						_, err := (&InstanceSetReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(100)}).Reconcile(context.Background(), ctrl.Request{NamespacedName: key})
+						if err != nil {
+							t.Fatal(err)
+						}
+					}
+					for i := 0; i < 3; i++ {
+						run()
+					}
+					pod := &corev1.Pod{}
+					podKey := client.ObjectKey{Namespace: key.Namespace, Name: its.Name + "-0"}
+					if err := cli.Get(context.Background(), podKey, pod); err != nil {
+						t.Fatal(err)
+					}
+					pod.Finalizers = []string{"test/hold"}
+					if err := cli.Update(context.Background(), pod); err != nil {
+						t.Fatal(err)
+					}
+					claims := &corev1.PersistentVolumeClaimList{}
+					if err := cli.List(context.Background(), claims); err != nil {
+						t.Fatal(err)
+					}
+					if len(claims.Items) != 2 {
+						t.Fatalf("initial PVC count: %d", len(claims.Items))
+					}
+					originalClaims := make(map[string]*corev1.PersistentVolumeClaim, len(claims.Items))
+					for i := range claims.Items {
+						claim := &claims.Items[i]
+						claim.UID = types.UID(claim.Name)
+						claim.Spec.VolumeName = "bound-" + claim.Name
+						if err := cli.Update(context.Background(), claim); err != nil {
+							t.Fatal(err)
+						}
+						originalClaims[claim.Name] = claim.DeepCopy()
+					}
+					if err := cli.Get(context.Background(), key, its); err != nil {
+						t.Fatal(err)
+					}
+					expectedTemplate := "a"
+					switch transfer {
+					case "named":
+						its.Spec.Instances[0].Name = "b"
+						expectedTemplate = "b"
+					case "default":
+						its.Spec.Instances = nil
+						its.Spec.Ordinals = workloads.Ordinals{Discrete: []int32{0, 1}}
+						expectedTemplate = ""
+					}
+					its.Generation++
+					if err := cli.Update(context.Background(), its); err != nil {
+						t.Fatal(err)
+					}
+					for i := 0; i < 3; i++ {
+						run()
+					}
+					if err := cli.Get(context.Background(), key, its); err != nil {
+						t.Fatal(err)
+					}
+					if status := its.FindInstanceStatus(podKey.Name); status == nil || status.TemplateName == nil || *status.TemplateName != expectedTemplate || status.DesiredState != workloads.InstanceDesiredStateActive {
+						t.Fatalf("transfer did not publish target identity: %#v", status)
+					}
+					if err := cli.Get(context.Background(), podKey, pod); err != nil {
+						t.Fatal(err)
+					}
+					if template, ok := instancetemplate.TemplateNameFromLabels(pod.Labels); !ok || template != "a" || !pod.DeletionTimestamp.IsZero() {
+						t.Fatal("OnDelete fixture did not preserve the old Pod")
+					}
+					its.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
+					wantDesired := workloads.InstanceDesiredStateReleased
+					wantClaims := 0
+					if offline {
+						its.Spec.Replicas = ptr.To(int32(1))
+						its.Spec.OfflineInstances = []string{podKey.Name}
+						if len(its.Spec.Instances) != 0 {
+							its.Spec.Instances[0].Replicas = ptr.To(int32(1))
+						}
+						wantDesired = workloads.InstanceDesiredStateOffline
+						wantClaims = 1
+					} else {
+						its.Spec.Replicas = ptr.To(int32(0))
+						its.Spec.Instances = nil
+						its.Spec.Ordinals = workloads.Ordinals{}
+					}
+					if retain {
+						wantClaims = 2
+					}
+					its.Generation++
+					if err := cli.Update(context.Background(), its); err != nil {
+						t.Fatal(err)
+					}
+					for i := 0; i < 4; i++ {
+						run()
+					}
+					if err := cli.Get(context.Background(), podKey, pod); err != nil {
+						t.Fatal(err)
+					}
+					if pod.DeletionTimestamp.IsZero() {
+						t.Fatal("cleanup never reached the remaining Pod")
+					}
+					if err := cli.Get(context.Background(), key, its); err != nil {
+						t.Fatal(err)
+					}
+					if status := its.FindInstanceStatus(podKey.Name); status == nil || status.TemplateName == nil || *status.TemplateName != expectedTemplate || status.DesiredState != wantDesired || status.CurrentState != workloads.InstanceCurrentStateTerminating || status.UpToDate {
+						t.Fatalf("incorrect retained cleanup status: %#v", status)
+					}
+					if err := cli.List(context.Background(), claims); err != nil {
+						t.Fatal(err)
+					}
+					if len(claims.Items) != wantClaims {
+						t.Fatalf("PVC cleanup policy: got %d claims, want %d", len(claims.Items), wantClaims)
+					}
+					for _, claim := range claims.Items {
+						original := originalClaims[claim.Name]
+						if original == nil || claim.UID != original.UID || claim.Spec.VolumeName != original.Spec.VolumeName || !reflect.DeepEqual(claim.OwnerReferences, original.OwnerReferences) {
+							t.Fatalf("retained PVC identity changed: %#v", claim)
+						}
+					}
+					pod.Finalizers = nil
+					if err := cli.Update(context.Background(), pod); err != nil {
+						t.Fatal(err)
+					}
+					for i := 0; i < 2; i++ {
+						run()
+					}
+					if err := cli.Get(context.Background(), key, its); err != nil {
+						t.Fatal(err)
+					}
+					status := its.FindInstanceStatus(podKey.Name)
+					if offline {
+						if status == nil || status.TemplateName == nil || *status.TemplateName != expectedTemplate || status.DesiredState != workloads.InstanceDesiredStateOffline || status.CurrentState != workloads.InstanceCurrentStateAbsent {
+							t.Fatalf("offline identity was lost after deletion: %#v", status)
+						}
+					} else if status != nil {
+						t.Fatalf("released identity survived deletion: %#v", status)
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestInstanceAPITransferredIdentityCleanup(t *testing.T) {
+	for _, offline := range []bool{false, true} {
+		t.Run(fmt.Sprintf("offline=%t", offline), func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			for _, add := range []func(*runtime.Scheme) error{clientgoscheme.AddToScheme, workloads.AddToScheme} {
+				if err := add(scheme); err != nil {
+					t.Fatal(err)
+				}
+			}
+			model.AddScheme(workloads.AddToScheme)
+			its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "instance-cleanup", Namespace: "default", UID: "its-uid", Generation: 1, Annotations: map[string]string{constant.CRDAPIVersionAnnotationKey: workloads.GroupVersion.String()}}, Spec: workloads.InstanceSetSpec{
+				EnableInstanceAPI: ptr.To(true), Replicas: ptr.To(int32(1)), FlatInstanceOrdinal: true, PodManagementPolicy: appsv1.ParallelPodManagement,
+				Selector:  &metav1.LabelSelector{MatchLabels: map[string]string{"app": "instance-cleanup"}},
+				Template:  corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "instance-cleanup"}}, Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "db", Image: "db:v1"}}}},
+				Instances: []workloads.InstanceTemplate{{Name: "a", Replicas: ptr.To(int32(1)), Ordinals: workloads.Ordinals{Discrete: []int32{0}}}},
+			}}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&workloads.InstanceSet{}, &workloads.Instance{}).WithObjects(its).Build()
+			key := client.ObjectKeyFromObject(its)
+			run := func() {
+				t.Helper()
+				_, err := (&InstanceSetReconciler2{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(100)}).Reconcile(context.Background(), ctrl.Request{NamespacedName: key})
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			for i := 0; i < 3; i++ {
+				run()
+			}
+			inst := &workloads.Instance{}
+			instKey := client.ObjectKey{Namespace: key.Namespace, Name: its.Name + "-0"}
+			if err := cli.Get(context.Background(), instKey, inst); err != nil {
+				t.Fatal(err)
+			}
+			inst.UID = "retained-instance"
+			inst.Finalizers = []string{"test/hold"}
+			if err := cli.Update(context.Background(), inst); err != nil {
+				t.Fatal(err)
+			}
+			inst.Status.CurrentState = workloads.InstanceCurrentStatePresent
+			if err := cli.Status().Update(context.Background(), inst); err != nil {
+				t.Fatal(err)
+			}
+			if err := cli.Get(context.Background(), key, its); err != nil {
+				t.Fatal(err)
+			}
+			its.Spec.Instances[0].Name = "b"
+			its.Generation++
+			if err := cli.Update(context.Background(), its); err != nil {
+				t.Fatal(err)
+			}
+			for i := 0; i < 3; i++ {
+				run()
+			}
+			if err := cli.Get(context.Background(), key, its); err != nil {
+				t.Fatal(err)
+			}
+			if status := its.FindInstanceStatus(instKey.Name); status == nil || status.TemplateName == nil || *status.TemplateName != "b" || status.DesiredState != workloads.InstanceDesiredStateActive {
+				t.Fatalf("transfer did not publish desired identity: %#v", status)
+			}
+			if err := cli.Get(context.Background(), instKey, inst); err != nil {
+				t.Fatal(err)
+			}
+			if inst.Spec.InstanceTemplateName != "a" {
+				t.Fatal("fixture did not retain the unready Instance's old spec")
+			}
+			its.Spec.Replicas = ptr.To(int32(0))
+			its.Spec.Instances = nil
+			its.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
+			wantDesired := workloads.InstanceDesiredStateReleased
+			if offline {
+				its.Spec.OfflineInstances = []string{instKey.Name}
+				wantDesired = workloads.InstanceDesiredStateOffline
+			}
+			its.Generation++
+			if err := cli.Update(context.Background(), its); err != nil {
+				t.Fatal(err)
+			}
+			for i := 0; i < 3; i++ {
+				run()
+			}
+			if err := cli.Get(context.Background(), instKey, inst); err != nil {
+				t.Fatal(err)
+			}
+			if inst.UID != "retained-instance" || !ptr.Deref(inst.Spec.ScaledDown, false) || inst.DeletionTimestamp.IsZero() {
+				t.Fatal("cleanup did not retire the retained Instance")
+			}
+			if err := cli.Get(context.Background(), key, its); err != nil {
+				t.Fatal(err)
+			}
+			if status := its.FindInstanceStatus(instKey.Name); status == nil || status.TemplateName == nil || *status.TemplateName != "b" || status.DesiredState != wantDesired || status.UpToDate {
+				t.Fatalf("cleanup lost the published identity: %#v", status)
+			}
+			inst.Finalizers = nil
+			if err := cli.Update(context.Background(), inst); err != nil {
+				t.Fatal(err)
+			}
+			for i := 0; i < 2; i++ {
+				run()
+			}
+			if err := cli.Get(context.Background(), key, its); err != nil {
+				t.Fatal(err)
+			}
+			status := its.FindInstanceStatus(instKey.Name)
+			if offline {
+				if status == nil || status.TemplateName == nil || *status.TemplateName != "b" || status.DesiredState != workloads.InstanceDesiredStateOffline || status.CurrentState != workloads.InstanceCurrentStateAbsent {
+					t.Fatalf("offline identity was lost after deletion: %#v", status)
+				}
+			} else if status != nil {
+				t.Fatalf("released identity survived deletion: %#v", status)
+			}
+		})
+	}
 }
 
 func legacyStopRecoveryFixture(t *testing.T, replicas int32, minReadySeconds int32) client.WithWatch {

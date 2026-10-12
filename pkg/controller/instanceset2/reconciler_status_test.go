@@ -796,7 +796,7 @@ func TestStatusReconcilerDoesNotDependOnRevisionAnnotationForCurrentRevision(t *
 	}
 }
 
-func TestStatusReconcilerDoesNotPublishPartialFlatAllocation(t *testing.T) {
+func TestStatusReconcilerPublishesTransferredFlatAllocation(t *testing.T) {
 	its := &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", Generation: 3},
 		Spec: workloads.InstanceSetSpec{
@@ -817,18 +817,23 @@ func TestStatusReconcilerDoesNotPublishPartialFlatAllocation(t *testing.T) {
 			AssignedOrdinals: map[string]workloads.Ordinals{
 				"a": {Discrete: []int32{0}}, "b": {Discrete: []int32{1}},
 			},
-			InstanceStatus: []workloads.InstanceStatus{{PodName: "demo-a-0"}},
+			InstanceStatus: []workloads.InstanceStatus{{PodName: "demo-0"}, {PodName: "demo-1"}},
 		},
 	}
-	before := its.DeepCopy().Status
 	tree := kubebuilderx.NewObjectTree()
 	tree.SetRoot(its)
 
 	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(before, its.Status) {
-		t.Fatalf("partial allocation changed status:\nbefore: %#v\nafter:  %#v", before, its.Status)
+	if its.Status.ReadyReplicas != 0 || len(its.Status.InstanceStatus) != 2 {
+		t.Fatalf("incorrect absent transfer status: %#v", its.Status)
+	}
+	for name, template := range map[string]string{"demo-0": "b", "demo-1": "a"} {
+		status := its.FindInstanceStatus(name)
+		if status == nil || status.TemplateName == nil || *status.TemplateName != template || status.DesiredState != workloads.InstanceDesiredStateActive || status.CurrentState != workloads.InstanceCurrentStateAbsent {
+			t.Fatalf("incorrect transferred identity: %#v", status)
+		}
 	}
 }
 

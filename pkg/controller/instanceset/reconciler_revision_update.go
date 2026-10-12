@@ -157,7 +157,7 @@ func (r *revisionUpdateReconciler) publishInstanceUpdateTargets(its *workloads.I
 		}
 
 		template, pod := desiredTemplates[status.PodName], podsByName[status.PodName]
-		if template == nil || pod == nil {
+		if template == nil || pod == nil || isStopRequested(its) || isTerminating(pod) {
 			status.UpToDate = false
 			continue
 		}

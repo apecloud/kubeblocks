@@ -1124,6 +1124,62 @@ func TestLegacyInstanceSetStopRecoveryMinReadySeconds(t *testing.T) {
 	}
 }
 
+func TestLegacyInstanceSetStopRecoveryFlatTemplateChange(t *testing.T) {
+	for _, retargetFirst := range []bool{false, true} {
+		t.Run(fmt.Sprintf("retargetFirst=%t", retargetFirst), func(t *testing.T) {
+			cli := legacyStopRecoveryFixture(t, 2, 0)
+			legacyStopRecoveryReady(t, cli)
+			legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) { its.Spec.FlatInstanceOrdinal = true })
+			legacyStopRecoveryReconcile(t, cli, 3)
+			changeTemplate := func(its *workloads.InstanceSet) {
+				its.Spec.Instances = []workloads.InstanceTemplate{{Name: "named", Replicas: ptr.To(int32(1)), Ordinals: workloads.Ordinals{Discrete: []int32{0}}}}
+			}
+			if retargetFirst {
+				legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) {
+					changeTemplate(its)
+					its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{Type: kbappsv1.OnDeleteStrategyType}
+				})
+				legacyStopRecoveryReconcile(t, cli, 2)
+			}
+			claims := legacyStopRecoveryClaims(t, cli)
+			legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) {
+				its.Spec.Stop = ptr.To(true)
+				its.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
+				changeTemplate(its)
+			})
+			legacyStopRecoveryReconcile(t, cli, 6)
+			its := legacyStopRecoverySet(t, cli)
+			if len(legacyStopRecoveryPods(t, cli)) != 0 || its.Status.Replicas != 0 || its.Status.ObservedGeneration != its.Generation {
+				t.Fatal("Stop with a template change did not finish draining Pods")
+			}
+			historicalTemplate := ""
+			if retargetFirst {
+				historicalTemplate = "named"
+			}
+			status := its.FindInstanceStatus("legacy-stop-0")
+			if status == nil || status.TemplateName == nil || *status.TemplateName != historicalTemplate || status.DesiredState != workloads.InstanceDesiredStateOffline || status.CurrentState != workloads.InstanceCurrentStateAbsent {
+				t.Fatalf("Stop did not retain the retained template identity after Pod deletion: %#v", status)
+			}
+			if !reflect.DeepEqual(claims, legacyStopRecoveryClaims(t, cli)) {
+				t.Fatal("Stop with a template change modified retained PVCs")
+			}
+			legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(false) })
+			legacyStopRecoveryReconcile(t, cli, 2)
+			legacyStopRecoveryReady(t, cli)
+			legacyStopRecoveryReconcile(t, cli, 3)
+			status = legacyStopRecoverySet(t, cli).FindInstanceStatus("legacy-stop-0")
+			if len(legacyStopRecoveryPods(t, cli)) != 2 || status == nil || status.TemplateName == nil || *status.TemplateName != "named" || status.DesiredState != workloads.InstanceDesiredStateActive {
+				t.Fatal("resume did not apply the desired template assignment")
+			}
+			for _, pod := range legacyStopRecoveryPods(t, cli) {
+				if pod.Name == "legacy-stop-0" && pod.Labels[instancetemplate.TemplateNameLabelKey] != "named" {
+					t.Fatal("resumed Pod did not use the desired template")
+				}
+			}
+		})
+	}
+}
+
 func TestLegacyInstanceSetStopRecoveryTerminatingSummary(t *testing.T) {
 	cli := legacyStopRecoveryFixture(t, 1, 0)
 	legacyStopRecoveryReady(t, cli)
@@ -1220,12 +1276,15 @@ func TestLegacyInstanceSetStopRecoveryWaitsForTermination(t *testing.T) {
 	if result := legacyStopRecoveryReconcile(t, cli, 1); result.RequeueAfter != time.Second {
 		t.Fatalf("termination wait did not reenter: %#v", result)
 	}
+	currentClaim := &corev1.PersistentVolumeClaim{}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(heldClaim), currentClaim); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(heldClaim, currentClaim) {
+		t.Fatal("termination wait changed held Pod storage")
+	}
 	for _, claim := range legacyStopRecoveryClaims(t, cli) {
-		if claim.Labels[constant.KBAppPodNameLabelKey] == before.Name {
-			if !reflect.DeepEqual(*heldClaim, claim) {
-				t.Fatal("termination wait changed held Pod storage")
-			}
-		} else if claim.Annotations["desired"] != "latest" {
+		if claim.Labels[constant.KBAppPodNameLabelKey] != before.Name && claim.Annotations["desired"] != "latest" {
 			t.Fatal("independent Pod PVC did not commit during termination wait")
 		}
 	}

@@ -220,9 +220,10 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	retentionPolicy := its.Spec.PersistentVolumeClaimRetentionPolicy
 	retireClaims := !stopping && (retentionPolicy == nil || retentionPolicy.WhenScaled != kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType)
 	if retireClaims {
+		allocatedNames := newNameSet.Union(sets.New(its.Spec.OfflineInstances...))
 		for _, obj := range oldPVCList {
 			name := obj.GetLabels()[constant.KBAppPodNameLabelKey]
-			if name != "" && !newNameSet.Has(name) && !oldNameSet.Has(name) {
+			if name != "" && !allocatedNames.Has(name) && !oldNameSet.Has(name) {
 				retiredNames.Insert(name)
 			}
 			if retiredNames.Has(name) {

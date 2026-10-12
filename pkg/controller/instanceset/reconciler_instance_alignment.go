@@ -22,6 +22,7 @@ package instanceset
 import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -183,6 +184,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	}
 
 	// delete useless instances
+	retiredNames := sets.New[string]()
 	priorities := make(map[string]int)
 	sortObjects(oldInstanceList, priorities, false)
 	for _, object := range oldInstanceList {
@@ -203,25 +205,29 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 			return kubebuilderx.Continue, err
 		}
 
-		if !isStopRequested(its) {
-			retentionPolicy := its.Spec.PersistentVolumeClaimRetentionPolicy
-			// the default policy is `Delete`
-			if retentionPolicy == nil || retentionPolicy.WhenScaled != kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType {
-				for _, obj := range oldPVCList {
-					pvc := obj.(*corev1.PersistentVolumeClaim)
-					if pvc.Labels != nil && pvc.Labels[constant.KBAppPodNameLabelKey] == pod.Name {
-						if err := tree.Delete(pvc); err != nil {
-							return kubebuilderx.Continue, err
-						}
-					}
-				}
-			}
-		}
+		retiredNames.Insert(pod.Name)
 
 		if isOrderedReady {
 			break
 		}
 		concurrency--
+	}
+
+	retentionPolicy := its.Spec.PersistentVolumeClaimRetentionPolicy
+	retireClaims := !isStopRequested(its) && (retentionPolicy == nil || retentionPolicy.WhenScaled != kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType)
+	if retireClaims {
+		allocatedNames := newNameSet.Union(sets.New(its.Spec.OfflineInstances...))
+		for _, obj := range oldPVCList {
+			name := obj.GetLabels()[constant.KBAppPodNameLabelKey]
+			if name == "" || allocatedNames.Has(name) {
+				continue
+			}
+			if retiredNames.Has(name) || (!oldNameSet.Has(name) && metav1.IsControlledBy(obj, its)) {
+				if err := tree.Delete(obj); err != nil {
+					return kubebuilderx.Continue, err
+				}
+			}
+		}
 	}
 
 	return kubebuilderx.Continue, nil

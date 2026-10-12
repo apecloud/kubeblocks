@@ -79,7 +79,6 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	oldNameSet := sets.New[string]()
 	oldInstanceMap := make(map[string]*corev1.Pod)
 	oldInstanceList := tree.List(&corev1.Pod{})
-	oldPVCList := tree.List(&corev1.PersistentVolumeClaim{})
 	for _, object := range oldInstanceList {
 		oldNameSet.Insert(object.GetName())
 		pod, _ := object.(*corev1.Pod)
@@ -207,7 +206,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	retentionPolicy := its.Spec.PersistentVolumeClaimRetentionPolicy
 	if retentionPolicy == nil || retentionPolicy.WhenScaled != kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType {
 		allocatedNames := newNameSet.Union(sets.New(its.Spec.OfflineInstances...))
-		for _, obj := range oldPVCList {
+		for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
 			name := obj.GetLabels()[constant.KBAppPodNameLabelKey]
 			if name == "" || allocatedNames.Has(name) {
 				continue

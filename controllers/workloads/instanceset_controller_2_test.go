@@ -588,7 +588,6 @@ var _ = Describe("InstanceSet Controller 2", func() {
 	})
 })
 
-// The fake API server needs to invalidate child observations after spec writes.
 type setStopClient struct {
 	client.Client
 	failChildWriteAt  int
@@ -1097,6 +1096,128 @@ func TestInstanceSetStopResumesLatestPayload(t *testing.T) {
 }
 
 func TestInstanceSetStopScaleRetirement(t *testing.T) {
+	for _, legacy := range []bool{true, false} {
+		for _, explicitDelete := range []bool{false, true} {
+			t.Run(fmt.Sprintf("Offline/legacy=%v/explicitDelete=%v", legacy, explicitDelete), func(t *testing.T) {
+				its := setStopFixture()
+				its.Spec.Replicas = ptr.To(int32(3))
+				its.Spec.EnableInstanceAPI = ptr.To(!legacy)
+				if explicitDelete {
+					its.Spec.PersistentVolumeClaimRetentionPolicy = &kbappsv1.PersistentVolumeClaimRetentionPolicy{WhenScaled: kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType, WhenDeleted: kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType}
+				}
+				cli := newSetStopClient(t, its)
+				for i := 0; i < 2; i++ {
+					if _, err := reconcileSetStopParent(cli, legacy); err != nil {
+						t.Fatal(err)
+					}
+				}
+				for _, child := range listSetStopChildren(t, cli) {
+					child.UID = types.UID(child.Name + "-uid")
+					if err := cli.Update(context.Background(), &child); err != nil {
+						t.Fatal(err)
+					}
+				}
+				reconcileSetStop(t, cli, legacy, 5)
+				bindSetStopClaims(t, cli)
+				offlineKey := client.ObjectKey{Namespace: "default", Name: "data-demo-0"}
+				claim := &corev1.PersistentVolumeClaim{}
+				if err := cli.Get(context.Background(), offlineKey, claim); err != nil {
+					t.Fatal(err)
+				}
+				claim.Spec.VolumeName = "offline-volume"
+				otherOwner := metav1.OwnerReference{APIVersion: "v1", Kind: "ConfigMap", Name: "storage-owner", UID: "storage-owner-uid"}
+				claim.OwnerReferences = append(claim.OwnerReferences, otherOwner)
+				if err := cli.Update(context.Background(), claim); err != nil {
+					t.Fatal(err)
+				}
+				before := claim.DeepCopy()
+				mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(true) })
+				reconcileSetStop(t, cli, legacy, 10)
+				if len(listSetStopPods(t, cli)) != 0 {
+					t.Fatal("Offline fixture did not finish Stop")
+				}
+				mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
+					its.Spec.OfflineInstances = []string{"demo-0"}
+					its.Spec.Replicas = ptr.To(int32(1))
+					its.Spec.Template.Spec.Containers[0].Image = "db:latest"
+					its.Spec.Stop = ptr.To(false)
+				})
+				if !legacy {
+					if explicitDelete {
+						wrapped := cli.(*setStopClient)
+						wrapped.childWrites = 0
+						wrapped.failChildWriteAt = 3
+						if _, err := reconcileSetStopParent(cli, false); !errors.Is(err, errSetStopChildWrite) {
+							t.Fatalf("expected partial retirement handoff failure, got %v", err)
+						}
+						committed := 0
+						for _, child := range listSetStopChildren(t, cli) {
+							if ptr.Deref(child.Spec.ScaledDown, false) {
+								committed++
+								wantPolicy := kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType
+								if child.Name == "demo-0" {
+									wantPolicy = kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType
+								}
+								if child.Spec.PersistentVolumeClaimRetentionPolicy == nil || child.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled != wantPolicy {
+									t.Fatal("partial failure persisted an incorrect retirement policy")
+								}
+							} else if !ptr.Deref(child.Spec.Stop, false) {
+								committed++
+							}
+						}
+						if committed != 2 {
+							t.Fatalf("partial failure persisted %d handoffs, want 2", committed)
+						}
+						wrapped.failChildWriteAt = 0
+					}
+					if _, err := reconcileSetStopParent(cli, false); err != nil {
+						t.Fatal(err)
+					}
+					offline := &workloads.Instance{}
+					if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "demo-0"}, offline); err != nil {
+						t.Fatal(err)
+					}
+					policy := offline.Spec.PersistentVolumeClaimRetentionPolicy
+					if !ptr.Deref(offline.Spec.ScaledDown, false) || policy == nil || policy.WhenScaled != kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType {
+						t.Fatalf("Offline retirement did not hand off retention: %#v", policy)
+					}
+					if explicitDelete && policy.WhenDeleted != kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType {
+						t.Fatal("Offline retirement changed WhenDeleted")
+					}
+				}
+				reconcileSetStop(t, cli, legacy, 8)
+				pods := listSetStopPods(t, cli)
+				if len(pods) != 1 || pods[0].Name != "demo-1" || pods[0].Spec.Containers[0].Image != "db:latest" {
+					t.Fatalf("resume did not replace Offline runtime with current desired Pod: %#v", pods)
+				}
+				if !legacy {
+					children := listSetStopChildren(t, cli)
+					if len(children) != 1 || children[0].Name != "demo-1" {
+						t.Fatal("resume kept retired child identities")
+					}
+				}
+				if err := cli.Get(context.Background(), offlineKey, claim); err != nil {
+					t.Fatalf("resume removed Offline storage: %v", err)
+				}
+				if claim.UID != before.UID || !reflect.DeepEqual(claim.Spec, before.Spec) || !reflect.DeepEqual(claim.Status, before.Status) || !claim.DeletionTimestamp.IsZero() {
+					t.Fatal("resume changed Offline storage identity or binding")
+				}
+				expectedOwners := before.OwnerReferences
+				if !legacy {
+					if len(before.OwnerReferences) != 2 || before.OwnerReferences[0].UID != "demo-0-uid" {
+						t.Fatal("Offline fixture did not have an Instance owner")
+					}
+					expectedOwners = []metav1.OwnerReference{otherOwner}
+				}
+				if !reflect.DeepEqual(claim.OwnerReferences, expectedOwners) {
+					t.Fatalf("Offline finalization changed unrelated ownership: %#v", claim.OwnerReferences)
+				}
+				if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "data-demo-2"}, &corev1.PersistentVolumeClaim{}); !apierrors.IsNotFound(err) {
+					t.Fatalf("resume did not delete truly scaled-down storage: %v", err)
+				}
+			})
+		}
+	}
 	for _, legacy := range []bool{true, false} {
 		for _, policy := range []kbappsv1.PersistentVolumeClaimRetentionPolicyType{kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType, kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType} {
 			t.Run(fmt.Sprintf("legacy=%v/policy=%s", legacy, policy), func(t *testing.T) {

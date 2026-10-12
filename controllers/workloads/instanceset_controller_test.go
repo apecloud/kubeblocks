@@ -1730,11 +1730,15 @@ func TestLegacyInstanceSetStopRecoveryRetiresAbsentClaims(t *testing.T) {
 	}
 	t.Run("Offline", func(t *testing.T) {
 		cli := legacyStopRecoveryFixture(t, 3, 0)
+		legacyStopRecoveryReady(t, cli)
+		legacyStopRecoveryHold(t, cli)
 		legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(true) })
 		legacyStopRecoveryReconcile(t, cli, 6)
-		if len(legacyStopRecoveryPods(t, cli)) != 0 || len(legacyStopRecoveryClaims(t, cli)) != 3 {
-			t.Fatal("Stop did not remove Pods while retaining their claims")
+		pods := legacyStopRecoveryPods(t, cli)
+		if len(pods) != 1 || pods[0].Name != "legacy-stop-0" || pods[0].DeletionTimestamp.IsZero() || len(legacyStopRecoveryClaims(t, cli)) != 3 {
+			t.Fatal("Stop did not leave the held Pod while retaining all claims")
 		}
+		held := pods[0]
 		offline := &corev1.PersistentVolumeClaim{}
 		if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "data-legacy-stop-0"}, offline); err != nil {
 			t.Fatal(err)
@@ -1744,10 +1748,26 @@ func TestLegacyInstanceSetStopRecoveryRetiresAbsentClaims(t *testing.T) {
 			its.Spec.Replicas = ptr.To(int32(1))
 			its.Spec.Stop = ptr.To(false)
 		})
-		legacyStopRecoveryReconcile(t, cli, 3)
-		if pods := legacyStopRecoveryPods(t, cli); len(pods) != 1 || pods[0].Name != "legacy-stop-1" {
-			t.Fatalf("resume did not replace the Offline identity: %#v", pods)
+		legacyStopRecoveryReconcile(t, cli, 1)
+		pods = legacyStopRecoveryPods(t, cli)
+		if len(pods) != 2 {
+			t.Fatalf("early resume did not create the independent Active identity: %#v", pods)
 		}
+		for _, pod := range pods {
+			if pod.Name == held.Name {
+				if !reflect.DeepEqual(held, pod) {
+					t.Fatal("early resume changed the held Offline Pod")
+				}
+			} else if pod.Name != "legacy-stop-1" || !pod.DeletionTimestamp.IsZero() {
+				t.Fatalf("early resume created an unexpected Active identity: %#v", pod)
+			} else {
+				pod.Status = held.Status
+				if err := cli.Status().Update(context.Background(), &pod); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+		legacyStopRecoveryReconcile(t, cli, 2)
 		current := &corev1.PersistentVolumeClaim{}
 		if err := cli.Get(context.Background(), client.ObjectKeyFromObject(offline), current); err != nil || !reflect.DeepEqual(offline, current) {
 			t.Fatalf("resume changed Offline storage: %v", err)
@@ -1758,6 +1778,17 @@ func TestLegacyInstanceSetStopRecoveryRetiresAbsentClaims(t *testing.T) {
 		if len(legacyStopRecoveryClaims(t, cli)) != 2 {
 			t.Fatal("resume did not retain exactly the Active and Offline claims")
 		}
+		held.Finalizers = nil
+		if err := cli.Update(context.Background(), &held); err != nil {
+			t.Fatal(err)
+		}
+		legacyStopRecoveryReconcile(t, cli, 3)
+		if pods := legacyStopRecoveryPods(t, cli); len(pods) != 1 || pods[0].Name != "legacy-stop-1" {
+			t.Fatalf("resume did not preserve the Active identity after Offline termination: %#v", pods)
+		}
+		if err := cli.Get(context.Background(), client.ObjectKeyFromObject(offline), current); err != nil || !reflect.DeepEqual(offline, current) {
+			t.Fatalf("absent Offline storage changed: %v", err)
+		}
 		legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) {
 			its.Spec.OfflineInstances = nil
 			its.Spec.Replicas = ptr.To(int32(0))
@@ -1767,6 +1798,77 @@ func TestLegacyInstanceSetStopRecoveryRetiresAbsentClaims(t *testing.T) {
 			t.Fatal("removing the Offline allocation did not retire its claim")
 		}
 	})
+	t.Run("LiveOffline", func(t *testing.T) {
+		cli := legacyStopRecoveryFixture(t, 1, 0)
+		legacyStopRecoveryReady(t, cli)
+		offline := legacyStopRecoveryClaims(t, cli)[0]
+		legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) {
+			its.Spec.OfflineInstances = []string{"legacy-stop-0"}
+		})
+		legacyStopRecoveryReconcile(t, cli, 1)
+		legacyStopRecoveryReady(t, cli)
+		if pods := legacyStopRecoveryPods(t, cli); len(pods) != 1 || pods[0].Name != "legacy-stop-1" {
+			t.Fatalf("live Offline transition did not replace the Pod: %#v", pods)
+		}
+		current := &corev1.PersistentVolumeClaim{}
+		if err := cli.Get(context.Background(), client.ObjectKeyFromObject(&offline), current); err != nil || !reflect.DeepEqual(offline, *current) {
+			t.Fatalf("live Offline retirement changed allocated storage: %v", err)
+		}
+	})
+}
+
+func TestLegacyInstanceSetRolloutWhileLowerOrdinalTerminates(t *testing.T) {
+	supportResizeSubResource := intctrlutil.SupportResizeSubResource
+	intctrlutil.SupportResizeSubResource = func() (bool, error) { return false, nil }
+	t.Cleanup(func() { intctrlutil.SupportResizeSubResource = supportResizeSubResource })
+	cli := legacyStopRecoveryFixture(t, 2, 0)
+	legacyStopRecoveryReady(t, cli)
+	legacyStopRecoveryHold(t, cli)
+	held := &corev1.Pod{}
+	if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "legacy-stop-0"}, held); err != nil {
+		t.Fatal(err)
+	}
+	if err := cli.Delete(context.Background(), held); err != nil {
+		t.Fatal(err)
+	}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(held), held); err != nil {
+		t.Fatal(err)
+	}
+	held.Annotations = map[string]string{constant.CMInsConfigurationHashLabelKey: "invalid-json"}
+	if err := cli.Update(context.Background(), held); err != nil {
+		t.Fatal(err)
+	}
+	held.Status.Phase = corev1.PodPending
+	if err := cli.Status().Update(context.Background(), held); err != nil {
+		t.Fatal(err)
+	}
+	claims := legacyStopRecoveryClaims(t, cli)
+	legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) {
+		its.Spec.Template.Annotations = map[string]string{"desired": "latest"}
+		its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{Type: kbappsv1.RollingUpdateStrategyType, RollingUpdate: &workloads.RollingUpdate{MaxUnavailable: ptr.To(intstr.FromInt(2))}}
+	})
+	if result := legacyStopRecoveryReconcile(t, cli, 1); result.RequeueAfter != time.Second {
+		t.Fatalf("rollout did not wait for held termination: %#v", result)
+	}
+	pods := legacyStopRecoveryPods(t, cli)
+	if len(pods) != 2 {
+		t.Fatalf("rollout changed the instance count: %#v", pods)
+	}
+	for _, pod := range pods {
+		if pod.Name == held.Name {
+			if !reflect.DeepEqual(*held, pod) {
+				t.Fatal("rollout changed the terminating Pod")
+			}
+		} else if pod.Name != "legacy-stop-1" || pod.Annotations["desired"] != "latest" || !pod.DeletionTimestamp.IsZero() {
+			t.Fatal("held lower ordinal blocked healthy higher ordinal rollout")
+		}
+	}
+	if !reflect.DeepEqual(claims, legacyStopRecoveryClaims(t, cli)) {
+		t.Fatal("rollout changed storage while a Pod terminated")
+	}
+	if ptr.Deref(legacyStopRecoverySet(t, cli).Spec.Stop, false) {
+		t.Fatal("ordinary rollout unexpectedly requested Stop")
+	}
 }
 
 func TestLegacyInstanceSetStopRecoveryPartialCommit(t *testing.T) {

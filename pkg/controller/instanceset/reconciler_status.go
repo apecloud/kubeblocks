@@ -56,6 +56,7 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	stopping := isStopRequested(its)
 	// 1. get all pods
 	pods := tree.List(&corev1.Pod{})
 	var podList []*corev1.Pod
@@ -125,12 +126,16 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			}
 		}
 		if isCreated(pod) && !isTerminating(pod) {
-			isPodUpdated, err := isPodUpdated(its, pod)
-			if err != nil {
-				return kubebuilderx.Continue, err
+			updated := false
+			if !stopping {
+				var err1 error
+				updated, err1 = isPodUpdated(its, pod)
+				if err1 != nil {
+					return kubebuilderx.Continue, err1
+				}
 			}
 			switch _, ok := updateRevisions[pod.Name]; {
-			case !ok, !isPodUpdated:
+			case !ok, !updated:
 				currentReplicas++
 				template2TemplatesStatus[templateName].CurrentReplicas++
 			default:
@@ -199,7 +204,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.Continue, err
 	}
 
-	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
+	if !stopping && its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 
@@ -342,12 +347,34 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	}
 	offlineNames := append([]string(nil), its.Spec.OfflineInstances...)
 	templateHints := make([]instancestatus.TemplateAssignment, 0, len(desiredTemplateAssignments)+len(pods)+len(offlineNames))
+	for _, pod := range pods {
+		if templateName, ok := instancetemplate.TemplateNameFromLabels(pod.Labels); ok {
+			templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: pod.Name, TemplateName: templateName})
+		}
+	}
+	var historicalTemplates map[string]string
 	if isStopRequested(its) {
-		// Stop removes the desired Pod assignments, but they remain useful for retaining template identity
-		// while the corresponding Pods are draining or have already disappeared.
+		// Retain published template identity; observed and desired templates are successive fallbacks.
+		historicalTemplates = make(map[string]string, len(pods)+len(its.Status.InstanceStatus))
+		for _, status := range its.Status.InstanceStatus {
+			if status.TemplateName != nil {
+				historicalTemplates[status.PodName] = *status.TemplateName
+			}
+		}
+		for _, hint := range templateHints {
+			if _, known := historicalTemplates[hint.InstanceName]; !known {
+				historicalTemplates[hint.InstanceName] = hint.TemplateName
+			}
+		}
 		for _, assignment := range desiredTemplateAssignments {
 			offlineNames = append(offlineNames, assignment.InstanceName)
-			templateHints = append(templateHints, assignment)
+			if _, known := historicalTemplates[assignment.InstanceName]; !known {
+				historicalTemplates[assignment.InstanceName] = assignment.TemplateName
+			}
+		}
+		templateHints = templateHints[:0]
+		for name, templateName := range historicalTemplates {
+			templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: name, TemplateName: templateName})
 		}
 		desiredTemplateAssignments = nil
 	}
@@ -361,9 +388,6 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		state := workloads.InstanceCurrentStatePresent
 		if !pod.DeletionTimestamp.IsZero() {
 			state = workloads.InstanceCurrentStateTerminating
-		}
-		if templateName, ok := instancetemplate.TemplateNameFromLabels(pod.Labels); ok {
-			templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: pod.Name, TemplateName: templateName})
 		}
 		ready := state == workloads.InstanceCurrentStatePresent && isImageMatched(pod) && intctrlutil.IsPodReady(pod)
 		observation := instancestatus.Observation{
@@ -398,6 +422,9 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 
 	for _, name := range append(append([]string(nil), offlineNames...), podObservationNames(observations)...) {
 		if _, ok := desiredNames[name]; ok {
+			continue
+		}
+		if _, known := historicalTemplates[name]; known {
 			continue
 		}
 		if templateName, ok, err := instancetemplate.ResolveHistoricalTemplate(its, name, templateNames); err != nil {

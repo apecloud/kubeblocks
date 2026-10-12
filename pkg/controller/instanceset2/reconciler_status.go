@@ -414,15 +414,6 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	}
 	offlineNames := append([]string(nil), its.Spec.OfflineInstances...)
 	templateHints := make([]instancestatus.TemplateAssignment, 0, len(desiredTemplateAssignments)+len(instances)+len(offlineNames))
-	if its.Spec.Stop != nil && *its.Spec.Stop {
-		// Stop removes the desired Pod assignments, but they remain useful for retaining template identity
-		// while the corresponding Instances are draining or have already disappeared.
-		for _, assignment := range desiredTemplateAssignments {
-			offlineNames = append(offlineNames, assignment.InstanceName)
-			templateHints = append(templateHints, assignment)
-		}
-		desiredTemplateAssignments = nil
-	}
 
 	observations := make([]instancestatus.Observation, 0, len(instances))
 	seenInstances := make(map[string]struct{}, len(instances))
@@ -464,8 +455,37 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		}
 	}
 
+	var historicalTemplates map[string]string
+	if isStopRequested(its) {
+		historicalTemplates = make(map[string]string, len(instances)+len(its.Status.InstanceStatus))
+		for _, status := range its.Status.InstanceStatus {
+			if status.TemplateName != nil {
+				historicalTemplates[status.PodName] = *status.TemplateName
+			}
+		}
+		for _, hint := range templateHints {
+			if _, known := historicalTemplates[hint.InstanceName]; !known {
+				historicalTemplates[hint.InstanceName] = hint.TemplateName
+			}
+		}
+		for _, assignment := range desiredTemplateAssignments {
+			offlineNames = append(offlineNames, assignment.InstanceName)
+			if _, known := historicalTemplates[assignment.InstanceName]; !known {
+				historicalTemplates[assignment.InstanceName] = assignment.TemplateName
+			}
+		}
+		templateHints = templateHints[:0]
+		for name, templateName := range historicalTemplates {
+			templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: name, TemplateName: templateName})
+		}
+		desiredTemplateAssignments = nil
+	}
+
 	for _, name := range append(append([]string(nil), offlineNames...), observationNames(observations)...) {
 		if _, ok := desiredNames[name]; ok {
+			continue
+		}
+		if _, known := historicalTemplates[name]; known {
 			continue
 		}
 		if templateName, ok, err := instancetemplate.ResolveHistoricalTemplate(its, name, templateNames); err != nil {

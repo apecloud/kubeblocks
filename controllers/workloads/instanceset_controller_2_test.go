@@ -889,6 +889,53 @@ func TestInstanceSetStopRuntimeSummaryRequiresFreshAbsence(t *testing.T) {
 	}
 }
 
+func TestInstanceSetStopClearsAppliedStatus(t *testing.T) {
+	for _, legacy := range []bool{true, false} {
+		t.Run(map[bool]string{true: "legacy", false: "instances"}[legacy], func(t *testing.T) {
+			its := setStopFixture()
+			its.Spec.EnableInstanceAPI = ptr.To(!legacy)
+			cli := newSetStopClient(t, its)
+			reconcileSetStop(t, cli, legacy, 5)
+			bindSetStopClaims(t, cli)
+			for _, pod := range listSetStopPods(t, cli) {
+				pod.Status.Phase = corev1.PodRunning
+				pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: metav1.Now()}}
+				pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "db", Image: pod.Spec.Containers[0].Image, Ready: true}}
+				if err := cli.Status().Update(context.Background(), &pod); err != nil {
+					t.Fatal(err)
+				}
+			}
+			reconcileSetStop(t, cli, legacy, 5)
+			if readSetStop(t, cli).Status.UpdatedReplicas != 2 {
+				t.Fatal("fixture did not publish applied runtime before Stop")
+			}
+			for _, status := range readSetStop(t, cli).Status.InstanceStatus {
+				if !status.UpToDate {
+					t.Fatal("fixture did not publish detailed applied status")
+				}
+			}
+			mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
+				its.Spec.Stop = ptr.To(true)
+				its.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
+			})
+			for i := 0; i < 2; i++ {
+				if _, err := reconcileSetStopParent(cli, legacy); err != nil {
+					t.Fatal(err)
+				}
+				stopped := readSetStop(t, cli)
+				if stopped.Status.UpdatedReplicas != 0 {
+					t.Errorf("Stop pass %d retained UpdatedReplicas=%d", i, stopped.Status.UpdatedReplicas)
+				}
+				for _, status := range stopped.Status.InstanceStatus {
+					if status.UpToDate {
+						t.Errorf("Stop pass %d retained UpToDate for %s", i, status.PodName)
+					}
+				}
+			}
+		})
+	}
+}
+
 func TestInstanceSetStopBypassesMinReadyStatusCutoff(t *testing.T) {
 	for _, legacy := range []bool{true, false} {
 		t.Run(map[bool]string{true: "legacy", false: "instances"}[legacy], func(t *testing.T) {

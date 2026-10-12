@@ -126,7 +126,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			currentRevisions[inst.Name] = getInstanceRevision(inst)
 		}
 		if !hasTerminatingRuntime(inst) && hasPresentRuntime(inst) {
-			if isInstanceUpdatedWithRevisions(inst, currentRevisions[inst.Name], updateRevisions) {
+			if !isStopRequested(its) && isInstanceUpdatedWithRevisions(inst, currentRevisions[inst.Name], updateRevisions) {
 				updatedReplicas++
 				template2TemplatesStatus[templateName].UpdatedReplicas++
 			} else {

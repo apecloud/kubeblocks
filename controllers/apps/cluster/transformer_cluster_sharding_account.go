@@ -64,6 +64,11 @@ func (t *clusterShardingAccountTransformer) reconcileShardingAccounts(transCtx *
 		if ok {
 			for _, account := range shardDef.Spec.SystemAccounts {
 				if ptr.Deref(account.Shared, false) {
+					// skip the shared account if it's already defined in the sharding template with
+					// a secretRef specified, in which case the credential is managed by the user.
+					if systemAccountSecretRefSpecified(sharding, account.Name) {
+						continue
+					}
 					if err := t.reconcileShardingAccount(transCtx, graphCli, dag, sharding, account.Name); err != nil {
 						return err
 					}
@@ -233,6 +238,18 @@ func (t *clusterShardingAccountTransformer) rewriteSystemAccount(transCtx *clust
 		shardingComps[i].SystemAccounts = append(shardingComps[i].SystemAccounts, newAccount)
 	}
 	transCtx.shardingComps[shardingName] = shardingComps
+}
+
+// systemAccountSecretRefSpecified checks whether the system account has been defined in the
+// sharding template and a secretRef has been specified.
+func systemAccountSecretRefSpecified(sharding *appsv1.ClusterSharding, accountName string) bool {
+	for i := range sharding.Template.SystemAccounts {
+		account := sharding.Template.SystemAccounts[i]
+		if account.Name == accountName && account.SecretRef != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func shardingAccountSecretName(cluster, sharding, account string) string {

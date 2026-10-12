@@ -219,10 +219,20 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	retireClaims := !isStopRequested(its) && (retentionPolicy == nil || retentionPolicy.WhenScaled != kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType)
 	if retireClaims {
 		allocatedNames := newNameSet.Union(sets.New(its.Spec.OfflineInstances...))
+		allocatedClaims := sets.New[string]()
+		for name, template := range nameToTemplateMap {
+			pvcs, err := buildInstancePVCByTemplate(name, template, its)
+			if err != nil {
+				return kubebuilderx.Continue, err
+			}
+			for _, pvc := range pvcs {
+				allocatedClaims.Insert(pvc.Name)
+			}
+		}
 		allocationComplete := len(nameToTemplateMap) == int(*its.Spec.Replicas)
 		for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
 			name := obj.GetLabels()[constant.KBAppPodNameLabelKey]
-			if name == "" || allocatedNames.Has(name) {
+			if name == "" || allocatedNames.Has(name) || allocatedClaims.Has(obj.GetName()) {
 				continue
 			}
 			if retiredNames.Has(name) || (allocationComplete && !oldNameSet.Has(name) && metav1.IsControlledBy(obj, its)) {

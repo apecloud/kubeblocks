@@ -467,11 +467,24 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	}
 	offlineNames := append([]string(nil), its.Spec.OfflineInstances...)
 	templateHints := make([]instancestatus.TemplateAssignment, 0, len(desiredTemplateAssignments)+len(pods)+len(offlineNames))
-	if isStopRequested(its) {
-		// Stop removes the desired Pod assignments, but they remain useful for retaining template identity
-		// while the corresponding Pods are draining or have already disappeared.
+	stopped := isStopRequested(its)
+	if stopped {
+		retainedTemplates := make(map[string]string, len(pods)+len(its.Status.InstanceStatus))
+		for _, pod := range pods {
+			if template, ok := instancetemplate.TemplateNameFromLabels(pod.Labels); ok {
+				retainedTemplates[pod.Name] = template
+			}
+		}
+		for _, status := range its.Status.InstanceStatus {
+			if status.TemplateName != nil {
+				retainedTemplates[status.PodName] = *status.TemplateName
+			}
+		}
 		for _, assignment := range desiredTemplateAssignments {
 			offlineNames = append(offlineNames, assignment.InstanceName)
+			if template, ok := retainedTemplates[assignment.InstanceName]; ok {
+				assignment.TemplateName = template
+			}
 			templateHints = append(templateHints, assignment)
 		}
 		desiredTemplateAssignments = nil
@@ -485,7 +498,9 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 			state = workloads.InstanceCurrentStateTerminating
 		}
 		if templateName, ok := instancetemplate.TemplateNameFromLabels(pod.Labels); ok {
-			templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: pod.Name, TemplateName: templateName})
+			if _, allocated := desiredNames[pod.Name]; !stopped || !allocated {
+				templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: pod.Name, TemplateName: templateName})
+			}
 		}
 		ready := state == workloads.InstanceCurrentStatePresent && isImageMatched(pod) && intctrlutil.IsPodReady(pod)
 		observation := instancestatus.Observation{

@@ -1460,6 +1460,62 @@ func TestLegacyInstanceSetStopRecoveryMinReadySeconds(t *testing.T) {
 	}
 }
 
+func TestLegacyInstanceSetStopRecoveryFlatTemplateChange(t *testing.T) {
+	for _, retargetFirst := range []bool{false, true} {
+		t.Run(fmt.Sprintf("retargetFirst=%t", retargetFirst), func(t *testing.T) {
+			cli := legacyStopRecoveryFixture(t, 2, 0)
+			legacyStopRecoveryReady(t, cli)
+			legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) { its.Spec.FlatInstanceOrdinal = true })
+			legacyStopRecoveryReconcile(t, cli, 3)
+			changeTemplate := func(its *workloads.InstanceSet) {
+				its.Spec.Instances = []workloads.InstanceTemplate{{Name: "named", Replicas: ptr.To(int32(1)), Ordinals: workloads.Ordinals{Discrete: []int32{0}}}}
+			}
+			if retargetFirst {
+				legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) {
+					changeTemplate(its)
+					its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{Type: kbappsv1.OnDeleteStrategyType}
+				})
+				legacyStopRecoveryReconcile(t, cli, 2)
+			}
+			claims := legacyStopRecoveryClaims(t, cli)
+			legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) {
+				its.Spec.Stop = ptr.To(true)
+				its.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
+				changeTemplate(its)
+			})
+			legacyStopRecoveryReconcile(t, cli, 6)
+			its := legacyStopRecoverySet(t, cli)
+			if len(legacyStopRecoveryPods(t, cli)) != 0 || its.Status.Replicas != 0 || its.Status.ObservedGeneration != its.Generation {
+				t.Fatal("Stop with a template change did not finish draining Pods")
+			}
+			historicalTemplate := ""
+			if retargetFirst {
+				historicalTemplate = "named"
+			}
+			status := its.FindInstanceStatus("legacy-stop-0")
+			if status == nil || status.TemplateName == nil || *status.TemplateName != historicalTemplate || status.DesiredState != workloads.InstanceDesiredStateOffline || status.CurrentState != workloads.InstanceCurrentStateAbsent {
+				t.Fatalf("Stop did not retain the retained template identity after Pod deletion: %#v", status)
+			}
+			if !reflect.DeepEqual(claims, legacyStopRecoveryClaims(t, cli)) {
+				t.Fatal("Stop with a template change modified retained PVCs")
+			}
+			legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(false) })
+			legacyStopRecoveryReconcile(t, cli, 2)
+			legacyStopRecoveryReady(t, cli)
+			legacyStopRecoveryReconcile(t, cli, 3)
+			status = legacyStopRecoverySet(t, cli).FindInstanceStatus("legacy-stop-0")
+			if len(legacyStopRecoveryPods(t, cli)) != 2 || status == nil || status.TemplateName == nil || *status.TemplateName != "named" || status.DesiredState != workloads.InstanceDesiredStateActive {
+				t.Fatal("resume did not apply the desired template assignment")
+			}
+			for _, pod := range legacyStopRecoveryPods(t, cli) {
+				if pod.Name == "legacy-stop-0" && pod.Labels[instancetemplate.TemplateNameLabelKey] != "named" {
+					t.Fatal("resumed Pod did not use the desired template")
+				}
+			}
+		})
+	}
+}
+
 func TestLegacyInstanceSetStopRecoveryMalformedObservedConfig(t *testing.T) {
 	cli := legacyStopRecoveryFixture(t, 2, 0)
 	legacyStopRecoveryReady(t, cli)

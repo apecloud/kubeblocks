@@ -472,13 +472,35 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	}
 	offlineNames := append([]string(nil), its.Spec.OfflineInstances...)
 	templateHints := make([]instancestatus.TemplateAssignment, 0, len(desiredTemplateAssignments)+len(pods)+len(offlineNames))
+	for _, pod := range pods {
+		if templateName, ok := instancetemplate.TemplateNameFromLabels(pod.Labels); ok {
+			templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: pod.Name, TemplateName: templateName})
+		}
+	}
+	var historicalTemplates map[string]string
 	activeNames := desiredNames
 	if isStopRequested(its) {
-		// Stop removes the desired Pod assignments, but they remain useful for retaining template identity
-		// while the corresponding Pods are draining or have already disappeared.
+		// Retain published template identity; observed and desired templates are successive fallbacks.
+		historicalTemplates = make(map[string]string, len(pods)+len(its.Status.InstanceStatus))
+		for _, status := range its.Status.InstanceStatus {
+			if status.TemplateName != nil {
+				historicalTemplates[status.PodName] = *status.TemplateName
+			}
+		}
+		for _, hint := range templateHints {
+			if _, known := historicalTemplates[hint.InstanceName]; !known {
+				historicalTemplates[hint.InstanceName] = hint.TemplateName
+			}
+		}
 		for _, assignment := range desiredTemplateAssignments {
 			offlineNames = append(offlineNames, assignment.InstanceName)
-			templateHints = append(templateHints, assignment)
+			if _, known := historicalTemplates[assignment.InstanceName]; !known {
+				historicalTemplates[assignment.InstanceName] = assignment.TemplateName
+			}
+		}
+		templateHints = templateHints[:0]
+		for name, templateName := range historicalTemplates {
+			templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: name, TemplateName: templateName})
 		}
 		desiredTemplateAssignments = nil
 		activeNames = nil
@@ -487,9 +509,6 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	observations := make([]instancestatus.Observation, 0, len(pods))
 	roleMap := composeRoleMap(*its)
 	for _, pod := range pods {
-		if templateName, ok := instancetemplate.TemplateNameFromLabels(pod.Labels); ok {
-			templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: pod.Name, TemplateName: templateName})
-		}
 		observation, err := observePodRuntime(its, pod, roleMap)
 		if err != nil {
 			return err
@@ -517,6 +536,9 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 
 	for _, name := range append(append([]string(nil), offlineNames...), podObservationNames(observations)...) {
 		if _, ok := desiredNames[name]; ok {
+			continue
+		}
+		if _, known := historicalTemplates[name]; known {
 			continue
 		}
 		if templateName, ok, err := instancetemplate.ResolveHistoricalTemplate(its, name, templateNames); err != nil {

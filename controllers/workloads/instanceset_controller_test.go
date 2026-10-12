@@ -1748,13 +1748,14 @@ func TestLegacyInstanceSetStopRecoveryRetiresAbsentClaims(t *testing.T) {
 			t.Fatalf("early resume did not create the independent Active identity: %#v", pods)
 		}
 		for _, pod := range pods {
-			if pod.Name == held.Name {
+			switch {
+			case pod.Name == held.Name:
 				if !reflect.DeepEqual(held, pod) {
 					t.Fatal("early resume changed the held Offline Pod")
 				}
-			} else if pod.Name != "legacy-stop-1" || !pod.DeletionTimestamp.IsZero() {
+			case pod.Name != "legacy-stop-1" || !pod.DeletionTimestamp.IsZero():
 				t.Fatalf("early resume created an unexpected Active identity: %#v", pod)
-			} else {
+			default:
 				pod.Status = held.Status
 				if err := cli.Status().Update(context.Background(), &pod); err != nil {
 					t.Fatal(err)

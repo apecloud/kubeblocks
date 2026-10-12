@@ -207,10 +207,63 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	if retentionPolicy == nil || retentionPolicy.WhenScaled != kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType {
 		allocatedNames := newNameSet.Union(sets.New(its.Spec.OfflineInstances...))
 		allocatedClaims := sets.New[string]()
+		preserveClaims := func(pod *corev1.Pod) {
+			for _, volume := range pod.Spec.Volumes {
+				if volume.PersistentVolumeClaim != nil {
+					allocatedClaims.Insert(volume.PersistentVolumeClaim.ClaimName)
+				}
+			}
+		}
+		for _, obj := range tree.List(&corev1.Pod{}) {
+			preserveClaims(obj.(*corev1.Pod))
+		}
 		for name, template := range nameToTemplateMap {
-			pvcs := buildInstancePVCByTemplate(name, template, its)
-			for _, pvc := range pvcs {
-				allocatedClaims.Insert(pvc.Name)
+			inst, err := buildInstanceByTemplate(name, template, its, "")
+			if err != nil {
+				return kubebuilderx.Continue, err
+			}
+			preserveClaims(inst.pod)
+		}
+		if len(its.Spec.OfflineInstances) > 0 {
+			// A previous Offline Pod may have used an explicit source now shadowed by a claim template.
+			// Keep still-declared explicit references until the Offline allocation is released.
+			preserveClaims(&corev1.Pod{Spec: its.Spec.Template.Spec})
+			// Offline Pods can be absent, so render their effective volumes as well.
+			offlineExt := &instanceSetExt{its: its, instanceTemplates: append([]*workloads.InstanceTemplate(nil), itsExt.instanceTemplates...)}
+			hasDefault := false
+			for _, template := range offlineExt.instanceTemplates {
+				hasDefault = hasDefault || template.Name == ""
+			}
+			if !hasDefault {
+				offlineExt.instanceTemplates = append(offlineExt.instanceTemplates, &workloads.InstanceTemplate{})
+			}
+			templates := buildInstanceTemplateExts(offlineExt)
+			for _, name := range its.Spec.OfflineInstances {
+				_, ordinal := ParseParentNameAndOrdinal(name)
+				var selected *instanceTemplateExt
+				if ordinal >= 0 {
+					for _, template := range templates {
+						names, err := GenerateInstanceNamesFromTemplate(its.Name, template.Name, 1, nil, []int32{int32(ordinal)})
+						if err != nil {
+							return kubebuilderx.Continue, err
+						}
+						if names[0] == name {
+							selected = template
+							break
+						}
+					}
+				}
+				// Unknown historical ownership must retain candidate references until Offline is removed.
+				for _, template := range templates {
+					if selected != nil && template != selected {
+						continue
+					}
+					instance, err := buildInstanceByTemplate(name, template, its, "")
+					if err != nil {
+						return kubebuilderx.Continue, err
+					}
+					preserveClaims(instance.pod)
+				}
 			}
 		}
 		for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {

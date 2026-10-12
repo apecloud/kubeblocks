@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"time"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -228,6 +230,12 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 					return kubebuilderx.Continue, err
 				}
 			}
+		}
+	}
+
+	for _, object := range tree.List(&corev1.Pod{}) {
+		if newNameSet.Has(object.GetName()) && model.IsObjectDeleting(object) {
+			return kubebuilderx.RetryAfter(time.Second), nil
 		}
 	}
 

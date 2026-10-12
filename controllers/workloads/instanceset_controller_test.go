@@ -1406,6 +1406,12 @@ func legacyStopRecoveryClaims(t *testing.T, cli client.Client) []corev1.Persiste
 
 func legacyStopRecoveryReady(t *testing.T, cli client.Client) {
 	t.Helper()
+	for _, claim := range legacyStopRecoveryClaims(t, cli) {
+		claim.Status.Capacity = claim.Spec.Resources.Requests.DeepCopy()
+		if err := cli.Status().Update(context.Background(), &claim); err != nil {
+			t.Fatal(err)
+		}
+	}
 	for _, pod := range legacyStopRecoveryPods(t, cli) {
 		pod.Status.Phase = corev1.PodRunning
 		pod.Status.PodIP = "127.0.0.1"
@@ -1457,6 +1463,11 @@ func TestLegacyInstanceSetStopRecoveryMinReadySeconds(t *testing.T) {
 func TestLegacyInstanceSetStopRecoveryMalformedObservedConfig(t *testing.T) {
 	cli := legacyStopRecoveryFixture(t, 2, 0)
 	legacyStopRecoveryReady(t, cli)
+	for _, status := range legacyStopRecoverySet(t, cli).Status.InstanceStatus {
+		if !status.UpToDate || status.CurrentState != workloads.InstanceCurrentStatePresent {
+			t.Fatal("fixture did not publish applied runtime before Stop")
+		}
+	}
 	claims := legacyStopRecoveryClaims(t, cli)
 	for _, pod := range legacyStopRecoveryPods(t, cli) {
 		if pod.Annotations == nil {
@@ -1503,12 +1514,35 @@ func TestLegacyInstanceSetStopRecoveryTerminatingSummary(t *testing.T) {
 	assertTerminating()
 }
 
-func TestLegacyInstanceSetStopRecoveryTerminatingSkipsActions(t *testing.T) {
-	cli := legacyStopRecoveryFixture(t, 1, 0)
+func TestLegacyInstanceSetStopRecoveryWaitsForTermination(t *testing.T) {
+	cli := legacyStopRecoveryFixture(t, 2, 0)
 	legacyStopRecoveryReady(t, cli)
 	legacyStopRecoveryHold(t, cli)
+	claims := legacyStopRecoveryClaims(t, cli)
 	legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(true) })
-	legacyStopRecoveryReconcile(t, cli, 2)
+	failure := errors.New("injected Stop status failure before early resume")
+	fired := false
+	faulty := interceptor.NewClient(cli, interceptor.Funcs{
+		SubResourceUpdate: func(ctx context.Context, delegate client.Client, name string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+			if _, ok := obj.(*workloads.InstanceSet); ok && name == "status" && !fired {
+				fired = true
+				return failure
+			}
+			return delegate.SubResource(name).Update(ctx, obj, opts...)
+		},
+	})
+	controller := &InstanceSetReconciler{Client: faulty, Recorder: record.NewFakeRecorder(1000)}
+	if _, err := controller.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKey{Namespace: "default", Name: "legacy-stop"}}); !errors.Is(err, failure) || !fired {
+		t.Fatalf("expected injected Stop status failure, got %v", err)
+	}
+	its := legacyStopRecoverySet(t, cli)
+	status := its.FindInstanceStatus("legacy-stop-0")
+	if its.Status.ObservedGeneration == its.Generation || status == nil || !status.UpToDate || status.CurrentState != workloads.InstanceCurrentStatePresent {
+		t.Fatal("fixture did not retain stale applied status after persisted Stop deletion")
+	}
+	if pods := legacyStopRecoveryPods(t, cli); len(pods) != 1 || pods[0].DeletionTimestamp.IsZero() {
+		t.Fatal("Stop status failure did not follow actual Pod deletions")
+	}
 	pod := legacyStopRecoveryPods(t, cli)[0]
 	pod.Annotations = map[string]string{constant.CMInsConfigurationHashLabelKey: "invalid-json"}
 	if err := cli.Update(context.Background(), &pod); err != nil {
@@ -1519,13 +1553,60 @@ func TestLegacyInstanceSetStopRecoveryTerminatingSkipsActions(t *testing.T) {
 	t.Cleanup(kbacli.UnsetMockClient)
 	legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) {
 		its.Spec.Stop = ptr.To(false)
+		its.Spec.Template.Spec.Containers[0].Image = "db:v2"
+		its.Spec.Template.Spec.Containers[0].Ports = []corev1.ContainerPort{{Name: "db", ContainerPort: 5432, Protocol: corev1.ProtocolTCP}}
+		its.Spec.VolumeClaimTemplates[0].Annotations = map[string]string{"desired": "latest"}
 		its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{Type: kbappsv1.RollingUpdateStrategyType, RollingUpdate: &workloads.RollingUpdate{MaxUnavailable: ptr.To(intstr.FromInt(2))}}
 		its.Spec.Configs = []workloads.ConfigTemplate{{Name: "server", ConfigHash: ptr.To("new"), Reconfigure: &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"true"}}}}}
 	})
 	before := legacyStopRecoveryPods(t, cli)[0]
-	legacyStopRecoveryReconcile(t, cli, 2)
-	if pods := legacyStopRecoveryPods(t, cli); len(pods) != 1 || !reflect.DeepEqual(before, pods[0]) {
-		t.Fatal("resume modified the terminating Pod")
+	if result := legacyStopRecoveryReconcile(t, cli, 1); result.RequeueAfter != time.Second {
+		t.Fatalf("early resume did not wait for termination: %#v", result)
+	}
+	status = legacyStopRecoverySet(t, cli).FindInstanceStatus(before.Name)
+	if status == nil || status.UpToDate {
+		t.Fatal("resume target publication trusted stale applied status for a terminating Pod")
+	}
+	pods := legacyStopRecoveryPods(t, cli)
+	if len(pods) != 2 {
+		t.Fatal("termination wait blocked independent Parallel creation")
+	}
+	for _, pod := range pods {
+		if pod.Name == before.Name {
+			if !reflect.DeepEqual(before, pod) {
+				t.Fatal("resume modified the terminating Pod")
+			}
+		} else {
+			if pod.Spec.Containers[0].Image != "db:v2" || !pod.DeletionTimestamp.IsZero() {
+				t.Fatal("independent Pod did not receive the latest resume payload")
+			}
+			pod.Status.Phase = corev1.PodPending
+			if err := cli.Status().Update(context.Background(), &pod); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if result := legacyStopRecoveryReconcile(t, cli, 1); result.RequeueAfter != time.Second {
+		t.Fatalf("termination wait did not reenter: %#v", result)
+	}
+	for _, claim := range legacyStopRecoveryClaims(t, cli) {
+		if claim.Labels[constant.KBAppPodNameLabelKey] == before.Name {
+			for _, original := range claims {
+				if original.Name == claim.Name && !reflect.DeepEqual(original, claim) {
+					t.Fatal("termination wait changed held Pod storage")
+				}
+			}
+		} else if claim.Annotations["desired"] != "latest" {
+			t.Fatal("independent Pod PVC did not commit during termination wait")
+		}
+	}
+	services := &corev1.ServiceList{}
+	if err := cli.List(context.Background(), services); err != nil || len(services.Items) != 1 || len(services.Items[0].Spec.Ports) != 1 || services.Items[0].Spec.Ports[0].Port != 5432 {
+		t.Fatalf("termination wait did not commit assistant changes: %v", err)
+	}
+	its = legacyStopRecoverySet(t, cli)
+	if its.Status.ObservedGeneration != its.Generation || its.Status.Replicas != 2 || its.Status.UpdatedReplicas != 1 {
+		t.Fatalf("termination wait did not commit current generation and runtime counts: generation=%d status=%#v", its.Generation, its.Status)
 	}
 }
 

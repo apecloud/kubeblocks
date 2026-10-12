@@ -1503,3 +1503,51 @@ func TestInstanceSetPVCAbsentOwnership(t *testing.T) {
 		}
 	}
 }
+
+func TestInstanceSetPVCIncompleteAllocation(t *testing.T) {
+	cli := pvcLifecycleFixture(t, 2)
+	pvcLifecycleReady(t, cli)
+	pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
+		its.Spec.FlatInstanceOrdinal = true
+		its.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
+		its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{Type: "OnDelete"}
+		its.Spec.Instances = []workloads.InstanceTemplate{
+			{Name: "a", Replicas: ptr.To(int32(1)), Ordinals: workloads.Ordinals{Discrete: []int32{0}}},
+			{Name: "b", Replicas: ptr.To(int32(1)), Ordinals: workloads.Ordinals{Discrete: []int32{1}}},
+		}
+	})
+	pvcLifecycleReconcile(t, cli, 4)
+	pvcLifecycleReady(t, cli)
+	pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
+		its.Spec.Instances[0].Ordinals.Discrete = []int32{1}
+		its.Spec.Instances[1].Ordinals.Discrete = []int32{0}
+	})
+	pvcLifecycleReconcile(t, cli, 1)
+	pod := &corev1.Pod{}
+	if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "pvc-lifecycle-0"}, pod); err != nil {
+		t.Fatal(err)
+	}
+	if err := cli.Delete(context.Background(), pod); err != nil {
+		t.Fatal(err)
+	}
+	claim := &corev1.PersistentVolumeClaim{}
+	key := client.ObjectKey{Namespace: "default", Name: "data-pvc-lifecycle-0"}
+	if err := cli.Get(context.Background(), key, claim); err != nil {
+		t.Fatal(err)
+	}
+	pvcLifecycleReconcile(t, cli, 3)
+	current := &corev1.PersistentVolumeClaim{}
+	if err := cli.Get(context.Background(), key, current); err != nil || !reflect.DeepEqual(claim, current) {
+		t.Fatalf("allocation transfer changed absent Active storage: %v", err)
+	}
+	pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
+		its.Spec.Replicas = ptr.To(int32(0))
+		for i := range its.Spec.Instances {
+			its.Spec.Instances[i].Replicas = ptr.To(int32(0))
+		}
+	})
+	pvcLifecycleReconcile(t, cli, 4)
+	if len(pvcLifecycleClaims(t, cli)) != 0 || len(pvcLifecyclePods(t, cli)) != 0 {
+		t.Fatal("complete scale-down did not resume claim retirement")
+	}
+}

@@ -217,12 +217,13 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	retireClaims := !isStopRequested(its) && (retentionPolicy == nil || retentionPolicy.WhenScaled != kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType)
 	if retireClaims {
 		allocatedNames := newNameSet.Union(sets.New(its.Spec.OfflineInstances...))
+		allocationComplete := len(nameToTemplateMap) == int(*its.Spec.Replicas)
 		for _, obj := range oldPVCList {
 			name := obj.GetLabels()[constant.KBAppPodNameLabelKey]
 			if name == "" || allocatedNames.Has(name) {
 				continue
 			}
-			if retiredNames.Has(name) || (!oldNameSet.Has(name) && metav1.IsControlledBy(obj, its)) {
+			if retiredNames.Has(name) || (allocationComplete && !oldNameSet.Has(name) && metav1.IsControlledBy(obj, its)) {
 				if err := tree.Delete(obj); err != nil {
 					return kubebuilderx.Continue, err
 				}

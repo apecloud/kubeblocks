@@ -2066,3 +2066,398 @@ func TestInstanceSetPVCReusedClaimBeforePodAdmission(t *testing.T) {
 		})
 	}
 }
+
+func TestInstanceSetPVCExplicitReference(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		management appsv1.PodManagementPolicyType
+		deferred   bool
+	}{
+		{"Immediate", appsv1.ParallelPodManagement, false},
+		{"OrderedReady", appsv1.OrderedReadyPodManagement, true},
+		{"Parallel", appsv1.ParallelPodManagement, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cli := pvcLifecycleFixture(t, 0)
+			pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
+				its.Spec.Replicas = ptr.To(int32(1))
+				its.Spec.Instances = []workloads.InstanceTemplate{{Name: "old", Replicas: ptr.To(int32(1))}}
+				its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{Type: "OnDelete"}
+				its.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: "data", MountPath: "/data"}}
+			})
+			pvcLifecycleReconcile(t, cli, 1)
+			pvcLifecycleReady(t, cli)
+			claimTemplate := pvcLifecycleSet(t, cli).Spec.VolumeClaimTemplates[0].DeepCopy()
+			claims := pvcLifecycleClaims(t, cli)
+			pods := pvcLifecyclePods(t, cli)
+			if len(claims) != 1 || len(pods) != 1 || pods[0].Name != "pvc-lifecycle-old-0" {
+				t.Fatal("invalid original storage fixture")
+			}
+			original := claims[0]
+			original.UID = "explicit-original-uid"
+			original.Spec.VolumeName = "explicit-original-volume"
+			if err := cli.Update(context.Background(), &original); err != nil {
+				t.Fatal(err)
+			}
+			if err := cli.Delete(context.Background(), &pods[0]); err != nil {
+				t.Fatal(err)
+			}
+			pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
+				its.Spec.VolumeClaimTemplates = nil
+				its.Spec.Template.Spec.Volumes = []corev1.Volume{{Name: "data", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: original.Name}}}}
+				its.Spec.Instances = []workloads.InstanceTemplate{{Name: "z", Replicas: ptr.To(int32(1))}}
+				its.Spec.PodManagementPolicy = tc.management
+				if tc.deferred {
+					its.Spec.Replicas = ptr.To(int32(2))
+					its.Spec.Instances = append(its.Spec.Instances, workloads.InstanceTemplate{Name: "a", Replicas: ptr.To(int32(1)), VolumeClaimTemplates: []corev1.PersistentVolumeClaim{*claimTemplate}})
+					its.Spec.ParallelPodManagementConcurrency = ptr.To(intstr.FromInt(1))
+				}
+			})
+			pvcLifecycleReconcile(t, cli, 1)
+			pods = pvcLifecyclePods(t, cli)
+			expectedFirst := "pvc-lifecycle-z-0"
+			if tc.deferred {
+				expectedFirst = "pvc-lifecycle-a-0"
+			}
+			if len(pods) != 1 || pods[0].Name != expectedFirst {
+				t.Fatalf("unexpected admitted Pods: %#v", pods)
+			}
+			assertStorage := func() {
+				t.Helper()
+				current := &corev1.PersistentVolumeClaim{}
+				if err := cli.Get(context.Background(), client.ObjectKeyFromObject(&original), current); err != nil {
+					t.Fatalf("explicitly referenced storage disappeared: %v", err)
+				}
+				if current.UID != original.UID || !reflect.DeepEqual(current.Spec, original.Spec) {
+					t.Fatal("explicitly referenced storage was replaced or modified")
+				}
+			}
+			assertStorage()
+			if tc.deferred {
+				if len(pods[0].Spec.Volumes) != 1 || pods[0].Spec.Volumes[0].PersistentVolumeClaim == nil || pods[0].Spec.Volumes[0].PersistentVolumeClaim.ClaimName != "data-pvc-lifecycle-a-0" {
+					t.Fatal("generated volume did not override the explicit template volume")
+				}
+				pvcLifecycleReconcile(t, cli, 2)
+				if len(pvcLifecyclePods(t, cli)) != 1 {
+					t.Fatal("unready predecessor did not defer explicit-volume Pod creation")
+				}
+				assertStorage()
+				pvcLifecycleReady(t, cli)
+			}
+			explicit := &corev1.Pod{}
+			if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "pvc-lifecycle-z-0"}, explicit); err != nil {
+				t.Fatal(err)
+			}
+			if len(explicit.Spec.Volumes) != 1 || explicit.Spec.Volumes[0].PersistentVolumeClaim == nil || explicit.Spec.Volumes[0].PersistentVolumeClaim.ClaimName != original.Name {
+				t.Fatal("resumed Pod did not reference original explicit PVC")
+			}
+			if len(explicit.Spec.Containers[0].VolumeMounts) != 1 || explicit.Spec.Containers[0].VolumeMounts[0].Name != "data" || explicit.Spec.Containers[0].VolumeMounts[0].MountPath != "/data" {
+				t.Fatal("resumed Pod did not mount explicit PVC")
+			}
+			assertStorage()
+			if tc.deferred {
+				pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
+					its.Spec.Replicas = ptr.To(int32(1))
+					its.Spec.Instances = []workloads.InstanceTemplate{{Name: "a", Replicas: ptr.To(int32(1)), VolumeClaimTemplates: []corev1.PersistentVolumeClaim{*claimTemplate}}, {Name: "z", Replicas: ptr.To(int32(0))}}
+				})
+				if tc.management == appsv1.ParallelPodManagement {
+					pending := &corev1.Pod{}
+					if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "pvc-lifecycle-a-0"}, pending); err != nil {
+						t.Fatal(err)
+					}
+					pending.Status.Conditions = nil
+					if err := cli.Status().Update(context.Background(), pending); err != nil {
+						t.Fatal(err)
+					}
+					pvcLifecycleReconcile(t, cli, 1)
+					if len(pvcLifecyclePods(t, cli)) != 2 {
+						t.Fatal("exhausted budget did not defer retiring the explicit-volume Pod")
+					}
+					assertStorage()
+					pvcLifecycleReady(t, cli)
+				} else {
+					pvcLifecycleReconcile(t, cli, 1)
+				}
+				current := &corev1.PersistentVolumeClaim{}
+				if err := cli.Get(context.Background(), client.ObjectKeyFromObject(&original), current); !apierrors.IsNotFound(err) {
+					t.Fatalf("shadowed explicit template reference kept retired storage: %v", err)
+				}
+			}
+			pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) { its.Spec.Replicas = ptr.To(int32(0)); its.Spec.Instances = nil })
+			pvcLifecycleReconcile(t, cli, 6)
+			if len(pvcLifecyclePods(t, cli)) != 0 || len(pvcLifecycleClaims(t, cli)) != 0 {
+				t.Fatal("final retirement did not clear previously reused storage")
+			}
+		})
+	}
+}
+
+func TestInstanceSetPVCExplicitOfflineReference(t *testing.T) {
+	for _, test := range []struct {
+		name            string
+		shadowed        bool
+		defaultTemplate bool
+	}{
+		{name: "named-explicit"},
+		{name: "named-shadowed", shadowed: true},
+		{name: "default-explicit", defaultTemplate: true},
+		{name: "default-shadowed", defaultTemplate: true, shadowed: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			shadowed := test.shadowed
+			podName := "pvc-lifecycle-z-0"
+			if test.defaultTemplate {
+				podName = "pvc-lifecycle-0"
+			}
+			cli := pvcLifecycleFixture(t, 0)
+			pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
+				its.Spec.Replicas = ptr.To(int32(1))
+				its.Spec.Instances = []workloads.InstanceTemplate{{Name: "old", Replicas: ptr.To(int32(1))}}
+				its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{Type: "OnDelete"}
+				its.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: "data", MountPath: "/data"}}
+			})
+			pvcLifecycleReconcile(t, cli, 1)
+			pvcLifecycleReady(t, cli)
+			claimTemplate := pvcLifecycleSet(t, cli).Spec.VolumeClaimTemplates[0].DeepCopy()
+			claims := pvcLifecycleClaims(t, cli)
+			pods := pvcLifecyclePods(t, cli)
+			if len(claims) != 1 || len(pods) != 1 || pods[0].Name != "pvc-lifecycle-old-0" {
+				t.Fatal("invalid original storage fixture")
+			}
+			original := claims[0]
+			original.UID = "explicit-offline-original-uid"
+			original.Spec.VolumeName = "explicit-offline-original-volume"
+			if err := cli.Update(context.Background(), &original); err != nil {
+				t.Fatal(err)
+			}
+			if err := cli.Delete(context.Background(), &pods[0]); err != nil {
+				t.Fatal(err)
+			}
+			pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
+				its.Spec.VolumeClaimTemplates = nil
+				its.Spec.Template.Spec.Volumes = []corev1.Volume{{Name: "data", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: original.Name}}}}
+				its.Spec.Instances = []workloads.InstanceTemplate{{Name: "z", Replicas: ptr.To(int32(1))}}
+				if shadowed {
+					its.Spec.Instances[0].VolumeClaimTemplates = []corev1.PersistentVolumeClaim{*claimTemplate}
+				}
+				if test.defaultTemplate {
+					its.Spec.Instances = nil
+					if shadowed {
+						its.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{*claimTemplate}
+					}
+				}
+			})
+			pvcLifecycleReconcile(t, cli, 1)
+			protected := original
+			if shadowed {
+				generated := &corev1.PersistentVolumeClaim{}
+				if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "data-" + podName}, generated); err != nil {
+					t.Fatal(err)
+				}
+				generated.UID = "shadowed-offline-original-uid"
+				generated.Spec.VolumeName = "shadowed-offline-original-volume"
+				if err := cli.Update(context.Background(), generated); err != nil {
+					t.Fatal(err)
+				}
+				protected = *generated
+			}
+			assertStorage := func() {
+				t.Helper()
+				current := &corev1.PersistentVolumeClaim{}
+				if err := cli.Get(context.Background(), client.ObjectKeyFromObject(&protected), current); err != nil {
+					t.Fatalf("Offline allocation lost its original storage: %v", err)
+				}
+				if current.UID != protected.UID || !reflect.DeepEqual(current.Spec, protected.Spec) {
+					t.Fatal("Offline allocation replaced or modified its storage")
+				}
+				if shadowed {
+					if err := cli.Get(context.Background(), client.ObjectKeyFromObject(&original), &corev1.PersistentVolumeClaim{}); !apierrors.IsNotFound(err) {
+						t.Fatalf("shadowed explicit source kept unallocated storage: %v", err)
+					}
+				}
+			}
+			assertMountedPod := func() {
+				t.Helper()
+				pod := &corev1.Pod{}
+				if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: podName}, pod); err != nil {
+					t.Fatal(err)
+				}
+				if len(pod.Spec.Volumes) != 1 || pod.Spec.Volumes[0].PersistentVolumeClaim == nil || pod.Spec.Volumes[0].PersistentVolumeClaim.ClaimName != protected.Name {
+					t.Fatal("Active Pod did not reference its original storage")
+				}
+				if len(pod.Spec.Containers[0].VolumeMounts) != 1 || pod.Spec.Containers[0].VolumeMounts[0].Name != "data" || pod.Spec.Containers[0].VolumeMounts[0].MountPath != "/data" {
+					t.Fatal("Active Pod did not mount its original storage")
+				}
+				assertStorage()
+			}
+			assertMountedPod()
+			for cycle := 0; cycle < 2; cycle++ {
+				pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
+					its.Spec.Replicas = ptr.To(int32(0))
+					if !test.defaultTemplate {
+						its.Spec.Instances[0].Replicas = ptr.To(int32(0))
+					}
+					its.Spec.OfflineInstances = []string{podName}
+				})
+				pvcLifecycleReconcile(t, cli, 1)
+				if len(pvcLifecyclePods(t, cli)) != 0 {
+					t.Fatal("Offline allocation retained its Pod")
+				}
+				assertStorage()
+				pvcLifecycleReconcile(t, cli, 3)
+				assertStorage()
+				if cycle == 0 {
+					pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
+						its.Spec.Replicas = ptr.To(int32(1))
+						if !test.defaultTemplate {
+							its.Spec.Instances[0].Replicas = ptr.To(int32(1))
+						}
+						its.Spec.OfflineInstances = nil
+					})
+					pvcLifecycleReconcile(t, cli, 1)
+					assertMountedPod()
+				}
+			}
+			pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) { its.Spec.OfflineInstances = nil; its.Spec.Instances = nil })
+			pvcLifecycleReconcile(t, cli, 4)
+			if len(pvcLifecyclePods(t, cli)) != 0 || len(pvcLifecycleClaims(t, cli)) != 0 {
+				t.Fatal("removing the Offline allocation did not retire its storage")
+			}
+		})
+	}
+}
+
+func TestInstanceSetPVCExplicitOfflineRetainsHistoricalFlatTemplate(t *testing.T) {
+	cli := pvcLifecycleFixture(t, 0)
+	pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
+		its.Spec.Replicas = ptr.To(int32(1))
+		its.Spec.Instances = []workloads.InstanceTemplate{{Name: "old", Replicas: ptr.To(int32(1))}}
+		its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{Type: "OnDelete"}
+	})
+	pvcLifecycleReconcile(t, cli, 1)
+	claimTemplate := pvcLifecycleSet(t, cli).Spec.VolumeClaimTemplates[0].DeepCopy()
+	claims, pods := pvcLifecycleClaims(t, cli), pvcLifecyclePods(t, cli)
+	if len(claims) != 1 || len(pods) != 1 {
+		t.Fatal("invalid original storage fixture")
+	}
+	original := claims[0]
+	original.UID = "historical-flat-storage-uid"
+	original.Spec.VolumeName = "historical-flat-storage-volume"
+	if err := cli.Update(context.Background(), &original); err != nil {
+		t.Fatal(err)
+	}
+	if err := cli.Delete(context.Background(), &pods[0]); err != nil {
+		t.Fatal(err)
+	}
+	pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
+		its.Spec.FlatInstanceOrdinal = true
+		its.Spec.VolumeClaimTemplates = nil
+		its.Spec.Template.Spec.Volumes = []corev1.Volume{{Name: "data", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: original.Name}}}}
+		its.Spec.Instances = []workloads.InstanceTemplate{{Name: "b", Replicas: ptr.To(int32(1))}}
+	})
+	pvcLifecycleReconcile(t, cli, 2)
+	status := pvcLifecycleSet(t, cli).FindInstanceStatus("pvc-lifecycle-0")
+	if status == nil || status.TemplateName == nil || *status.TemplateName != "b" {
+		t.Fatalf("historical template was not published: %#v", status)
+	}
+	pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
+		its.Spec.Replicas = ptr.To(int32(0))
+		its.Spec.OfflineInstances = []string{"pvc-lifecycle-0"}
+		its.Spec.Instances = []workloads.InstanceTemplate{
+			{Name: "b", Replicas: ptr.To(int32(0))},
+			{Name: "a", Replicas: ptr.To(int32(0)), Ordinals: workloads.Ordinals{Discrete: []int32{0}}, VolumeClaimTemplates: []corev1.PersistentVolumeClaim{*claimTemplate}},
+		}
+	})
+	pvcLifecycleReconcile(t, cli, 1)
+	if len(pvcLifecyclePods(t, cli)) != 0 {
+		t.Fatal("historical Offline identity retained its Pod")
+	}
+	current := &corev1.PersistentVolumeClaim{}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(&original), current); err != nil {
+		t.Fatal(err)
+	}
+	if current.UID != original.UID || !reflect.DeepEqual(current.Spec, original.Spec) {
+		t.Fatal("historical Offline template lost its original explicit storage")
+	}
+	pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
+		its.Spec.OfflineInstances = nil
+		its.Spec.Instances = nil
+	})
+	pvcLifecycleReconcile(t, cli, 4)
+	if len(pvcLifecyclePods(t, cli)) != 0 || len(pvcLifecycleClaims(t, cli)) != 0 {
+		t.Fatal("removing historical Offline allocation did not retire its storage")
+	}
+}
+
+func TestInstanceSetPVCExplicitOfflineTemplateChange(t *testing.T) {
+	cli := pvcLifecycleFixture(t, 0)
+	pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
+		its.Spec.Replicas = ptr.To(int32(1))
+		its.Spec.Instances = []workloads.InstanceTemplate{{Name: "old", Replicas: ptr.To(int32(1))}}
+		its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{Type: "OnDelete"}
+		its.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: "data", MountPath: "/data"}}
+	})
+	pvcLifecycleReconcile(t, cli, 2)
+	claimTemplate := pvcLifecycleSet(t, cli).Spec.VolumeClaimTemplates[0].DeepCopy()
+	claims, pods := pvcLifecycleClaims(t, cli), pvcLifecyclePods(t, cli)
+	if len(claims) != 1 || len(pods) != 1 {
+		t.Fatal("invalid original storage fixture")
+	}
+	original := claims[0]
+	if !metav1.IsControlledBy(&original, pvcLifecycleSet(t, cli)) {
+		t.Fatal("original storage lacks the current root controller")
+	}
+	original.UID = "offline-template-change-storage-uid"
+	original.Spec.VolumeName = "offline-template-change-storage-volume"
+	if err := cli.Update(context.Background(), &original); err != nil {
+		t.Fatal(err)
+	}
+	if err := cli.Delete(context.Background(), &pods[0]); err != nil {
+		t.Fatal(err)
+	}
+	pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
+		its.Spec.Instances = nil
+		its.Spec.VolumeClaimTemplates = nil
+		its.Spec.Template.Spec.Volumes = []corev1.Volume{{Name: "data", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: original.Name}}}}
+	})
+	pvcLifecycleReconcile(t, cli, 1)
+	pods = pvcLifecyclePods(t, cli)
+	if len(pods) != 1 || pods[0].Name != "pvc-lifecycle-0" || len(pods[0].Spec.Volumes) != 1 || pods[0].Spec.Volumes[0].PersistentVolumeClaim == nil || pods[0].Spec.Volumes[0].PersistentVolumeClaim.ClaimName != original.Name {
+		t.Fatal("Active identity did not explicitly reuse the original claim")
+	}
+	if len(pods[0].Spec.Containers[0].VolumeMounts) != 1 || pods[0].Spec.Containers[0].VolumeMounts[0].Name != "data" || pods[0].Spec.Containers[0].VolumeMounts[0].MountPath != "/data" {
+		t.Fatal("Active identity did not mount the original explicit claim")
+	}
+	assertStorage := func() {
+		t.Helper()
+		current := &corev1.PersistentVolumeClaim{}
+		if err := cli.Get(context.Background(), client.ObjectKeyFromObject(&original), current); err != nil {
+			t.Fatalf("historical Offline explicit storage disappeared: %v", err)
+		}
+		if current.UID != original.UID || !reflect.DeepEqual(current.Spec, original.Spec) {
+			t.Fatal("historical Offline explicit storage was replaced or modified")
+		}
+	}
+	pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
+		its.Spec.Replicas = ptr.To(int32(0))
+		its.Spec.OfflineInstances = []string{"pvc-lifecycle-0"}
+	})
+	pvcLifecycleReconcile(t, cli, 4)
+	if len(pvcLifecyclePods(t, cli)) != 0 {
+		t.Fatal("Offline identity retained its Pod")
+	}
+	assertStorage()
+	pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
+		its.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{*claimTemplate}
+	})
+	pvcLifecycleReconcile(t, cli, 3)
+	if len(pvcLifecyclePods(t, cli)) != 0 {
+		t.Fatal("prospective volume template recreated the Offline Pod")
+	}
+	assertStorage()
+	pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) { its.Spec.OfflineInstances = nil })
+	pvcLifecycleReconcile(t, cli, 4)
+	if len(pvcLifecyclePods(t, cli)) != 0 || len(pvcLifecycleClaims(t, cli)) != 0 {
+		t.Fatal("removing Offline allocation did not retire historical explicit storage")
+	}
+}

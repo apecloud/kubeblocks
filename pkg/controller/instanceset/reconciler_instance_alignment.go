@@ -218,7 +218,6 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	retentionPolicy := its.Spec.PersistentVolumeClaimRetentionPolicy
 	retireClaims := !isStopRequested(its) && (retentionPolicy == nil || retentionPolicy.WhenScaled != kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType)
 	if retireClaims {
-		allocatedNames := newNameSet.Union(sets.New(its.Spec.OfflineInstances...))
 		allocatedClaims := sets.New[string]()
 		preserveClaims := func(pod *corev1.Pod) {
 			for _, volume := range pod.Spec.Volumes {
@@ -237,53 +236,10 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 			}
 			preserveClaims(pod)
 		}
-		if len(its.Spec.OfflineInstances) > 0 {
-			// A previous Offline Pod may have used an explicit source now shadowed by a claim template.
-			// Keep still-declared explicit references until the Offline allocation is released.
-			preserveClaims(&corev1.Pod{Spec: its.Spec.Template.Spec})
-			// Offline Pods can be absent, so render their effective volumes as well.
-			offlineExt := &instancetemplate.InstanceSetExt{InstanceSet: its, InstanceTemplates: make(map[string]*workloads.InstanceTemplate)}
-			for name, template := range itsExt.InstanceTemplates {
-				offlineExt.InstanceTemplates[name] = template
-			}
-			if _, ok := offlineExt.InstanceTemplates[""]; !ok {
-				offlineExt.InstanceTemplates[""] = &workloads.InstanceTemplate{}
-			}
-			templates := instancetemplate.BuildInstanceTemplateExt(offlineExt)
-			templateNames := make([]string, 0, len(templates))
-			for _, template := range templates {
-				templateNames = append(templateNames, template.Name)
-			}
-			for _, name := range its.Spec.OfflineInstances {
-				templateName, known := "", false
-				if status := its.FindInstanceStatus(name); status != nil && status.TemplateName != nil {
-					templateName, known = *status.TemplateName, true
-				} else {
-					templateName, known, err = instancetemplate.ResolveHistoricalTemplate(its, name, templateNames)
-					if err != nil {
-						return kubebuilderx.Continue, err
-					}
-				}
-				if _, exists := offlineExt.InstanceTemplates[templateName]; !exists {
-					known = false
-				}
-				// Unknown historical ownership must retain candidate references until Offline is removed.
-				for _, template := range templates {
-					if known && template.Name != templateName {
-						continue
-					}
-					pod, err := buildInstancePodByTemplate(name, template, its, "")
-					if err != nil {
-						return kubebuilderx.Continue, err
-					}
-					preserveClaims(pod)
-				}
-			}
-		}
 		allocationComplete := len(nameToTemplateMap) == int(*its.Spec.Replicas)
 		for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
 			name := obj.GetLabels()[constant.KBAppPodNameLabelKey]
-			if name == "" || allocatedNames.Has(name) || allocatedClaims.Has(obj.GetName()) {
+			if name == "" || newNameSet.Has(name) || allocatedClaims.Has(obj.GetName()) {
 				continue
 			}
 			if retiredNames.Has(name) || (allocationComplete && !oldNameSet.Has(name) && metav1.IsControlledBy(obj, its)) {

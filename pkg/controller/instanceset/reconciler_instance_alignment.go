@@ -156,6 +156,9 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 
 	// create PVCs
 	for _, name := range currentAlignedNameList {
+		if pod := oldInstanceMap[name]; pod != nil && model.IsObjectDeleting(pod) {
+			continue
+		}
 		pvcs, err := buildInstancePVCByTemplate(name, nameToTemplateMap[name], its)
 		if err != nil {
 			return kubebuilderx.Continue, err

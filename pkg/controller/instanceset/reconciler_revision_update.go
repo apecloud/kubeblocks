@@ -157,7 +157,7 @@ func (r *revisionUpdateReconciler) publishInstanceUpdateTargets(its *workloads.I
 		}
 
 		template, pod := desiredTemplates[status.PodName], podsByName[status.PodName]
-		if template == nil || pod == nil {
+		if template == nil || pod == nil || isStopRequested(its) || isTerminating(pod) {
 			status.UpToDate = false
 			continue
 		}
@@ -219,9 +219,15 @@ func (r *revisionUpdateReconciler) updateAssignedOrdinals(its *workloads.Instanc
 }
 
 func (r *revisionUpdateReconciler) calculateUpdatedReplicas(its *workloads.InstanceSet, pods []client.Object) (int32, error) {
+	if isStopRequested(its) {
+		return 0, nil
+	}
 	updatedReplicas := int32(0)
 	for i := range pods {
 		pod, _ := pods[i].(*corev1.Pod)
+		if isTerminating(pod) {
+			continue
+		}
 		updated, err := isPodUpdated(its, pod)
 		if err != nil {
 			return 0, nil

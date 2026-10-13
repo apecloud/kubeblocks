@@ -93,12 +93,12 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
 	upgradeSpec := opsRes.OpsRequest.Spec.Upgrade
 	var (
-		compOpsHelper   componentOpsHelper
-		componentDefMap map[string]*appsv1.ComponentDefinition
-		err             error
+		compOpsHelper componentOpsHelper
+		containersMap map[string]map[string][]corev1.Container
+		err           error
 	)
 	compOpsHelper = newComponentOpsHelper(upgradeSpec.Components)
-	if componentDefMap, err = u.getComponentDefMapWithUpdatedImages(reqCtx, cli, opsRes); err != nil {
+	if containersMap, err = u.getExpectedContainersMap(reqCtx, cli, opsRes); err != nil {
 		return opsRes.OpsRequest.Status.Phase, 0, err
 	}
 	podApplyCompOps := func(
@@ -106,11 +106,16 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		pod *corev1.Pod,
 		pgRes *progressResource) bool {
 		upgradeComponent := pgRes.compOps.(opsv1alpha1.UpgradeComponent)
-		compDef, ok := componentDefMap[upgradeComponent.GetComponentName()]
+		templates, ok := containersMap[upgradeComponent.GetComponentName()]
 		if !ok {
 			return true
 		}
-		return u.podImageApplied(pod, compDef.Spec.Runtime.Containers)
+		templateName := appsv1.GetInstanceTemplateName(opsRes.Cluster.Name, pgRes.fullComponentName, pod.Name)
+		containers, ok := templates[templateName]
+		if !ok {
+			containers = templates[""]
+		}
+		return u.podImageApplied(pod, containers)
 	}
 	handleUpgradeProgress := func(reqCtx intctrlutil.RequestCtx,
 		cli client.Client,
@@ -134,12 +139,10 @@ func (u upgradeOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 	return nil
 }
 
-// getComponentDefMapWithUpdatedImages gets the desired componentDefinition map
-// that is updated with the corresponding images of the ComponentDefinition and service version.
-func (u upgradeOpsHandler) getComponentDefMapWithUpdatedImages(reqCtx intctrlutil.RequestCtx,
+func (u upgradeOpsHandler) getExpectedContainersMap(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
-	opsRes *OpsResource) (map[string]*appsv1.ComponentDefinition, error) {
-	compDefMap := map[string]*appsv1.ComponentDefinition{}
+	opsRes *OpsResource) (map[string]map[string][]corev1.Container, error) {
+	containersMap := map[string]map[string][]corev1.Container{}
 	for _, v := range opsRes.OpsRequest.Spec.Upgrade.Components {
 		compSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, v.ComponentName)
 		if compSpec == nil {
@@ -153,9 +156,30 @@ func (u upgradeOpsHandler) getComponentDefMapWithUpdatedImages(reqCtx intctrluti
 		if err = component.UpdateCompDefinitionImages4ServiceVersion(reqCtx.Ctx, cli, compDef, compSpec.ServiceVersion); err != nil {
 			return nil, err
 		}
-		compDefMap[v.ComponentName] = compDef
+		templates := map[string][]corev1.Container{"": compDef.Spec.Runtime.Containers}
+		for _, template := range compSpec.Instances {
+			if template.ServiceVersion == "" {
+				continue
+			}
+			templateCompDef, err := component.GetCompDefByName(reqCtx.Ctx, cli, template.CompDef)
+			if err != nil {
+				return nil, err
+			}
+			images, err := component.ResolveInstanceTemplateImages4ServiceVersion(reqCtx.Ctx, cli, templateCompDef, template.ServiceVersion)
+			if err != nil {
+				return nil, err
+			}
+			containers := append([]corev1.Container(nil), compDef.Spec.Runtime.Containers...)
+			for i := range containers {
+				if image := images[containers[i].Name]; image != "" {
+					containers[i].Image = image
+				}
+			}
+			templates[template.Name] = containers
+		}
+		containersMap[v.ComponentName] = templates
 	}
-	return compDefMap, nil
+	return containersMap, nil
 }
 
 // podImageApplied checks if the pod has applied the new image.

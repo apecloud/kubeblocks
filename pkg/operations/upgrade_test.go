@@ -29,6 +29,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -234,6 +235,98 @@ var _ = Describe("Upgrade OpsRequest", func() {
 	}
 
 	Context("Test OpsRequest", func() {
+		DescribeTable("completes an upgrade with an instance template service version", func(templateVersion, templateRelease string, sharding bool) {
+			compDef1, compDef2, opsRes := initOpsResWithComponentDef(true)
+			DeferCleanup(func() {
+				selector := client.MatchingLabels{constant.AppInstanceLabelKey: clusterName}
+				testapps.ClearResources(&testCtx, generics.PodSignature, client.InNamespace(testCtx.DefaultNamespace), selector)
+				testapps.ClearResources(&testCtx, generics.ComponentSignature, client.InNamespace(testCtx.DefaultNamespace), selector)
+			})
+			targetName, componentName := defaultCompName, defaultCompName
+			if sharding {
+				targetName, componentName = "sharding", "sharding-shard-0"
+			}
+			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(cluster *appsv1.Cluster) {
+				cluster.Spec.ComponentSpecs[0].Instances = []appsv1.InstanceTemplate{{
+					Name: "pinned", CompDef: compDef1.Name, ServiceVersion: templateVersion,
+					Replicas: pointer.Int32(1),
+				}}
+				if sharding {
+					cluster.Spec.Shardings = []appsv1.ClusterSharding{{
+						Name: targetName, Shards: 1, Template: *cluster.Spec.ComponentSpecs[0].DeepCopy(),
+					}}
+				}
+			})).Should(Succeed())
+			opsRes.OpsRequest = createUpgradeOpsRequest(opsRes.Cluster, opsv1alpha1.Upgrade{
+				Components: []opsv1alpha1.UpgradeComponent{{
+					ComponentOps:            opsv1alpha1.ComponentOps{ComponentName: targetName},
+					ComponentDefinitionName: &compDef2.Name, ServiceVersion: pointer.String(serviceVer2),
+				}},
+			})
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			makeUpgradeOpsIsRunning(reqCtx, opsRes)
+			mockComponentIsOperating(opsRes.Cluster, appsv1.RunningComponentPhase, defaultCompName)
+			if sharding {
+				testapps.NewComponentFactory(testCtx.DefaultNamespace, clusterName+"-"+componentName, compDef2.Name).
+					AddLabels(constant.AppInstanceLabelKey, clusterName).
+					AddLabels(constant.KBAppClusterUIDKey, string(opsRes.Cluster.UID)).
+					AddLabels(constant.KBAppShardingNameLabelKey, targetName).
+					AddLabels(constant.KBAppComponentLabelKey, componentName).
+					SetReplicas(3).Create(&testCtx)
+				Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
+					opsRes.Cluster.Status.Shardings = map[string]appsv1.ClusterComponentStatus{
+						targetName: {Phase: appsv1.RunningComponentPhase},
+					}
+				})).Should(Succeed())
+			}
+			for _, name := range []string{
+				clusterName + "-" + componentName + "-0",
+				clusterName + "-" + componentName + "-1",
+				clusterName + "-" + componentName + "-pinned-0",
+			} {
+				image := testapps.AppImage(testapps.AppName, release3)
+				if name == clusterName+"-"+componentName+"-pinned-0" {
+					image = testapps.AppImage(testapps.AppName, release0)
+				}
+				pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterName, componentName, name, "")
+				Expect(testapps.ChangeObj(&testCtx, pod, func(pod *corev1.Pod) {
+					pod.Spec.Containers[0].Image = image
+				})).Should(Succeed())
+				Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
+					pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: testapps.DefaultMySQLContainerName, Image: image}}
+				})).Should(Succeed())
+			}
+			By("waiting while the template Pod still has the old spec and status images")
+			phase, _, err := (upgradeOpsHandler{}).ReconcileAction(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(phase).Should(Equal(opsv1alpha1.OpsRunningPhase))
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("2/3"))
+			pinnedPod := &corev1.Pod{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: testCtx.DefaultNamespace,
+				Name: clusterName + "-" + componentName + "-pinned-0"}, pinnedPod)).Should(Succeed())
+			expectedImage := testapps.AppImage(testapps.AppName, templateRelease)
+			Expect(testapps.ChangeObj(&testCtx, pinnedPod, func(pod *corev1.Pod) {
+				pod.Spec.Containers[0].Image = expectedImage
+			})).Should(Succeed())
+			By("waiting for the observed container image even after the Pod spec is updated")
+			phase, _, err = (upgradeOpsHandler{}).ReconcileAction(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(phase).Should(Equal(opsv1alpha1.OpsRunningPhase))
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("2/3"))
+			Expect(testapps.ChangeObjStatus(&testCtx, pinnedPod, func() {
+				pinnedPod.Status.ContainerStatuses[0].Image = expectedImage
+			})).Should(Succeed())
+			By("completing once all Pods have their own expected images")
+			phase, _, err = (upgradeOpsHandler{}).ReconcileAction(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(phase).Should(Equal(opsv1alpha1.OpsSucceedPhase))
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("3/3"))
+		},
+			Entry("keeps the explicitly pinned version", serviceVer1, release4, false),
+			Entry("inherits default images when the template resolver returns no overrides", serviceVer0, release3, false),
+			Entry("uses the actual shard component name for template ownership", serviceVer1, release4, true),
+		)
+
 		It("Test upgrade OpsRequest with ComponentDef and no ComponentVersion", func() {
 			By("init operations resources ")
 			compDef1, compDef2, opsRes := initOpsResWithComponentDef(false)

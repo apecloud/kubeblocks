@@ -588,7 +588,7 @@ var _ = Describe("InstanceSet Controller 2", func() {
 	})
 })
 
-func retentionFixture(t *testing.T, replicas int32) client.Client {
+func retentionFixture(t *testing.T, replicas int32, configure ...func(*workloads.InstanceSet)) client.Client {
 	t.Helper()
 	scheme := runtime.NewScheme()
 	for _, add := range []func(*runtime.Scheme) error{clientgoscheme.AddToScheme, workloads.AddToScheme} {
@@ -603,6 +603,9 @@ func retentionFixture(t *testing.T, replicas int32) client.Client {
 		VolumeClaimTemplates:                 []corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "data"}, Spec: corev1.PersistentVolumeClaimSpec{AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}, Resources: corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}}}}},
 		PersistentVolumeClaimRetentionPolicy: &kbappsv1.PersistentVolumeClaimRetentionPolicy{WhenScaled: kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType, WhenDeleted: kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType},
 	}}
+	for _, change := range configure {
+		change(its)
+	}
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&workloads.InstanceSet{}, &workloads.Instance{}, &corev1.Pod{}, &corev1.PersistentVolumeClaim{}).WithObjects(its).Build()
 	runRetentionControllers(t, cli, 5)
 	pods := &corev1.PodList{}
@@ -737,34 +740,66 @@ func TestInstanceRetentionPolicyChange(t *testing.T) {
 }
 
 func TestInstanceRetentionScaleReversal(t *testing.T) {
-	cli := retentionFixture(t, 2)
-	changeRetentionSet(t, cli, func(its *workloads.InstanceSet) { its.Spec.Replicas = ptr.To(int32(1)) })
-	if _, err := reconcileRetentionSet(cli); err != nil {
-		t.Fatal(err)
+	for _, scenario := range []struct {
+		name     string
+		policy   appsv1.PodManagementPolicyType
+		creating bool
+	}{
+		{name: "Aligned", policy: appsv1.ParallelPodManagement},
+		{name: "OrderedReadyCreation", policy: appsv1.OrderedReadyPodManagement, creating: true},
+		{name: "ParallelCreation", policy: appsv1.ParallelPodManagement, creating: true},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			cli := retentionFixture(t, 2, func(its *workloads.InstanceSet) {
+				if scenario.creating {
+					its.Spec.Ordinals.Discrete = []int32{2, 3}
+				}
+			})
+			changeRetentionSet(t, cli, func(its *workloads.InstanceSet) {
+				its.Spec.Replicas = ptr.To(int32(1))
+				its.Spec.PodManagementPolicy = scenario.policy
+				its.Spec.ParallelPodManagementConcurrency = ptr.To(intstr.FromInt32(1))
+			})
+			if _, err := reconcileRetentionSet(cli); err != nil {
+				t.Fatal(err)
+			}
+			inst := &workloads.Instance{}
+			key := client.ObjectKey{Namespace: "default", Name: "demo-1"}
+			if scenario.creating {
+				key.Name = "demo-3"
+			}
+			if err := cli.Get(context.Background(), key, inst); err != nil {
+				t.Fatal(err)
+			}
+			if !ptr.Deref(inst.Spec.ScaledDown, false) || !inst.DeletionTimestamp.IsZero() {
+				t.Fatal("scale-down did not persist the intermediate spec.scaledDown state")
+			}
+			changeRetentionSet(t, cli, func(its *workloads.InstanceSet) {
+				its.Spec.Replicas = ptr.To(int32(2))
+				if scenario.creating {
+					its.Spec.Replicas = ptr.To(int32(4))
+					its.Spec.Ordinals.Discrete = []int32{0, 1, 2, 3}
+				}
+			})
+			runRetentionControllers(t, cli, 3)
+			if err := cli.Get(context.Background(), key, inst); err != nil {
+				t.Fatal(err)
+			}
+			if inst.Status.CurrentState != workloads.InstanceCurrentStatePresent {
+				t.Fatal("Instance did not return to Present")
+			}
+			if ptr.Deref(inst.Spec.ScaledDown, false) {
+				t.Error("desired Instance still has spec.scaledDown=true")
+			}
+			if scenario.creating && len(retentionInstances(t, cli)) != 3 {
+				t.Fatal("fixture did not block creation of the remaining desired Instance")
+			}
+			if err := cli.Delete(context.Background(), retentionSet(t, cli)); err != nil {
+				t.Fatal(err)
+			}
+			checkRetentionDeleted(t, cli, 0)
+		})
 	}
-	inst := &workloads.Instance{}
-	key := client.ObjectKey{Namespace: "default", Name: "demo-1"}
-	if err := cli.Get(context.Background(), key, inst); err != nil {
-		t.Fatal(err)
-	}
-	if !ptr.Deref(inst.Spec.ScaledDown, false) || !inst.DeletionTimestamp.IsZero() {
-		t.Fatal("scale-down did not persist the intermediate spec.scaledDown state")
-	}
-	changeRetentionSet(t, cli, func(its *workloads.InstanceSet) { its.Spec.Replicas = ptr.To(int32(2)) })
-	runRetentionControllers(t, cli, 3)
-	if err := cli.Get(context.Background(), key, inst); err != nil {
-		t.Fatal(err)
-	}
-	if inst.Status.CurrentState != workloads.InstanceCurrentStatePresent {
-		t.Fatal("Instance did not return to Present")
-	}
-	if ptr.Deref(inst.Spec.ScaledDown, false) {
-		t.Error("desired Instance still has spec.scaledDown=true")
-	}
-	if err := cli.Delete(context.Background(), retentionSet(t, cli)); err != nil {
-		t.Fatal(err)
-	}
-	checkRetentionDeleted(t, cli, 0)
 }
 
 type retentionWriteFailureClient struct {

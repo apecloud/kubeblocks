@@ -436,10 +436,12 @@ func TestUpgradeInstanceTemplateVersions(t *testing.T) {
 		name, version, templateImage   string
 		flat, shard, wrongStatus       bool
 		unlabeled, alternateDefinition bool
-		ownerRecovery                  bool
+		ownerRecovery, zeroReplicas    bool
 		want                           opsv1alpha1.OpsPhase
 		progress                       string
 	}{
+		{name: "zero replicas with unpublished version", version: "1.0.0", zeroReplicas: true, want: opsv1alpha1.OpsSucceedPhase, progress: "0/0"},
+		{name: "zero replica shard with unpublished version", version: "1.0.0", zeroReplicas: true, shard: true, want: opsv1alpha1.OpsSucceedPhase, progress: "0/0"},
 		{name: "shard publication recovery", version: "1.0.0", templateImage: "db:v1", shard: true, ownerRecovery: true, want: opsv1alpha1.OpsSucceedPhase, progress: "2/2"},
 		{name: "owner publication recovery", version: "1.0.0", templateImage: "db:v1", ownerRecovery: true, want: opsv1alpha1.OpsSucceedPhase, progress: "2/2"},
 		{name: "fixed template", version: "1.0.0", templateImage: "db:owner", want: opsv1alpha1.OpsSucceedPhase, progress: "2/2"},
@@ -486,6 +488,10 @@ func TestUpgradeInstanceTemplateVersions(t *testing.T) {
 				FlatInstanceOrdinal: tc.flat,
 				Instances:           []appsv1.InstanceTemplate{{Name: "fixed", CompDef: "db", ServiceVersion: tc.version}},
 			}
+			if tc.zeroReplicas {
+				spec.Replicas = 0
+				spec.Instances[0].Replicas = ptr.To(int32(0))
+			}
 			cluster := &appsv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{Name: "cluster", Namespace: "ns", Generation: 3},
 				Spec:       appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{spec}},
@@ -499,13 +505,15 @@ func TestUpgradeInstanceTemplateVersions(t *testing.T) {
 				target, componentName = "shards", "shards-abc"
 				defaultSpec := spec
 				defaultSpec.Name = "shards"
-				defaultSpec.Replicas = 3
+				if !tc.zeroReplicas {
+					defaultSpec.Replicas = 3
+				}
 				defaultSpec.Instances = nil
 				cluster.Spec.ComponentSpecs = nil
 				cluster.Spec.Shardings = []appsv1.ClusterSharding{{
 					Name: target, Shards: 1, Template: defaultSpec,
 					ShardTemplates: []appsv1.ShardTemplate{{
-						Name: "special", Shards: ptr.To(int32(1)), Replicas: ptr.To(int32(2)), Instances: spec.Instances,
+						Name: "special", Shards: ptr.To(int32(1)), Replicas: ptr.To(spec.Replicas), Instances: spec.Instances,
 					}},
 				}}
 				cluster.Status.Shardings = map[string]appsv1.ClusterShardingStatus{
@@ -592,7 +600,16 @@ func TestUpgradeInstanceTemplateVersions(t *testing.T) {
 					Instances: []workloads.InstanceTemplate{{Name: "fixed", Images: images}},
 				},
 			}
-			objects := []client.Object{def, ver, cluster, ops, base, fixed, owner, its}
+			objects := []client.Object{def, ver, cluster, ops, owner, its}
+			if tc.zeroReplicas {
+				owner.Spec.Stop = ptr.To(true)
+				its.Spec.Replicas = ptr.To(int32(0))
+				its.Spec.Stop = ptr.To(true)
+				its.Spec.Instances[0].Replicas = ptr.To(int32(0))
+				its.Annotations[constant.KBAppServiceVersionKey] = "1.0.0"
+			} else {
+				objects = append(objects, base, fixed)
+			}
 			if tc.alternateDefinition {
 				alternate := def.DeepCopy()
 				alternate.Name = "alternate"

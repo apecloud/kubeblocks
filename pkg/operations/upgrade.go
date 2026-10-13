@@ -119,8 +119,8 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	if containersMap, err = u.getExpectedContainersMap(reqCtx, cli, opsRes.Cluster, specs); err != nil {
 		return opsRes.OpsRequest.Status.Phase, 0, err
 	}
-	for _, expected := range containersMap {
-		if expected.pendingOwner {
+	for name, expected := range containersMap {
+		if expected.pendingOwner && specs[name].Replicas > 0 {
 			return opsv1alpha1.OpsRunningPhase, time.Second, nil
 		}
 	}

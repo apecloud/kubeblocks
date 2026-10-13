@@ -21,15 +21,18 @@ package operations
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
@@ -41,6 +44,7 @@ type upgradeOpsHandler struct{}
 type upgradeExpectedImages struct {
 	definition           *appsv1.ComponentDefinition
 	containersByTemplate map[string][]corev1.Container
+	pendingOwner         bool
 }
 
 var _ OpsHandler = upgradeOpsHandler{}
@@ -105,19 +109,27 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		err           error
 	)
 	compOpsHelper = newComponentOpsHelper(upgradeSpec.Components)
-	specs, err := u.getUpgradeComponentSpecs(reqCtx, cli, opsRes)
+	specs, pending, err := u.getUpgradeComponentSpecs(reqCtx, cli, opsRes)
 	if err != nil {
 		return opsRes.OpsRequest.Status.Phase, 0, err
 	}
-	if containersMap, err = u.getExpectedContainersMap(reqCtx, cli, specs); err != nil {
+	if pending {
+		return opsv1alpha1.OpsRunningPhase, time.Second, nil
+	}
+	if containersMap, err = u.getExpectedContainersMap(reqCtx, cli, opsRes.Cluster, specs); err != nil {
 		return opsRes.OpsRequest.Status.Phase, 0, err
+	}
+	for _, expected := range containersMap {
+		if expected.pendingOwner {
+			return opsv1alpha1.OpsRunningPhase, time.Second, nil
+		}
 	}
 	podApplyCompOps := func(
 		ops *opsv1alpha1.OpsRequest,
 		pod *corev1.Pod,
 		pgRes *progressResource) bool {
 		expected, ok := containersMap[pgRes.fullComponentName]
-		if !ok {
+		if !ok || expected.pendingOwner {
 			return false
 		}
 		templateName, labeled := instancetemplate.TemplateNameFromLabels(pod.Labels)
@@ -160,7 +172,7 @@ func (u upgradeOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 }
 
 func (u upgradeOpsHandler) getUpgradeComponentSpecs(reqCtx intctrlutil.RequestCtx,
-	cli client.Client, opsRes *OpsResource) (map[string]*appsv1.ClusterComponentSpec, error) {
+	cli client.Client, opsRes *OpsResource) (map[string]*appsv1.ClusterComponentSpec, bool, error) {
 	specs := map[string]*appsv1.ClusterComponentSpec{}
 	for _, target := range opsRes.OpsRequest.Spec.Upgrade.Components {
 		found := false
@@ -176,27 +188,36 @@ func (u upgradeOpsHandler) getUpgradeComponentSpecs(reqCtx intctrlutil.RequestCt
 			if spec.Name != target.ComponentName {
 				continue
 			}
-			shards, err := sharding.BuildShardingCompSpecs(reqCtx.Ctx, cli,
-				opsRes.Cluster.Namespace, opsRes.Cluster.Name, spec)
+			shards, err := sharding.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, spec.Name)
 			if err != nil {
-				return nil, err
+				return nil, false, err
 			}
-			for _, group := range shards {
-				for _, shard := range group {
-					specs[shard.Name] = shard
+			if len(shards) == 0 || len(shards) != int(spec.Shards) {
+				return nil, true, nil
+			}
+			for _, shard := range shards {
+				if shard.Generation == 0 || shard.Annotations[constant.KubeBlocksGenerationKey] != strconv.FormatInt(opsRes.Cluster.Generation, 10) {
+					return nil, true, nil
+				}
+				name := shard.Labels[constant.KBAppComponentLabelKey]
+				specs[name] = &appsv1.ClusterComponentSpec{
+					Name: name, ComponentDef: shard.Spec.CompDef, ServiceVersion: shard.Spec.ServiceVersion,
+					Replicas: shard.Spec.Replicas, Instances: shard.Spec.Instances,
+					FlatInstanceOrdinal: shard.Spec.FlatInstanceOrdinal,
 				}
 			}
 			found = true
 		}
 		if !found {
-			return nil, intctrlutil.NewFatalError(fmt.Sprintf("cannot find component %q in cluster %q", target.ComponentName, opsRes.Cluster.Name))
+			return nil, false, intctrlutil.NewFatalError(fmt.Sprintf("cannot find component %q in cluster %q", target.ComponentName, opsRes.Cluster.Name))
 		}
 	}
-	return specs, nil
+	return specs, false, nil
 }
 
 func (u upgradeOpsHandler) getExpectedContainersMap(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
+	cluster *appsv1.Cluster,
 	specs map[string]*appsv1.ClusterComponentSpec) (map[string]upgradeExpectedImages, error) {
 	containersMap := map[string]upgradeExpectedImages{}
 	for name, compSpec := range specs {
@@ -204,25 +225,48 @@ func (u upgradeOpsHandler) getExpectedContainersMap(reqCtx intctrlutil.RequestCt
 		if err != nil {
 			return nil, err
 		}
-		if err = component.UpdateCompDefinitionImages4ServiceVersion(reqCtx.Ctx, cli, compDef, compSpec.ServiceVersion); err != nil {
+		heterogeneous := false
+		for _, template := range compSpec.Instances {
+			heterogeneous = heterogeneous || template.ServiceVersion != ""
+		}
+		isShard := true
+		for _, spec := range cluster.Spec.ComponentSpecs {
+			if spec.Name == name {
+				isShard = false
+				break
+			}
+		}
+		if !heterogeneous && !isShard {
+			if err = component.UpdateCompDefinitionImages4ServiceVersion(reqCtx.Ctx, cli, compDef, compSpec.ServiceVersion); err != nil {
+				return nil, err
+			}
+			containersMap[name] = upgradeExpectedImages{definition: compDef, containersByTemplate: map[string][]corev1.Container{"": compDef.Spec.Runtime.Containers}}
+			continue
+		}
+		containersMap[name] = upgradeExpectedImages{definition: compDef, pendingOwner: true}
+		comp := &appsv1.Component{}
+		if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: component.FullName(cluster.Name, name)}, comp); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return nil, err
+			}
+			continue
+		}
+		if comp.Generation == 0 || comp.Annotations[constant.KubeBlocksGenerationKey] != strconv.FormatInt(cluster.Generation, 10) {
+			continue
+		}
+		workloads, err := component.ListOwnedWorkloads(reqCtx.Ctx, cli, cluster.Namespace, cluster.Name, name)
+		if err != nil {
 			return nil, err
 		}
-		templates := map[string][]corev1.Container{"": compDef.Spec.Runtime.Containers}
-		for _, template := range compSpec.Instances {
-			if template.ServiceVersion == "" {
-				continue
-			}
-			templateCompDef, err := component.GetCompDefByName(reqCtx.Ctx, cli, template.CompDef)
-			if err != nil {
-				return nil, err
-			}
-			images, err := component.ResolveInstanceTemplateImages4ServiceVersion(reqCtx.Ctx, cli, templateCompDef, template.ServiceVersion)
-			if err != nil {
-				return nil, err
-			}
-			containers := append([]corev1.Container(nil), compDef.Spec.Runtime.Containers...)
+		if len(workloads) != 1 || workloads[0].Annotations[constant.KubeBlocksGenerationKey] != strconv.FormatInt(comp.Generation, 10) {
+			continue
+		}
+		its := workloads[0]
+		templates := map[string][]corev1.Container{"": its.Spec.Template.Spec.Containers}
+		for _, template := range its.Spec.Instances {
+			containers := append([]corev1.Container(nil), its.Spec.Template.Spec.Containers...)
 			for i := range containers {
-				if image := images[containers[i].Name]; image != "" {
+				if image := template.Images[containers[i].Name]; image != "" {
 					containers[i].Image = image
 				}
 			}

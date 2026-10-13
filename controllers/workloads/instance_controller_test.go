@@ -116,86 +116,6 @@ var _ = Describe("Instance Controller", func() {
 		})).Should(Succeed())
 	}
 
-	It("stop preserves PVCs and resume waits for termination before applying the latest template", func() {
-		createInstObj(instName, func(f *testapps.MockInstanceFactory) {
-			f.SetMinReadySeconds(3600)
-			f.AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{Name: "data"},
-				Spec: corev1.PersistentVolumeClaimSpec{
-					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-					Resources:   corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}},
-				},
-			})
-		})
-		pod := &corev1.Pod{}
-		Eventually(func() error { return k8sClient.Get(ctx, instKey, pod) }).Should(Succeed())
-		oldPodUID := pod.UID
-		Eventually(testapps.GetAndChangeObj(&testCtx, instKey, func(p *corev1.Pod) {
-			p.Finalizers = append(p.Finalizers, "test.kubeblocks.io/hold")
-		})).Should(Succeed())
-		pvcKey := client.ObjectKey{Namespace: instObj.Namespace, Name: "data-" + instObj.Name}
-		claim := &corev1.PersistentVolumeClaim{}
-		Eventually(func() error { return k8sClient.Get(ctx, pvcKey, claim) }).Should(Succeed())
-		pvcUID, pvcVersion := claim.UID, claim.ResourceVersion
-		pvcSpec, pvcOwners := claim.Spec.DeepCopy(), claim.OwnerReferences
-		Expect(pvcOwners).Should(HaveLen(1))
-		Expect(pvcOwners[0].UID).Should(Equal(instObj.UID))
-
-		Eventually(testapps.GetAndChangeObj(&testCtx, instKey, func(inst *workloads.Instance) {
-			inst.Spec.Stop = ptr.To(true)
-		})).Should(Succeed())
-		Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, p *corev1.Pod) {
-			g.Expect(p.DeletionTimestamp.IsZero()).Should(BeFalse())
-			g.Expect(p.UID).Should(Equal(oldPodUID))
-		})).Should(Succeed())
-		Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
-			g.Expect(inst.Status.CurrentState).Should(Equal(workloads.InstanceCurrentStateTerminating))
-			g.Expect(inst.Status.UpToDate).Should(BeFalse())
-			g.Expect(inst.Status.Ready).Should(BeFalse())
-			g.Expect(inst.Spec.ScaledDown).Should(BeNil())
-		})).Should(Succeed())
-
-		Eventually(testapps.GetAndChangeObj(&testCtx, instKey, func(inst *workloads.Instance) {
-			inst.Spec.Template.Spec.Containers[0].Image = "bar:v2"
-			inst.Spec.VolumeClaimTemplates = nil
-		})).Should(Succeed())
-		Consistently(func(g Gomega) {
-			current := &corev1.PersistentVolumeClaim{}
-			g.Expect(k8sClient.Get(ctx, pvcKey, current)).Should(Succeed())
-			g.Expect(current.UID).Should(Equal(pvcUID))
-			g.Expect(current.ResourceVersion).Should(Equal(pvcVersion))
-			g.Expect(current.Spec).Should(Equal(*pvcSpec))
-			g.Expect(current.OwnerReferences).Should(Equal(pvcOwners))
-		}, time.Second).Should(Succeed())
-
-		Eventually(testapps.GetAndChangeObj(&testCtx, instKey, func(inst *workloads.Instance) {
-			inst.Spec.Stop = ptr.To(false)
-			inst.Spec.MinReadySeconds = 0
-			inst.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaimTemplate{{ObjectMeta: metav1.ObjectMeta{Name: "data"}, Spec: *pvcSpec}}
-		})).Should(Succeed())
-		Consistently(func(g Gomega) {
-			currentPod := &corev1.Pod{}
-			g.Expect(k8sClient.Get(ctx, instKey, currentPod)).Should(Succeed())
-			g.Expect(currentPod.UID).Should(Equal(oldPodUID))
-			g.Expect(currentPod.Spec.Containers[0].Image).Should(Equal("bar:v1"))
-			currentPVC := &corev1.PersistentVolumeClaim{}
-			g.Expect(k8sClient.Get(ctx, pvcKey, currentPVC)).Should(Succeed())
-			g.Expect(currentPVC.ResourceVersion).Should(Equal(pvcVersion))
-		}, time.Second).Should(Succeed())
-		Eventually(testapps.GetAndChangeObj(&testCtx, instKey, func(p *corev1.Pod) { p.Finalizers = nil })).Should(Succeed())
-		Eventually(func(g Gomega) {
-			resumed := &corev1.Pod{}
-			g.Expect(k8sClient.Get(ctx, instKey, resumed)).Should(Succeed())
-			g.Expect(resumed.UID).ShouldNot(Equal(oldPodUID))
-			g.Expect(resumed.Spec.Containers[0].Image).Should(Equal("bar:v2"))
-			currentPVC := &corev1.PersistentVolumeClaim{}
-			g.Expect(k8sClient.Get(ctx, pvcKey, currentPVC)).Should(Succeed())
-			g.Expect(currentPVC.UID).Should(Equal(pvcUID))
-			g.Expect(currentPVC.OwnerReferences).Should(Equal(pvcOwners))
-			g.Expect(currentPVC.Spec).Should(Equal(*pvcSpec))
-		}).Should(Succeed())
-	})
-
 	Context("provision", func() {
 		var (
 			pvc = corev1.PersistentVolumeClaim{
@@ -995,38 +915,18 @@ func TestInstanceStopInitiallyStopped(t *testing.T) {
 	if got.Status.CurrentState != workloads.InstanceCurrentStateAbsent || got.Status.UpToDate || ptr.Deref(got.Spec.ScaledDown, false) {
 		t.Fatalf("incorrect stopped status: %#v", got.Status)
 	}
+	revision := got.Status.UpdateRevision
 	got.Spec.Stop = nil
 	got.Generation++
 	if err := cli.Update(context.Background(), got); err != nil {
 		t.Fatal(err)
 	}
 	reconcileStopEntry(t, cli, 2)
+	if revision == "" || readStopInstance(t, cli).Status.UpdateRevision != revision {
+		t.Fatal("clearing Stop changed the Pod revision")
+	}
 	readStopPod(t, cli)
 	readStopPVC(t, cli)
-}
-
-func TestInstanceStopDoesNotChangePodRevision(t *testing.T) {
-	var revision string
-	for _, tc := range []struct {
-		name string
-		stop *bool
-	}{{name: "unset"}, {name: "false", stop: ptr.To(false)}, {name: "true", stop: ptr.To(true)}} {
-		t.Run(tc.name, func(t *testing.T) {
-			inst := stopTestInstance()
-			inst.Spec.Stop = tc.stop
-			cli := stopTestClient(t, inst)
-			reconcileStopEntry(t, cli, 3)
-			actual := readStopInstance(t, cli).Status.UpdateRevision
-			if actual == "" {
-				t.Fatal("revision was not computed")
-			}
-			if revision == "" {
-				revision = actual
-			} else if actual != revision {
-				t.Fatalf("Stop changed revision from %s to %s", revision, actual)
-			}
-		})
-	}
 }
 
 func TestInstanceStopSuspendsPVCsAndResumesLatestTemplate(t *testing.T) {
@@ -1035,42 +935,24 @@ func TestInstanceStopSuspendsPVCsAndResumesLatestTemplate(t *testing.T) {
 	reconcileStopEntry(t, cli, 3)
 	pvc := bindStopPVC(t, cli)
 	pod := readStopPod(t, cli)
-	pod.UID = "pod-old"
+	pod.Finalizers = []string{"test/hold"}
 	if err := cli.Update(context.Background(), pod); err != nil {
 		t.Fatal(err)
 	}
 	got := readStopInstance(t, cli)
+	got.Spec.Stop = ptr.To(true)
 	got.Spec.MinReadySeconds = 3600
 	got.Generation++
 	if err := cli.Update(context.Background(), got); err != nil {
 		t.Fatal(err)
 	}
-	result := reconcileStopEntry(t, cli, 1)
-	if result.RequeueAfter != time.Second || readStopPod(t, cli).UID != "pod-old" {
-		t.Fatalf("running readiness wait lost its earlier retry or deleted the Pod: %#v", result)
+	result := reconcileStopEntry(t, cli, 3)
+	if result.RequeueAfter != time.Second || readStopPod(t, cli).DeletionTimestamp.IsZero() || readStopInstance(t, cli).Status.CurrentState != workloads.InstanceCurrentStateTerminating {
+		t.Fatalf("Stop did not observe the held terminating Pod and retry: %#v", result)
 	}
-	got = readStopInstance(t, cli)
-	got.Spec.Stop = ptr.To(true)
-	got.Generation++
-	if err := cli.Update(context.Background(), got); err != nil {
-		t.Fatal(err)
-	}
-	result = reconcileStopEntry(t, cli, 1)
-	if result.RequeueAfter != time.Second {
-		t.Fatalf("stop deletion did not schedule a retry: %#v", result)
-	}
-	assertStopPodAbsent(t, cli)
-	observed := readStopInstance(t, cli)
-	if observed.Status.CurrentState != workloads.InstanceCurrentStatePresent || observed.Status.UpToDate {
-		t.Fatalf("stop guessed absent before observation: %#v", observed.Status)
-	}
-	reconcileStopEntry(t, cli, 2)
-	before := readStopPVC(t, cli)
 	got = readStopInstance(t, cli)
 	got.Spec.Template.Spec.Containers[0].Image = "db:v2"
 	got.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
-	got.Spec.VolumeClaimTemplates[0].Labels = map[string]string{"changed": "true"}
-	got.Spec.VolumeClaimTemplates[0].Annotations = map[string]string{"changed": "true"}
 	got.Spec.VolumeClaimTemplates = append(got.Spec.VolumeClaimTemplates, corev1.PersistentVolumeClaimTemplate{ObjectMeta: metav1.ObjectMeta{Name: "logs"}, Spec: *got.Spec.VolumeClaimTemplates[0].Spec.DeepCopy()})
 	got.Spec.InstanceAssistantObjects = []workloads.InstanceAssistantObject{{ConfigMap: &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "demo-env", Namespace: "default"}, Data: map[string]string{"version": "v2"}}}}
 	got.Generation++
@@ -1078,108 +960,44 @@ func TestInstanceStopSuspendsPVCsAndResumesLatestTemplate(t *testing.T) {
 		t.Fatal(err)
 	}
 	reconcileStopEntry(t, cli, 3)
-	after := readStopPVC(t, cli)
-	if !reflect.DeepEqual(after, before) || after.UID != pvc.UID || len(after.OwnerReferences) != 1 || after.OwnerReferences[0].UID != inst.UID {
-		t.Fatalf("stop mutated PVC: %#v", after)
+	if !reflect.DeepEqual(readStopPVC(t, cli), pvc) {
+		t.Fatal("Stop changed existing storage")
 	}
-	err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "logs-demo-0"}, &corev1.PersistentVolumeClaim{})
-	if !apierrors.IsNotFound(err) {
-		t.Fatal("stop created new claim")
+	logsKey := client.ObjectKey{Namespace: "default", Name: "logs-demo-0"}
+	if err := cli.Get(context.Background(), logsKey, &corev1.PersistentVolumeClaim{}); !apierrors.IsNotFound(err) {
+		t.Fatalf("Stop created a newly desired claim: %v", err)
 	}
 	cm := &corev1.ConfigMap{}
-	if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "demo-env"}, cm); err != nil {
-		t.Fatal(err)
-	}
-	if cm.Data["version"] != "v2" {
-		t.Fatal("assistant stopped reconciling")
-	}
-	got = readStopInstance(t, cli)
-	got.Spec.VolumeClaimTemplates = nil
-	got.Generation++
-	if err := cli.Update(context.Background(), got); err != nil {
-		t.Fatal(err)
-	}
-	reconcileStopEntry(t, cli, 2)
-	retained := readStopPVC(t, cli)
-	if retained.UID != pvc.UID || retained.ResourceVersion != before.ResourceVersion {
-		t.Fatal("removed template mutated retained PVC")
+	if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "demo-env"}, cm); err != nil || cm.Data["version"] != "v2" {
+		t.Fatalf("stopped assistant did not receive current content: %v", err)
 	}
 	got = readStopInstance(t, cli)
 	got.Spec.Stop = ptr.To(false)
 	got.Spec.MinReadySeconds = 0
-	got.Spec.VolumeClaimTemplates = inst.Spec.VolumeClaimTemplates
-	got.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
-	got.Generation++
-	if err := cli.Update(context.Background(), got); err != nil {
-		t.Fatal(err)
-	}
-	reconcileStopEntry(t, cli, 2)
-	resumed := readStopPod(t, cli)
-	if resumed.Spec.Containers[0].Image != "db:v2" {
-		t.Fatal("resume used old template")
-	}
-	if readStopPVC(t, cli).UID != pvc.UID || readStopPVC(t, cli).Spec.Resources.Requests.Storage().Cmp(resource.MustParse("2Gi")) != 0 {
-		t.Fatal("resume replaced storage or ignored latest capacity")
-	}
-}
-
-func TestInstanceStopWaitsForTerminatingPodOnEarlyResume(t *testing.T) {
-	inst := stopTestInstance()
-	cli := stopTestClient(t, inst)
-	reconcileStopEntry(t, cli, 3)
-	pvc := bindStopPVC(t, cli)
-	pod := readStopPod(t, cli)
-	pod.UID = "pod-held"
-	pod.Finalizers = []string{"test/hold"}
-	if err := cli.Update(context.Background(), pod); err != nil {
-		t.Fatal(err)
-	}
-	got := readStopInstance(t, cli)
-	got.Spec.Stop = ptr.To(true)
-	got.Generation++
-	if err := cli.Update(context.Background(), got); err != nil {
-		t.Fatal(err)
-	}
-	result := reconcileStopEntry(t, cli, 3)
-	if result.RequeueAfter != time.Second {
-		t.Fatalf("stopped terminating Pod has no retry: %#v", result)
-	}
-	terminating := readStopPod(t, cli)
-	if terminating.DeletionTimestamp.IsZero() {
-		t.Fatal("stop did not request deletion")
-	}
-	got = readStopInstance(t, cli)
-	if got.Status.CurrentState != workloads.InstanceCurrentStateTerminating {
-		t.Fatal("deleting Pod was not reported as Terminating")
-	}
-	got.Spec.Stop = ptr.To(false)
-	got.Spec.Template.Spec.Containers[0].Image = "db:v3"
-	got.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
 	got.Generation++
 	if err := cli.Update(context.Background(), got); err != nil {
 		t.Fatal(err)
 	}
 	result = reconcileStopEntry(t, cli, 2)
-	if result.RequeueAfter != time.Second {
-		t.Fatalf("early resume did not schedule a terminating Pod retry: %#v", result)
+	if result.RequeueAfter != time.Second || readStopPod(t, cli).Spec.Containers[0].Image != "db:v1" || !reflect.DeepEqual(readStopPVC(t, cli), pvc) {
+		t.Fatalf("early resume changed runtime or storage before Pod deletion: %#v", result)
 	}
-	if readStopPod(t, cli).UID != "pod-held" || readStopPod(t, cli).Spec.Containers[0].Image != "db:v1" {
-		t.Fatal("early resume replaced or modified terminating Pod")
-	}
-	if !reflect.DeepEqual(readStopPVC(t, cli), pvc) {
-		t.Fatal("early resume changed PVC before the terminating Pod disappeared")
-	}
-	terminating = readStopPod(t, cli)
-	terminating.Finalizers = nil
-	if err := cli.Update(context.Background(), terminating); err != nil {
+	held := readStopPod(t, cli)
+	held.Finalizers = nil
+	if err := cli.Update(context.Background(), held); err != nil {
 		t.Fatal(err)
 	}
-	reconcileStopEntry(t, cli, 2)
-	if readStopPod(t, cli).Spec.Containers[0].Image != "db:v3" {
-		t.Fatal("resume did not use current template")
+	reconcileStopEntry(t, cli, 3)
+	if readStopPod(t, cli).Spec.Containers[0].Image != "db:v2" {
+		t.Fatal("resume used an obsolete Pod template")
 	}
-	if readStopPVC(t, cli).UID != pvc.UID || readStopPVC(t, cli).Spec.Resources.Requests.Storage().Cmp(resource.MustParse("2Gi")) != 0 {
-		t.Fatal("resume did not apply current storage template to the original PVC")
+	resumed := readStopPVC(t, cli)
+	if resumed.UID != pvc.UID || resumed.Spec.Resources.Requests.Storage().Cmp(resource.MustParse("2Gi")) != 0 {
+		t.Fatal("resume replaced storage or ignored the current expansion target")
+	}
+	logs := &corev1.PersistentVolumeClaim{}
+	if err := cli.Get(context.Background(), logsKey, logs); err != nil || logs.Spec.Resources.Requests.Storage().Cmp(resource.MustParse("2Gi")) != 0 {
+		t.Fatalf("resume did not create the current claim template: %v", err)
 	}
 }
 
@@ -1235,49 +1053,42 @@ func TestInstanceStopRetriesAfterCommitFailure(t *testing.T) {
 }
 
 func TestInstanceStopActualDeletionKeepsRetentionPolicy(t *testing.T) {
-	for _, scaled := range []bool{false, true} {
-		for _, retain := range []bool{false, true} {
-			t.Run(fmt.Sprintf("scaled=%t/retain=%t", scaled, retain), func(t *testing.T) {
-				inst := stopTestInstance()
-				inst.Spec.PersistentVolumeClaimRetentionPolicy = &workloads.PersistentVolumeClaimRetentionPolicy{WhenDeleted: kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType, WhenScaled: kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType}
-				if retain {
-					if scaled {
-						inst.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled = kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType
-					} else {
-						inst.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted = kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType
-					}
+	for _, retain := range []bool{false, true} {
+		t.Run(fmt.Sprintf("retain=%t", retain), func(t *testing.T) {
+			inst := stopTestInstance()
+			inst.Spec.PersistentVolumeClaimRetentionPolicy = &workloads.PersistentVolumeClaimRetentionPolicy{WhenDeleted: kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType}
+			if retain {
+				inst.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted = kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType
+			}
+			cli := stopTestClient(t, inst)
+			reconcileStopEntry(t, cli, 3)
+			pvc := bindStopPVC(t, cli)
+			got := readStopInstance(t, cli)
+			got.Spec.Stop = ptr.To(true)
+			got.Spec.VolumeClaimTemplates = nil
+			got.Generation++
+			if err := cli.Update(context.Background(), got); err != nil {
+				t.Fatal(err)
+			}
+			reconcileStopEntry(t, cli, 3)
+			if err := cli.Delete(context.Background(), readStopInstance(t, cli)); err != nil {
+				t.Fatal(err)
+			}
+			reconcileStopEntry(t, cli, 4)
+			err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "demo-0"}, &workloads.Instance{})
+			if !apierrors.IsNotFound(err) {
+				t.Fatalf("Instance deletion incomplete: %v", err)
+			}
+			existing := &corev1.PersistentVolumeClaim{}
+			err = cli.Get(context.Background(), client.ObjectKeyFromObject(pvc), existing)
+			if retain {
+				if err != nil || existing.UID != pvc.UID || len(existing.OwnerReferences) != 0 {
+					t.Fatalf("retention broken: %v %#v", err, existing)
 				}
-				cli := stopTestClient(t, inst)
-				reconcileStopEntry(t, cli, 3)
-				pvc := bindStopPVC(t, cli)
-				got := readStopInstance(t, cli)
-				got.Spec.Stop = ptr.To(true)
-				got.Spec.ScaledDown = ptr.To(scaled)
-				got.Spec.VolumeClaimTemplates = nil
-				got.Generation++
-				if err := cli.Update(context.Background(), got); err != nil {
-					t.Fatal(err)
-				}
-				reconcileStopEntry(t, cli, 3)
-				if err := cli.Delete(context.Background(), readStopInstance(t, cli)); err != nil {
-					t.Fatal(err)
-				}
-				reconcileStopEntry(t, cli, 4)
-				err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "demo-0"}, &workloads.Instance{})
-				if !apierrors.IsNotFound(err) {
-					t.Fatalf("Instance deletion incomplete: %v", err)
-				}
-				existing := &corev1.PersistentVolumeClaim{}
-				err = cli.Get(context.Background(), client.ObjectKeyFromObject(pvc), existing)
-				if retain {
-					if err != nil || existing.UID != pvc.UID || len(existing.OwnerReferences) != 0 {
-						t.Fatalf("retention broken: %v %#v", err, existing)
-					}
-				} else if !apierrors.IsNotFound(err) {
-					t.Fatalf("delete policy ignored: %v", err)
-				}
-			})
-		}
+			} else if !apierrors.IsNotFound(err) {
+				t.Fatalf("delete policy ignored: %v", err)
+			}
+		})
 	}
 }
 

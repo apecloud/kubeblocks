@@ -218,27 +218,9 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	retentionPolicy := its.Spec.PersistentVolumeClaimRetentionPolicy
 	retireClaims := !isStopRequested(its) && (retentionPolicy == nil || retentionPolicy.WhenScaled != kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType)
 	if retireClaims {
-		allocatedClaims := sets.New[string]()
-		preserveClaims := func(pod *corev1.Pod) {
-			for _, volume := range pod.Spec.Volumes {
-				if volume.PersistentVolumeClaim != nil {
-					allocatedClaims.Insert(volume.PersistentVolumeClaim.ClaimName)
-				}
-			}
-		}
-		for _, obj := range tree.List(&corev1.Pod{}) {
-			preserveClaims(obj.(*corev1.Pod))
-		}
-		for name, template := range nameToTemplateMap {
-			pod, err := buildInstancePodByTemplate(name, template, its, "")
-			if err != nil {
-				return kubebuilderx.Continue, err
-			}
-			preserveClaims(pod)
-		}
 		for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
 			name := obj.GetLabels()[constant.KBAppPodNameLabelKey]
-			if name == "" || newNameSet.Has(name) || allocatedClaims.Has(obj.GetName()) {
+			if name == "" || newNameSet.Has(name) {
 				continue
 			}
 			if retiredNames.Has(name) || (!oldNameSet.Has(name) && metav1.IsControlledBy(obj, its)) {

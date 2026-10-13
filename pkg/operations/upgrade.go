@@ -216,7 +216,7 @@ func (u upgradeOpsHandler) getOwnedExpectedContainers(reqCtx intctrlutil.Request
 	if err != nil {
 		return nil, err
 	}
-	if len(workloads) != 1 || !generationMatches(workloads[0].Annotations, comp.Generation) {
+	if len(workloads) != 1 || !component.IsWorkloadVersionUpdated(comp, workloads[0]) {
 		return nil, nil
 	}
 	its := workloads[0]

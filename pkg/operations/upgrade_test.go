@@ -321,6 +321,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			assertPending()
 			Expect(testapps.ChangeObj(&testCtx, comp, func(comp *appsv1.Component) {
 				comp.Annotations[constant.KubeBlocksGenerationKey] = strconv.FormatInt(opsRes.Cluster.Generation, 10)
+				comp.Spec.ServiceVersion = serviceVer2
 			})).Should(Succeed())
 			By("waiting for the owned workload to exist")
 			assertPending()
@@ -334,8 +335,16 @@ var _ = Describe("Upgrade OpsRequest", func() {
 					Images: map[string]string{testapps.DefaultMySQLContainerName: testapps.AppImage(testapps.AppName, release0)}}}
 			})).Should(Succeed())
 			assertPending()
+			By("waiting when stop publishes the generation without the upgrade version")
 			Expect(testapps.ChangeObj(&testCtx, its, func(its *workloads.InstanceSet) {
 				its.Annotations[constant.KubeBlocksGenerationKey] = strconv.FormatInt(comp.Generation, 10)
+				its.Annotations[constant.AppComponentLabelKey] = comp.Spec.CompDef
+				its.Annotations[constant.KBAppServiceVersionKey] = serviceVer0
+			})).Should(Succeed())
+			assertPending()
+			Expect(testapps.ChangeObj(&testCtx, its, func(its *workloads.InstanceSet) {
+				its.Annotations[constant.KubeBlocksGenerationKey] = strconv.FormatInt(comp.Generation, 10)
+				its.Annotations[constant.KBAppServiceVersionKey] = comp.Spec.ServiceVersion
 				its.Spec.Instances[0].Images[testapps.DefaultMySQLContainerName] = ownerImage
 			})).Should(Succeed())
 			By("waiting while the template Pod still has the old spec and status images")

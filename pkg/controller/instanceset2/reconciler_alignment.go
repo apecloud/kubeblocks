@@ -85,6 +85,16 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 	}
 	createNameSet := newNameSet.Difference(oldNameSet)
 	deleteNameSet := oldNameSet.Difference(newNameSet)
+	for name, inst := range oldInstanceMap {
+		if !newNameSet.Has(name) || model.IsObjectDeleting(inst) || !ptr.Deref(inst.Spec.ScaledDown, false) {
+			continue
+		}
+		instCopy := inst.DeepCopy()
+		instCopy.Spec.ScaledDown = nil
+		if err := tree.Update(instCopy); err != nil {
+			return kubebuilderx.Continue, err
+		}
+	}
 
 	// default OrderedReady policy
 	isOrderedReady := true
@@ -120,14 +130,6 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 	}
 	for i, name := range newNameList {
 		if _, ok := createNameSet[name]; !ok {
-			inst := oldInstanceMap[name]
-			if !model.IsObjectDeleting(inst) && ptr.Deref(inst.Spec.ScaledDown, false) {
-				instCopy := inst.DeepCopy()
-				instCopy.Spec.ScaledDown = nil
-				if err := tree.Update(instCopy); err != nil {
-					return kubebuilderx.Continue, err
-				}
-			}
 			continue
 		}
 		if !isOrderedReady && concurrency <= 0 {

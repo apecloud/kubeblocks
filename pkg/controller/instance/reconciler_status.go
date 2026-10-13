@@ -121,7 +121,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	inst.Status.Role = r.observedRoleOfPod(inst, pod)
 	inst.Status.VolumeExpansion = r.hasRunningVolumeExpansion(tree, inst)
 	configs, err := r.observedConfigsOfPod(pod)
-	if err != nil && !stopped {
+	if err != nil {
 		return kubebuilderx.Continue, err
 	}
 	inst.Status.Configs = configs

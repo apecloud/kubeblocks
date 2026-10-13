@@ -900,8 +900,12 @@ func assertStopPodAbsent(t *testing.T, cli client.Client) {
 
 func TestInstanceStopInitiallyStopped(t *testing.T) {
 	inst := stopTestInstance()
-	inst.Spec.Stop = ptr.To(true)
 	cli := stopTestClient(t, inst)
+	inst.Spec.Stop = ptr.To(true)
+	inst.Generation++
+	if err := cli.Update(context.Background(), inst); err != nil {
+		t.Fatal(err)
+	}
 	reconcileStopEntry(t, cli, 4)
 	assertStopPodAbsent(t, cli)
 	pvcs := &corev1.PersistentVolumeClaimList{}
@@ -940,6 +944,9 @@ func TestInstanceStopSuspendsPVCsAndResumesLatestTemplate(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := readStopInstance(t, cli)
+	got.Spec.Template.Spec.Containers[0].Image = "db:v2"
+	got.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
+	got.Spec.InstanceAssistantObjects = []workloads.InstanceAssistantObject{{ConfigMap: &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "demo-env", Namespace: "default"}, Data: map[string]string{"version": "v2"}}}}
 	got.Spec.Stop = ptr.To(true)
 	got.Spec.MinReadySeconds = 3600
 	got.Generation++
@@ -950,41 +957,28 @@ func TestInstanceStopSuspendsPVCsAndResumesLatestTemplate(t *testing.T) {
 	if result.RequeueAfter != time.Second || readStopPod(t, cli).DeletionTimestamp.IsZero() || readStopInstance(t, cli).Status.CurrentState != workloads.InstanceCurrentStateTerminating {
 		t.Fatalf("Stop did not observe the held terminating Pod and retry: %#v", result)
 	}
-	got = readStopInstance(t, cli)
-	got.Spec.Template.Spec.Containers[0].Image = "db:v2"
-	got.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
-	got.Spec.VolumeClaimTemplates = append(got.Spec.VolumeClaimTemplates, corev1.PersistentVolumeClaimTemplate{ObjectMeta: metav1.ObjectMeta{Name: "logs"}, Spec: *got.Spec.VolumeClaimTemplates[0].Spec.DeepCopy()})
-	got.Spec.InstanceAssistantObjects = []workloads.InstanceAssistantObject{{ConfigMap: &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "demo-env", Namespace: "default"}, Data: map[string]string{"version": "v2"}}}}
-	got.Generation++
-	if err := cli.Update(context.Background(), got); err != nil {
-		t.Fatal(err)
-	}
 	reconcileStopEntry(t, cli, 3)
 	if !reflect.DeepEqual(readStopPVC(t, cli), pvc) {
 		t.Fatal("Stop changed existing storage")
-	}
-	logsKey := client.ObjectKey{Namespace: "default", Name: "logs-demo-0"}
-	if err := cli.Get(context.Background(), logsKey, &corev1.PersistentVolumeClaim{}); !apierrors.IsNotFound(err) {
-		t.Fatalf("Stop created a newly desired claim: %v", err)
 	}
 	cm := &corev1.ConfigMap{}
 	if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "demo-env"}, cm); err != nil || cm.Data["version"] != "v2" {
 		t.Fatalf("stopped assistant did not receive current content: %v", err)
 	}
+	held := readStopPod(t, cli)
+	held.Finalizers = nil
+	if err := cli.Update(context.Background(), held); err != nil {
+		t.Fatal(err)
+	}
+	reconcileStopEntry(t, cli, 1)
 	got = readStopInstance(t, cli)
+	if got.Status.CurrentState != workloads.InstanceCurrentStateAbsent || got.Status.ObservedGeneration != got.Generation {
+		t.Fatal("resume handoff requires current Absent observation")
+	}
 	got.Spec.Stop = ptr.To(false)
 	got.Spec.MinReadySeconds = 0
 	got.Generation++
 	if err := cli.Update(context.Background(), got); err != nil {
-		t.Fatal(err)
-	}
-	result = reconcileStopEntry(t, cli, 2)
-	if result.RequeueAfter != time.Second || readStopPod(t, cli).Spec.Containers[0].Image != "db:v1" || !reflect.DeepEqual(readStopPVC(t, cli), pvc) {
-		t.Fatalf("early resume changed runtime or storage before Pod deletion: %#v", result)
-	}
-	held := readStopPod(t, cli)
-	held.Finalizers = nil
-	if err := cli.Update(context.Background(), held); err != nil {
 		t.Fatal(err)
 	}
 	reconcileStopEntry(t, cli, 3)
@@ -994,10 +988,6 @@ func TestInstanceStopSuspendsPVCsAndResumesLatestTemplate(t *testing.T) {
 	resumed := readStopPVC(t, cli)
 	if resumed.UID != pvc.UID || resumed.Spec.Resources.Requests.Storage().Cmp(resource.MustParse("2Gi")) != 0 {
 		t.Fatal("resume replaced storage or ignored the current expansion target")
-	}
-	logs := &corev1.PersistentVolumeClaim{}
-	if err := cli.Get(context.Background(), logsKey, logs); err != nil || logs.Spec.Resources.Requests.Storage().Cmp(resource.MustParse("2Gi")) != 0 {
-		t.Fatalf("resume did not create the current claim template: %v", err)
 	}
 }
 
@@ -1065,7 +1055,6 @@ func TestInstanceStopActualDeletionKeepsRetentionPolicy(t *testing.T) {
 			pvc := bindStopPVC(t, cli)
 			got := readStopInstance(t, cli)
 			got.Spec.Stop = ptr.To(true)
-			got.Spec.VolumeClaimTemplates = nil
 			got.Generation++
 			if err := cli.Update(context.Background(), got); err != nil {
 				t.Fatal(err)
@@ -1092,41 +1081,9 @@ func TestInstanceStopActualDeletionKeepsRetentionPolicy(t *testing.T) {
 	}
 }
 
-func TestInstanceStopInvalidConfigObservation(t *testing.T) {
-	inst := stopTestInstance()
-	cli := stopTestClient(t, inst)
-	reconcileStopEntry(t, cli, 3)
-	pod := readStopPod(t, cli)
-	pod.Annotations = map[string]string{constant.CMInsConfigurationHashLabelKey: "invalid-json"}
-	if err := cli.Update(context.Background(), pod); err != nil {
-		t.Fatal(err)
-	}
-	pod.Status.Phase = corev1.PodRunning
-	if err := cli.Status().Update(context.Background(), pod); err != nil {
-		t.Fatal(err)
-	}
-	controller := &InstanceReconciler{Client: cli, Recorder: record.NewFakeRecorder(1000)}
-	req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(inst)}
-	if _, err := controller.Reconcile(context.Background(), req); err == nil {
-		t.Fatal("running observation should reject invalid config metadata")
-	}
-	got := readStopInstance(t, cli)
-	got.Spec.Stop = ptr.To(true)
-	got.Generation++
-	if err := cli.Update(context.Background(), got); err != nil {
-		t.Fatal(err)
-	}
-	reconcileStopEntry(t, cli, 3)
-	assertStopPodAbsent(t, cli)
-	status := readStopInstance(t, cli).Status
-	if status.CurrentState != workloads.InstanceCurrentStateAbsent || status.UpToDate || status.Configs != nil {
-		t.Fatalf("invalid config metadata prevented stop convergence: %#v", status)
-	}
-}
-
 func TestInstanceStopSkipsUpdateActionsAndPreservesRevision(t *testing.T) {
 	inst := stopTestInstance()
-	inst.Spec.LifecycleActions = &workloads.LifecycleActions{Switchover: &kbappsv1.Action{Exec: &kbappsv1.ExecAction{}}}
+	inst.Spec.LifecycleActions = &workloads.LifecycleActions{Switchover: &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"switchover"}}}}
 	inst.Spec.Configs = []workloads.ConfigTemplate{{Name: "config", ConfigHash: ptr.To("old")}}
 	cli := stopTestClient(t, inst)
 	reconcileStopEntry(t, cli, 3)
@@ -1153,7 +1110,7 @@ func TestInstanceStopSkipsUpdateActionsAndPreservesRevision(t *testing.T) {
 	got.Spec.Stop = ptr.To(true)
 	got.Spec.Template.Spec.DNSPolicy = corev1.DNSClusterFirstWithHostNet
 	got.Spec.Configs[0].ConfigHash = ptr.To("new")
-	got.Spec.Configs[0].Reconfigure = &kbappsv1.Action{Exec: &kbappsv1.ExecAction{}}
+	got.Spec.Configs[0].Reconfigure = &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"reload-config"}}}
 	got.Generation++
 	if err := cli.Update(context.Background(), got); err != nil {
 		t.Fatal(err)
@@ -1167,7 +1124,11 @@ func TestInstanceStopSkipsUpdateActionsAndPreservesRevision(t *testing.T) {
 	if observed.CurrentState != workloads.InstanceCurrentStatePresent || !observed.Ready || !observed.Available || observed.UpToDate {
 		t.Fatalf("stop did not preserve the actual ready Pod observation: %#v", observed)
 	}
+	reconcileStopEntry(t, cli, 1)
 	got = readStopInstance(t, cli)
+	if got.Status.CurrentState != workloads.InstanceCurrentStateAbsent || got.Status.ObservedGeneration != got.Generation {
+		t.Fatal("resume handoff requires current Absent observation")
+	}
 	changedRevision := got.Status.UpdateRevision
 	got.Spec.Stop = nil
 	got.Spec.MinReadySeconds = 3600

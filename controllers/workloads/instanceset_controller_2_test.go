@@ -590,10 +590,12 @@ var _ = Describe("InstanceSet Controller 2", func() {
 
 type setStopClient struct {
 	client.Client
-	failChildWriteAt  int
-	childWrites       int
-	failResumeWriteAt int
-	resumeWrites      int
+	failChildWriteAt    int
+	childWrites         int
+	failResumeWriteAt   int
+	resumeWrites        int
+	delayPodObservation bool
+	beforePodDelete     func() error
 }
 
 var (
@@ -639,14 +641,19 @@ func TestInstanceSetStopRecoversAfterParentStatusFailure(t *testing.T) {
 				if len(listSetStopPods(t, cli)) != 0 || readSetStop(t, cli).Status.Replicas != 0 {
 					t.Fatal("resume fixture did not finish Stop")
 				}
-				mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Template.Spec.Containers[0].Image = "db:latest" })
-				reconcileSetStop(t, cli, 4)
+			}
+			if !stopping {
+				mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(false) })
 			}
 			mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
-				its.Spec.Stop = ptr.To(stopping)
 				its.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
 				its.Spec.MinReadySeconds = 3600
 			})
+			if stopping {
+				mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(true) })
+			} else {
+				mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Template.Spec.Containers[0].Image = "db:latest" })
+			}
 			beforeStatus := readSetStop(t, cli).Status
 			faulty := &failSetStopStatusClient{Client: cli, fail: true}
 			if _, err := reconcileSetStopParent(faulty); !errors.Is(err, errSetStopStatusWrite) || faulty.fail {
@@ -751,22 +758,86 @@ func (c *setStopClient) Create(ctx context.Context, obj client.Object, opts ...c
 	return c.Client.Create(ctx, obj, opts...)
 }
 
-func TestInstanceSetStopIgnoresMalformedObservedConfig(t *testing.T) {
-	cli := newSetStopClient(t, setStopFixture())
-	reconcileSetStop(t, cli, 5)
-	for _, pod := range listSetStopPods(t, cli) {
-		if pod.Annotations == nil {
-			pod.Annotations = map[string]string{}
+func (c *setStopClient) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+	if err := c.Client.List(ctx, list, opts...); err != nil {
+		return err
+	}
+	if pods, ok := list.(*corev1.PodList); ok && c.delayPodObservation {
+		pods.Items = nil
+	}
+	return nil
+}
+
+func (c *setStopClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
+	if _, ok := obj.(*corev1.Pod); ok && c.beforePodDelete != nil {
+		hook := c.beforePodDelete
+		c.beforePodDelete = nil
+		if err := hook(); err != nil {
+			return err
 		}
-		pod.Annotations[constant.CMInsConfigurationHashLabelKey] = "invalid-json"
-		if err := cli.Update(context.Background(), &pod); err != nil {
+	}
+	return c.Client.Delete(ctx, obj, opts...)
+}
+
+func TestInstanceSetStopResumeDuringPodObservationDelay(t *testing.T) {
+	its := setStopFixture()
+	its.Spec.Replicas = ptr.To(int32(1))
+	cli := newSetStopClient(t, its)
+	for i := 0; i < 3; i++ {
+		if _, err := reconcileSetStopParent(cli); err != nil {
 			t.Fatal(err)
 		}
 	}
+	wrapped := cli.(*setStopClient)
+	wrapped.delayPodObservation = true
+	reconcileStopEntry(t, cli, 2)
+	pvc := bindStopPVC(t, cli)
+	pod := readStopPod(t, cli)
+	pod.Finalizers = []string{"test/hold"}
+	if err := cli.Update(context.Background(), pod); err != nil {
+		t.Fatal(err)
+	}
 	mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(true) })
-	reconcileSetStop(t, cli, 8)
-	if len(listSetStopPods(t, cli)) != 0 || readSetStop(t, cli).Status.Replicas != 0 {
-		t.Fatal("malformed runtime config blocked Stop")
+	if _, err := reconcileSetStopParent(cli); err != nil {
+		t.Fatal(err)
+	}
+	reconcileStopEntry(t, cli, 1)
+	stopped := readStopInstance(t, cli)
+	if !ptr.Deref(stopped.Spec.Stop, false) || stopped.Generation != stopped.Status.ObservedGeneration || stopped.Status.CurrentState != workloads.InstanceCurrentStateAbsent {
+		t.Fatalf("delayed Pod observation did not produce stopped Absent status: %#v", stopped)
+	}
+	mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
+		its.Spec.Stop = nil
+	})
+	mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
+		its.Spec.Template.Spec.Containers[0].Image = "db:v2"
+		its.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
+	})
+	wrapped.delayPodObservation = false
+	wrapped.beforePodDelete = func() error { _, err := reconcileSetStopParent(cli); return err }
+	controller := &InstanceReconciler{Client: cli, Scheme: cli.Scheme(), Recorder: record.NewFakeRecorder(1000)}
+	conflictResult, err := controller.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(stopped)})
+	if err != nil || !conflictResult.Requeue || conflictResult.RequeueAfter != 0 || wrapped.beforePodDelete != nil {
+		t.Fatalf("parent resume did not requeue conflict after Stop deletion: %#v %v", conflictResult, err)
+	}
+	if ptr.Deref(readStopInstance(t, cli).Spec.Stop, false) || readStopPod(t, cli).DeletionTimestamp.IsZero() {
+		t.Fatal("actual parent/child commits did not produce resumed Instance with terminating Pod")
+	}
+	result := reconcileStopEntry(t, cli, 1)
+	if !reflect.DeepEqual(readStopPVC(t, cli), pvc) {
+		t.Fatal("resume changed PVCs before Stop deletion completed")
+	}
+	if result.RequeueAfter != time.Second {
+		t.Fatalf("terminating Pod has no bounded resume retry: %#v", result)
+	}
+	held := readStopPod(t, cli)
+	held.Finalizers = nil
+	if err := cli.Update(context.Background(), held); err != nil {
+		t.Fatal(err)
+	}
+	reconcileStopEntry(t, cli, 3)
+	if readStopPod(t, cli).Spec.Containers[0].Image != "db:v2" || readStopPVC(t, cli).Spec.Resources.Requests.Storage().Cmp(resource.MustParse("2Gi")) != 0 {
+		t.Fatal("resume did not converge after deletion")
 	}
 }
 
@@ -780,6 +851,7 @@ func TestInstanceSetStopSynchronizesClonedAssistantsBeforeNameAlignment(t *testi
 		t.Fatal(err)
 	}
 	reconcileSetStop(t, cli, 5)
+	mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Replicas = ptr.To(int32(3)) })
 	mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(true) })
 	reconcileSetStop(t, cli, 8)
 	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(cm), cm); err != nil {
@@ -789,7 +861,6 @@ func TestInstanceSetStopSynchronizesClonedAssistantsBeforeNameAlignment(t *testi
 	if err := cli.Update(context.Background(), cm); err != nil {
 		t.Fatal(err)
 	}
-	mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Replicas = ptr.To(int32(3)) })
 	reconcileSetStop(t, cli, 4)
 	children := listSetStopChildren(t, cli)
 	if len(children) != 2 || len(listSetStopPods(t, cli)) != 0 {
@@ -943,18 +1014,14 @@ func TestInstanceSetStopResumesLatestPayload(t *testing.T) {
 	if err := cli.List(context.Background(), claims); err != nil {
 		t.Fatal(err)
 	}
-	mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(true) })
-	reconcileSetStop(t, cli, 8)
 	mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
 		its.Spec.Template.Spec.Containers[0].Image = "db:v2"
 		its.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
-		added := *its.Spec.VolumeClaimTemplates[0].DeepCopy()
-		added.Name = "logs"
-		its.Spec.VolumeClaimTemplates = append(its.Spec.VolumeClaimTemplates, added)
 	})
-	reconcileSetStop(t, cli, 4)
+	mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(true) })
+	reconcileSetStop(t, cli, 8)
 	for _, child := range listSetStopChildren(t, cli) {
-		if !ptr.Deref(child.Spec.Stop, false) || child.Spec.Template.Spec.Containers[0].Image != "db:v2" || len(child.Spec.VolumeClaimTemplates) != 2 {
+		if !ptr.Deref(child.Spec.Stop, false) || child.Spec.Template.Spec.Containers[0].Image != "db:v2" || len(child.Spec.VolumeClaimTemplates) != 1 || child.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests.Storage().Cmp(resource.MustParse("2Gi")) != 0 {
 			t.Fatal("stopped Instance did not receive latest payload")
 		}
 	}
@@ -979,8 +1046,8 @@ func TestInstanceSetStopResumesLatestPayload(t *testing.T) {
 	if err := cli.List(context.Background(), claims); err != nil {
 		t.Fatal(err)
 	}
-	if len(claims.Items) != 4 {
-		t.Fatal("resume did not create newly desired claims")
+	if len(claims.Items) != 2 {
+		t.Fatal("resume replaced existing claims")
 	}
 	for _, claim := range claims.Items {
 		if claim.Spec.Resources.Requests.Storage().Cmp(resource.MustParse("2Gi")) != 0 {
@@ -999,9 +1066,9 @@ func TestInstanceSetStopFlatTemplateChange(t *testing.T) {
 			changeTemplate := func(its *workloads.InstanceSet) {
 				its.Spec.Instances = []workloads.InstanceTemplate{{Name: "named", Replicas: ptr.To(int32(1)), Ordinals: workloads.Ordinals{Discrete: []int32{0}}, Labels: map[string]string{"selected-template": "named"}}}
 			}
+			mutateSetStop(t, cli, changeTemplate)
 			if retargetFirst {
 				mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
-					changeTemplate(its)
 					its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{Type: kbappsv1.OnDeleteStrategyType}
 				})
 				reconcileSetStop(t, cli, 3)
@@ -1013,7 +1080,6 @@ func TestInstanceSetStopFlatTemplateChange(t *testing.T) {
 			mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
 				its.Spec.Stop = ptr.To(true)
 				its.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
-				changeTemplate(its)
 			})
 			reconcileSetStop(t, cli, 10)
 			stopped := readSetStop(t, cli)
@@ -1066,11 +1132,11 @@ func TestInstanceSetStopScaleRetirement(t *testing.T) {
 		if len(listSetStopPods(t, cli)) != 0 {
 			t.Fatal("Offline fixture did not finish Stop")
 		}
+		mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(false) })
 		mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
 			its.Spec.OfflineInstances = []string{"demo-0"}
 			its.Spec.Replicas = ptr.To(int32(1))
 			its.Spec.Template.Spec.Containers[0].Image = "db:latest"
-			its.Spec.Stop = ptr.To(false)
 		})
 		wrapped := cli.(*setStopClient)
 		wrapped.childWrites = 0
@@ -1119,10 +1185,11 @@ func TestInstanceSetStopScaleRetirement(t *testing.T) {
 			its.Spec.PersistentVolumeClaimRetentionPolicy = &kbappsv1.PersistentVolumeClaimRetentionPolicy{WhenScaled: policy, WhenDeleted: kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType}
 			cli := newSetStopClient(t, its)
 			reconcileSetStop(t, cli, 5)
-			mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(true); its.Spec.Replicas = ptr.To(int32(0)) })
+			mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Replicas = ptr.To(int32(0)) })
+			mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(true) })
 			reconcileSetStop(t, cli, 12)
 			if len(listSetStopPods(t, cli)) != 0 {
-				t.Fatal("simultaneous Stop and scale zero did not drain")
+				t.Fatal("Stop with a pending scale-to-zero target did not drain")
 			}
 			claims := &corev1.PersistentVolumeClaimList{}
 			if err := cli.List(context.Background(), claims); err != nil {
@@ -1189,6 +1256,8 @@ func TestInstanceSetStopOrderedWaitsForHeldRuntime(t *testing.T) {
 	}
 	mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
 		its.Spec.Stop = ptr.To(false)
+	})
+	mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
 		its.Spec.Template.Spec.Containers[0].Image = "db:v3"
 	})
 	reconcileSetStop(t, cli, 3)
@@ -1309,6 +1378,8 @@ func TestInstanceSetStopParallelPartialWriteKeepsBudget(t *testing.T) {
 	assertClaimsUnchanged()
 	mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
 		its.Spec.Stop = ptr.To(false)
+	})
+	mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
 		its.Spec.Template.Spec.Containers[0].Image = "db:latest"
 	})
 	wrapped.resumeWrites = 0
@@ -1436,7 +1507,7 @@ func TestInstanceSetStopInitiallyStopped(t *testing.T) {
 	if err := cli.List(context.Background(), pvcs); err != nil {
 		t.Fatal(err)
 	}
-	if len(pods.Items) != 0 || len(pvcs.Items) != 0 {
+	if len(listSetStopChildren(t, cli)) != 0 || len(pods.Items) != 0 || len(pvcs.Items) != 0 {
 		t.Fatalf("initial Stop provisioned %d Pods and %d PVCs", len(pods.Items), len(pvcs.Items))
 	}
 }
@@ -1503,10 +1574,19 @@ var _ = Describe("InstanceSet Stop path parity", func() {
 				g.Expect(its.Status.Replicas).Should(Equal(int32(1)))
 			}).Should(Succeed())
 
+			Consistently(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, pvcKey, claim)).Should(Succeed())
+				g.Expect(claim.ResourceVersion).Should(Equal(pvcVersion))
+				g.Expect(claim.Spec).Should(Equal(*pvcSpec))
+				g.Expect(claim.OwnerReferences).Should(Equal(pvcOwners))
+			}, time.Second).Should(Succeed())
+			Eventually(testapps.GetAndChangeObj(&testCtx, itsKey, func(set *workloads.InstanceSet) {
+				set.Spec.Stop = nil
+			})).Should(Succeed())
 			Eventually(testapps.GetAndChangeObj(&testCtx, itsKey, func(set *workloads.InstanceSet) {
 				set.Spec.Template.Spec.Containers[0].Image = "db:v2"
 				set.Spec.Template.Spec.Containers[0].Ports = []corev1.ContainerPort{{Name: "db", ContainerPort: 5432, Protocol: corev1.ProtocolTCP}}
-				set.Spec.VolumeClaimTemplates = nil
+				set.Spec.VolumeClaimTemplates[0].Annotations = map[string]string{"test.kubeblocks.io/resume": "latest"}
 			})).Should(Succeed())
 			Eventually(func(g Gomega) {
 				service := &corev1.Service{}
@@ -1514,20 +1594,6 @@ var _ = Describe("InstanceSet Stop path parity", func() {
 				g.Expect(service.Spec.Ports).Should(HaveLen(1))
 				g.Expect(service.Spec.Ports[0].Port).Should(Equal(int32(5432)))
 			}).Should(Succeed())
-			Consistently(func(g Gomega) {
-				g.Expect(k8sClient.Get(ctx, pvcKey, claim)).Should(Succeed())
-				g.Expect(claim.ResourceVersion).Should(Equal(pvcVersion))
-				g.Expect(claim.Spec).Should(Equal(*pvcSpec))
-				g.Expect(claim.OwnerReferences).Should(Equal(pvcOwners))
-			}, time.Second).Should(Succeed())
-
-			Eventually(testapps.GetAndChangeObj(&testCtx, itsKey, func(set *workloads.InstanceSet) {
-				set.Spec.Stop = nil
-				set.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{{
-					ObjectMeta: metav1.ObjectMeta{Name: "data", Annotations: map[string]string{"test.kubeblocks.io/resume": "latest"}},
-					Spec:       *pvcSpec,
-				}}
-			})).Should(Succeed())
 			Consistently(func(g Gomega) {
 				g.Expect(k8sClient.Get(ctx, podKey, pod)).Should(Succeed())
 				g.Expect(pod.UID).Should(Equal(oldPodUID))

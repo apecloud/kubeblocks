@@ -192,7 +192,7 @@ func (u upgradeOpsHandler) getUpgradeComponentSpecs(reqCtx intctrlutil.RequestCt
 			if err != nil {
 				return nil, false, err
 			}
-			if len(shards) == 0 || len(shards) != int(spec.Shards) {
+			if len(shards) != int(spec.Shards) {
 				return nil, true, nil
 			}
 			for _, shard := range shards {
@@ -258,7 +258,7 @@ func (u upgradeOpsHandler) getExpectedContainersMap(reqCtx intctrlutil.RequestCt
 		if err != nil {
 			return nil, err
 		}
-		if len(workloads) != 1 || workloads[0].Annotations[constant.KubeBlocksGenerationKey] != strconv.FormatInt(comp.Generation, 10) {
+		if len(workloads) != 1 || !component.IsWorkloadVersionUpdated(comp, workloads[0]) {
 			continue
 		}
 		its := workloads[0]

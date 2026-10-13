@@ -580,7 +580,10 @@ func TestUpgradeInstanceTemplateVersions(t *testing.T) {
 			its := &workloads.InstanceSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: owner.Name, Namespace: "ns", Labels: owner.Labels,
-					Annotations: map[string]string{constant.KubeBlocksGenerationKey: "5"},
+					Annotations: map[string]string{
+						constant.KubeBlocksGenerationKey: "5", constant.AppComponentLabelKey: owner.Spec.CompDef,
+						constant.KBAppServiceVersionKey: owner.Spec.ServiceVersion,
+					},
 				},
 				Spec: workloads.InstanceSetSpec{
 					Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
@@ -597,6 +600,7 @@ func TestUpgradeInstanceTemplateVersions(t *testing.T) {
 				ver.Labels[alternate.Name] = alternate.Name
 				ver.Spec.CompatibilityRules[0].CompDefs = append(ver.Spec.CompatibilityRules[0].CompDefs, alternate.Name)
 				owner.Spec.CompDef = alternate.Name
+				its.Annotations[constant.AppComponentLabelKey] = alternate.Name
 				cluster.Spec.Shardings[0].ShardTemplates[0].CompDef = ptr.To(alternate.Name)
 				cluster.Spec.Shardings[0].ShardTemplates[0].ServiceVersion = ptr.To("2.0.0")
 				objects = append(objects, alternate)
@@ -651,7 +655,13 @@ func TestUpgradeInstanceTemplateVersions(t *testing.T) {
 				reconcileWaiting()
 				its.ResourceVersion = ""
 				its.Annotations[constant.KubeBlocksGenerationKey] = "5"
+				its.Annotations[constant.KBAppServiceVersionKey] = "1.0.0"
 				if err := cli.Create(context.Background(), its); err != nil {
+					t.Fatal(err)
+				}
+				reconcileWaiting()
+				its.Annotations[constant.KBAppServiceVersionKey] = owner.Spec.ServiceVersion
+				if err := cli.Update(context.Background(), its); err != nil {
 					t.Fatal(err)
 				}
 				fixed.Spec.Containers[0].Image = "db:wrong"
@@ -678,5 +688,77 @@ func TestUpgradeInstanceTemplateVersions(t *testing.T) {
 				t.Fatalf("phase=%s progress=%s, want %s %s", phase, ops.Status.Progress, tc.want, tc.progress)
 			}
 		})
+	}
+}
+
+func TestUpgradeZeroShards(t *testing.T) {
+	scheme := runtime.NewScheme()
+	for _, add := range []func(*runtime.Scheme) error{
+		appsv1.AddToScheme, opsv1alpha1.AddToScheme,
+	} {
+		if err := add(scheme); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cluster := &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "cluster", Namespace: "ns", Generation: 3},
+		Spec: appsv1.ClusterSpec{Shardings: []appsv1.ClusterSharding{{
+			Name: "shards", Shards: 0,
+			Template: appsv1.ClusterComponentSpec{ComponentDef: "db", ServiceVersion: "2.0.0", Replicas: 2},
+		}}},
+	}
+	ops := &opsv1alpha1.OpsRequest{
+		ObjectMeta: metav1.ObjectMeta{Name: "upgrade", Namespace: "ns"},
+		Spec: opsv1alpha1.OpsRequestSpec{
+			Type: opsv1alpha1.UpgradeType,
+			SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{
+				Upgrade: &opsv1alpha1.Upgrade{Components: []opsv1alpha1.UpgradeComponent{{
+					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "shards"},
+				}}},
+			},
+		},
+		Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsRunningPhase},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(ops).WithObjects(cluster, ops).Build()
+	phase, requeue, err := (upgradeOpsHandler{}).ReconcileAction(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, cli,
+		&OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(100)},
+	)
+	if err != nil || phase != opsv1alpha1.OpsSucceedPhase || requeue != 0 || ops.Status.Progress != "0/0" {
+		t.Fatalf("phase=%s requeue=%s progress=%s err=%v, want Succeed with 0/0", phase, requeue, ops.Status.Progress, err)
+	}
+	if _, err := GetOpsManager().Reconcile(intctrlutil.RequestCtx{Ctx: context.Background()}, cli,
+		&OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(100)}); err != nil {
+		t.Fatal(err)
+	}
+	stored := &opsv1alpha1.OpsRequest{}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(ops), stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored.Status.Phase != opsv1alpha1.OpsSucceedPhase || stored.Status.Progress != "0/0" {
+		t.Fatalf("persisted phase=%s progress=%s, want Succeed with 0/0", stored.Status.Phase, stored.Status.Progress)
+	}
+	cluster.Spec.Shardings[0].Shards = 1
+	pending := ops.DeepCopy()
+	pending.Name = "pending"
+	pending.ResourceVersion = ""
+	pending.Status = opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsRunningPhase, StartTimestamp: metav1.Now()}
+	if err := cli.Create(context.Background(), pending); err != nil {
+		t.Fatal(err)
+	}
+	pendingRes := &OpsResource{Cluster: cluster, OpsRequest: pending, Recorder: record.NewFakeRecorder(100)}
+	if requeue, err := GetOpsManager().Reconcile(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, pendingRes); err != nil || requeue <= 0 {
+		t.Fatalf("missing shard requeue=%s err=%v, want a retry", requeue, err)
+	}
+	pending.Spec.TimeoutSeconds = ptr.To(int32(1))
+	pending.Status.StartTimestamp = metav1.NewTime(time.Now().Add(-2 * time.Second))
+	if _, err := GetOpsManager().Reconcile(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, pendingRes); err != nil {
+		t.Fatal(err)
+	}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(pending), stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored.Status.Phase != opsv1alpha1.OpsAbortedPhase {
+		t.Fatalf("missing shard timed out with phase=%s, want Aborted", stored.Status.Phase)
 	}
 }

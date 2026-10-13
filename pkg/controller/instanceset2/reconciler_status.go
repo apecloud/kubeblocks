@@ -103,7 +103,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 				Name: templateName,
 			}
 		}
-		if hasObservedAbsentRuntime(inst) {
+		if hasObservedStoppedRuntime(inst) {
 			continue
 		}
 		{
@@ -111,7 +111,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			replicas++
 			template2TemplatesStatus[templateName].Replicas++
 		}
-		if !hasTerminatingRuntime(inst) && hasPresentRuntime(inst) && intctrlutil.IsInstanceReady(inst) {
+		if intctrlutil.IsInstanceReady(inst) {
 			readyReplicas++
 			template2TemplatesStatus[templateName].ReadyReplicas++
 			notReadyNames.Delete(inst.Name)
@@ -122,10 +122,8 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 				notAvailableNames.Insert(inst.Name)
 			}
 		}
-		if hasPresentRuntime(inst) || inst.Status.CurrentState == workloads.InstanceCurrentStateTerminating {
-			currentRevisions[inst.Name] = getInstanceRevision(inst)
-		}
-		if !hasTerminatingRuntime(inst) && hasPresentRuntime(inst) {
+		currentRevisions[inst.Name] = getInstanceRevision(inst)
+		if !intctrlutil.IsInstanceTerminating(inst) {
 			if !isStopRequested(its) && isInstanceUpdatedWithRevisions(inst, currentRevisions[inst.Name], updateRevisions) {
 				updatedReplicas++
 				template2TemplatesStatus[templateName].UpdatedReplicas++
@@ -359,7 +357,7 @@ func buildAvailableCondition(its *workloads.InstanceSet, available bool, notAvai
 func buildFailureCondition(its *workloads.InstanceSet, instances []*workloads.Instance) (*metav1.Condition, error) {
 	var failureNames []string
 	for _, inst := range instances {
-		if !hasTerminatingRuntime(inst) && hasPresentRuntime(inst) && intctrlutil.IsInstanceFailure(inst) {
+		if intctrlutil.IsInstanceFailure(inst) {
 			failureNames = append(failureNames, inst.Name)
 		}
 	}

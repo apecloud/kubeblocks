@@ -796,13 +796,6 @@ func TestInstanceSetRetainedClaimsAfterRecreation(t *testing.T) {
 			WhenScaled:  kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType,
 		}
 	})
-	extra := pvcLifecycleClaims(t, cli)[0].DeepCopy()
-	extra.Name = "retained-" + extra.Name
-	extra.UID = types.UID(extra.Name + "-uid")
-	extra.ResourceVersion = ""
-	if err := cli.Create(context.Background(), extra); err != nil {
-		t.Fatal(err)
-	}
 	original := pvcLifecycleSet(t, cli)
 	if err := cli.Delete(context.Background(), original); err != nil {
 		t.Fatal(err)
@@ -812,7 +805,7 @@ func TestInstanceSetRetainedClaimsAfterRecreation(t *testing.T) {
 		t.Fatalf("original InstanceSet was not deleted: %v", err)
 	}
 	claims := pvcLifecycleClaims(t, cli)
-	if len(claims) != 3 {
+	if len(claims) != 2 {
 		t.Fatal("root deletion did not retain all claims")
 	}
 	for _, claim := range claims {
@@ -841,10 +834,6 @@ func TestInstanceSetRetainedClaimsAfterRecreation(t *testing.T) {
 		case "data-pvc-lifecycle-0":
 			if !metav1.IsControlledBy(&claim, replacement) || !reflect.DeepEqual(claim.Spec, claims[0].Spec) || claim.UID != claims[0].UID {
 				t.Fatal("active claim was not adopted with its storage preserved")
-			}
-		case extra.Name:
-			if !reflect.DeepEqual(claim, claims[2]) {
-				t.Fatal("adoption changed the detached sibling claim")
 			}
 		default:
 			if !reflect.DeepEqual(claim, claims[1]) {

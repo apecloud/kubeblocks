@@ -236,13 +236,12 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 			}
 			preserveClaims(pod)
 		}
-		allocationComplete := len(nameToTemplateMap) == int(*its.Spec.Replicas)
 		for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
 			name := obj.GetLabels()[constant.KBAppPodNameLabelKey]
 			if name == "" || newNameSet.Has(name) || allocatedClaims.Has(obj.GetName()) {
 				continue
 			}
-			if retiredNames.Has(name) || (allocationComplete && !oldNameSet.Has(name) && metav1.IsControlledBy(obj, its)) {
+			if retiredNames.Has(name) || (!oldNameSet.Has(name) && metav1.IsControlledBy(obj, its)) {
 				if err := tree.Delete(obj); err != nil {
 					return kubebuilderx.Continue, err
 				}

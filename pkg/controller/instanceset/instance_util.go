@@ -841,6 +841,17 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 	mergeMap(&template.Annotations, &templateExt.Annotations)
 	mergeMap(&template.Labels, &templateExt.Labels)
 
+	for i, c := range templateExt.Spec.InitContainers {
+		if image, ok := template.Images[c.Name]; ok {
+			templateExt.Spec.InitContainers[i].Image = image
+		}
+	}
+	for i, c := range templateExt.Spec.Containers {
+		if image, ok := template.Images[c.Name]; ok {
+			templateExt.Spec.Containers[i].Image = image
+		}
+	}
+
 	if len(templateExt.Spec.Containers) > 0 {
 		if template.Resources != nil {
 			src := template.Resources

@@ -352,6 +352,12 @@ type InstanceTemplate struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
+	// Specifies the container images to override in the default template.
+	// Keys are the container names.
+	//
+	// +optional
+	Images map[string]string `json:"images,omitempty"`
+
 	// Specifies the number of instances (Pods) to create from this InstanceTemplate.
 	// This field allows setting how many replicated instances of the Component,
 	// with the specific overrides in the InstanceTemplate, are created.

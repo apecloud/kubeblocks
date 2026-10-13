@@ -27,8 +27,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("Component Version", func() {
@@ -229,5 +232,41 @@ var _ = Describe("Component Version", func() {
 			err := resolveImagesWithCompVersions(compDefObj, []*appsv1.ComponentVersion{compVersionObj}, testapps.ServiceVersion(""))
 			Expect(err).ShouldNot(BeNil())
 		})
+	})
+})
+
+var _ = Describe("instance template image resolution", func() {
+	It("resolves init containers and actions without changing the definition", func() {
+		def := testapps.NewComponentDefinitionFactory("image-resolution").SetServiceVersion("1.0.0").
+			SetRuntime(&corev1.Container{Name: "db", Image: "db:1"}).GetObject()
+		def.Spec.Runtime.InitContainers = []corev1.Container{{Name: "setup", Image: "setup:1"}}
+		def.Spec.LifecycleActions = &appsv1.ComponentLifecycleActions{PostProvision: &appsv1.Action{Exec: &appsv1.ExecAction{Image: "action:1"}}}
+		ver := &appsv1.ComponentVersion{Spec: appsv1.ComponentVersionSpec{Releases: []appsv1.ComponentVersionRelease{
+			{Name: "r2", ServiceVersion: "2.0.0", Images: map[string]string{"db": "db:2", "setup": "setup:2", "postProvision": "action:2"}},
+		}}}
+		before := def.DeepCopy()
+		By("returning no overrides when no compatible ComponentVersion exists")
+		images, err := ResolveInstanceTemplateImages4ServiceVersion(ctx, testCtx.Cli, def, "2.0.0")
+		Expect(err).Should(Succeed())
+		Expect(images).Should(BeNil())
+		images, err = resolveImagesWithCompVersions4Template(def, []*appsv1.ComponentVersion{ver}, "2.0.0")
+		Expect(err).Should(Succeed())
+		Expect(images).Should(Equal(map[string]string{"db": "db:2", "setup": "setup:2", kbagent.ContainerName: "action:2", kbagent.ContainerName4Worker: "action:2"}))
+		Expect(def).Should(Equal(before))
+		By("using the configured tools image for actions without an explicit image")
+		oldTools := viper.GetString(constant.KBToolsImage)
+		defer viper.Set(constant.KBToolsImage, oldTools)
+		viper.Set(constant.KBToolsImage, "tools:default")
+		def.Spec.LifecycleActions.PostProvision.Exec.Image = ""
+		delete(ver.Spec.Releases[0].Images, "postProvision")
+		images, err = resolveImagesWithCompVersions4Template(def, []*appsv1.ComponentVersion{ver}, "2.0.0")
+		Expect(err).Should(Succeed())
+		Expect(images[kbagent.ContainerName]).Should(Equal("tools:default"))
+		Expect(images[kbagent.ContainerName4Worker]).Should(Equal("tools:default"))
+		By("retaining the definition image for an action absent from the release")
+		def.Spec.LifecycleActions.PostProvision.Exec.Image = "action:fixed"
+		images, err = resolveImagesWithCompVersions4Template(def, []*appsv1.ComponentVersion{ver}, "2.0.0")
+		Expect(err).Should(Succeed())
+		Expect(images[kbagent.ContainerName]).Should(Equal("action:fixed"))
 	})
 })

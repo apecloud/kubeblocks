@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -38,12 +39,18 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-type updateReconciler struct{}
+type updateReconciler struct {
+	reader client.Reader
+}
 
 var _ kubebuilderx.Reconciler = &updateReconciler{}
 
-func NewUpdateReconciler() kubebuilderx.Reconciler {
-	return &updateReconciler{}
+func NewUpdateReconciler(readers ...client.Reader) kubebuilderx.Reconciler {
+	var reader client.Reader
+	if len(readers) > 0 {
+		reader = readers[0]
+	}
+	return &updateReconciler{reader: reader}
 }
 
 func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
@@ -93,30 +100,13 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 
 	needRetry := false
 	isBlocked := false
-	canBeUpdated := func(pod *corev1.Pod) bool {
-		if !isImageMatched(pod) {
-			tree.Logger.Info(fmt.Sprintf("Instance %s/%s blocks on update as the pod %s does not have the same image(s) in the status and in the spec", inst.Namespace, inst.Name, pod.Name))
-			return false
-		}
-		if !intctrlutil.IsPodReady(pod) {
-			tree.Logger.Info(fmt.Sprintf("Instance %s/%s blocks on update as the pod %s is not ready", inst.Namespace, inst.Name, pod.Name))
-			return false
-		}
-		if !intctrlutil.IsPodAvailable(pod, inst.Spec.MinReadySeconds) {
-			tree.Logger.Info(fmt.Sprintf("Instance %s/%s blocks on update as the pod %s is not available", inst.Namespace, inst.Name, pod.Name))
-			// no pod event will trigger the next reconciliation, so retry it
-			needRetry = true
-			return false
-		}
-		if !isRoleReady(pod, inst.Spec.Roles) {
-			tree.Logger.Info(fmt.Sprintf("Instance %s/%s blocks on update as the role of pod %s is not ready", inst.Namespace, inst.Name, pod.Name))
-			return false
-		}
-		return true
-	}
-
 	for _, pod := range oldPodList {
-		if !canBeUpdated(pod) {
+		canUpdate, retry, err := r.isPodCanBeUpdated(tree, inst, pod)
+		if err != nil {
+			return kubebuilderx.Continue, err
+		}
+		if !canUpdate {
+			needRetry = retry
 			break
 		}
 
@@ -191,6 +181,30 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.RetryAfter(time.Second * time.Duration(inst.Spec.MinReadySeconds)), nil
 	}
 	return kubebuilderx.Continue, nil
+}
+
+func (r *updateReconciler) isPodCanBeUpdated(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod) (bool, bool, error) {
+	imageMatched, err := isImageMatched(tree.Context, r.reader, pod)
+	if err != nil {
+		return false, false, err
+	}
+	if !imageMatched {
+		tree.Logger.Info(fmt.Sprintf("Instance %s/%s blocks on update as the pod %s does not have the same image(s) in the status and in the spec", inst.Namespace, inst.Name, pod.Name))
+		return false, false, nil
+	}
+	if !intctrlutil.IsPodReady(pod) {
+		tree.Logger.Info(fmt.Sprintf("Instance %s/%s blocks on update as the pod %s is not ready", inst.Namespace, inst.Name, pod.Name))
+		return false, false, nil
+	}
+	if !intctrlutil.IsPodAvailable(pod, inst.Spec.MinReadySeconds) {
+		tree.Logger.Info(fmt.Sprintf("Instance %s/%s blocks on update as the pod %s is not available", inst.Namespace, inst.Name, pod.Name))
+		return false, true, nil
+	}
+	if !isRoleReady(pod, inst.Spec.Roles) {
+		tree.Logger.Info(fmt.Sprintf("Instance %s/%s blocks on update as the role of pod %s is not ready", inst.Namespace, inst.Name, pod.Name))
+		return false, false, nil
+	}
+	return true, false, nil
 }
 
 func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod) error {

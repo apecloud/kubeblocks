@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -577,6 +578,12 @@ var _ = Describe("instance util test", func() {
 	})
 
 	Context("isImageMatched", func() {
+		matched := func(pod *corev1.Pod) bool {
+			result, err := isImageMatched(context.Background(), nil, pod)
+			Expect(err).NotTo(HaveOccurred())
+			return result
+		}
+
 		It("should work well", func() {
 			pod := builder.NewPodBuilder(namespace, name).GetObject()
 
@@ -589,35 +596,35 @@ var _ = Describe("instance util test", func() {
 				Name:  name,
 				Image: "docker.io/nginx:latest@0f37a86c04f8",
 			}}
-			Expect(isImageMatched(pod)).Should(BeTrue())
+			Expect(matched(pod)).Should(BeTrue())
 
 			By("exactly match w/o registry and repository")
 			pod.Status.ContainerStatuses = []corev1.ContainerStatus{{
 				Name:  name,
 				Image: "nginx",
 			}}
-			Expect(isImageMatched(pod)).Should(BeTrue())
+			Expect(matched(pod)).Should(BeTrue())
 
 			By("digest not matches")
 			pod.Spec.Containers = []corev1.Container{{
 				Name:  name,
 				Image: "nginx:latest@xxxxxxxxx",
 			}}
-			Expect(isImageMatched(pod)).Should(BeFalse())
+			Expect(matched(pod)).Should(BeFalse())
 
 			By("tag not matches")
 			pod.Spec.Containers = []corev1.Container{{
 				Name:  name,
 				Image: "nginx:xxxx@0f37a86c04f8",
 			}}
-			Expect(isImageMatched(pod)).Should(BeFalse())
+			Expect(matched(pod)).Should(BeFalse())
 
 			By("hostname not matches")
 			pod.Spec.Containers = []corev1.Container{{
 				Name:  name,
 				Image: "apecloud.com/nginx",
 			}}
-			Expect(isImageMatched(pod)).Should(BeTrue())
+			Expect(matched(pod)).Should(BeTrue())
 		})
 	})
 

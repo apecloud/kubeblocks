@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instance
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -488,7 +489,15 @@ func TestPodStateHelpers(t *testing.T) {
 }
 
 func TestIsImageMatched(t *testing.T) {
-	if !isImageMatched(&corev1.Pod{
+	matched := func(pod *corev1.Pod) bool {
+		result, err := isImageMatched(context.Background(), nil, pod)
+		if err != nil {
+			t.Fatalf("isImageMatched() error = %v", err)
+		}
+		return result
+	}
+
+	if !matched(&corev1.Pod{
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{{Name: "mysql", Image: "mysql:8.0"}},
 		},
@@ -499,7 +508,7 @@ func TestIsImageMatched(t *testing.T) {
 		t.Fatal("missing matching status should be ignored")
 	}
 
-	if !isImageMatched(&corev1.Pod{
+	if !matched(&corev1.Pod{
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{{Name: "mysql", Image: "docker.io/library/mysql:8.0"}},
 		},
@@ -513,7 +522,7 @@ func TestIsImageMatched(t *testing.T) {
 		t.Fatal("equivalent image references should match")
 	}
 
-	if isImageMatched(&corev1.Pod{
+	if matched(&corev1.Pod{
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{{Name: "mysql", Image: "mysql:8.0"}},
 		},

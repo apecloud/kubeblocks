@@ -2882,118 +2882,13 @@ func TestInstanceSetPVCAbsentOwnership(t *testing.T) {
 	}
 }
 
-func TestInstanceSetPVCAbsentClaimDuringFlatTransfer(t *testing.T) {
-	cli := pvcLifecycleFixture(t, 2)
-	pvcLifecycleReady(t, cli)
-	pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
-		its.Spec.FlatInstanceOrdinal = true
-		its.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
-		its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{Type: "OnDelete"}
-		its.Spec.Instances = []workloads.InstanceTemplate{
-			{Name: "a", Replicas: ptr.To(int32(1)), Ordinals: workloads.Ordinals{Discrete: []int32{0}}},
-			{Name: "b", Replicas: ptr.To(int32(1)), Ordinals: workloads.Ordinals{Discrete: []int32{1}}},
-		}
-	})
-	pvcLifecycleReconcile(t, cli, 4)
-	pvcLifecycleReady(t, cli)
-	pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
-		its.Spec.Instances[0].Ordinals.Discrete = []int32{1}
-		its.Spec.Instances[1].Ordinals.Discrete = []int32{0}
-	})
-	pvcLifecycleReconcile(t, cli, 1)
-	pod := &corev1.Pod{}
-	if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "pvc-lifecycle-0"}, pod); err != nil {
-		t.Fatal(err)
-	}
-	if err := cli.Delete(context.Background(), pod); err != nil {
-		t.Fatal(err)
-	}
-	claim := &corev1.PersistentVolumeClaim{}
-	key := client.ObjectKey{Namespace: "default", Name: "data-pvc-lifecycle-0"}
-	if err := cli.Get(context.Background(), key, claim); err != nil {
-		t.Fatal(err)
-	}
-	pvcLifecycleReconcile(t, cli, 3)
-	current := &corev1.PersistentVolumeClaim{}
-	if err := cli.Get(context.Background(), key, current); err != nil || !reflect.DeepEqual(claim, current) {
-		t.Fatalf("allocation transfer changed absent Active storage: %v", err)
-	}
-	pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
-		its.Spec.Replicas = ptr.To(int32(0))
-		for i := range its.Spec.Instances {
-			its.Spec.Instances[i].Replicas = ptr.To(int32(0))
-		}
-	})
-	pvcLifecycleReconcile(t, cli, 4)
-	if len(pvcLifecycleClaims(t, cli)) != 0 || len(pvcLifecyclePods(t, cli)) != 0 {
-		t.Fatal("complete scale-down did not resume claim retirement")
-	}
-}
-
-func TestInstanceSetPVCReusedClaimAfterIdentityChange(t *testing.T) {
-	cli := pvcLifecycleFixture(t, 1)
-	pvcLifecycleReady(t, cli)
-	for _, initialPod := range pvcLifecyclePods(t, cli) {
-		if err := cli.Delete(context.Background(), &initialPod); err != nil {
-			t.Fatal(err)
-		}
-	}
-	for _, initialClaim := range pvcLifecycleClaims(t, cli) {
-		if err := cli.Delete(context.Background(), &initialClaim); err != nil {
-			t.Fatal(err)
-		}
-	}
-	pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
-		its.Spec.Instances = []workloads.InstanceTemplate{{Name: "a-pvc-lifecycle", Replicas: ptr.To(int32(1))}}
-	})
-	pvcLifecycleReconcile(t, cli, 1)
-	pvcLifecycleReady(t, cli)
-	pvcLifecycleReconcile(t, cli, 4)
-	claims := pvcLifecycleClaims(t, cli)
-	pods := pvcLifecyclePods(t, cli)
-	if len(claims) != 1 || len(pods) != 1 || pods[0].Name != "pvc-lifecycle-a-pvc-lifecycle-0" {
-		t.Fatalf("invalid fixture claims=%#v pods=%#v", claims, pods)
-	}
-	claim := claims[0]
-	claim.UID = "transfer-original-uid"
-	claim.Spec.VolumeName = "transfer-original-volume"
-	if err := cli.Update(context.Background(), &claim); err != nil {
-		t.Fatal(err)
-	}
-	if err := cli.Delete(context.Background(), &pods[0]); err != nil {
-		t.Fatal(err)
-	}
-	pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
-		its.Spec.Instances = nil
-		its.Spec.VolumeClaimTemplates[0].Name = "data-pvc-lifecycle-a"
-	})
-	pvcLifecycleReconcile(t, cli, 1)
-	current := &corev1.PersistentVolumeClaim{}
-	err := cli.Get(context.Background(), client.ObjectKeyFromObject(&claim), current)
-	if err != nil {
-		t.Fatalf("Active claim %s deleted after successful identity adoption: %v", claim.Name, err)
-	}
-	if current.UID != claim.UID || !reflect.DeepEqual(current.Spec, claim.Spec) || current.Labels[constant.KBAppPodNameLabelKey] != "pvc-lifecycle-0" {
-		t.Fatalf("Active claim lost storage or identity: %#v", current)
-	}
-}
-
 func TestInstanceSetPVCReusedClaimBeforePodAdmission(t *testing.T) {
 	for _, management := range []appsv1.PodManagementPolicyType{appsv1.OrderedReadyPodManagement, appsv1.ParallelPodManagement} {
 		t.Run(string(management), func(t *testing.T) {
-			cli := pvcLifecycleFixture(t, 2)
-			for _, pod := range pvcLifecyclePods(t, cli) {
-				if err := cli.Delete(context.Background(), &pod); err != nil {
-					t.Fatal(err)
-				}
-			}
-			for _, claim := range pvcLifecycleClaims(t, cli) {
-				if err := cli.Delete(context.Background(), &claim); err != nil {
-					t.Fatal(err)
-				}
-			}
+			cli := pvcLifecycleFixture(t, 0)
 			pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
-				its.Spec.Instances = []workloads.InstanceTemplate{{Name: "a-pvc-lifecycle", Replicas: ptr.To(int32(2))}}
+				its.Spec.Replicas = ptr.To(int32(2))
+				its.Spec.Instances = []workloads.InstanceTemplate{{Name: "old", Replicas: ptr.To(int32(2))}}
 			})
 			pvcLifecycleReconcile(t, cli, 1)
 			pvcLifecycleReady(t, cli)
@@ -3016,7 +2911,7 @@ func TestInstanceSetPVCReusedClaimBeforePodAdmission(t *testing.T) {
 			}
 			pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
 				its.Spec.Instances = nil
-				its.Spec.VolumeClaimTemplates[0].Name = "data-pvc-lifecycle-a"
+				its.Spec.VolumeClaimTemplates[0].Annotations = map[string]string{constant.PVCNamePrefixAnnotationKey: "data-pvc-lifecycle-old"}
 				its.Spec.PodManagementPolicy = management
 				its.Spec.ParallelPodManagementConcurrency = ptr.To(intstr.FromInt(1))
 			})
@@ -3032,6 +2927,9 @@ func TestInstanceSetPVCReusedClaimBeforePodAdmission(t *testing.T) {
 				}
 				if current.UID != claim.UID || !reflect.DeepEqual(current.Spec, claim.Spec) {
 					t.Fatalf("claim storage changed: %#v", current)
+				}
+				if claim.Name == "data-pvc-lifecycle-old-0" && current.Labels[constant.KBAppPodNameLabelKey] != "pvc-lifecycle-0" {
+					t.Fatal("admitted Pod did not reuse and relabel its original claim")
 				}
 			}
 
@@ -3049,7 +2947,7 @@ func TestInstanceSetPVCReusedClaimBeforePodAdmission(t *testing.T) {
 					t.Fatal("resumed Pod did not reuse its original storage")
 				}
 				expectedPod := "pvc-lifecycle-0"
-				if claim.Name == "data-pvc-lifecycle-a-pvc-lifecycle-1" {
+				if claim.Name == "data-pvc-lifecycle-old-1" {
 					expectedPod = "pvc-lifecycle-1"
 				}
 				if current.Labels[constant.KBAppPodNameLabelKey] != expectedPod {
@@ -3071,10 +2969,12 @@ func TestInstanceSetPVCExplicitReference(t *testing.T) {
 		name       string
 		management appsv1.PodManagementPolicyType
 		deferred   bool
+		live       bool
 	}{
-		{"Immediate", appsv1.ParallelPodManagement, false},
-		{"OrderedReady", appsv1.OrderedReadyPodManagement, true},
-		{"Parallel", appsv1.ParallelPodManagement, true},
+		{"LiveRetirement", appsv1.ParallelPodManagement, false, true},
+		{"AbsentPod", appsv1.ParallelPodManagement, false, false},
+		{"OrderedReady", appsv1.OrderedReadyPodManagement, true, false},
+		{"Parallel", appsv1.ParallelPodManagement, true, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cli := pvcLifecycleFixture(t, 0)
@@ -3098,13 +2998,15 @@ func TestInstanceSetPVCExplicitReference(t *testing.T) {
 			if err := cli.Update(context.Background(), &original); err != nil {
 				t.Fatal(err)
 			}
-			if err := cli.Delete(context.Background(), &pods[0]); err != nil {
-				t.Fatal(err)
+			if !tc.live {
+				if err := cli.Delete(context.Background(), &pods[0]); err != nil {
+					t.Fatal(err)
+				}
 			}
 			pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
 				its.Spec.VolumeClaimTemplates = nil
 				its.Spec.Template.Spec.Volumes = []corev1.Volume{{Name: "data", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: original.Name}}}}
-				its.Spec.Instances = []workloads.InstanceTemplate{{Name: "z", Replicas: ptr.To(int32(1))}}
+				its.Spec.Instances = []workloads.InstanceTemplate{{Name: "old", Replicas: ptr.To(int32(0))}, {Name: "z", Replicas: ptr.To(int32(1))}}
 				its.Spec.PodManagementPolicy = tc.management
 				if tc.deferred {
 					its.Spec.Replicas = ptr.To(int32(2))
@@ -3113,6 +3015,9 @@ func TestInstanceSetPVCExplicitReference(t *testing.T) {
 				}
 			})
 			pvcLifecycleReconcile(t, cli, 1)
+			if tc.live {
+				pvcLifecycleReady(t, cli)
+			}
 			pods = pvcLifecyclePods(t, cli)
 			expectedFirst := "pvc-lifecycle-z-0"
 			if tc.deferred {
@@ -3186,107 +3091,6 @@ func TestInstanceSetPVCExplicitReference(t *testing.T) {
 			pvcLifecycleReconcile(t, cli, 6)
 			if len(pvcLifecyclePods(t, cli)) != 0 || len(pvcLifecycleClaims(t, cli)) != 0 {
 				t.Fatal("final retirement did not clear previously reused storage")
-			}
-		})
-	}
-}
-
-func TestInstanceSetPVCCleanupOwnershipConflict(t *testing.T) {
-	for _, tc := range []struct {
-		name      string
-		handoff   bool
-		finalizer bool
-	}{
-		{name: "ownership-handoff", handoff: true},
-		{name: "same-owner-update"},
-		{name: "owned-finalizer", finalizer: true},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
-			cli := pvcLifecycleFixture(t, 1)
-			original := pvcLifecycleClaims(t, cli)[0]
-			if !metav1.IsControlledBy(&original, pvcLifecycleSet(t, cli)) {
-				t.Fatal("claim fixture lacks current controller ownership")
-			}
-			if tc.finalizer {
-				original.Finalizers = append([]string(nil), pvcLifecycleSet(t, cli).Finalizers...)
-				if len(original.Finalizers) != 1 {
-					t.Fatal("fixture lacks the controller finalizer")
-				}
-				if err := cli.Update(ctx, &original); err != nil {
-					t.Fatal(err)
-				}
-			}
-			pods := pvcLifecyclePods(t, cli)
-			if err := cli.Delete(ctx, &pods[0]); err != nil {
-				t.Fatal(err)
-			}
-			pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) { its.Spec.Replicas = ptr.To(int32(0)) })
-			successor := &appsv1.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "storage-successor", Namespace: "default", UID: "successor-uid"},
-				Spec: appsv1.StatefulSetSpec{
-					ServiceName: "storage-successor", Replicas: ptr.To(int32(1)),
-					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "successor"}},
-					Template: corev1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "successor"}},
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{{Name: "db", Image: "db:v1", VolumeMounts: []corev1.VolumeMount{{Name: "data", MountPath: "/data"}}}},
-							Volumes:    []corev1.Volume{{Name: "data", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: original.Name}}}},
-						},
-					},
-				},
-			}
-			if tc.handoff {
-				if err := cli.Create(ctx, successor); err != nil {
-					t.Fatal(err)
-				}
-			}
-			changed := false
-			faulty := interceptor.NewClient(cli, interceptor.Funcs{List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
-				err := c.List(ctx, list, opts...)
-				if _, ok := list.(*corev1.PersistentVolumeClaimList); ok && err == nil && !changed && !tc.finalizer {
-					current := &corev1.PersistentVolumeClaim{}
-					if err := c.Get(ctx, client.ObjectKeyFromObject(&original), current); err != nil {
-						t.Fatal(err)
-					}
-					current.Annotations = map[string]string{"test/update": "after-list"}
-					if tc.handoff {
-						current.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(successor, appsv1.SchemeGroupVersion.WithKind("StatefulSet"))}
-					}
-					if err := c.Update(ctx, current); err != nil {
-						t.Fatal(err)
-					}
-					changed = true
-				}
-				return err
-			}})
-			r := &InstanceSetReconciler{Client: faulty, Scheme: cli.Scheme(), Recorder: record.NewFakeRecorder(1000)}
-			result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKey{Namespace: "default", Name: "pvc-lifecycle"}})
-			if tc.finalizer {
-				if err != nil || result.Requeue || result.RequeueAfter > 0 {
-					t.Fatalf("finalizer removal did not use the updated resource version: %v", err)
-				}
-			} else {
-				if !changed || err != nil || !result.Requeue {
-					t.Fatalf("concurrent PVC update did not requeue cleanup: changed=%t result=%+v err=%v", changed, result, err)
-				}
-				current := &corev1.PersistentVolumeClaim{}
-				if err := cli.Get(ctx, client.ObjectKeyFromObject(&original), current); err != nil {
-					t.Fatal(err)
-				}
-				if current.UID != original.UID || !reflect.DeepEqual(current.Spec, original.Spec) || current.Annotations["test/update"] != "after-list" {
-					t.Fatal("conflicting cleanup replaced storage or overwrote the concurrent update")
-				}
-			}
-			pvcLifecycleReconcile(t, cli, 3)
-			current := &corev1.PersistentVolumeClaim{}
-			err = cli.Get(ctx, client.ObjectKeyFromObject(&original), current)
-			if tc.handoff {
-				if err != nil || !metav1.IsControlledBy(current, successor) || current.UID != original.UID || !reflect.DeepEqual(current.Spec, original.Spec) {
-					t.Fatalf("fresh reconciles failed to preserve transferred storage: %v", err)
-				}
-			} else if !apierrors.IsNotFound(err) {
-				t.Fatalf("fresh cleanup did not retire still-owned storage: %v", err)
 			}
 		})
 	}

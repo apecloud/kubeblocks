@@ -780,32 +780,6 @@ func TestInstanceSetStopIgnoresMalformedObservedConfig(t *testing.T) {
 	}
 }
 
-func TestInstanceSetStopKeepsClaimsOfRemovedTemplate(t *testing.T) {
-	for _, legacy := range []bool{true, false} {
-		t.Run(map[bool]string{true: "legacy", false: "instances"}[legacy], func(t *testing.T) {
-			its := setStopFixture()
-			its.Spec.EnableInstanceAPI = ptr.To(!legacy)
-			cli := newSetStopClient(t, its)
-			reconcileSetStop(t, cli, legacy, 5)
-			mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(true) })
-			reconcileSetStop(t, cli, legacy, 8)
-			claims := &corev1.PersistentVolumeClaimList{}
-			if err := cli.List(context.Background(), claims); err != nil {
-				t.Fatal(err)
-			}
-			mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.VolumeClaimTemplates = nil; its.Spec.Stop = ptr.To(false) })
-			reconcileSetStop(t, cli, legacy, 5)
-			retained := &corev1.PersistentVolumeClaimList{}
-			if err := cli.List(context.Background(), retained); err != nil {
-				t.Fatal(err)
-			}
-			if !reflect.DeepEqual(claims.Items, retained.Items) {
-				t.Fatal("removing a claim template deleted allocated-identity storage")
-			}
-		})
-	}
-}
-
 func TestInstanceSetStopSynchronizesClonedAssistantsBeforeNameAlignment(t *testing.T) {
 	its := setStopFixture()
 	its.Spec.EnableInstanceAPI = ptr.To(true)

@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "properties": {
+    "spec": {
+      "type": "object",
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "a": {
+              "type": "string"
+            }
+          }
+        }
+      ],
+      "properties": {
+        "b": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

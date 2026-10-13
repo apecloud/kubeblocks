@@ -1,0 +1,46 @@
+{
+  "type": "object",
+  "properties": {
+    "spec": {
+      "type": "object",
+      "allOf": [
+        {
+          "type": "object",
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "a": {
+                  "type": "string"
+                }
+              }
+            }
+          ],
+          "properties": {
+            "b": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "a": {
+                  "type": "string"
+                }
+              }
+            }
+          ],
+          "properties": {
+            "c": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

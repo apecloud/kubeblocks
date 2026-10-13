@@ -37,6 +37,7 @@ import (
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
@@ -481,6 +482,30 @@ var _ = Describe("Restore Controller test", func() {
 				mockAndCheckRestoreCompleted(restore)
 			})
 
+		})
+
+		It("records a postReady fatal error on the postReady condition", func() {
+			restore := &dpv1alpha1.Restore{
+				ObjectMeta: metav1.ObjectMeta{Name: "post-ready-error", Namespace: testCtx.DefaultNamespace},
+				Spec:       dpv1alpha1.RestoreSpec{ReadyConfig: &dpv1alpha1.ReadyConfig{}},
+			}
+			restoreMgr := &dprestore.RestoreManager{
+				Restore: restore,
+				PostReadyBackupSets: []dprestore.BackupActionSet{{
+					Backup: &dpv1alpha1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup"}},
+					ActionSet: &dpv1alpha1.ActionSet{Spec: dpv1alpha1.ActionSetSpec{Restore: &dpv1alpha1.RestoreActionSpec{
+						PostReady: []dpv1alpha1.ActionSpec{{}},
+					}}},
+				}},
+			}
+
+			completed, err := (&RestoreReconciler{}).postReady(intctrlutil.RequestCtx{Ctx: ctx}, restoreMgr)
+			Expect(completed).Should(BeFalse())
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+			postReadyCondition := meta.FindStatusCondition(restore.Status.Conditions, dprestore.ConditionTypeRestorePostReady)
+			Expect(postReadyCondition).ShouldNot(BeNil())
+			Expect(postReadyCondition.Reason).Should(Equal(dprestore.ReasonFailed))
+			Expect(meta.FindStatusCondition(restore.Status.Conditions, dprestore.ConditionTypeRestorePreparedData)).Should(BeNil())
 		})
 
 		Context("test postReady stage", func() {

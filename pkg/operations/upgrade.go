@@ -21,15 +21,18 @@ package operations
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -101,14 +104,19 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	if containersMap, err = u.getExpectedContainersMap(reqCtx, cli, opsRes); err != nil {
 		return opsRes.OpsRequest.Status.Phase, 0, err
 	}
+	ownerPending := false
+	ownerContainers := map[string]map[string][]corev1.Container{}
 	podApplyCompOps := func(
 		ops *opsv1alpha1.OpsRequest,
 		pod *corev1.Pod,
 		pgRes *progressResource) bool {
 		upgradeComponent := pgRes.compOps.(opsv1alpha1.UpgradeComponent)
-		templates, ok := containersMap[upgradeComponent.GetComponentName()]
-		if !ok {
-			return true
+		templates, owner := ownerContainers[pgRes.fullComponentName]
+		if !owner {
+			templates = containersMap[upgradeComponent.GetComponentName()]
+		}
+		if templates == nil {
+			return false
 		}
 		templateName := appsv1.GetInstanceTemplateName(opsRes.Cluster.Name, pgRes.fullComponentName, pod.Name)
 		containers, ok := templates[templateName]
@@ -122,9 +130,21 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		opsRes *OpsResource,
 		pgRes *progressResource,
 		compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
+		if hasInstanceTemplateServiceVersion(pgRes.clusterComponent) {
+			templates, err := u.getOwnedExpectedContainers(reqCtx, cli, opsRes.Cluster, pgRes.fullComponentName)
+			if err != nil {
+				return 0, 0, err
+			}
+			ownerContainers[pgRes.fullComponentName] = templates
+			ownerPending = ownerPending || templates == nil
+		}
 		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, podApplyCompOps)
 	}
-	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "upgrade", handleUpgradeProgress)
+	phase, requeue, err := compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "upgrade", handleUpgradeProgress)
+	if ownerPending && phase == opsv1alpha1.OpsRunningPhase && err == nil && requeue == 0 {
+		requeue = time.Second
+	}
+	return phase, requeue, err
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
@@ -149,6 +169,9 @@ func (u upgradeOpsHandler) getExpectedContainersMap(reqCtx intctrlutil.RequestCt
 			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`"can not found the component "%s" in the cluster "%s"`,
 				v.ComponentName, opsRes.Cluster.Name))
 		}
+		if hasInstanceTemplateServiceVersion(compSpec) {
+			continue
+		}
 		compDef, err := component.GetCompDefByName(reqCtx.Ctx, cli, compSpec.ComponentDef)
 		if err != nil {
 			return nil, err
@@ -156,30 +179,58 @@ func (u upgradeOpsHandler) getExpectedContainersMap(reqCtx intctrlutil.RequestCt
 		if err = component.UpdateCompDefinitionImages4ServiceVersion(reqCtx.Ctx, cli, compDef, compSpec.ServiceVersion); err != nil {
 			return nil, err
 		}
-		templates := map[string][]corev1.Container{"": compDef.Spec.Runtime.Containers}
-		for _, template := range compSpec.Instances {
-			if template.ServiceVersion == "" {
-				continue
-			}
-			templateCompDef, err := component.GetCompDefByName(reqCtx.Ctx, cli, template.CompDef)
-			if err != nil {
-				return nil, err
-			}
-			images, err := component.ResolveInstanceTemplateImages4ServiceVersion(reqCtx.Ctx, cli, templateCompDef, template.ServiceVersion)
-			if err != nil {
-				return nil, err
-			}
-			containers := append([]corev1.Container(nil), compDef.Spec.Runtime.Containers...)
-			for i := range containers {
-				if image := images[containers[i].Name]; image != "" {
-					containers[i].Image = image
-				}
-			}
-			templates[template.Name] = containers
-		}
-		containersMap[v.ComponentName] = templates
+		containersMap[v.ComponentName] = map[string][]corev1.Container{"": compDef.Spec.Runtime.Containers}
 	}
 	return containersMap, nil
+}
+
+func hasInstanceTemplateServiceVersion(spec *appsv1.ClusterComponentSpec) bool {
+	if spec != nil {
+		for _, template := range spec.Instances {
+			if template.ServiceVersion != "" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (u upgradeOpsHandler) getOwnedExpectedContainers(reqCtx intctrlutil.RequestCtx, cli client.Client,
+	cluster *appsv1.Cluster, compName string) (map[string][]corev1.Container, error) {
+	comp := &appsv1.Component{}
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: cluster.Namespace,
+		Name: constant.GenerateClusterComponentName(cluster.Name, compName)}, comp); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	generationMatches := func(annotations map[string]string, generation int64) bool {
+		value, err := strconv.ParseInt(annotations[constant.KubeBlocksGenerationKey], 10, 64)
+		return err == nil && value == generation
+	}
+	if !generationMatches(comp.Annotations, cluster.Generation) {
+		return nil, nil
+	}
+	workloads, err := component.ListOwnedWorkloads(reqCtx.Ctx, cli, cluster.Namespace, cluster.Name, compName)
+	if err != nil {
+		return nil, err
+	}
+	if len(workloads) != 1 || !generationMatches(workloads[0].Annotations, comp.Generation) {
+		return nil, nil
+	}
+	its := workloads[0]
+	templates := map[string][]corev1.Container{"": its.Spec.Template.Spec.Containers}
+	for _, template := range its.Spec.Instances {
+		containers := append([]corev1.Container(nil), its.Spec.Template.Spec.Containers...)
+		for i := range containers {
+			if image := template.Images[containers[i].Name]; image != "" {
+				containers[i].Image = image
+			}
+		}
+		templates[template.Name] = containers
+	}
+	return templates, nil
 }
 
 // podImageApplied checks if the pod has applied the new image.

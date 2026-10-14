@@ -163,7 +163,7 @@ func TestUpdateReconcilerKeepsConvergingInstanceInRollingWindow(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if _, err := NewInstanceReconciler().Reconcile(tree); err != nil {
+			if _, err := NewUpdateReconciler().Reconcile(tree); err != nil {
 				t.Fatal(err)
 			}
 			object, err := tree.Get(&workloads.Instance{ObjectMeta: metav1.ObjectMeta{Namespace: its.Namespace, Name: pending.Name}})

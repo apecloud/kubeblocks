@@ -75,14 +75,17 @@ func TestAlignmentPreservesExistingInstanceSpec(t *testing.T) {
 		Spec:       workloads.InstanceSpec{ScaledDown: ptr.To(true)},
 	}
 	before := inst.DeepCopy()
-	if err := tree.Add(inst); err != nil {
+	departing := &workloads.Instance{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo-1", Namespace: its.Namespace},
+		Status: workloads.InstanceStatus2{Conditions: []metav1.Condition{
+			{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue},
+		}},
+	}
+	departingBefore := departing.DeepCopy()
+	if err := tree.Add(inst, departing); err != nil {
 		t.Fatal(err)
 	}
-	plan, err := generateInstancePlan(tree)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := alignInstances(tree, plan); err != nil {
+	if _, err := NewAlignmentReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)
 	}
 	object, err := tree.Get(inst)
@@ -91,6 +94,13 @@ func TestAlignmentPreservesExistingInstanceSpec(t *testing.T) {
 	}
 	if !reflect.DeepEqual(object.(*workloads.Instance).Spec, before.Spec) {
 		t.Fatal("member alignment changed an existing Instance spec")
+	}
+	object, err = tree.Get(departing)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if object == nil || !reflect.DeepEqual(object.(*workloads.Instance).Spec, departingBefore.Spec) {
+		t.Fatal("member alignment changed or deleted an Instance before scale-down handoff")
 	}
 }
 
@@ -132,12 +142,9 @@ func TestFlatOrdinalReassignmentPublishesTargetsAndPreservesInstances(t *testing
 		t.Fatalf("incomplete revision targets: %#v", revisions)
 	}
 
-	plan, err := generateInstancePlan(tree)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := alignInstances(tree, plan); err != nil {
-		t.Fatalf("alignment failed: %v", err)
+	res, err = NewAlignmentReconciler().Reconcile(tree)
+	if err != nil || res != kubebuilderx.Continue {
+		t.Fatalf("alignment did not continue: result=%v err=%v", res, err)
 	}
 	scaledDown := 0
 	for _, object := range tree.List(&workloads.Instance{}) {

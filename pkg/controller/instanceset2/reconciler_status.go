@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -102,6 +103,9 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 				Name: templateName,
 			}
 		}
+		if hasObservedStoppedRuntime(inst) {
+			continue
+		}
 		{
 			notReadyNames.Insert(inst.Name)
 			replicas++
@@ -120,7 +124,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 		currentRevisions[inst.Name] = getInstanceRevision(inst)
 		if !intctrlutil.IsInstanceTerminating(inst) {
-			if isInstanceUpdatedWithRevisions(inst, currentRevisions[inst.Name], updateRevisions) {
+			if !isStopRequested(its) && isInstanceUpdatedWithRevisions(inst, currentRevisions[inst.Name], updateRevisions) {
 				updatedReplicas++
 				template2TemplatesStatus[templateName].UpdatedReplicas++
 			} else {
@@ -184,7 +188,11 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.Continue, err
 	}
 
-	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
+	pendingLifecycle := isStopRequested(its)
+	for _, inst := range instanceList {
+		pendingLifecycle = pendingLifecycle || ptr.Deref(inst.Spec.Stop, false)
+	}
+	if !pendingLifecycle && its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	return kubebuilderx.Continue, nil
@@ -370,6 +378,12 @@ func buildFailureCondition(its *workloads.InstanceSet, instances []*workloads.In
 }
 
 func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, instances []*workloads.Instance) error {
+	for _, inst := range instances {
+		if (isStopRequested(its) || ptr.Deref(inst.Spec.Stop, false)) &&
+			(inst.Status.CurrentState == "" || (inst.Status.CurrentState == workloads.InstanceCurrentStateAbsent && !hasObservedStoppedRuntime(inst))) {
+			return nil
+		}
+	}
 	desiredAssignments, templateNames, err := instancetemplate.BuildAssignments(tree, its)
 	if err != nil {
 		return err

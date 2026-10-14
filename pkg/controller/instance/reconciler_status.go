@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -53,6 +54,7 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	inst := tree.GetRoot().(*workloads.Instance)
+	stopped := ptr.Deref(inst.Spec.Stop, false)
 	r.reconcileRestoreCondition(tree, inst)
 
 	obj, err := tree.Get(podObj(inst))
@@ -60,12 +62,12 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.Continue, err
 	}
 	if obj == nil {
-		r.setPodUnavailableStatus(inst, workloads.InstanceCurrentStateAbsent, inst.Name, "")
+		setPodUnavailableStatus(inst, workloads.InstanceCurrentStateAbsent, inst.Name, "")
 		return kubebuilderx.Continue, nil
 	}
 	pod := obj.(*corev1.Pod)
 	if isTerminating(pod) {
-		r.setPodUnavailableStatus(inst, workloads.InstanceCurrentStateTerminating, pod.Name, getPodRevision(pod))
+		setPodUnavailableStatus(inst, workloads.InstanceCurrentStateTerminating, pod.Name, getPodRevision(pod))
 		return kubebuilderx.Continue, nil
 	}
 
@@ -84,7 +86,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			notAvailableName = pod.Name
 		}
 	}
-	if isCreated(pod) {
+	if isCreated(pod) && !stopped {
 		updated, err = isPodUpdated(inst, pod)
 		if err != nil {
 			return kubebuilderx.Continue, err
@@ -96,10 +98,10 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		inst.Status.CurrentRevision = inst.Status.UpdateRevision
 	}
 
-	readyCondition := r.buildReadyCondition(inst, ready, notReadyName)
+	readyCondition := buildReadyCondition(inst, ready, notReadyName)
 	meta.SetStatusCondition(&inst.Status.Conditions, *readyCondition)
 
-	availableCondition := r.buildAvailableCondition(inst, available, notAvailableName)
+	availableCondition := buildAvailableCondition(inst, available, notAvailableName)
 	meta.SetStatusCondition(&inst.Status.Conditions, *availableCondition)
 
 	failureCondition := r.buildFailureCondition(inst, pod)
@@ -124,7 +126,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 	inst.Status.Configs = configs
 
-	if inst.Spec.MinReadySeconds > 0 && !available {
+	if !stopped && inst.Spec.MinReadySeconds > 0 && !available {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	return kubebuilderx.Continue, nil
@@ -209,52 +211,6 @@ func findPVCRestoreCondition(pvc *corev1.PersistentVolumeClaim) *corev1.Persiste
 		}
 	}
 	return nil
-}
-
-// An absent or terminating Pod cannot provide a valid runtime observation. Clear every Pod-derived field and
-// condition together so values from the previous Pod do not survive the lifecycle transition.
-func (r *statusReconciler) setPodUnavailableStatus(inst *workloads.Instance, state workloads.InstanceCurrentState, name, revision string) {
-	inst.Status.CurrentState = state
-	inst.Status.CurrentRevision = revision
-	inst.Status.UpToDate = false
-	inst.Status.Ready = false
-	inst.Status.Available = false
-	inst.Status.Role = ""
-	inst.Status.VolumeExpansion = false
-	inst.Status.Configs = nil
-	meta.SetStatusCondition(&inst.Status.Conditions, *r.buildReadyCondition(inst, false, name))
-	meta.SetStatusCondition(&inst.Status.Conditions, *r.buildAvailableCondition(inst, false, name))
-	meta.RemoveStatusCondition(&inst.Status.Conditions, string(workloads.InstanceFailure))
-}
-
-func (r *statusReconciler) buildReadyCondition(inst *workloads.Instance, ready bool, notReadyName string) *metav1.Condition {
-	condition := &metav1.Condition{
-		Type:               string(workloads.InstanceReady),
-		Status:             metav1.ConditionTrue,
-		ObservedGeneration: inst.Generation,
-		Reason:             workloads.ReasonReady,
-	}
-	if !ready {
-		condition.Status = metav1.ConditionFalse
-		condition.Reason = workloads.ReasonNotReady
-		condition.Message = notReadyName
-	}
-	return condition
-}
-
-func (r *statusReconciler) buildAvailableCondition(inst *workloads.Instance, available bool, notAvailableName string) *metav1.Condition {
-	condition := &metav1.Condition{
-		Type:               string(workloads.InstanceAvailable),
-		Status:             metav1.ConditionTrue,
-		ObservedGeneration: inst.Generation,
-		Reason:             workloads.ReasonAvailable,
-	}
-	if !available {
-		condition.Status = metav1.ConditionFalse
-		condition.Reason = workloads.ReasonNotAvailable
-		condition.Message = notAvailableName
-	}
-	return condition
 }
 
 func (r *statusReconciler) buildFailureCondition(inst *workloads.Instance, pod *corev1.Pod) *metav1.Condition {

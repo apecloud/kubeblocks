@@ -21,7 +21,6 @@ package instanceset2
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -63,44 +62,6 @@ func TestRevisionUpdatePublishesRevisionsBeforeInstanceStatus(t *testing.T) {
 	}
 	if len(its.Status.InstanceStatus) != 0 {
 		t.Fatalf("revision reconcile unexpectedly published InstanceStatus: %#v", its.Status.InstanceStatus)
-	}
-}
-
-func TestAlignmentPreservesExistingInstanceSpec(t *testing.T) {
-	its := revisionTestInstanceSet()
-	tree := kubebuilderx.NewObjectTree()
-	tree.SetRoot(its)
-	inst := &workloads.Instance{
-		ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Namespace: its.Namespace},
-		Spec:       workloads.InstanceSpec{ScaledDown: ptr.To(true)},
-	}
-	before := inst.DeepCopy()
-	departing := &workloads.Instance{
-		ObjectMeta: metav1.ObjectMeta{Name: "demo-1", Namespace: its.Namespace},
-		Status: workloads.InstanceStatus2{Conditions: []metav1.Condition{
-			{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue},
-		}},
-	}
-	departingBefore := departing.DeepCopy()
-	if err := tree.Add(inst, departing); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := NewAlignmentReconciler().Reconcile(tree); err != nil {
-		t.Fatal(err)
-	}
-	object, err := tree.Get(inst)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(object.(*workloads.Instance).Spec, before.Spec) {
-		t.Fatal("member alignment changed an existing Instance spec")
-	}
-	object, err = tree.Get(departing)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if object == nil || !reflect.DeepEqual(object.(*workloads.Instance).Spec, departingBefore.Spec) {
-		t.Fatal("member alignment changed or deleted an Instance before scale-down handoff")
 	}
 }
 

@@ -21,13 +21,9 @@ package instanceset2
 
 import (
 	"fmt"
-	"time"
 
-	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/utils/ptr"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -85,13 +81,6 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		inst, _ := object.(*workloads.Instance)
 		oldInstanceMap[object.GetName()] = inst
 		oldInstanceList = append(oldInstanceList, inst)
-	}
-	updated, err := updateScaledDownInstances(tree, newNameSet, oldInstanceList)
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
-	if updated {
-		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	updateNameSet := oldNameSet.Intersection(newNameSet)
 	if len(updateNameSet) != len(oldNameSet) || len(updateNameSet) != len(newNameSet) {
@@ -193,58 +182,6 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		updatedInstances++
 	}
 	return kubebuilderx.Continue, nil
-}
-
-func updateScaledDownInstances(tree *kubebuilderx.ObjectTree, desiredNames sets.Set[string], instances []*workloads.Instance) (bool, error) {
-	its := tree.GetRoot().(*workloads.InstanceSet)
-	concurrency := 1
-	if its.Spec.PodManagementPolicy == appsv1.ParallelPodManagement {
-		var err error
-		concurrency, err = calculateConcurrencyReplicas(its.Spec.ParallelPodManagementConcurrency, int(*its.Spec.Replicas))
-		if err != nil {
-			return false, err
-		}
-		existingNames := sets.New[string]()
-		for _, inst := range instances {
-			existingNames.Insert(inst.Name)
-			if desiredNames.Has(inst.Name) && !intctrlutil.IsInstanceAvailable(inst) {
-				concurrency--
-			}
-		}
-		concurrency -= len(desiredNames.Difference(existingNames))
-	}
-	sortInstanceObjects(instances, nil, false)
-	updated := false
-	for _, inst := range instances {
-		if desiredNames.Has(inst.Name) {
-			if model.IsObjectDeleting(inst) || !ptr.Deref(inst.Spec.ScaledDown, false) {
-				continue
-			}
-			instCopy := inst.DeepCopy()
-			instCopy.Spec.ScaledDown = nil
-			if err := tree.Update(instCopy); err != nil {
-				return updated, err
-			}
-			updated = true
-			continue
-		}
-		if concurrency <= 0 {
-			continue
-		}
-		concurrency--
-		if model.IsObjectDeleting(inst) || (ptr.Deref(inst.Spec.ScaledDown, false) && equality.Semantic.DeepEqual(
-			inst.Spec.PersistentVolumeClaimRetentionPolicy, its.Spec.PersistentVolumeClaimRetentionPolicy)) {
-			continue
-		}
-		instCopy := inst.DeepCopy()
-		instCopy.Spec.ScaledDown = ptr.To(true)
-		instCopy.Spec.PersistentVolumeClaimRetentionPolicy = its.Spec.PersistentVolumeClaimRetentionPolicy.DeepCopy()
-		if err := tree.Update(instCopy); err != nil {
-			return updated, err
-		}
-		updated = true
-	}
-	return updated, nil
 }
 
 func parseReplicasNMaxUnavailable(updateStrategy *workloads.InstanceUpdateStrategy, totalReplicas int) (int, int, error) {

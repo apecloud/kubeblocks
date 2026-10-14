@@ -171,7 +171,6 @@ func TestCopyAndMerge(t *testing.T) {
 }
 
 func TestCopyAndMergeInstance(t *testing.T) {
-	scaledDown := true
 	oldInst := &workloads.Instance{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "mysql-0",
@@ -185,7 +184,6 @@ func TestCopyAndMergeInstance(t *testing.T) {
 				},
 			},
 			InstanceSetName: "mysql",
-			ScaledDown:      &scaledDown,
 		},
 	}
 	newInst := &workloads.Instance{
@@ -215,9 +213,6 @@ func TestCopyAndMergeInstance(t *testing.T) {
 	}
 	if got.Spec.Template.Spec.Containers[0].Image != "mysql:8.4" {
 		t.Fatalf("unexpected merged image: %s", got.Spec.Template.Spec.Containers[0].Image)
-	}
-	if got.Spec.ScaledDown != nil || oldInst.Spec.ScaledDown == nil || !*oldInst.Spec.ScaledDown {
-		t.Fatal("merge must apply the desired scale-down state without changing the original Instance")
 	}
 	if !reflect.DeepEqual(got.Labels, map[string]string{"old": "kept", "new": "added"}) {
 		t.Fatalf("unexpected merged labels: %#v", got.Labels)

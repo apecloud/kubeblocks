@@ -202,7 +202,6 @@ func copyAndMergeInstance(oldInst, newInst *workloads.Instance) *workloads.Insta
 	// merge pvcs
 	targetInst.Spec.VolumeClaimTemplates = newInst.Spec.VolumeClaimTemplates
 	targetInst.Spec.PersistentVolumeClaimRetentionPolicy = newInst.Spec.PersistentVolumeClaimRetentionPolicy
-	targetInst.Spec.ScaledDown = newInst.Spec.ScaledDown
 
 	// copyAndMergeService := func(old, new *corev1.Service) client.Object {
 	//	mergeMap(&new.Labels, &old.Labels)

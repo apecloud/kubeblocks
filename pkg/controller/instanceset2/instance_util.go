@@ -26,9 +26,12 @@ import (
 	"strconv"
 	"strings"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -155,6 +158,168 @@ func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree,
 	return inst, nil
 }
 
+type instancePlan struct {
+	desired   map[string]*workloads.Instance
+	names     []string
+	create    []*workloads.Instance
+	remove    []*workloads.Instance
+	lifecycle []*workloads.Instance
+}
+
+func generateInstancePlan(tree *kubebuilderx.ObjectTree) (*instancePlan, error) {
+	its := tree.GetRoot().(*workloads.InstanceSet)
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
+	if err != nil {
+		return nil, err
+	}
+	nameBuilder, err := instancetemplate.NewPodNameBuilder(
+		itsExt, &instancetemplate.PodNameBuilderOpts{EventLogger: tree.EventRecorder},
+	)
+	if err != nil {
+		return nil, err
+	}
+	nameToTemplateMap, err := nameBuilder.BuildInstanceName2TemplateMap()
+	if err != nil {
+		return nil, err
+	}
+
+	newNameSet := sets.New[string]()
+	for name := range nameToTemplateMap {
+		newNameSet.Insert(name)
+	}
+	oldNameSet := sets.New[string]()
+	oldInstanceMap := make(map[string]*workloads.Instance)
+	oldInstanceList := tree.List(&workloads.Instance{})
+	for _, object := range oldInstanceList {
+		oldNameSet.Insert(object.GetName())
+		oldInstanceMap[object.GetName()] = object.(*workloads.Instance)
+	}
+	createNameSet := newNameSet.Difference(oldNameSet)
+	deleteNameSet := oldNameSet.Difference(newNameSet)
+	plan := &instancePlan{desired: make(map[string]*workloads.Instance, len(newNameSet))}
+	for name, inst := range oldInstanceMap {
+		if !newNameSet.Has(name) || model.IsObjectDeleting(inst) || !ptr.Deref(inst.Spec.ScaledDown, false) {
+			continue
+		}
+		target := inst.DeepCopy()
+		target.Spec.ScaledDown = nil
+		plan.lifecycle = append(plan.lifecycle, target)
+	}
+
+	isOrderedReady := true
+	concurrency := 0
+	if its.Spec.PodManagementPolicy == appsv1.ParallelPodManagement {
+		concurrency, err = calculateConcurrencyReplicas(its.Spec.ParallelPodManagementConcurrency, int(*its.Spec.Replicas))
+		if err != nil {
+			return nil, err
+		}
+		isOrderedReady = false
+	}
+	plan.names = sets.List(newNameSet)
+	baseSort(plan.names, func(i int) (string, int) {
+		return parseParentNameAndOrdinal(plan.names[i])
+	}, nil, true)
+	getPredecessor := func(i int) *workloads.Instance {
+		if i <= 0 {
+			return nil
+		}
+		return oldInstanceMap[plan.names[i-1]]
+	}
+	if !isOrderedReady {
+		for _, name := range plan.names {
+			if !createNameSet.Has(name) && !intctrlutil.IsInstanceAvailable(oldInstanceMap[name]) {
+				concurrency--
+			}
+		}
+	}
+	for i, name := range plan.names {
+		if !createNameSet.Has(name) {
+			continue
+		}
+		if !isOrderedReady && concurrency <= 0 {
+			break
+		}
+		predecessor := getPredecessor(i)
+		if isOrderedReady && predecessor != nil && !intctrlutil.IsInstanceAvailable(predecessor) {
+			break
+		}
+		newInst, err := buildInstanceByTemplate(tree, name, nameToTemplateMap[name], its)
+		if err != nil {
+			return nil, err
+		}
+		plan.create = append(plan.create, newInst)
+		plan.desired[name] = newInst
+		if isOrderedReady {
+			break
+		}
+		concurrency--
+	}
+
+	sortObjects(oldInstanceList, map[string]int{}, false)
+	for _, object := range oldInstanceList {
+		inst := object.(*workloads.Instance)
+		if !deleteNameSet.Has(inst.Name) {
+			continue
+		}
+		if !isOrderedReady && concurrency <= 0 {
+			break
+		}
+		if isOrderedReady && !intctrlutil.IsInstanceReady(inst) {
+			tree.EventRecorder.Eventf(its, corev1.EventTypeWarning, "InstanceSet %s/%s is waiting for Instance %s to be Ready",
+				its.Namespace, its.Name, inst.Name)
+		}
+		if model.IsObjectDeleting(inst) || (ptr.Deref(inst.Spec.ScaledDown, false) && equality.Semantic.DeepEqual(
+			inst.Spec.PersistentVolumeClaimRetentionPolicy, its.Spec.PersistentVolumeClaimRetentionPolicy)) {
+			plan.remove = append(plan.remove, inst)
+		} else {
+			target := inst.DeepCopy()
+			target.Spec.ScaledDown = ptr.To(true)
+			target.Spec.PersistentVolumeClaimRetentionPolicy = its.Spec.PersistentVolumeClaimRetentionPolicy.DeepCopy()
+			plan.lifecycle = append(plan.lifecycle, target)
+		}
+		if isOrderedReady {
+			break
+		}
+		concurrency--
+	}
+
+	plannedNames := oldNameSet.Clone()
+	for _, inst := range plan.create {
+		plannedNames.Insert(inst.Name)
+	}
+	for _, inst := range plan.remove {
+		plannedNames.Delete(inst.Name)
+	}
+	if plannedNames.Equal(newNameSet) {
+		for _, name := range plan.names {
+			if _, ok := plan.desired[name]; ok {
+				continue
+			}
+			desired, err := buildInstanceByTemplate(tree, name, nameToTemplateMap[name], its)
+			if err != nil {
+				return nil, err
+			}
+			plan.desired[name] = desired
+		}
+	}
+	return plan, nil
+}
+
+func desiredInstancesForDeletion(tree *kubebuilderx.ObjectTree) []*workloads.Instance {
+	its := tree.GetRoot().(*workloads.InstanceSet)
+	var targets []*workloads.Instance
+	for _, object := range tree.List(&workloads.Instance{}) {
+		inst := object.(*workloads.Instance)
+		if model.IsObjectDeleting(inst) {
+			continue
+		}
+		target := inst.DeepCopy()
+		target.Spec.PersistentVolumeClaimRetentionPolicy = its.Spec.PersistentVolumeClaimRetentionPolicy.DeepCopy()
+		targets = append(targets, target)
+	}
+	return targets
+}
+
 func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	if reflect.TypeOf(oldObj) != reflect.TypeOf(newObj) {
 		return nil
@@ -202,6 +367,7 @@ func copyAndMergeInstance(oldInst, newInst *workloads.Instance) *workloads.Insta
 	// merge pvcs
 	targetInst.Spec.VolumeClaimTemplates = newInst.Spec.VolumeClaimTemplates
 	targetInst.Spec.PersistentVolumeClaimRetentionPolicy = newInst.Spec.PersistentVolumeClaimRetentionPolicy
+	targetInst.Spec.ScaledDown = newInst.Spec.ScaledDown
 
 	// copyAndMergeService := func(old, new *corev1.Service) client.Object {
 	//	mergeMap(&new.Labels, &old.Labels)

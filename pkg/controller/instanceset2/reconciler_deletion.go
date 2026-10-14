@@ -23,9 +23,6 @@ import (
 	"maps"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/equality"
-
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -49,20 +46,9 @@ func (r *deletionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebu
 }
 
 func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
-	its := tree.GetRoot().(*workloads.InstanceSet)
-	updated := false
-	for _, obj := range tree.List(&workloads.Instance{}) {
-		inst := obj.(*workloads.Instance)
-		if model.IsObjectDeleting(inst) || equality.Semantic.DeepEqual(
-			inst.Spec.PersistentVolumeClaimRetentionPolicy, its.Spec.PersistentVolumeClaimRetentionPolicy) {
-			continue
-		}
-		instCopy := inst.DeepCopy()
-		instCopy.Spec.PersistentVolumeClaimRetentionPolicy = its.Spec.PersistentVolumeClaimRetentionPolicy.DeepCopy()
-		if err := tree.Update(instCopy); err != nil {
-			return kubebuilderx.Continue, err
-		}
-		updated = true
+	updated, err := updateInstanceLifecycle(tree, desiredInstancesForDeletion(tree))
+	if err != nil {
+		return kubebuilderx.Continue, err
 	}
 	if updated {
 		return kubebuilderx.RetryAfter(time.Second), nil

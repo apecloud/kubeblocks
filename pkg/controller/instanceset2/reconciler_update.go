@@ -22,73 +22,59 @@ package instanceset2
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-func NewUpdateReconciler() kubebuilderx.Reconciler {
-	return &updateReconciler{}
+func updateInstanceLifecycle(tree *kubebuilderx.ObjectTree, targets []*workloads.Instance) (bool, error) {
+	updated := false
+	for _, target := range targets {
+		object, err := tree.Get(target)
+		if err != nil {
+			return updated, err
+		}
+		current := object.(*workloads.Instance)
+		if model.IsObjectDeleting(current) || (equality.Semantic.DeepEqual(current.Spec.ScaledDown, target.Spec.ScaledDown) &&
+			equality.Semantic.DeepEqual(current.Spec.PersistentVolumeClaimRetentionPolicy, target.Spec.PersistentVolumeClaimRetentionPolicy)) {
+			continue
+		}
+		inst := current.DeepCopy()
+		inst.Spec.ScaledDown = target.Spec.ScaledDown
+		inst.Spec.PersistentVolumeClaimRetentionPolicy = target.Spec.PersistentVolumeClaimRetentionPolicy
+		if err := tree.Update(inst); err != nil {
+			return updated, err
+		}
+		updated = true
+	}
+	return updated, nil
 }
 
-type updateReconciler struct{}
-
-var _ kubebuilderx.Reconciler = &updateReconciler{}
-
-func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
-	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
-		return kubebuilderx.ConditionUnsatisfied
+func updateInstances(tree *kubebuilderx.ObjectTree, plan *instancePlan) error {
+	if _, err := updateInstanceLifecycle(tree, plan.lifecycle); err != nil {
+		return err
 	}
-	if model.IsReconciliationPaused(tree.GetRoot()) {
-		return kubebuilderx.ConditionUnsatisfied
-	}
-	return kubebuilderx.ConditionSatisfied
-}
-
-func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
-	its, _ := tree.GetRoot().(*workloads.InstanceSet)
-	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
-
-	// 1. build desired name to template map
-	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
-	nameToTemplateMap, err := nameBuilder.BuildInstanceName2TemplateMap()
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
-
-	// 2. validate the update set
-	newNameSet := sets.New[string]()
-	for name := range nameToTemplateMap {
-		newNameSet.Insert(name)
-	}
+	its := tree.GetRoot().(*workloads.InstanceSet)
+	newNameSet := sets.New(plan.names...)
 	oldNameSet := sets.New[string]()
-	oldInstanceMap := make(map[string]*workloads.Instance)
 	var oldInstanceList []*workloads.Instance
 	for _, object := range tree.List(&workloads.Instance{}) {
 		oldNameSet.Insert(object.GetName())
 		inst, _ := object.(*workloads.Instance)
-		oldInstanceMap[object.GetName()] = inst
 		oldInstanceList = append(oldInstanceList, inst)
 	}
 	updateNameSet := oldNameSet.Intersection(newNameSet)
 	if len(updateNameSet) != len(oldNameSet) || len(updateNameSet) != len(newNameSet) {
 		tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s instances are not aligned", its.Namespace, its.Name))
-		return kubebuilderx.Continue, nil
+		return nil
 	}
 
-	// 3. do update
 	instanceUpdateStrategy := its.Spec.InstanceUpdateStrategy
 	if instanceUpdateStrategy != nil && instanceUpdateStrategy.Type == kbappsv1.OnDeleteStrategyType {
 		instanceUpdateStrategy = nil
@@ -97,16 +83,9 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	// handle 'RollingUpdate'
 	replicas, maxUnavailable, err := parseReplicasNMaxUnavailable(instanceUpdateStrategy, len(oldInstanceList))
 	if err != nil {
-		return kubebuilderx.Continue, err
+		return err
 	}
-	desiredInstanceMap := make(map[string]*workloads.Instance, len(oldInstanceList))
-	for _, inst := range oldInstanceList {
-		desired, err := buildInstanceByTemplate(tree, inst.Name, nameToTemplateMap[inst.Name], its)
-		if err != nil {
-			return kubebuilderx.Continue, err
-		}
-		desiredInstanceMap[inst.Name] = desired
-	}
+	desiredInstanceMap := plan.desired
 
 	// Account for existing rolling participants against both admission budgets before sorting candidates.
 	// Otherwise traversal order could admit another Instance into a full availability or member-plan window.
@@ -130,7 +109,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		plan := newUpdatePlan(*its, oldInstanceList)
 		instancesToBeUpdated, err := plan.Execute()
 		if err != nil {
-			return kubebuilderx.Continue, err
+			return err
 		}
 		updateCount = max(0, len(instancesToBeUpdated)-occupiedMemberPlanSlots)
 	}
@@ -175,13 +154,13 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		if mergedInst != nil {
 			err = tree.Update(mergedInst)
 			if err != nil {
-				return kubebuilderx.Continue, err
+				return err
 			}
 			updatingInstances++
 		}
 		updatedInstances++
 	}
-	return kubebuilderx.Continue, nil
+	return nil
 }
 
 func parseReplicasNMaxUnavailable(updateStrategy *workloads.InstanceUpdateStrategy, totalReplicas int) (int, int, error) {

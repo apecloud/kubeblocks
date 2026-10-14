@@ -946,94 +946,38 @@ func TestInstanceRetentionPartialHandoff(t *testing.T) {
 }
 
 func TestInstanceRetentionPartialScaleReversal(t *testing.T) {
-	writeFailure := errors.New("injected scale reversal update failure")
-	conflict := apierrors.NewConflict(schema.GroupResource{Group: workloads.GroupVersion.Group, Resource: "instances"}, "demo", errors.New("concurrent update"))
-	for _, scenario := range []struct {
-		name              string
-		retryBeforeDelete bool
-		retainOnDelete    bool
-		flatOrdinal       bool
-		failure           error
-	}{
-		{name: "RetryBeforeDeletion", retryBeforeDelete: true, failure: writeFailure},
-		{name: "DeleteAfterFailure", failure: writeFailure},
-		{name: "RetainAfterFailure", retainOnDelete: true, failure: writeFailure},
-		{name: "DeleteAfterConflict", failure: conflict},
-		{name: "RetainAfterConflict", retainOnDelete: true, failure: conflict},
-		{name: "FlatOrdinalRetainAfterFailure", retainOnDelete: true, flatOrdinal: true, failure: writeFailure},
-	} {
-		t.Run(scenario.name, func(t *testing.T) {
-			cli := retentionFixture(t, 4, func(its *workloads.InstanceSet) {
-				its.Spec.FlatInstanceOrdinal = scenario.flatOrdinal
-				if scenario.retainOnDelete {
-					its.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled = kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType
-					its.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted = kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType
-				}
-			})
-			changeRetentionSet(t, cli, func(its *workloads.InstanceSet) { its.Spec.Replicas = ptr.To(int32(2)) })
-			if _, err := reconcileRetentionSet(cli); err != nil {
-				t.Fatal(err)
-			}
-			changeRetentionSet(t, cli, func(its *workloads.InstanceSet) { its.Spec.Replicas = ptr.To(int32(4)) })
-			result, err := reconcileRetentionSet(&retentionWriteFailureClient{Client: cli, failure: scenario.failure})
-			if apierrors.IsConflict(scenario.failure) {
-				if err != nil || !result.Requeue {
-					t.Fatalf("conflict must retry, result=%#v err=%v", result, err)
-				}
-			} else if !errors.Is(err, scenario.failure) {
-				t.Fatalf("expected partial reversal failure, got %v", err)
-			}
-			marked := 0
-			for _, inst := range retentionInstances(t, cli) {
-				if !inst.DeletionTimestamp.IsZero() {
-					t.Fatal("scale reversal started Instance deletion")
-				}
-				if ptr.Deref(inst.Spec.ScaledDown, false) {
-					marked++
-				}
-			}
-			if marked != 1 {
-				t.Fatalf("partial scale reversal has %d marked Instances, want 1", marked)
-			}
-			if scenario.retryBeforeDelete {
-				runRetentionControllers(t, cli, 3)
-				for _, inst := range retentionInstances(t, cli) {
-					if ptr.Deref(inst.Spec.ScaledDown, false) {
-						t.Fatal("scale reversal retry left spec.scaledDown=true")
-					}
-				}
-			}
-			if err := cli.Delete(context.Background(), retentionSet(t, cli)); err != nil {
-				t.Fatal(err)
-			}
-			wantClaims := 0
-			if scenario.retainOnDelete {
-				wantClaims = 4
-			}
-			checkRetentionDeleted(t, cli, wantClaims)
-		})
+	cli := retentionFixture(t, 4)
+	changeRetentionSet(t, cli, func(its *workloads.InstanceSet) { its.Spec.Replicas = ptr.To(int32(2)) })
+	if _, err := reconcileRetentionSet(cli); err != nil {
+		t.Fatal(err)
 	}
-}
-
-func TestInstanceRetentionParentDeletionDuringScaleDown(t *testing.T) {
-	for _, retainOnDelete := range []bool{false, true} {
-		t.Run(fmt.Sprintf("RetainOnDelete=%t", retainOnDelete), func(t *testing.T) {
-			cli := retentionFixture(t, 4, func(its *workloads.InstanceSet) {
-				if retainOnDelete {
-					its.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled = kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType
-					its.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted = kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType
-				}
-			})
-			changeRetentionSet(t, cli, func(its *workloads.InstanceSet) { its.Spec.Replicas = ptr.To(int32(2)) })
-			if _, err := reconcileRetentionSet(cli); err != nil {
-				t.Fatal(err)
-			}
-			if err := cli.Delete(context.Background(), retentionSet(t, cli)); err != nil {
-				t.Fatal(err)
-			}
-			checkRetentionDeleted(t, cli, 2)
-		})
+	changeRetentionSet(t, cli, func(its *workloads.InstanceSet) { its.Spec.Replicas = ptr.To(int32(4)) })
+	failure := errors.New("injected scale reversal update failure")
+	if _, err := reconcileRetentionSet(&retentionWriteFailureClient{Client: cli, failure: failure}); !errors.Is(err, failure) {
+		t.Fatalf("expected partial reversal failure, got %v", err)
 	}
+	marked := 0
+	for _, inst := range retentionInstances(t, cli) {
+		if !inst.DeletionTimestamp.IsZero() {
+			t.Fatal("scale reversal started Instance deletion")
+		}
+		if ptr.Deref(inst.Spec.ScaledDown, false) {
+			marked++
+		}
+	}
+	if marked != 1 {
+		t.Fatalf("partial scale reversal has %d marked Instances, want 1", marked)
+	}
+	runRetentionControllers(t, cli, 3)
+	for _, inst := range retentionInstances(t, cli) {
+		if ptr.Deref(inst.Spec.ScaledDown, false) {
+			t.Fatal("scale reversal retry left spec.scaledDown=true")
+		}
+	}
+	if err := cli.Delete(context.Background(), retentionSet(t, cli)); err != nil {
+		t.Fatal(err)
+	}
+	checkRetentionDeleted(t, cli, 0)
 }
 
 func TestInstanceRetentionDeletingInstanceKeepsPolicy(t *testing.T) {

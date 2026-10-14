@@ -1711,12 +1711,16 @@ func TestInstanceSetStopWaitsForDeletionObservation(t *testing.T) {
 func TestInstanceSetStopWaitsForRetiringRuntime(t *testing.T) {
 	for _, policy := range []appsv1.PodManagementPolicyType{appsv1.OrderedReadyPodManagement, appsv1.ParallelPodManagement} {
 		t.Run(string(policy), func(t *testing.T) {
+			deletingName, remainingName := "demo-1", "demo-0"
+			if policy == appsv1.ParallelPodManagement {
+				deletingName, remainingName = "demo-0", "demo-1"
+			}
 			its := setStopFixture()
 			its.Spec.PersistentVolumeClaimRetentionPolicy = &kbappsv1.PersistentVolumeClaimRetentionPolicy{WhenScaled: kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType}
 			cli := newSetStopClient(t, its)
 			reconcileSetStop(t, cli, 5)
 			held := &corev1.Pod{}
-			if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "demo-1"}, held); err != nil {
+			if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: deletingName}, held); err != nil {
 				t.Fatal(err)
 			}
 			held.Finalizers = append(held.Finalizers, "test/hold")
@@ -1724,7 +1728,7 @@ func TestInstanceSetStopWaitsForRetiringRuntime(t *testing.T) {
 				t.Fatal(err)
 			}
 			pvc := &corev1.PersistentVolumeClaim{}
-			pvcKey := client.ObjectKey{Namespace: "default", Name: "data-demo-1"}
+			pvcKey := client.ObjectKey{Namespace: "default", Name: "data-" + deletingName}
 			if err := cli.Get(context.Background(), pvcKey, pvc); err != nil {
 				t.Fatal(err)
 			}
@@ -1735,6 +1739,9 @@ func TestInstanceSetStopWaitsForRetiringRuntime(t *testing.T) {
 			mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
 				its.Spec.Replicas = ptr.To(int32(1))
 				its.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
+				if policy == appsv1.ParallelPodManagement {
+					its.Spec.OfflineInstances = []string{deletingName}
+				}
 			})
 			reconcileSetStop(t, cli, 4)
 			if err := cli.Get(context.Background(), client.ObjectKeyFromObject(held), held); err != nil {
@@ -1760,10 +1767,10 @@ func TestInstanceSetStopWaitsForRetiringRuntime(t *testing.T) {
 			if err != nil || result.RequeueAfter != time.Second {
 				t.Fatalf("held retirement has no bounded Stop retry: result=%#v err=%v", result, err)
 			}
-			lower := &corev1.Pod{}
-			err = cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "demo-0"}, lower)
-			if err != nil || !lower.DeletionTimestamp.IsZero() {
-				t.Fatalf("Stop passed held retirement: lower Pod err=%v, deletion=%v", err, lower.DeletionTimestamp)
+			remainingPod := &corev1.Pod{}
+			err = cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: remainingName}, remainingPod)
+			if err != nil || !remainingPod.DeletionTimestamp.IsZero() {
+				t.Fatalf("Stop passed held deletion: remaining Pod err=%v, deletion=%v", err, remainingPod.DeletionTimestamp)
 			}
 			held.Finalizers = nil
 			if err := cli.Update(context.Background(), held); err != nil {
@@ -1778,7 +1785,7 @@ func TestInstanceSetStopWaitsForRetiringRuntime(t *testing.T) {
 				t.Fatal(err)
 			}
 			remaining := &workloads.Instance{}
-			if err = cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "demo-0"}, remaining); err != nil || ptr.Deref(remaining.Spec.Stop, false) {
+			if err = cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: remainingName}, remaining); err != nil || ptr.Deref(remaining.Spec.Stop, false) {
 				t.Fatalf("uncommitted absence released Stop budget: %v", err)
 			}
 			reconcileSetStop(t, cli, 8)
@@ -1810,7 +1817,7 @@ func TestInstanceSetStopWaitsForRetiringRuntime(t *testing.T) {
 				t.Fatalf("scale-down Instance cleanup did not complete: %v", err)
 			}
 			claims := &corev1.PersistentVolumeClaimList{}
-			if err := cli.List(context.Background(), claims); err != nil || len(claims.Items) != 1 || claims.Items[0].Name != "data-demo-0" {
+			if err := cli.List(context.Background(), claims); err != nil || len(claims.Items) != 1 || claims.Items[0].Name != "data-"+remainingName {
 				t.Fatalf("Stop changed the remaining Instance claim: %v", err)
 			}
 		})

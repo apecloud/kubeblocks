@@ -24,8 +24,11 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -51,13 +54,36 @@ func (r *deletionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebu
 func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its := tree.GetRoot().(*workloads.InstanceSet)
 	updated := false
+	var desiredNames sets.Set[string]
 	for _, obj := range tree.List(&workloads.Instance{}) {
 		inst := obj.(*workloads.Instance)
-		if model.IsObjectDeleting(inst) || equality.Semantic.DeepEqual(
+		if model.IsObjectDeleting(inst) {
+			continue
+		}
+		if ptr.Deref(inst.Spec.ScaledDown, false) && desiredNames == nil {
+			itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
+			if err != nil {
+				return kubebuilderx.Continue, err
+			}
+			nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, &instancetemplate.PodNameBuilderOpts{EventLogger: tree.EventRecorder})
+			if err != nil {
+				return kubebuilderx.Continue, err
+			}
+			names, err := nameBuilder.GenerateAllInstanceNames()
+			if err != nil {
+				return kubebuilderx.Continue, err
+			}
+			desiredNames = sets.New(names...)
+		}
+		cancelledScaleDown := ptr.Deref(inst.Spec.ScaledDown, false) && desiredNames.Has(inst.Name)
+		if !cancelledScaleDown && equality.Semantic.DeepEqual(
 			inst.Spec.PersistentVolumeClaimRetentionPolicy, its.Spec.PersistentVolumeClaimRetentionPolicy) {
 			continue
 		}
 		instCopy := inst.DeepCopy()
+		if cancelledScaleDown {
+			instCopy.Spec.ScaledDown = nil
+		}
 		instCopy.Spec.PersistentVolumeClaimRetentionPolicy = its.Spec.PersistentVolumeClaimRetentionPolicy.DeepCopy()
 		if err := tree.Update(instCopy); err != nil {
 			return kubebuilderx.Continue, err

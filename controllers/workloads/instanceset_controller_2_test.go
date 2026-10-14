@@ -1624,6 +1624,87 @@ var _ = Describe("InstanceSet Stop path parity", func() {
 	}
 })
 
+func TestInstanceSetStopWaitsForDeletionObservation(t *testing.T) {
+	cli := newSetStopClient(t, setStopFixture())
+	ctx := context.Background()
+	reconcileParent := func() {
+		t.Helper()
+		if _, err := reconcileSetStopParent(cli); err != nil {
+			t.Fatal(err)
+		}
+	}
+	reconcileInstance := func(name string) {
+		t.Helper()
+		_, err := (&InstanceReconciler{Client: cli, Scheme: cli.Scheme(), Recorder: record.NewFakeRecorder(1000)}).Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKey{Namespace: "default", Name: name}})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := 0; i < 3; i++ {
+		reconcileParent()
+	}
+	mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
+		its.Spec.Replicas = ptr.To(int32(1))
+		its.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
+	})
+	reconcileParent()
+	for _, name := range []string{"demo-0", "demo-1"} {
+		reconcileInstance(name)
+		reconcileInstance(name)
+	}
+	markSetStopPodsReady(t, cli)
+	inst := &workloads.Instance{}
+	key := client.ObjectKey{Namespace: "default", Name: "demo-1"}
+	if err := cli.Get(ctx, key, inst); err != nil {
+		t.Fatal(err)
+	}
+	if !ptr.Deref(inst.Spec.ScaledDown, false) || inst.Status.CurrentState != workloads.InstanceCurrentStateAbsent || inst.Status.ObservedGeneration != inst.Generation {
+		t.Fatalf("fixture did not produce current-generation Absent before deletion: %#v", inst)
+	}
+	generation := inst.Generation
+	pod := &corev1.Pod{}
+	if err := cli.Get(ctx, key, pod); err != nil {
+		t.Fatal(err)
+	}
+	pod.Finalizers = []string{"test/hold"}
+	if err := cli.Update(ctx, pod); err != nil {
+		t.Fatal(err)
+	}
+	reconcileParent()
+	if err := cli.Get(ctx, key, inst); err != nil || inst.DeletionTimestamp.IsZero() || inst.Generation != generation {
+		t.Fatalf("scale-down did not delete the Instance without changing generation: %v", err)
+	}
+	if err := cli.Get(ctx, key, pod); err != nil || pod.Status.Phase != corev1.PodRunning || !pod.DeletionTimestamp.IsZero() {
+		t.Fatalf("fixture did not keep the Pod Running before deletion was observed: %v", err)
+	}
+	mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(true) })
+	reconcileParent()
+	remaining := &workloads.Instance{}
+	if err := cli.Get(ctx, client.ObjectKey{Namespace: "default", Name: "demo-0"}, remaining); err != nil || ptr.Deref(remaining.Spec.Stop, false) {
+		t.Fatalf("pre-deletion Absent released the Stop slot while the Pod was Running: %v", err)
+	}
+	if readSetStop(t, cli).Status.Replicas != 2 {
+		t.Fatal("Stop excluded the deleting Instance before observing its runtime deletion")
+	}
+	reconcileInstance("demo-1")
+	reconcileInstance("demo-1")
+	reconcileParent()
+	if err := cli.Get(ctx, client.ObjectKeyFromObject(remaining), remaining); err != nil || ptr.Deref(remaining.Spec.Stop, false) {
+		t.Fatalf("terminating Pod released the Stop slot: %v", err)
+	}
+	if err := cli.Get(ctx, key, pod); err != nil {
+		t.Fatal(err)
+	}
+	pod.Finalizers = nil
+	if err := cli.Update(ctx, pod); err != nil {
+		t.Fatal(err)
+	}
+	reconcileSetStop(t, cli, 8)
+	if len(listSetStopPods(t, cli)) != 0 || readSetStop(t, cli).Status.Replicas != 0 {
+		t.Fatal("Stop did not converge after the deleting Pod disappeared")
+	}
+}
+
 func TestInstanceSetStopWaitsForRetiringRuntime(t *testing.T) {
 	for _, policy := range []appsv1.PodManagementPolicyType{appsv1.OrderedReadyPodManagement, appsv1.ParallelPodManagement} {
 		t.Run(string(policy), func(t *testing.T) {

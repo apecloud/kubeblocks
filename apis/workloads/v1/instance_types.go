@@ -159,7 +159,7 @@ type InstanceStatus2 struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// Represents the latest available observations of an instance's current state.
-	// Known .status.conditions.type are: "InstanceFailure", "InstanceReady", "InstanceAvailable", "Restore"
+	// Known .status.conditions.type are: "InstanceFailure", "InstanceReady", "InstanceAvailable", "Restore", "InstanceRuntimeDeleted"
 	//
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`

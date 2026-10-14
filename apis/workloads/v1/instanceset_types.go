@@ -741,6 +741,10 @@ const (
 	// InstanceRestore indicates whether the initial data restore for this Instance or InstanceSet has completed.
 	InstanceRestore ConditionType = "Restore"
 
+	// InstanceRuntimeDeleted is True when the Instance controller observes no Pod during Instance deletion.
+	// It does not indicate that PVC or assistant-object cleanup has completed.
+	InstanceRuntimeDeleted ConditionType = "InstanceRuntimeDeleted"
+
 	// InstanceUpdateRestricted represents a ConditionType that indicates updates to an InstanceSet are blocked(when the
 	// PodUpdatePolicy is set to StrictInPlace but the pods cannot be updated in-place).
 	InstanceUpdateRestricted ConditionType = "InstanceUpdateRestricted"

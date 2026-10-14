@@ -139,16 +139,27 @@ func (r *statusReconciler) reconcileDeletingRuntime(tree *kubebuilderx.ObjectTre
 	}
 	if obj == nil {
 		r.setPodUnavailableStatus(inst, workloads.InstanceCurrentStateAbsent, inst.Name, "")
-		return nil
+	} else {
+		pod := obj.(*corev1.Pod)
+		if isTerminating(pod) {
+			r.setPodUnavailableStatus(inst, workloads.InstanceCurrentStateTerminating, pod.Name, getPodRevision(pod))
+		} else {
+			inst.Status.CurrentState = workloads.InstanceCurrentStatePresent
+			inst.Status.CurrentRevision = getPodRevision(pod)
+			inst.Status.UpToDate = false
+		}
 	}
-	pod := obj.(*corev1.Pod)
-	if isTerminating(pod) {
-		r.setPodUnavailableStatus(inst, workloads.InstanceCurrentStateTerminating, pod.Name, getPodRevision(pod))
-		return nil
+	status := metav1.ConditionFalse
+	if inst.Status.CurrentState == workloads.InstanceCurrentStateAbsent {
+		status = metav1.ConditionTrue
 	}
-	inst.Status.CurrentState = workloads.InstanceCurrentStatePresent
-	inst.Status.CurrentRevision = getPodRevision(pod)
-	inst.Status.UpToDate = false
+	meta.SetStatusCondition(&inst.Status.Conditions, metav1.Condition{
+		Type:               string(workloads.InstanceRuntimeDeleted),
+		Status:             status,
+		ObservedGeneration: inst.Generation,
+		Reason:             string(inst.Status.CurrentState),
+		Message:            fmt.Sprintf("Observed Pod state %s during Instance deletion", inst.Status.CurrentState),
+	})
 	return nil
 }
 

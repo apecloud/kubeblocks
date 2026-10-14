@@ -27,6 +27,7 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -70,6 +71,7 @@ func failedRestoreFixture() (*appsv1.Component, *dpv1alpha1.Restore, *corev1.Per
 
 func failedRestoreClient(objects ...client.Object) client.Client {
 	model.AddScheme(corev1.AddToScheme)
+	model.AddScheme(batchv1.AddToScheme)
 	model.AddScheme(appsv1.AddToScheme)
 	model.AddScheme(dpv1alpha1.AddToScheme)
 	model.AddScheme(workloads.AddToScheme)
@@ -139,7 +141,7 @@ func TestFailedRestorePVCSelection(t *testing.T) {
 				tc.change(comp, restore, pvc)
 			}
 			cli := failedRestoreClient(restore, pvc)
-			pvcs, err := failedRestorePVCs(&componentTransformContext{Context: context.Background(), Client: cli}, comp, constant.GetCompLabels("cluster", "db"))
+			pvcs, _, err := failedRestorePVCs(&componentTransformContext{Context: context.Background(), Client: cli}, comp, constant.GetCompLabels("cluster", "db"))
 			if err != nil || len(pvcs) != tc.want {
 				t.Fatalf("selected %d PVCs, error=%v; want %d", len(pvcs), err, tc.want)
 			}
@@ -191,7 +193,7 @@ func TestFailedRestorePVCDeletionOrderingAndPrecondition(t *testing.T) {
 	if err := builder.reconcileDeleteObject(context.Background(), vertex); err != nil {
 		t.Fatalf("repeat deletion: %v", err)
 	}
-	pvcs, err := failedRestorePVCs(transCtx, comp, constant.GetCompLabels("cluster", "db"))
+	pvcs, _, err := failedRestorePVCs(transCtx, comp, constant.GetCompLabels("cluster", "db"))
 	if err != nil || len(pvcs) != 0 {
 		t.Fatalf("repeat selection: %v, %v", pvcs, err)
 	}
@@ -258,7 +260,7 @@ func TestFailedRestorePVCDeletionProtectsConcurrentAdoption(t *testing.T) {
 	comp, restore, pvc := failedRestoreFixture()
 	cli := failedRestoreClient(restore, pvc)
 	transCtx := &componentTransformContext{Context: context.Background(), Client: cli}
-	selected, err := failedRestorePVCs(transCtx, comp, constant.GetCompLabels("cluster", "db"))
+	selected, _, err := failedRestorePVCs(transCtx, comp, constant.GetCompLabels("cluster", "db"))
 	if err != nil || len(selected) != 1 {
 		t.Fatalf("selection: %v, %v", selected, err)
 	}
@@ -274,5 +276,163 @@ func TestFailedRestorePVCDeletionProtectsConcurrentAdoption(t *testing.T) {
 	}
 	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(current), &corev1.PersistentVolumeClaim{}); err != nil {
 		t.Fatalf("adopted claim was removed: %v", err)
+	}
+}
+
+func restoreMount(name string) []corev1.Volume {
+	return []corev1.Volume{{Name: "data", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: name}}}}
+}
+
+func prepareJobFixture(restore *dpv1alpha1.Restore, pvc *corev1.PersistentVolumeClaim) *batchv1.Job {
+	return &batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "prepare", Namespace: restore.Namespace, UID: "job-uid",
+		OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(restore, dpv1alpha1.GroupVersion.WithKind("Restore"))}},
+		Spec: batchv1.JobSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{Volumes: restoreMount(pvc.Name)}}}, Status: batchv1.JobStatus{Active: 1}}
+}
+
+func planFailedRestoreDeletion(t *testing.T, cli client.Client, comp *appsv1.Component) (*graph.DAG, model.GraphClient, *componentTransformContext) {
+	t.Helper()
+	graphCli := model.NewGraphClient(cli)
+	transCtx := &componentTransformContext{Context: context.Background(), Client: graphCli, Component: comp, Logger: logr.Discard()}
+	dag := graph.NewDAG()
+	graphCli.Root(dag, comp, comp, nil)
+	if err := (&componentDeletionTransformer{}).deleteCompResources(transCtx, graphCli, dag, comp, constant.GetCompLabels("cluster", "db"), kindsForCompDelete()); err == nil {
+		t.Fatal("deletion must wait for referenced resources")
+	}
+	if graphCli.IsAction(dag, comp, model.ActionDeletePtr()) {
+		t.Fatal("Component cannot disappear before failed-restore cleanup")
+	}
+	return dag, graphCli, transCtx
+}
+
+func TestFailedRestoreStopsJobAndWaitsForPodsBeforePVC(t *testing.T) {
+	comp, restore, pvc := failedRestoreFixture()
+	job := prepareJobFixture(restore, pvc)
+	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "prepare-pod", Namespace: job.Namespace, UID: "pod-uid",
+		OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(job, batchv1.SchemeGroupVersion.WithKind("Job"))}},
+		Spec: corev1.PodSpec{NodeName: "node", Volumes: restoreMount(pvc.Name)}, Status: corev1.PodStatus{Phase: corev1.PodRunning}}
+	cli := &restorePVCDeleteRecorder{Client: failedRestoreClient(restore, pvc, job, pod)}
+	dag, graphCli, transCtx := planFailedRestoreDeletion(t, cli, comp)
+	vertex := graphCli.FindMatchedVertex(dag, job).(*model.ObjectVertex)
+	if vertex.PropagationPolicy != client.PropagationPolicy(metav1.DeletePropagationForeground) || graphCli.FindMatchedVertex(dag, pvc) != nil {
+		t.Fatal("Job must be foreground-deleted before the PVC")
+	}
+	builder := &componentPlanBuilder{cli: cli, transCtx: transCtx}
+	if err := builder.reconcileDeleteObject(context.Background(), vertex); err != nil {
+		t.Fatal(err)
+	}
+	if cli.options.PropagationPolicy == nil || *cli.options.PropagationPolicy != metav1.DeletePropagationForeground ||
+		cli.options.Preconditions == nil || cli.options.Preconditions.UID == nil || *cli.options.Preconditions.UID != job.UID ||
+		cli.options.Preconditions.ResourceVersion == nil || *cli.options.Preconditions.ResourceVersion != vertex.Obj.GetResourceVersion() {
+		t.Fatalf("actual Job Delete options=%#v", cli.options)
+	}
+	// The fake client has no garbage collector: keep the Job's child Pod to prove the wait barrier.
+	dag, graphCli, _ = planFailedRestoreDeletion(t, cli, comp)
+	if graphCli.FindMatchedVertex(dag, pvc) != nil {
+		t.Fatal("PVC deletion cannot precede child Pod removal")
+	}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(restore), &dpv1alpha1.Restore{}); err != nil {
+		t.Fatal("Restore evidence disappeared before cleanup")
+	}
+	if err := cli.Delete(context.Background(), pod); err != nil {
+		t.Fatal(err)
+	}
+	dag, graphCli, _ = planFailedRestoreDeletion(t, cli, comp)
+	vertex = graphCli.FindMatchedVertex(dag, pvc).(*model.ObjectVertex)
+	if err := builder.reconcileDeleteObject(context.Background(), vertex); err != nil {
+		t.Fatal(err)
+	}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(pvc), &corev1.PersistentVolumeClaim{}); !apierrors.IsNotFound(err) {
+		t.Fatalf("PVC cleanup after Job/Pod removal: %v", err)
+	}
+}
+
+func TestFailedRestoreKeepsUnrelatedReferences(t *testing.T) {
+	for _, phase := range []corev1.PodPhase{corev1.PodPending, corev1.PodRunning, corev1.PodSucceeded, corev1.PodFailed} {
+		t.Run(string(phase), func(t *testing.T) {
+			comp, restore, pvc := failedRestoreFixture()
+			pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "unrelated", Namespace: pvc.Namespace, UID: "other-pod"},
+				Spec: corev1.PodSpec{NodeName: "node", Volumes: restoreMount(pvc.Name)}, Status: corev1.PodStatus{Phase: phase}}
+			cli := failedRestoreClient(restore, pvc, pod)
+			dag, graphCli, _ := planFailedRestoreDeletion(t, cli, comp)
+			if graphCli.FindMatchedVertex(dag, pvc) != nil || graphCli.FindMatchedVertex(dag, pod) != nil {
+				t.Fatal("reference must block cleanup without deleting an unrelated Pod")
+			}
+		})
+	}
+	for _, owner := range []string{"old-restore-uid", "other-component-restore-uid"} {
+		t.Run(owner, func(t *testing.T) {
+			comp, restore, pvc := failedRestoreFixture()
+			job := prepareJobFixture(restore, pvc)
+			job.OwnerReferences[0].UID = types.UID(owner)
+			cli := failedRestoreClient(restore, pvc, job)
+			dag, graphCli, _ := planFailedRestoreDeletion(t, cli, comp)
+			if graphCli.FindMatchedVertex(dag, job) != nil || graphCli.FindMatchedVertex(dag, pvc) != nil {
+				t.Fatal("unknown Restore owner must not be terminated or lose its referenced PVC")
+			}
+		})
+	}
+}
+
+func TestFailedRestoreDoesNotTouchAnotherComponent(t *testing.T) {
+	comp, restore, pvc := failedRestoreFixture()
+	_, otherRestore, otherPVC := failedRestoreFixture()
+	otherRestore.Name, otherRestore.UID = "other-restore", "other-restore-uid"
+	otherRestore.OwnerReferences[0].Name, otherRestore.OwnerReferences[0].UID = "cluster-other", "other-component-uid"
+	otherRestore.Labels = constant.GetCompLabels("cluster", "other")
+	claim := &otherRestore.Spec.PrepareDataConfig.RestoreVolumeClaimsTemplate.Templates[0]
+	claim.Name = "data-cluster-other"
+	claim.Labels = otherRestore.Labels
+	claim.Annotations[constant.RestorePVCComponentUIDAnnotationKey] = "other-component-uid"
+	otherPVC.Name, otherPVC.UID = "data-cluster-other-3", "other-pvc-uid"
+	otherPVC.Labels = otherRestore.Labels
+	otherPVC.Annotations[constant.RestorePVCComponentUIDAnnotationKey] = "other-component-uid"
+	otherJob := prepareJobFixture(otherRestore, otherPVC)
+	cli := failedRestoreClient(restore, pvc, otherRestore, otherPVC, otherJob)
+	dag, graphCli, _ := planFailedRestoreDeletion(t, cli, comp)
+	if !graphCli.IsAction(dag, pvc, model.ActionDeletePtr()) || graphCli.FindMatchedVertex(dag, otherPVC) != nil || graphCli.FindMatchedVertex(dag, otherJob) != nil {
+		t.Fatal("cleanup must be limited to the selected Component and its exact claims")
+	}
+}
+
+func TestFailedRestoreJobDeletionProtectsReplacedJob(t *testing.T) {
+	_, restore, pvc := failedRestoreFixture()
+	oldJob := prepareJobFixture(restore, pvc)
+	oldJob.ResourceVersion = "10"
+	liveUID := types.UID("replacement-job-uid")
+	deleted := false
+	var requested metav1.DeleteOptions
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete || r.URL.Path != "/apis/batch/v1/namespaces/default/jobs/"+oldJob.Name {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&requested); err != nil {
+			t.Error(err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		status := metav1.Status{TypeMeta: metav1.TypeMeta{Kind: "Status", APIVersion: "v1"}, Status: metav1.StatusSuccess, Code: http.StatusOK}
+		if requested.Preconditions != nil && requested.Preconditions.UID != nil && *requested.Preconditions.UID != liveUID {
+			status.Status, status.Reason, status.Code = metav1.StatusFailure, metav1.StatusReasonConflict, http.StatusConflict
+			w.WriteHeader(http.StatusConflict)
+		} else {
+			deleted = true
+		}
+		_ = json.NewEncoder(w).Encode(&status)
+	}))
+	defer server.Close()
+	scheme := runtime.NewScheme()
+	if err := batchv1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{batchv1.SchemeGroupVersion})
+	mapper.Add(batchv1.SchemeGroupVersion.WithKind("Job"), meta.RESTScopeNamespace)
+	cli, err := client.New(&rest.Config{Host: server.URL, ContentConfig: rest.ContentConfig{ContentType: runtime.ContentTypeJSON}}, client.Options{Scheme: scheme, Mapper: mapper})
+	if err != nil {
+		t.Fatal(err)
+	}
+	builder := &componentPlanBuilder{cli: cli}
+	err = builder.reconcileDeleteObject(context.Background(), &model.ObjectVertex{Obj: oldJob, Action: model.ActionDeletePtr(), PropagationPolicy: client.PropagationPolicy(metav1.DeletePropagationForeground)})
+	if !apierrors.IsConflict(err) || deleted || requested.Preconditions == nil || requested.Preconditions.UID == nil || *requested.Preconditions.UID != oldJob.UID ||
+		requested.Preconditions.ResourceVersion == nil || *requested.Preconditions.ResourceVersion != oldJob.ResourceVersion || requested.PropagationPolicy == nil || *requested.PropagationPolicy != metav1.DeletePropagationForeground {
+		t.Fatalf("replacement Job protection: options=%#v deleted=%v error=%v", requested, deleted, err)
 	}
 }

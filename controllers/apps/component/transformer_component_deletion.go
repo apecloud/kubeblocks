@@ -23,11 +23,13 @@ import (
 	"fmt"
 	"time"
 
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
@@ -121,11 +123,18 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 	}
 
 	// Failed prepareData may leave claims before an InstanceSet can adopt them.
-	pvcs, err := failedRestorePVCs(transCtx, comp, matchLabels)
+	pvcs, restores, err := failedRestorePVCs(transCtx, comp, matchLabels)
 	if err != nil {
 		return err
 	}
 	if len(pvcs) > 0 {
+		waiting, err := stopFailedRestoreJobs(transCtx, graphCli, dag, comp.Namespace, restores, pvcs)
+		if err != nil {
+			return err
+		}
+		if waiting {
+			return intctrlutil.NewRequeueError(time.Second, "waiting for failed restore Jobs and PVC references to disappear")
+		}
 		for _, pvc := range pvcs {
 			graphCli.Delete(dag, pvc)
 		}
@@ -172,25 +181,27 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 	return graph.ErrPrematureStop
 }
 
-func failedRestorePVCs(transCtx *componentTransformContext, comp *appsv1.Component, matchLabels map[string]string) ([]*corev1.PersistentVolumeClaim, error) {
+func failedRestorePVCs(transCtx *componentTransformContext, comp *appsv1.Component, matchLabels map[string]string) ([]*corev1.PersistentVolumeClaim, []*dpv1alpha1.Restore, error) {
 	if comp.UID == "" || (comp.Spec.TerminationPolicy != appsv1.Delete && comp.Spec.TerminationPolicy != appsv1.WipeOut) {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if policy := comp.Spec.PersistentVolumeClaimRetentionPolicy; policy != nil {
 		retention := policy.WhenDeleted
 		if retention != "" && retention != appsv1.DeletePersistentVolumeClaimRetentionPolicyType {
-			return nil, nil
+			return nil, nil, nil
 		}
 	}
 	var restores dpv1alpha1.RestoreList
 	if err := transCtx.Client.List(transCtx.Context, &restores, client.InNamespace(comp.Namespace), client.MatchingLabels(matchLabels)); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	claims := make(map[string]dpv1alpha1.RestoreVolumeClaim)
-	for _, restore := range restores.Items {
-		owner := metav1.GetControllerOf(&restore)
+	restoreByClaim := make(map[string][]*dpv1alpha1.Restore)
+	for i := range restores.Items {
+		restore := &restores.Items[i]
+		owner := metav1.GetControllerOf(restore)
 		cfg := restore.Spec.PrepareDataConfig
-		if owner == nil || owner.UID != comp.UID || owner.Name != comp.Name || owner.Kind != appsv1.ComponentKind ||
+		if restore.UID == "" || owner == nil || owner.UID != comp.UID || owner.Name != comp.Name || owner.Kind != appsv1.ComponentKind ||
 			restore.Status.Phase != dpv1alpha1.RestorePhaseFailed || cfg == nil || cfg.RestoreVolumeClaimsTemplate == nil {
 			continue
 		}
@@ -200,26 +211,92 @@ func failedRestorePVCs(transCtx *componentTransformContext, comp *appsv1.Compone
 				continue
 			}
 			for i := int32(0); i < template.Replicas; i++ {
-				claims[fmt.Sprintf("%s-%d", claim.Name, template.StartingIndex+i)] = claim
+				name := fmt.Sprintf("%s-%d", claim.Name, template.StartingIndex+i)
+				claims[name] = claim
+				restoreByClaim[name] = append(restoreByClaim[name], restore)
 			}
 		}
 	}
 	var pvcs []*corev1.PersistentVolumeClaim
+	selectedRestores := make(map[types.UID]*dpv1alpha1.Restore)
 	for name, claim := range claims {
 		pvc := &corev1.PersistentVolumeClaim{}
 		if err := transCtx.Client.Get(transCtx.Context, client.ObjectKey{Namespace: comp.Namespace, Name: name}, pvc); err != nil {
 			if apierrors.IsNotFound(err) {
 				continue
 			}
-			return nil, err
+			return nil, nil, err
 		}
 		if pvc.UID == "" || len(pvc.OwnerReferences) > 0 || pvc.Annotations[constant.RestorePVCComponentUIDAnnotationKey] != string(comp.UID) ||
 			!labels.SelectorFromSet(matchLabels).Matches(labels.Set(pvc.Labels)) || !labels.SelectorFromSet(claim.Labels).Matches(labels.Set(pvc.Labels)) {
 			continue
 		}
 		pvcs = append(pvcs, pvc)
+		for _, restore := range restoreByClaim[name] {
+			selectedRestores[restore.UID] = restore
+		}
 	}
-	return pvcs, nil
+	var owners []*dpv1alpha1.Restore
+	for _, restore := range selectedRestores {
+		owners = append(owners, restore)
+	}
+	return pvcs, owners, nil
+}
+
+// A Failed Restore can still have active Jobs after a fatal revalidation error.
+func stopFailedRestoreJobs(transCtx *componentTransformContext, graphCli model.GraphClient, dag *graph.DAG,
+	namespace string, restores []*dpv1alpha1.Restore, pvcs []*corev1.PersistentVolumeClaim) (bool, error) {
+	owners := make(map[types.UID]*dpv1alpha1.Restore)
+	for _, restore := range restores {
+		owners[restore.UID] = restore
+	}
+	claims := make(map[string]bool)
+	for _, pvc := range pvcs {
+		claims[pvc.Name] = true
+	}
+	var jobs batchv1.JobList
+	if err := transCtx.Client.List(transCtx.Context, &jobs, client.InNamespace(namespace)); err != nil {
+		return false, err
+	}
+	waiting := false
+	for i := range jobs.Items {
+		job := &jobs.Items[i]
+		if !restoreClaimsReferenced(job.Spec.Template.Spec.Volumes, claims) {
+			continue
+		}
+		waiting = true
+		owner := metav1.GetControllerOf(job)
+		if owner == nil || job.UID == "" {
+			continue
+		}
+		restore := owners[owner.UID]
+		if restore == nil || owner.Name != restore.Name || owner.Kind != "Restore" {
+			continue
+		}
+		// Delete currently drops propagation options; Do retains foreground deletion in the graph.
+		graphCli.Do(dag, nil, job, model.ActionDeletePtr(), nil, model.WithPropagationPolicy(client.PropagationPolicy(metav1.DeletePropagationForeground)))
+		waiting = true
+	}
+	var pods corev1.PodList
+	if err := transCtx.Client.List(transCtx.Context, &pods, client.InNamespace(namespace)); err != nil {
+		return false, err
+	}
+	for _, pod := range pods.Items {
+		// Scheduled terminal Pods can still hold PVC protection. Never delete an unrelated reference.
+		if restoreClaimsReferenced(pod.Spec.Volumes, claims) {
+			waiting = true
+		}
+	}
+	return waiting, nil
+}
+
+func restoreClaimsReferenced(volumes []corev1.Volume, claims map[string]bool) bool {
+	for _, volume := range volumes {
+		if volume.PersistentVolumeClaim != nil && claims[volume.PersistentVolumeClaim.ClaimName] {
+			return true
+		}
+	}
+	return false
 }
 
 func handleRBACResourceDeletion(obj client.Object, transCtx *componentTransformContext, comp *appsv1.Component,

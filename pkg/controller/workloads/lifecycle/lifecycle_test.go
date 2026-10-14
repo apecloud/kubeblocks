@@ -200,7 +200,10 @@ func TestDataObservationDistinguishesUnavailableAndReplacementPVC(t *testing.T) 
 	}
 }
 
-func TestValidationRejectsUnownedPreconditionsAndNonblockingMembers(t *testing.T) {
+func TestValidationRejectsUnownedPreconditionsAndNonblockingActions(t *testing.T) {
+	if err := ConfigurePod(dataWorkload(), dataPod(), nil, false, false); err != nil {
+		t.Fatalf("blocking actions did not configure a bootstrap Pod: %v", err)
+	}
 	for _, condition := range []apps.PreConditionType{apps.RuntimeReadyPreConditionType, apps.ComponentReadyPreConditionType, apps.ClusterReadyPreConditionType} {
 		its := dataWorkload()
 		its.Spec.LifecycleActions.MemberJoin.PreCondition = ptr.To(condition)
@@ -208,19 +211,27 @@ func TestValidationRejectsUnownedPreconditionsAndNonblockingMembers(t *testing.T
 			t.Fatalf("accepted unowned precondition %s", condition)
 		}
 	}
-	for _, name := range []string{"join", "leave", "switch"} {
+	for _, name := range []string{"join", "leave", "switch", "dump", "load"} {
 		its := dataWorkload()
 		switch name {
 		case "join":
 			its.Spec.LifecycleActions.MemberJoin.NonBlocking = true
 		case "leave":
 			its.Spec.LifecycleActions.MemberLeave.NonBlocking = true
-		default:
+		case "switch":
 			its.Spec.LifecycleActions.Switchover = testAction("true")
 			its.Spec.LifecycleActions.Switchover.NonBlocking = true
+		case "dump":
+			its.Spec.LifecycleActions.DataDump.NonBlocking = true
+		case "load":
+			its.Spec.LifecycleActions.DataLoad.NonBlocking = true
 		}
-		if err := Validate(its); err == nil {
+		pod := dataPod()
+		if err := ConfigurePod(its, pod, nil, false, false); err == nil {
 			t.Fatalf("accepted nonblocking %s without a completion contract", name)
+		}
+		if len(pod.Spec.InitContainers) != 0 || len(pod.Spec.Containers) != 1 {
+			t.Fatalf("invalid %s action changed the Pod", name)
 		}
 	}
 }

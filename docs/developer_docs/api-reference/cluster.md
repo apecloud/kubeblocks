@@ -21181,8 +21181,7 @@ indicated by UpdateRevisions.</p>
 (<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSpec">InstanceSpec</a>)
 </p>
 <div>
-<p>LifecycleActions configures parent InstanceSet lifecycle execution. Instance carries
-its worker inputs but does not decide or execute MemberJoin or MemberLeave.</p>
+<p>LifecycleActions defines actions for customizing the behavior of a workload.</p>
 </div>
 <table>
 <thead>
@@ -21229,7 +21228,7 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the procedure that update replicas with new configuration.</p>
+<p>Defines the procedure to update a replica with new configuration.</p>
 </td>
 </tr>
 <tr>
@@ -21243,9 +21242,8 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>MemberJoin and MemberLeave opt in to workload-owned membership changes.
-Initial engine bootstrap keeps membership unknown until an action records a result.
-Workload-owned member actions must use blocking execution and Immediately or unset preconditions.</p>
+<p>Defines the procedure to add a new replica to the replication group.
+This action is initiated after a replica Pod becomes ready.</p>
 </td>
 </tr>
 <tr>
@@ -21259,6 +21257,8 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
+<p>Defines the procedure to remove a replica from the replication group.
+The operator waits for successful completion before releasing the replica and cleaning up its resources.</p>
 </td>
 </tr>
 <tr>
@@ -21272,8 +21272,8 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>DataDump and DataLoad opt in to copying data into newly allocated replicas.
-Both actions, DataVolume, and Worker must be provided together.</p>
+<p>Defines the procedure for exporting the data from a replica.
+The output must be a valid data dump streamed to stdout.</p>
 </td>
 </tr>
 <tr>
@@ -21287,6 +21287,8 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
+<p>Defines the procedure for importing data into a replica.
+Data is received through stdin. The action must be idempotent to allow retries from the beginning.</p>
 </td>
 </tr>
 <tr>

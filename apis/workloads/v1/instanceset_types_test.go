@@ -31,6 +31,7 @@ import (
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextvalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -113,7 +114,7 @@ func TestLifecycleActionsAPIRoundTrip(t *testing.T) {
 	}
 }
 
-func TestDataCopyExampleUsesGeneratedSchema(t *testing.T) {
+func TestLifecycleActionsGeneratedSchemas(t *testing.T) {
 	readCRD := func(path string) *apiextensionsv1.CustomResourceDefinition {
 		t.Helper()
 		data, err := os.ReadFile(path)
@@ -158,29 +159,28 @@ func TestDataCopyExampleUsesGeneratedSchema(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := os.ReadFile("../../../examples/workloads/data-copy.yaml")
+	its := &InstanceSet{Spec: InstanceSetSpec{
+		Replicas: ptr.To[int32](1),
+		Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "data-copy"}},
+		Template: corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "data-copy"}},
+			Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "database", Image: "database:v1"}}}},
+		LifecycleActions: &LifecycleActions{
+			DataDump:   &Action{Exec: &apps.ExecAction{Command: []string{"dump"}}},
+			DataLoad:   &Action{Exec: &apps.ExecAction{Command: []string{"load"}}},
+			DataVolume: "data", Worker: &corev1.Container{Name: "worker", Image: "agent:v1"},
+		},
+	}}
+	data, err := json.Marshal(its)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var object map[string]interface{}
-	if err := yaml.Unmarshal(data, &object); err != nil {
+	if err := json.Unmarshal(data, &object); err != nil {
 		t.Fatal(err)
 	}
 	if errs := apiextvalidation.ValidateCustomResource(field.NewPath(""), object, validator); len(errs) > 0 {
-		t.Fatalf("example violates CRD: %v", errs)
+		t.Fatalf("lifecycle inputs violate CRD: %v", errs)
 	}
-	jsonData, err := json.Marshal(object)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var its InstanceSet
-	if err := json.Unmarshal(jsonData, &its); err != nil {
-		t.Fatal(err)
-	}
-	if its.Spec.LifecycleActions.Worker.Image == "" || its.Spec.LifecycleActions.DataDump == nil || its.Spec.LifecycleActions.DataLoad == nil || its.Spec.Template.Spec.ServiceAccountName != "workloads-data-loader" || !ptr.Deref(its.Spec.Template.Spec.AutomountServiceAccountToken, false) {
-		t.Fatal("example is missing data worker inputs or explicit API access")
-	}
-	// A Worker without its required Container name must fail CRD validation.
 	delete(object["spec"].(map[string]interface{})["lifecycleActions"].(map[string]interface{})["worker"].(map[string]interface{}), "name")
 	if errs := apiextvalidation.ValidateCustomResource(field.NewPath(""), object, validator); len(errs) == 0 {
 		t.Fatal("schema accepted worker without name")

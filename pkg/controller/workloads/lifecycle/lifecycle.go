@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// Package lifecycle contains the inputs shared by both InstanceSet implementations.
+// Package lifecycle provides workload state and data-task helpers shared by InstanceSet and Instance controllers.
 package lifecycle
 
 import (
@@ -65,10 +65,8 @@ func Validate(its *workloads.InstanceSet) error {
 		if action != nil && action.PreCondition != nil && *action.PreCondition != apps.ImmediatelyPreConditionType {
 			return fmt.Errorf("workload-owned actions support only Immediately preconditions; runtime availability is observed by the workload controller")
 		}
-	}
-	for _, action := range []*apps.Action{a.MemberJoin, a.MemberLeave, a.Switchover} {
 		if action != nil && action.NonBlocking {
-			return fmt.Errorf("workload membership and switchover actions must use blocking execution")
+			return fmt.Errorf("workload-owned lifecycle actions must use blocking execution")
 		}
 	}
 	if HasData(its) && (a.DataDump == nil || a.DataLoad == nil || a.Worker == nil || a.Worker.Image == "" || a.DataVolume == "") {

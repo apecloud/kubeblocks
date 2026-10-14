@@ -513,8 +513,7 @@ type ReplicaRole = kbappsv1.ReplicaRole
 // +kubebuilder:object:generate=false
 type Action = kbappsv1.Action
 
-// LifecycleActions configures parent InstanceSet lifecycle execution. Instance carries
-// its worker inputs but does not decide or execute MemberJoin or MemberLeave.
+// LifecycleActions defines actions for customizing the behavior of a workload.
 type LifecycleActions struct {
 	// Provides variables which are used to call Actions.
 	//
@@ -526,23 +525,32 @@ type LifecycleActions struct {
 	// +optional
 	Switchover *Action `json:"switchover,omitempty"`
 
-	// Defines the procedure that update replicas with new configuration.
+	// Defines the procedure to update a replica with new configuration.
 	//
 	// +optional
 	Reconfigure *Action `json:"reconfigure,omitempty"`
 
-	// MemberJoin and MemberLeave opt in to workload-owned membership changes.
-	// Initial engine bootstrap keeps membership unknown until an action records a result.
-	// Workload-owned member actions must use blocking execution and Immediately or unset preconditions.
+	// Defines the procedure to add a new replica to the replication group.
+	// This action is initiated after a replica Pod becomes ready.
+	//
 	// +optional
 	MemberJoin *Action `json:"memberJoin,omitempty"`
+
+	// Defines the procedure to remove a replica from the replication group.
+	// The operator waits for successful completion before releasing the replica and cleaning up its resources.
+	//
 	// +optional
 	MemberLeave *Action `json:"memberLeave,omitempty"`
 
-	// DataDump and DataLoad opt in to copying data into newly allocated replicas.
-	// Both actions, DataVolume, and Worker must be provided together.
+	// Defines the procedure for exporting the data from a replica.
+	// The output must be a valid data dump streamed to stdout.
+	//
 	// +optional
 	DataDump *Action `json:"dataDump,omitempty"`
+
+	// Defines the procedure for importing data into a replica.
+	// Data is received through stdin. The action must be idempotent to allow retries from the beginning.
+	//
 	// +optional
 	DataLoad *Action `json:"dataLoad,omitempty"`
 

@@ -2516,8 +2516,8 @@ spec:
                 properties:
                   dataDump:
                     description: |-
-                      DataDump and DataLoad opt in to copying data into newly allocated replicas.
-                      Both actions, DataVolume, and Worker must be provided together.
+                      Defines the procedure for exporting the data from a replica.
+                      The output must be a valid data dump streamed to stdout.
                     properties:
                       exec:
                         description: |-
@@ -2956,52 +2956,8 @@ spec:
                     type: object
                   dataLoad:
                     description: |-
-                      Action defines a customizable hook or procedure tailored for different database engines,
-                      designed to be invoked at predetermined points within the lifecycle of a Component instance.
-                      It provides a modular and extensible way to customize a Component's behavior through the execution of defined actions.
-
-                      Action should be idempotent if possible. In some circumstances (for example, an UPDATE to an k8s object fails due to concurrent updates),
-                      the action may be retried even after a success.
-
-                      Available Action triggers include:
-
-                        - `postProvision`: Defines the hook to be executed after the creation of a Component,
-                          with `preCondition` specifying when the action should be fired relative to the Component's lifecycle stages:
-                          `Immediately`, `RuntimeReady`, `ComponentReady`, and `ClusterReady`.
-                        - `preTerminate`: Defines the hook to be executed before terminating a Component.
-                        - `roleProbe`: Defines the procedure which is invoked regularly to assess the role of replicas.
-                        - `availableProbe`: Defines the procedure which is invoked regularly to assess the availability of the component.
-                        - `switchover`: Defines the procedure for a controlled transition of a role to a new replica.
-                        - `memberJoin`: Defines the procedure to add a new replica to the replication group.
-                        - `memberLeave`: Defines the method to remove a replica from the replication group.
-                        - `readOnly`: Defines the procedure to switch a replica into the read-only state.
-                        - `readWrite`: Defines the procedure to transition a replica from the read-only state back to the read-write state.
-                        - `dataDump`: Defines the procedure to export the data from a replica.
-                        - `dataLoad`: Defines the procedure to import data into a replica.
-                        - `reconfigure`: Defines the procedure that update a replica with new configuration.
-                        - `accountProvision`: Defines the procedure to generate a new database account.
-
-                      Actions can be executed in different ways:
-
-                        - ExecAction: Executes a command inside a container.
-                          A set of predefined environment variables are available and can be leveraged within the `exec.command`
-                          to access context information such as details about pods, components, the overall cluster state,
-                          or database connection credentials.
-                          These variables provide a dynamic and context-aware mechanism for script execution.
-                        - HTTPAction: Performs a single HTTP(S) request.
-                        - GRPCAction: Issues a unary gRPC call to a target service.
-                          This allows developers to implement Actions using plugins written in programming language like Go,
-                          providing greater flexibility and extensibility.
-
-                      An action is considered successful on returning 0, or HTTP 2xx for status HTTP actions.
-                      Any other return value or HTTP status codes indicate failure,
-                      and the action may be retried based on the configured retry policy.
-
-                        - If an action exceeds the specified timeout duration, it will be terminated, and the action is considered failed.
-                        - If an action produces any data as output, it should be written to stdout,
-                          or included in the HTTP response payload for HTTP actions.
-                        - If an action encounters any errors, error messages should be written to stderr,
-                          or detailed in the HTTP response with the appropriate non-2xx status code.
+                      Defines the procedure for importing data into a replica.
+                      Data is received through stdin. The action must be idempotent to allow retries from the beginning.
                     properties:
                       exec:
                         description: |-
@@ -3445,9 +3401,8 @@ spec:
                     type: string
                   memberJoin:
                     description: |-
-                      MemberJoin and MemberLeave opt in to workload-owned membership changes.
-                      Initial engine bootstrap keeps membership unknown until an action records a result.
-                      Workload-owned member actions must use blocking execution and Immediately or unset preconditions.
+                      Defines the procedure to add a new replica to the replication group.
+                      This action is initiated after a replica Pod becomes ready.
                     properties:
                       exec:
                         description: |-
@@ -3886,52 +3841,8 @@ spec:
                     type: object
                   memberLeave:
                     description: |-
-                      Action defines a customizable hook or procedure tailored for different database engines,
-                      designed to be invoked at predetermined points within the lifecycle of a Component instance.
-                      It provides a modular and extensible way to customize a Component's behavior through the execution of defined actions.
-
-                      Action should be idempotent if possible. In some circumstances (for example, an UPDATE to an k8s object fails due to concurrent updates),
-                      the action may be retried even after a success.
-
-                      Available Action triggers include:
-
-                        - `postProvision`: Defines the hook to be executed after the creation of a Component,
-                          with `preCondition` specifying when the action should be fired relative to the Component's lifecycle stages:
-                          `Immediately`, `RuntimeReady`, `ComponentReady`, and `ClusterReady`.
-                        - `preTerminate`: Defines the hook to be executed before terminating a Component.
-                        - `roleProbe`: Defines the procedure which is invoked regularly to assess the role of replicas.
-                        - `availableProbe`: Defines the procedure which is invoked regularly to assess the availability of the component.
-                        - `switchover`: Defines the procedure for a controlled transition of a role to a new replica.
-                        - `memberJoin`: Defines the procedure to add a new replica to the replication group.
-                        - `memberLeave`: Defines the method to remove a replica from the replication group.
-                        - `readOnly`: Defines the procedure to switch a replica into the read-only state.
-                        - `readWrite`: Defines the procedure to transition a replica from the read-only state back to the read-write state.
-                        - `dataDump`: Defines the procedure to export the data from a replica.
-                        - `dataLoad`: Defines the procedure to import data into a replica.
-                        - `reconfigure`: Defines the procedure that update a replica with new configuration.
-                        - `accountProvision`: Defines the procedure to generate a new database account.
-
-                      Actions can be executed in different ways:
-
-                        - ExecAction: Executes a command inside a container.
-                          A set of predefined environment variables are available and can be leveraged within the `exec.command`
-                          to access context information such as details about pods, components, the overall cluster state,
-                          or database connection credentials.
-                          These variables provide a dynamic and context-aware mechanism for script execution.
-                        - HTTPAction: Performs a single HTTP(S) request.
-                        - GRPCAction: Issues a unary gRPC call to a target service.
-                          This allows developers to implement Actions using plugins written in programming language like Go,
-                          providing greater flexibility and extensibility.
-
-                      An action is considered successful on returning 0, or HTTP 2xx for status HTTP actions.
-                      Any other return value or HTTP status codes indicate failure,
-                      and the action may be retried based on the configured retry policy.
-
-                        - If an action exceeds the specified timeout duration, it will be terminated, and the action is considered failed.
-                        - If an action produces any data as output, it should be written to stdout,
-                          or included in the HTTP response payload for HTTP actions.
-                        - If an action encounters any errors, error messages should be written to stderr,
-                          or detailed in the HTTP response with the appropriate non-2xx status code.
+                      Defines the procedure to remove a replica from the replication group.
+                      The operator waits for successful completion before releasing the replica and cleaning up its resources.
                     properties:
                       exec:
                         description: |-
@@ -4369,7 +4280,7 @@ spec:
                         type: integer
                     type: object
                   reconfigure:
-                    description: Defines the procedure that update replicas with new
+                    description: Defines the procedure to update a replica with new
                       configuration.
                     properties:
                       exec:

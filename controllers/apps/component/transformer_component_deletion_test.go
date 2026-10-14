@@ -22,6 +22,7 @@ package component
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -37,8 +38,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -46,6 +49,9 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 func failedRestoreFixture() (*appsv1.Component, *dpv1alpha1.Restore, *corev1.PersistentVolumeClaim) {
@@ -283,10 +289,28 @@ func restoreMount(name string) []corev1.Volume {
 	return []corev1.Volume{{Name: "data", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: name}}}}
 }
 
-func prepareJobFixture(restore *dpv1alpha1.Restore, pvc *corev1.PersistentVolumeClaim) *batchv1.Job {
-	return &batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "prepare", Namespace: restore.Namespace, UID: "job-uid",
-		OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(restore, dpv1alpha1.GroupVersion.WithKind("Restore"))}},
-		Spec: batchv1.JobSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{Volumes: restoreMount(pvc.Name)}}}, Status: batchv1.JobStatus{Active: 1}}
+func prepareJobFixture(t *testing.T, restore *dpv1alpha1.Restore, pvc *corev1.PersistentVolumeClaim) *batchv1.Job {
+	t.Helper()
+	restore.Spec.PrepareDataConfig.RestoreVolumeClaimsTemplate.Templates[0].MountPath = "/data"
+	cli := failedRestoreClient(pvc)
+	manager := dprestore.NewRestoreManager(restore, record.NewFakeRecorder(8), model.GetScheme(), cli)
+	backupSet := dprestore.BackupActionSet{Backup: &dpv1alpha1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "source-backup", Namespace: restore.Namespace}},
+		ActionSet: &dpv1alpha1.ActionSet{Spec: dpv1alpha1.ActionSetSpec{Restore: &dpv1alpha1.RestoreActionSpec{PrepareData: &dpv1alpha1.JobActionSpec{BaseJobActionSpec: dpv1alpha1.BaseJobActionSpec{Image: "test-image", Command: []string{"true"}}}}}}}
+	reqCtx := intctrlutil.RequestCtx{Ctx: context.Background(), Req: ctrl.Request{NamespacedName: client.ObjectKeyFromObject(restore)}}
+	jobs, err := manager.BuildPrepareDataJobs(reqCtx, cli, backupSet, &dpv1alpha1.BackupStatusTarget{BackupTarget: dpv1alpha1.BackupTarget{PodSelector: &dpv1alpha1.PodSelector{Strategy: dpv1alpha1.PodSelectionStrategyAny}}}, "prepareData")
+	if err != nil || len(jobs) != 1 {
+		t.Fatalf("real prepare Job builder: jobs=%d error=%v", len(jobs), err)
+	}
+	if !controllerutil.ContainsFinalizer(jobs[0], dptypes.DataProtectionFinalizerName) {
+		t.Fatal("real prepare Job must carry the DP finalizer")
+	}
+	jobs[0].UID = "job-uid"
+	jobs[0].Status.Active = 1
+	created, err := manager.CreateJobsIfNotExist(reqCtx, cli, restore, jobs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return created[0]
 }
 
 func planFailedRestoreDeletion(t *testing.T, cli client.Client, comp *appsv1.Component) (*graph.DAG, model.GraphClient, *componentTransformContext) {
@@ -306,17 +330,25 @@ func planFailedRestoreDeletion(t *testing.T, cli client.Client, comp *appsv1.Com
 
 func TestFailedRestoreStopsJobAndWaitsForPodsBeforePVC(t *testing.T) {
 	comp, restore, pvc := failedRestoreFixture()
-	job := prepareJobFixture(restore, pvc)
+	job := prepareJobFixture(t, restore, pvc)
 	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "prepare-pod", Namespace: job.Namespace, UID: "pod-uid",
 		OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(job, batchv1.SchemeGroupVersion.WithKind("Job"))}},
 		Spec: corev1.PodSpec{NodeName: "node", Volumes: restoreMount(pvc.Name)}, Status: corev1.PodStatus{Phase: corev1.PodRunning}}
 	cli := &restorePVCDeleteRecorder{Client: failedRestoreClient(restore, pvc, job, pod)}
 	dag, graphCli, transCtx := planFailedRestoreDeletion(t, cli, comp)
 	vertex := graphCli.FindMatchedVertex(dag, job).(*model.ObjectVertex)
+	builder := &componentPlanBuilder{cli: cli, transCtx: transCtx}
+	if vertex.Action == nil || *vertex.Action != model.UPDATE || graphCli.FindMatchedVertex(dag, pvc) != nil {
+		t.Fatal("DP finalizer must be removed before Job/PVC deletion")
+	}
+	if err := builder.reconcileUpdateObject(context.Background(), vertex); err != nil {
+		t.Fatal(err)
+	}
+	dag, graphCli, _ = planFailedRestoreDeletion(t, cli, comp)
+	vertex = graphCli.FindMatchedVertex(dag, job).(*model.ObjectVertex)
 	if vertex.PropagationPolicy != client.PropagationPolicy(metav1.DeletePropagationForeground) || graphCli.FindMatchedVertex(dag, pvc) != nil {
 		t.Fatal("Job must be foreground-deleted before the PVC")
 	}
-	builder := &componentPlanBuilder{cli: cli, transCtx: transCtx}
 	if err := builder.reconcileDeleteObject(context.Background(), vertex); err != nil {
 		t.Fatal(err)
 	}
@@ -362,7 +394,7 @@ func TestFailedRestoreKeepsUnrelatedReferences(t *testing.T) {
 	for _, owner := range []string{"old-restore-uid", "other-component-restore-uid"} {
 		t.Run(owner, func(t *testing.T) {
 			comp, restore, pvc := failedRestoreFixture()
-			job := prepareJobFixture(restore, pvc)
+			job := prepareJobFixture(t, restore, pvc)
 			job.OwnerReferences[0].UID = types.UID(owner)
 			cli := failedRestoreClient(restore, pvc, job)
 			dag, graphCli, _ := planFailedRestoreDeletion(t, cli, comp)
@@ -386,7 +418,7 @@ func TestFailedRestoreDoesNotTouchAnotherComponent(t *testing.T) {
 	otherPVC.Name, otherPVC.UID = "data-cluster-other-3", "other-pvc-uid"
 	otherPVC.Labels = otherRestore.Labels
 	otherPVC.Annotations[constant.RestorePVCComponentUIDAnnotationKey] = "other-component-uid"
-	otherJob := prepareJobFixture(otherRestore, otherPVC)
+	otherJob := prepareJobFixture(t, otherRestore, otherPVC)
 	cli := failedRestoreClient(restore, pvc, otherRestore, otherPVC, otherJob)
 	dag, graphCli, _ := planFailedRestoreDeletion(t, cli, comp)
 	if !graphCli.IsAction(dag, pvc, model.ActionDeletePtr()) || graphCli.FindMatchedVertex(dag, otherPVC) != nil || graphCli.FindMatchedVertex(dag, otherJob) != nil {
@@ -396,7 +428,7 @@ func TestFailedRestoreDoesNotTouchAnotherComponent(t *testing.T) {
 
 func TestFailedRestoreJobDeletionProtectsReplacedJob(t *testing.T) {
 	_, restore, pvc := failedRestoreFixture()
-	oldJob := prepareJobFixture(restore, pvc)
+	oldJob := prepareJobFixture(t, restore, pvc)
 	oldJob.ResourceVersion = "10"
 	liveUID := types.UID("replacement-job-uid")
 	deleted := false
@@ -434,5 +466,131 @@ func TestFailedRestoreJobDeletionProtectsReplacedJob(t *testing.T) {
 	if !apierrors.IsConflict(err) || deleted || requested.Preconditions == nil || requested.Preconditions.UID == nil || *requested.Preconditions.UID != oldJob.UID ||
 		requested.Preconditions.ResourceVersion == nil || *requested.Preconditions.ResourceVersion != oldJob.ResourceVersion || requested.PropagationPolicy == nil || *requested.PropagationPolicy != metav1.DeletePropagationForeground {
 		t.Fatalf("replacement Job protection: options=%#v deleted=%v error=%v", requested, deleted, err)
+	}
+}
+
+func TestFailedRestoreDPFinalizerLifecycle(t *testing.T) {
+	for _, deleting := range []bool{false, true} {
+		for _, foreign := range []bool{false, true} {
+			name := fmt.Sprintf("deleting=%t/foreign=%t", deleting, foreign)
+			t.Run(name, func(t *testing.T) {
+				comp, restore, pvc := failedRestoreFixture()
+				job := prepareJobFixture(t, restore, pvc)
+				if foreign {
+					job.Finalizers = append(job.Finalizers, "example.test/hold")
+				}
+				cli := failedRestoreClient(restore, pvc, job)
+				if deleting {
+					if err := cli.Delete(context.Background(), job); err != nil {
+						t.Fatal(err)
+					}
+				}
+				dag, graphCli, transCtx := planFailedRestoreDeletion(t, cli, comp)
+				vertex := graphCli.FindMatchedVertex(dag, job).(*model.ObjectVertex)
+				if vertex.Action == nil || *vertex.Action != model.UPDATE || graphCli.FindMatchedVertex(dag, pvc) != nil {
+					t.Fatal("only DP-finalizer update is allowed first")
+				}
+				updated := vertex.Obj.(*batchv1.Job)
+				if controllerutil.ContainsFinalizer(updated, dptypes.DataProtectionFinalizerName) || controllerutil.ContainsFinalizer(updated, "example.test/hold") != foreign {
+					t.Fatalf("incorrect finalizer removal: %v", updated.Finalizers)
+				}
+				builder := &componentPlanBuilder{cli: cli, transCtx: transCtx}
+				if err := builder.reconcileUpdateObject(context.Background(), vertex); err != nil {
+					t.Fatal(err)
+				}
+				current := &batchv1.Job{}
+				err := cli.Get(context.Background(), client.ObjectKeyFromObject(job), current)
+				if deleting && !foreign {
+					if !apierrors.IsNotFound(err) {
+						t.Fatalf("last DP finalizer must release a deleting Job: %v", err)
+					}
+				} else {
+					if err != nil {
+						t.Fatal(err)
+					}
+					dag, graphCli, _ = planFailedRestoreDeletion(t, cli, comp)
+					vertex = graphCli.FindMatchedVertex(dag, job).(*model.ObjectVertex)
+					if vertex.Action == nil || *vertex.Action != model.DELETE || graphCli.FindMatchedVertex(dag, pvc) != nil {
+						t.Fatal("observe DP finalizer removal before foreground deletion")
+					}
+					if err := builder.reconcileDeleteObject(context.Background(), vertex); err != nil {
+						t.Fatal(err)
+					}
+					err = cli.Get(context.Background(), client.ObjectKeyFromObject(job), current)
+					if foreign {
+						if err != nil || !controllerutil.ContainsFinalizer(current, "example.test/hold") {
+							t.Fatal("foreign finalizer must be preserved")
+						}
+						dag, graphCli, _ = planFailedRestoreDeletion(t, cli, comp)
+						if graphCli.FindMatchedVertex(dag, pvc) != nil {
+							t.Fatal("foreign-finalized Job must continue protecting its claim")
+						}
+					} else if !apierrors.IsNotFound(err) {
+						t.Fatalf("Job cleanup remained blocked: %v", err)
+					}
+				}
+				if err := cli.Get(context.Background(), client.ObjectKeyFromObject(restore), &dpv1alpha1.Restore{}); err != nil {
+					t.Fatal("Restore evidence must be retained")
+				}
+			})
+		}
+	}
+}
+
+func TestFailedRestoreDPFinalizerUpdatePreconditions(t *testing.T) {
+	for _, mode := range []string{"matching", "replaced UID", "adopted resourceVersion"} {
+		t.Run(mode, func(t *testing.T) {
+			comp, restore, pvc := failedRestoreFixture()
+			job := prepareJobFixture(t, restore, pvc)
+			job.ResourceVersion = "10"
+			job.Finalizers = append(job.Finalizers, "example.test/hold")
+			dag, graphCli, _ := planFailedRestoreDeletion(t, failedRestoreClient(restore, pvc, job), comp)
+			vertex := graphCli.FindMatchedVertex(dag, job).(*model.ObjectVertex)
+			liveUID, liveVersion := job.UID, job.ResourceVersion
+			if mode == "replaced UID" {
+				liveUID = "replacement-uid"
+			}
+			if mode == "adopted resourceVersion" {
+				liveVersion = "11"
+			}
+			var request batchv1.Job
+			mutated := false
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodPut || r.URL.Path != "/apis/batch/v1/namespaces/default/jobs/"+job.Name {
+					t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+				}
+				if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+					t.Error(err)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				if request.UID != liveUID || request.ResourceVersion != liveVersion {
+					w.WriteHeader(http.StatusConflict)
+					_ = json.NewEncoder(w).Encode(&metav1.Status{TypeMeta: metav1.TypeMeta{Kind: "Status", APIVersion: "v1"}, Status: metav1.StatusFailure, Reason: metav1.StatusReasonConflict, Code: http.StatusConflict})
+					return
+				}
+				mutated = true
+				request.ResourceVersion = "11"
+				_ = json.NewEncoder(w).Encode(&request)
+			}))
+			defer server.Close()
+			scheme := runtime.NewScheme()
+			if err := batchv1.AddToScheme(scheme); err != nil {
+				t.Fatal(err)
+			}
+			mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{batchv1.SchemeGroupVersion})
+			mapper.Add(batchv1.SchemeGroupVersion.WithKind("Job"), meta.RESTScopeNamespace)
+			cli, err := client.New(&rest.Config{Host: server.URL, ContentConfig: rest.ContentConfig{ContentType: runtime.ContentTypeJSON}}, client.Options{Scheme: scheme, Mapper: mapper})
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = (&componentPlanBuilder{cli: cli}).reconcileUpdateObject(context.Background(), vertex)
+			if mode == "matching" {
+				if err != nil || !mutated || request.UID != job.UID || len(request.Finalizers) != 1 || request.Finalizers[0] != "example.test/hold" {
+					t.Fatalf("guarded finalizer update: %#v %v", request.ObjectMeta, err)
+				}
+			} else if !apierrors.IsConflict(err) || mutated {
+				t.Fatalf("stale Update must preserve replacement/adopted Job: %v", err)
+			}
+		})
 	}
 }

@@ -34,6 +34,7 @@ import (
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 func TestFailedRestoreCanKeepActivePrepareJob(t *testing.T) {
@@ -46,7 +47,7 @@ func TestFailedRestoreCanKeepActivePrepareJob(t *testing.T) {
 	restore := &dpv1alpha1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: "default", UID: "restore-uid"},
 		Spec:   dpv1alpha1.RestoreSpec{Backup: dpv1alpha1.BackupRef{Name: "removed-backup", Namespace: "default"}},
 		Status: dpv1alpha1.RestoreStatus{Phase: dpv1alpha1.RestorePhaseRunning}}
-	job := &batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "prepare", Namespace: restore.Namespace, UID: "job-uid",
+	job := &batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "prepare", Namespace: restore.Namespace, UID: "job-uid", Finalizers: []string{dptypes.DataProtectionFinalizerName},
 		OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(restore, dpv1alpha1.GroupVersion.WithKind("Restore"))}},
 		Spec:   batchv1.JobSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{Volumes: []corev1.Volume{{Name: "data", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "data-target-db-0"}}}}}}},
 		Status: batchv1.JobStatus{Active: 1}}

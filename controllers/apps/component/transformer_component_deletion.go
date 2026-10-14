@@ -44,6 +44,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 // componentDeletionTransformer handles component deletion
@@ -271,6 +272,13 @@ func stopFailedRestoreJobs(transCtx *componentTransformContext, graphCli model.G
 		}
 		restore := owners[owner.UID]
 		if restore == nil || owner.Name != restore.Name || owner.Kind != "Restore" {
+			continue
+		}
+		if controllerutil.ContainsFinalizer(job, dptypes.DataProtectionFinalizerName) {
+			updated := job.DeepCopy()
+			controllerutil.RemoveFinalizer(updated, dptypes.DataProtectionFinalizerName)
+			// Update preserves UID/RV checks; observe finalizer removal before foreground deletion.
+			graphCli.Update(dag, job, updated)
 			continue
 		}
 		// Delete currently drops propagation options; Do retains foreground deletion in the graph.

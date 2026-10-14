@@ -59,6 +59,7 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	stopping := isStopRequested(its)
 	// 1. get all pods
 	pods := tree.List(&corev1.Pod{})
 	var podList []*corev1.Pod
@@ -128,9 +129,13 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			}
 		}
 		if isCreated(pod) && !isTerminating(pod) {
-			updated, err1 := isPodUpdated(its, pod)
-			if err1 != nil {
-				return kubebuilderx.Continue, err1
+			updated := false
+			if !stopping {
+				var err1 error
+				updated, err1 = isPodUpdated(its, pod)
+				if err1 != nil {
+					return kubebuilderx.Continue, err1
+				}
 			}
 			switch _, ok := updateRevisions[pod.Name]; {
 			case !ok, !updated:
@@ -206,7 +211,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.Continue, err
 	}
 
-	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
+	if !stopping && its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 
@@ -468,12 +473,24 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	}
 	offlineNames := append([]string(nil), its.Spec.OfflineInstances...)
 	templateHints := make([]instancestatus.TemplateAssignment, 0, len(desiredTemplateAssignments)+len(pods)+len(offlineNames))
-	if isStopRequested(its) {
-		// Stop removes the desired Pod assignments, but they remain useful for retaining template identity
-		// while the corresponding Pods are draining or have already disappeared.
+	retainedTemplates := make(map[string]string, len(pods)+len(its.Status.InstanceStatus))
+	for _, pod := range pods {
+		if template, ok := instancetemplate.TemplateNameFromLabels(pod.Labels); ok {
+			retainedTemplates[pod.Name] = template
+		}
+	}
+	for _, status := range its.Status.InstanceStatus {
+		if status.TemplateName != nil {
+			retainedTemplates[status.PodName] = *status.TemplateName
+		}
+	}
+	stopped := isStopRequested(its)
+	if stopped {
 		for _, assignment := range desiredTemplateAssignments {
 			offlineNames = append(offlineNames, assignment.InstanceName)
-			templateHints = append(templateHints, assignment)
+			if _, known := retainedTemplates[assignment.InstanceName]; !known {
+				retainedTemplates[assignment.InstanceName] = assignment.TemplateName
+			}
 		}
 		desiredTemplateAssignments = nil
 	}
@@ -481,37 +498,13 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	observations := make([]instancestatus.Observation, 0, len(pods))
 	roleMap := composeRoleMap(*its)
 	for _, pod := range pods {
-		state := workloads.InstanceCurrentStatePresent
-		if !pod.DeletionTimestamp.IsZero() {
-			state = workloads.InstanceCurrentStateTerminating
-		}
-		if templateName, ok := instancetemplate.TemplateNameFromLabels(pod.Labels); ok {
-			templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: pod.Name, TemplateName: templateName})
-		}
-		ready := state == workloads.InstanceCurrentStatePresent && isImageMatched(pod) && intctrlutil.IsPodReady(pod)
-		observation := instancestatus.Observation{
-			InstanceName: pod.Name,
-			State:        state,
-			Revision:     getPodRevision(pod),
-			Ready:        ready,
-			Available:    ready && intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds),
-			Failed:       instancePodFailed(pod),
-		}
-		if state == workloads.InstanceCurrentStatePresent && intctrlutil.PodIsReadyWithLabel(*pod) {
-			if role, ok := roleMap[getRoleName(pod)]; ok {
-				observation.Role = role.Name
-			}
-		}
-		configs, err := configsFromPod(pod)
+		observation, err := observePodRuntime(its, pod, roleMap)
 		if err != nil {
 			return err
 		}
-		for _, config := range configs {
-			observation.Configs = append(observation.Configs, workloads.InstanceConfigStatus{Name: config.Name, ConfigHash: config.ConfigHash})
-		}
-		if state == workloads.InstanceCurrentStatePresent && isCreated(pod) {
+		if observation.State == workloads.InstanceCurrentStatePresent && isCreated(pod) {
 			template := desiredTemplates[pod.Name]
-			if _, active := desiredNames[pod.Name]; active && template != nil {
+			if _, active := desiredNames[pod.Name]; !stopped && active && template != nil {
 				podApplied, err := isDesiredPodApplied(its, pod, template)
 				if err != nil {
 					return err
@@ -531,7 +524,11 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	}
 
 	for _, name := range append(append([]string(nil), offlineNames...), podObservationNames(observations)...) {
-		if _, ok := desiredNames[name]; ok {
+		if _, ok := desiredNames[name]; !stopped && ok {
+			continue
+		}
+		if templateName, ok := retainedTemplates[name]; ok {
+			templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: name, TemplateName: templateName})
 			continue
 		}
 		if templateName, ok, err := instancetemplate.ResolveHistoricalTemplate(its, name, templateNames); err != nil {
@@ -576,6 +573,35 @@ func cleanupResourceObservations(tree *kubebuilderx.ObjectTree, its *workloads.I
 		resources = append(resources, instancestatus.ResourceObservation{InstanceName: name, StorageCleanup: true})
 	}
 	return resources
+}
+
+func observePodRuntime(its *workloads.InstanceSet, pod *corev1.Pod, roles map[string]workloads.ReplicaRole) (instancestatus.Observation, error) {
+	observation := instancestatus.Observation{
+		InstanceName: pod.Name,
+		State:        workloads.InstanceCurrentStatePresent,
+		Revision:     getPodRevision(pod),
+	}
+	if !pod.DeletionTimestamp.IsZero() {
+		observation.State = workloads.InstanceCurrentStateTerminating
+		return observation, nil
+	}
+
+	observation.Ready = isImageMatched(pod) && intctrlutil.IsPodReady(pod)
+	observation.Available = observation.Ready && intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds)
+	observation.Failed = instancePodFailed(pod)
+	if intctrlutil.PodIsReadyWithLabel(*pod) {
+		if role, ok := roles[getRoleName(pod)]; ok {
+			observation.Role = role.Name
+		}
+	}
+	configs, err := configsFromPod(pod)
+	if err != nil && !isStopRequested(its) {
+		return observation, err
+	}
+	for _, config := range configs {
+		observation.Configs = append(observation.Configs, workloads.InstanceConfigStatus{Name: config.Name, ConfigHash: config.ConfigHash})
+	}
+	return observation, nil
 }
 
 func podObservationNames(observations []instancestatus.Observation) []string {

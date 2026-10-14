@@ -147,7 +147,7 @@ func (r *lifecycleReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 	// Cleanup and regeneration change only the Instance input. Commit before membership calls.
 	for _, inst := range instances {
 		status := instanceLifecycleStatus(its, inst.Name)
-		if status == nil || status.DataLoaded == nil || status.EffectiveDesiredState() != workloads.InstanceDesiredStateActive || !inst.DeletionTimestamp.IsZero() {
+		if status == nil || status.DataLoaded == nil || status.EffectiveDesiredState() != workloads.InstanceDesiredStateActive || !inst.DeletionTimestamp.IsZero() || ptr.Deref(inst.Spec.Stop, false) {
 			continue
 		}
 		desired := inst.DeepCopy()
@@ -174,7 +174,7 @@ func (r *lifecycleReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 			if err != nil {
 				return kubebuilderx.Continue, err
 			}
-			if current == nil || !current.GetDeletionTimestamp().IsZero() {
+			if current == nil || !current.GetDeletionTimestamp().IsZero() || ptr.Deref(current.(*workloads.Instance).Spec.Stop, false) {
 				continue
 			}
 		}

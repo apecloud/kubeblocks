@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -102,6 +103,9 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 				Name: templateName,
 			}
 		}
+		if hasObservedStoppedRuntime(inst) {
+			continue
+		}
 		{
 			notReadyNames.Insert(inst.Name)
 			replicas++
@@ -120,7 +124,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 		currentRevisions[inst.Name] = getInstanceRevision(inst)
 		if !intctrlutil.IsInstanceTerminating(inst) {
-			if isInstanceUpdatedWithRevisions(inst, currentRevisions[inst.Name], updateRevisions) {
+			if !isStopRequested(its) && isInstanceUpdatedWithRevisions(inst, currentRevisions[inst.Name], updateRevisions) {
 				updatedReplicas++
 				template2TemplatesStatus[templateName].UpdatedReplicas++
 			} else {
@@ -184,7 +188,11 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.Continue, err
 	}
 
-	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
+	pendingLifecycle := isStopRequested(its)
+	for _, inst := range instanceList {
+		pendingLifecycle = pendingLifecycle || ptr.Deref(inst.Spec.Stop, false)
+	}
+	if !pendingLifecycle && its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	return kubebuilderx.Continue, nil
@@ -370,6 +378,12 @@ func buildFailureCondition(its *workloads.InstanceSet, instances []*workloads.In
 }
 
 func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, instances []*workloads.Instance) error {
+	for _, inst := range instances {
+		if (isStopRequested(its) || ptr.Deref(inst.Spec.Stop, false)) &&
+			(inst.Status.CurrentState == "" || (inst.Status.CurrentState == workloads.InstanceCurrentStateAbsent && !hasObservedStoppedRuntime(inst))) {
+			return nil
+		}
+	}
 	desiredAssignments, templateNames, err := instancetemplate.BuildAssignments(tree, its)
 	if err != nil {
 		return err
@@ -398,12 +412,22 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	}
 	offlineNames := append([]string(nil), its.Spec.OfflineInstances...)
 	templateHints := make([]instancestatus.TemplateAssignment, 0, len(desiredTemplateAssignments)+len(instances)+len(offlineNames))
-	if its.Spec.Stop != nil && *its.Spec.Stop {
-		// Stop removes the desired Pod assignments, but they remain useful for retaining template identity
-		// while the corresponding Instances are draining or have already disappeared.
+	retainedTemplates := make(map[string]string, len(instances)+len(its.Status.InstanceStatus))
+	for _, inst := range instances {
+		retainedTemplates[inst.Name] = inst.Spec.InstanceTemplateName
+	}
+	for _, status := range its.Status.InstanceStatus {
+		if status.TemplateName != nil {
+			retainedTemplates[status.PodName] = *status.TemplateName
+		}
+	}
+	stopped := its.Spec.Stop != nil && *its.Spec.Stop
+	if stopped {
 		for _, assignment := range desiredTemplateAssignments {
 			offlineNames = append(offlineNames, assignment.InstanceName)
-			templateHints = append(templateHints, assignment)
+			if _, known := retainedTemplates[assignment.InstanceName]; !known {
+				retainedTemplates[assignment.InstanceName] = assignment.TemplateName
+			}
 		}
 		desiredTemplateAssignments = nil
 	}
@@ -424,10 +448,6 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 			return fmt.Errorf("duplicate Instance object for %q", inst.Name)
 		}
 		seenInstances[inst.Name] = struct{}{}
-		templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: inst.Name, TemplateName: inst.Spec.InstanceTemplateName})
-		if templateName, ok := instancetemplate.TemplateNameFromLabels(inst.Labels); ok {
-			templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: inst.Name, TemplateName: templateName})
-		}
 		switch inst.Status.CurrentState {
 		case workloads.InstanceCurrentStatePresent, workloads.InstanceCurrentStateTerminating:
 			// InstanceSet revisions identify desired Instance specs, while Instance CurrentRevision identifies the
@@ -457,7 +477,11 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	}
 
 	for _, name := range append(append([]string(nil), offlineNames...), observationNames(observations)...) {
-		if _, ok := desiredNames[name]; ok {
+		if _, ok := desiredNames[name]; !stopped && ok {
+			continue
+		}
+		if templateName, ok := retainedTemplates[name]; ok {
+			templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: name, TemplateName: templateName})
 			continue
 		}
 		if templateName, ok, err := instancetemplate.ResolveHistoricalTemplate(its, name, templateNames); err != nil {

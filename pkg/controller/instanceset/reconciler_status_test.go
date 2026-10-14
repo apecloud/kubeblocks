@@ -56,7 +56,7 @@ var _ = Describe("status reconciler test", func() {
 		priorityMap = ComposeRolePriorityMap(its.Spec.Roles)
 	})
 
-	It("does not publish any status field from a partial flat allocation", func() {
+	It("publishes absent desired instances after explicit flat ordinal transfer", func() {
 		replicas, one := int32(2), int32(1)
 		its = &workloads.InstanceSet{
 			ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", Generation: 3},
@@ -78,17 +78,24 @@ var _ = Describe("status reconciler test", func() {
 				AssignedOrdinals: map[string]workloads.Ordinals{
 					"a": {Discrete: []int32{0}}, "b": {Discrete: []int32{1}},
 				},
-				InstanceStatus: []workloads.InstanceStatus{{PodName: "demo-a-0"}},
+				InstanceStatus: []workloads.InstanceStatus{{PodName: "demo-0"}, {PodName: "demo-1"}},
 			},
 		}
-		before := its.DeepCopy().Status
 		tree := kubebuilderx.NewObjectTree()
 		tree.SetRoot(its)
 
 		result, err := NewStatusReconciler().Reconcile(tree)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(result).Should(Equal(kubebuilderx.Continue))
-		Expect(its.Status).Should(Equal(before))
+		Expect(its.Status.ReadyReplicas).Should(BeZero())
+		Expect(its.Status.InstanceStatus).Should(HaveLen(2))
+		for name, template := range map[string]string{"demo-0": "b", "demo-1": "a"} {
+			status := its.FindInstanceStatus(name)
+			Expect(status).ShouldNot(BeNil())
+			Expect(status.TemplateName).Should(Equal(ptr.To(template)))
+			Expect(status.DesiredState).Should(Equal(workloads.InstanceDesiredStateActive))
+			Expect(status.CurrentState).Should(Equal(workloads.InstanceCurrentStateAbsent))
+		}
 	})
 
 	It("uses the active flat allocation while the current Pod still carries the old template", func() {

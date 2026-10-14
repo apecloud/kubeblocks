@@ -85,22 +85,26 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	oldNameSet := sets.New[string]()
 	oldInstanceMap := make(map[string]*corev1.Pod)
 	var oldPodList []*corev1.Pod
+	result := kubebuilderx.Continue
 	for _, object := range tree.List(&corev1.Pod{}) {
 		oldNameSet.Insert(object.GetName())
 		pod, _ := object.(*corev1.Pod)
 		oldInstanceMap[object.GetName()] = pod
 		oldPodList = append(oldPodList, pod)
+		if newNameSet.Has(pod.Name) && isTerminating(pod) {
+			result = kubebuilderx.RetryAfter(time.Second)
+		}
 	}
 	updateNameSet := oldNameSet.Intersection(newNameSet)
 	if len(updateNameSet) != len(oldNameSet) || len(updateNameSet) != len(newNameSet) {
 		tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s instances are not aligned", its.Namespace, its.Name))
-		return kubebuilderx.Continue, nil
+		return result, nil
 	}
 
 	// 3. do update
 	// do nothing if update strategy type is 'OnDelete'
 	if its.Spec.InstanceUpdateStrategy != nil && its.Spec.InstanceUpdateStrategy.Type == kbappsv1.OnDeleteStrategyType {
-		return kubebuilderx.Continue, nil
+		return result, nil
 	}
 
 	// handle 'RollingUpdate'
@@ -124,6 +128,9 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		if i >= rollingUpdateQuota {
 			break
 		}
+		if isTerminating(pod) {
+			continue
+		}
 		updatePolicy, _, _, err := getPodUpdatePolicy(its, pod)
 		if err != nil {
 			return kubebuilderx.Continue, err
@@ -131,7 +138,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		if isPodPending(pod) && updatePolicy != noOpsPolicy {
 			err = tree.Delete(pod)
 			// wait another reconciliation, so that the following update process won't be confused
-			return kubebuilderx.Continue, err
+			return result, err
 		}
 	}
 
@@ -231,9 +238,12 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceUpdateRestricted))
 	}
 	if needRetry {
-		return kubebuilderx.RetryAfter(time.Second * time.Duration(its.Spec.MinReadySeconds)), nil
+		delay := time.Second * time.Duration(its.Spec.MinReadySeconds)
+		if result == kubebuilderx.Continue || delay < result.RetryAfter {
+			result = kubebuilderx.RetryAfter(delay)
+		}
 	}
-	return kubebuilderx.Continue, nil
+	return result, nil
 }
 
 func (r *updateReconciler) rollingUpdateQuota(its *workloads.InstanceSet, podList []*corev1.Pod) (int, int, error) {

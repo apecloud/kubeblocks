@@ -79,7 +79,7 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 
 // invalidateAffectedInstanceStatus preserves observations for unaffected instances while preventing
 // a stale UpToDate=true from crossing an InstanceSet generation that changed that instance's Pod,
-// dynamic config, or PVC expansion target. Instance readiness and allocation lifecycle are independent.
+// dynamic config, PVC expansion target, or Stop state. Instance readiness and allocation lifecycle are independent.
 func (r *revisionUpdateReconciler) invalidateAffectedInstanceStatus(its *workloads.InstanceSet,
 	desiredInstances map[string]*workloads.Instance, instances []client.Object) {
 	currentByName := make(map[string]*workloads.Instance, len(instances))
@@ -91,6 +91,10 @@ func (r *revisionUpdateReconciler) invalidateAffectedInstanceStatus(its *workloa
 		status := &its.Status.InstanceStatus[i]
 		if !status.UpToDate || status.EffectiveDesiredState() != workloads.InstanceDesiredStateActive ||
 			status.EffectiveCurrentState() != workloads.InstanceCurrentStatePresent {
+			continue
+		}
+		if isStopRequested(its) {
+			status.UpToDate = false
 			continue
 		}
 		desired, current := desiredInstances[status.PodName], currentByName[status.PodName]
@@ -142,6 +146,9 @@ func volumeExpansionTargetsApplied(current, desired *workloads.Instance) bool {
 }
 
 func (r *revisionUpdateReconciler) calculateUpdatedReplicas(its *workloads.InstanceSet, instances []client.Object) int32 {
+	if isStopRequested(its) {
+		return 0
+	}
 	updatedReplicas := int32(0)
 	for i := range instances {
 		inst, _ := instances[i].(*workloads.Instance)

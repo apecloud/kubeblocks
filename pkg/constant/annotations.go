@@ -32,6 +32,7 @@ const (
 	RestartAnnotationKey                 = "kubeblocks.io/restart"                   // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
 	RestoreFromBackupAnnotationKey       = "kubeblocks.io/restore-from-backup"
 	RestoreDoneAnnotationKey             = "kubeblocks.io/restore-done"
+	RestorePVCComponentUIDAnnotationKey  = "apps.kubeblocks.io/restore-pvc-component-uid"
 	BackupSourceTargetAnnotationKey      = "kubeblocks.io/backup-source-target" // RestoreFromBackupAnnotationKey specifies the component to recover from the backup.
 	SkipRestoreAnnotationKey             = "kubeblocks.io/skip-restore"         // SkipRestoreAnnotationKey indicates the shard component should skip sharding restore scheduling.
 

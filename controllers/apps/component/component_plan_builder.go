@@ -24,6 +24,7 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -230,6 +231,11 @@ func (c *componentPlanBuilder) reconcileDeleteObject(ctx context.Context, vertex
 	if !model.IsObjectDeleting(vertex.Obj) {
 		var opts []client.DeleteOption
 		opts = append(opts, appsutil.ClientOption(vertex))
+		if _, ok := vertex.Obj.(*corev1.PersistentVolumeClaim); ok && vertex.Obj.GetAnnotations()[constant.RestorePVCComponentUIDAnnotationKey] != "" {
+			uid := vertex.Obj.GetUID()
+			resourceVersion := vertex.Obj.GetResourceVersion()
+			opts = append(opts, client.Preconditions{UID: &uid, ResourceVersion: &resourceVersion})
+		}
 		if len(vertex.PropagationPolicy) > 0 {
 			opts = append(opts, vertex.PropagationPolicy)
 		}

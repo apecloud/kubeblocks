@@ -502,6 +502,16 @@ func (r *RestoreManager) createRestoreAndWait(compObj *appsv1.Component, restore
 			if !apierrors.IsNotFound(err) {
 				return err
 			}
+			if cfg := restore.Spec.PrepareDataConfig; cfg != nil && cfg.RestoreVolumeClaimsTemplate != nil && compObj.UID != "" {
+				// Mark only new restore claims; existing PVCs are left untouched by the restore controller.
+				for j := range cfg.RestoreVolumeClaimsTemplate.Templates {
+					claim := &cfg.RestoreVolumeClaimsTemplate.Templates[j]
+					if claim.Annotations == nil {
+						claim.Annotations = make(map[string]string)
+					}
+					claim.Annotations[constant.RestorePVCComponentUIDAnnotationKey] = string(compObj.UID)
+				}
+			}
 			if err = r.Client.Create(r.Ctx, restore); err != nil && !apierrors.IsAlreadyExists(err) {
 				return err
 			}

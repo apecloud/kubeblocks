@@ -25,12 +25,16 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -116,6 +120,18 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 		return graph.ErrPrematureStop
 	}
 
+	// Failed prepareData may leave claims before an InstanceSet can adopt them.
+	pvcs, err := failedRestorePVCs(transCtx, comp, matchLabels)
+	if err != nil {
+		return err
+	}
+	if len(pvcs) > 0 {
+		for _, pvc := range pvcs {
+			graphCli.Delete(dag, pvc)
+		}
+		return intctrlutil.NewRequeueError(time.Second, "not all failed restore PVCs deleted")
+	}
+
 	// secondly, delete the other sub-resources owned by the component
 	snapshot, err1 := model.ReadCacheSnapshot(transCtx, comp, matchLabels, kinds...)
 	if err1 != nil {
@@ -154,6 +170,56 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
 	return graph.ErrPrematureStop
+}
+
+func failedRestorePVCs(transCtx *componentTransformContext, comp *appsv1.Component, matchLabels map[string]string) ([]*corev1.PersistentVolumeClaim, error) {
+	if comp.UID == "" || (comp.Spec.TerminationPolicy != appsv1.Delete && comp.Spec.TerminationPolicy != appsv1.WipeOut) {
+		return nil, nil
+	}
+	if policy := comp.Spec.PersistentVolumeClaimRetentionPolicy; policy != nil {
+		retention := policy.WhenDeleted
+		if retention != "" && retention != appsv1.DeletePersistentVolumeClaimRetentionPolicyType {
+			return nil, nil
+		}
+	}
+	var restores dpv1alpha1.RestoreList
+	if err := transCtx.Client.List(transCtx.Context, &restores, client.InNamespace(comp.Namespace), client.MatchingLabels(matchLabels)); err != nil {
+		return nil, err
+	}
+	claims := make(map[string]dpv1alpha1.RestoreVolumeClaim)
+	for _, restore := range restores.Items {
+		owner := metav1.GetControllerOf(&restore)
+		cfg := restore.Spec.PrepareDataConfig
+		if owner == nil || owner.UID != comp.UID || owner.Name != comp.Name || owner.Kind != appsv1.ComponentKind ||
+			restore.Status.Phase != dpv1alpha1.RestorePhaseFailed || cfg == nil || cfg.RestoreVolumeClaimsTemplate == nil {
+			continue
+		}
+		template := cfg.RestoreVolumeClaimsTemplate
+		for _, claim := range template.Templates {
+			if claim.Annotations[constant.RestorePVCComponentUIDAnnotationKey] != string(comp.UID) {
+				continue
+			}
+			for i := int32(0); i < template.Replicas; i++ {
+				claims[fmt.Sprintf("%s-%d", claim.Name, template.StartingIndex+i)] = claim
+			}
+		}
+	}
+	var pvcs []*corev1.PersistentVolumeClaim
+	for name, claim := range claims {
+		pvc := &corev1.PersistentVolumeClaim{}
+		if err := transCtx.Client.Get(transCtx.Context, client.ObjectKey{Namespace: comp.Namespace, Name: name}, pvc); err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			return nil, err
+		}
+		if pvc.UID == "" || len(pvc.OwnerReferences) > 0 || pvc.Annotations[constant.RestorePVCComponentUIDAnnotationKey] != string(comp.UID) ||
+			!labels.SelectorFromSet(matchLabels).Matches(labels.Set(pvc.Labels)) || !labels.SelectorFromSet(claim.Labels).Matches(labels.Set(pvc.Labels)) {
+			continue
+		}
+		pvcs = append(pvcs, pvc)
+	}
+	return pvcs, nil
 }
 
 func handleRBACResourceDeletion(obj client.Object, transCtx *componentTransformContext, comp *appsv1.Component,

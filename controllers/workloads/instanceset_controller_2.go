@@ -59,8 +59,8 @@ func (r *InstanceSetReconciler2) Reconcile(ctx context.Context, req ctrl.Request
 		Do(instanceset2.NewStatusReconciler()).
 		Do(instanceset2.NewRevisionUpdateReconciler()).
 		Do(instanceset2.NewAssistantObjectReconciler()).
-		Do(instanceset2.NewUpdateReconciler()).
 		Do(instanceset2.NewAlignmentReconciler()).
+		Do(instanceset2.NewUpdateReconciler()).
 		Commit()
 }
 

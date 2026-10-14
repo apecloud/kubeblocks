@@ -28,7 +28,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -447,21 +446,7 @@ func isStopRequested(its *workloads.InstanceSet) bool {
 	return ptr.Deref(its.Spec.Stop, false)
 }
 
-func hasObservedAbsentRuntime(inst *workloads.Instance) bool {
-	if inst.Status.CurrentState != workloads.InstanceCurrentStateAbsent {
-		return false
-	}
-	if model.IsObjectDeleting(inst) {
-		condition := meta.FindStatusCondition(inst.Status.Conditions, string(workloads.InstanceRuntimeDeleted))
-		return condition != nil && condition.Status == metav1.ConditionTrue && condition.ObservedGeneration == inst.Generation
-	}
-	return inst.Generation == inst.Status.ObservedGeneration
-}
-
 func hasObservedStoppedRuntime(inst *workloads.Instance) bool {
-	return ptr.Deref(inst.Spec.Stop, false) && hasObservedAbsentRuntime(inst)
-}
-
-func isInstanceStopComplete(inst *workloads.Instance) bool {
-	return (ptr.Deref(inst.Spec.Stop, false) || model.IsObjectDeleting(inst)) && hasObservedAbsentRuntime(inst)
+	return ptr.Deref(inst.Spec.Stop, false) && inst.Generation == inst.Status.ObservedGeneration &&
+		inst.Status.CurrentState == workloads.InstanceCurrentStateAbsent
 }

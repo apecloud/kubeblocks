@@ -103,7 +103,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 				Name: templateName,
 			}
 		}
-		if hasObservedStoppedRuntime(inst) || (isStopRequested(its) && isInstanceStopComplete(inst)) {
+		if hasObservedStoppedRuntime(inst) {
 			continue
 		}
 		{
@@ -380,7 +380,7 @@ func buildFailureCondition(its *workloads.InstanceSet, instances []*workloads.In
 func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, instances []*workloads.Instance) error {
 	for _, inst := range instances {
 		if (isStopRequested(its) || ptr.Deref(inst.Spec.Stop, false)) &&
-			(inst.Status.CurrentState == "" || (inst.Status.CurrentState == workloads.InstanceCurrentStateAbsent && !hasObservedAbsentRuntime(inst))) {
+			(inst.Status.CurrentState == "" || (inst.Status.CurrentState == workloads.InstanceCurrentStateAbsent && !hasObservedStoppedRuntime(inst))) {
 			return nil
 		}
 	}

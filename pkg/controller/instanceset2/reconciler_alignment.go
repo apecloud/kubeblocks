@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset2
 
 import (
+	"time"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -212,38 +214,44 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 }
 
 func (r *alignmentReconciler) stopInstances(tree *kubebuilderx.ObjectTree, instances []client.Object, ordered bool, concurrency int) (kubebuilderx.Result, error) {
+	result := kubebuilderx.Continue
 	sortObjects(instances, nil, false)
 	if !ordered {
 		for _, obj := range instances {
 			inst := obj.(*workloads.Instance)
-			if (model.IsObjectDeleting(inst) || ptr.Deref(inst.Spec.Stop, false)) && !isInstanceStopComplete(inst) {
+			if (model.IsObjectDeleting(inst) || ptr.Deref(inst.Spec.Stop, false)) && !hasObservedStoppedRuntime(inst) {
 				concurrency--
 			}
 		}
 	}
 	for _, obj := range instances {
 		inst := obj.(*workloads.Instance)
-		if isInstanceStopComplete(inst) {
+		if hasObservedStoppedRuntime(inst) {
 			continue
 		}
-		if model.IsObjectDeleting(inst) || ptr.Deref(inst.Spec.Stop, false) {
+		if ptr.Deref(inst.Spec.Stop, false) {
 			if ordered {
 				break
 			}
 			continue
 		}
-		if !ordered && concurrency <= 0 {
-			break
+		deleting := model.IsObjectDeleting(inst)
+		if !deleting && !ordered && concurrency <= 0 {
+			continue
 		}
 		next := inst.DeepCopy()
 		next.Spec.Stop = ptr.To(true)
 		if err := tree.Update(next); err != nil {
 			return kubebuilderx.Continue, err
 		}
+		// Reload the API-assigned generation before evaluating Stop completion.
+		result = kubebuilderx.RetryAfter(time.Second)
 		if ordered {
 			break
 		}
-		concurrency--
+		if !deleting {
+			concurrency--
+		}
 	}
-	return kubebuilderx.Continue, nil
+	return result, nil
 }

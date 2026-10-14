@@ -1679,6 +1679,9 @@ func TestInstanceSetStopWaitsForDeletionObservation(t *testing.T) {
 	}
 	mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(true) })
 	reconcileParent()
+	if err := cli.Get(ctx, key, inst); err != nil || !ptr.Deref(inst.Spec.Stop, false) || inst.Generation <= generation || inst.Status.ObservedGeneration == inst.Generation {
+		t.Fatalf("deleting Instance Stop handoff did not invalidate the pre-deletion observation: %v", err)
+	}
 	remaining := &workloads.Instance{}
 	if err := cli.Get(ctx, client.ObjectKey{Namespace: "default", Name: "demo-0"}, remaining); err != nil || ptr.Deref(remaining.Spec.Stop, false) {
 		t.Fatalf("pre-deletion Absent released the Stop slot while the Pod was Running: %v", err)
@@ -1785,8 +1788,8 @@ func TestInstanceSetStopWaitsForRetiringRuntime(t *testing.T) {
 			if err := cli.Get(context.Background(), pvcKey, pvc); err != nil || pvc.DeletionTimestamp.IsZero() {
 				t.Fatalf("fixture did not hold PVC deletion: %v", err)
 			}
-			if err := cli.Get(context.Background(), client.ObjectKeyFromObject(held), child); err != nil || child.DeletionTimestamp.IsZero() || ptr.Deref(child.Spec.Stop, false) {
-				t.Fatalf("scale-down Instance should still be deleting without Stop: %v", err)
+			if err := cli.Get(context.Background(), client.ObjectKeyFromObject(held), child); err != nil || child.DeletionTimestamp.IsZero() || !ptr.Deref(child.Spec.Stop, false) {
+				t.Fatalf("scale-down Instance should still be deleting with Stop: %v", err)
 			}
 			if len(listSetStopPods(t, cli)) != 0 {
 				t.Fatal("PVC cleanup blocked Stop after the scale-down Pod disappeared")

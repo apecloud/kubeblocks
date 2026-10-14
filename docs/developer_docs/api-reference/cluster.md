@@ -19350,10 +19350,6 @@ Or, a NotReady reason with not ready instances encoded in the Message filed will
 </tr><tr><td><p>&#34;Restore&#34;</p></td>
 <td><p>InstanceRestore indicates whether the initial data restore for this Instance or InstanceSet has completed.</p>
 </td>
-</tr><tr><td><p>&#34;InstanceRuntimeDeleted&#34;</p></td>
-<td><p>InstanceRuntimeDeleted is True when the Instance controller observes no Pod during Instance deletion.
-It does not indicate that PVC or assistant-object cleanup has completed.</p>
-</td>
 </tr><tr><td><p>&#34;InstanceUpdateRestricted&#34;</p></td>
 <td><p>InstanceUpdateRestricted represents a ConditionType that indicates updates to an InstanceSet are blocked(when the
 PodUpdatePolicy is set to StrictInPlace but the pods cannot be updated in-place).</p>
@@ -20766,7 +20762,7 @@ Instance&rsquo;s generation, which is updated on mutation by the API Server.</p>
 <td>
 <em>(Optional)</em>
 <p>Represents the latest available observations of an instance&rsquo;s current state.
-Known .status.conditions.type are: &ldquo;InstanceFailure&rdquo;, &ldquo;InstanceReady&rdquo;, &ldquo;InstanceAvailable&rdquo;, &ldquo;Restore&rdquo;, &ldquo;InstanceRuntimeDeleted&rdquo;</p>
+Known .status.conditions.type are: &ldquo;InstanceFailure&rdquo;, &ldquo;InstanceReady&rdquo;, &ldquo;InstanceAvailable&rdquo;, &ldquo;Restore&rdquo;</p>
 </td>
 </tr>
 <tr>

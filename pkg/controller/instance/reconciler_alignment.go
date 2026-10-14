@@ -69,7 +69,7 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 		return kubebuilderx.Continue, nil
 	}
 	if obj != nil && isTerminating(obj.(*corev1.Pod)) {
-		return kubebuilderx.RetryAfter(time.Second), nil
+		return kubebuilderx.Continue, nil
 	}
 	if obj == nil {
 		newPod, err := buildInstancePod(inst, "")

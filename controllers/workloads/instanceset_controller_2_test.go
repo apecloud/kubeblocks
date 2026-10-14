@@ -823,12 +823,9 @@ func TestInstanceSetStopResumeDuringPodObservationDelay(t *testing.T) {
 	if ptr.Deref(readStopInstance(t, cli).Spec.Stop, false) || readStopPod(t, cli).DeletionTimestamp.IsZero() {
 		t.Fatal("actual parent/child commits did not produce resumed Instance with terminating Pod")
 	}
-	result := reconcileStopEntry(t, cli, 1)
+	reconcileStopEntry(t, cli, 1)
 	if !reflect.DeepEqual(readStopPVC(t, cli), pvc) {
 		t.Fatal("resume changed PVCs before Stop deletion completed")
-	}
-	if result.RequeueAfter != time.Second {
-		t.Fatalf("terminating Pod has no bounded resume retry: %#v", result)
 	}
 	held := readStopPod(t, cli)
 	held.Finalizers = nil

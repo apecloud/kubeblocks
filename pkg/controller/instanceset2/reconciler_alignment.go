@@ -24,6 +24,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -87,6 +88,18 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 	}
 	createNameSet := newNameSet.Difference(oldNameSet)
 	deleteNameSet := oldNameSet.Difference(newNameSet)
+	for name, inst := range oldInstanceMap {
+		if !newNameSet.Has(name) || model.IsObjectDeleting(inst) || !ptr.Deref(inst.Spec.ScaledDown, false) {
+			continue
+		}
+		instCopy := inst.DeepCopy()
+		instCopy.Spec.ScaledDown = nil
+		if err := tree.Update(instCopy); err != nil {
+			return kubebuilderx.Continue, err
+		}
+		oldInstanceMap[name] = instCopy
+	}
+	oldInstanceList = tree.List(&workloads.Instance{})
 
 	// default OrderedReady policy
 	isOrderedReady := true
@@ -191,13 +204,15 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 				its.Name,
 				inst.Name)
 		}
-		if ptr.Deref(inst.Spec.ScaledDown, false) {
+		if model.IsObjectDeleting(inst) || (ptr.Deref(inst.Spec.ScaledDown, false) && equality.Semantic.DeepEqual(
+			inst.Spec.PersistentVolumeClaimRetentionPolicy, its.Spec.PersistentVolumeClaimRetentionPolicy)) {
 			if err := tree.Delete(inst); err != nil {
 				return kubebuilderx.Continue, err
 			}
 		} else {
 			instCopy := inst.DeepCopy()
 			instCopy.Spec.ScaledDown = ptr.To(true)
+			instCopy.Spec.PersistentVolumeClaimRetentionPolicy = its.Spec.PersistentVolumeClaimRetentionPolicy.DeepCopy()
 			if err := tree.Update(instCopy); err != nil {
 				return kubebuilderx.Continue, err
 			}

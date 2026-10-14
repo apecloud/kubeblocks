@@ -162,7 +162,7 @@ jobs:
                      clickhouse|elasticsearch|etcd|influxdb|loki|minio|milvus|nebula|pulsar|qdrant|rabbitmq|rocketmq|tidb|victoria-metrics|zookeeper,
                      greptimedb|mogdb|oceanbase|opensearch|orioledb|orchestrator|polardbx|risingwave|starrocks|vanilla-pg|weaviate|yashandb,
                      tdengine|oracle|doris|oceanbase-ent|starrocks-ent|camellia-redis-proxy|gaussdb|damengdb|kingbase|vastbase|victoria-logs|he3sql,
-                     mariadb|mssql|goldendb|tdsql|greatdb|hadoop|hive|oceanbase-proxy|nacos|vault|foundationdb|selectdb|rustfs ]
+                     mariadb|mssql|goldendb|tdsql|greatdb|hadoop|hive|oceanbase-proxy|nacos|vault|foundationdb|selectdb|rustfs|polardb-pg ]
     with:
       GITHUB_REPO: "apecloud/kubeblocks"
       BRANCH_NAME: "main"

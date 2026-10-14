@@ -21,6 +21,7 @@ package instanceset2
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -65,6 +66,34 @@ func TestRevisionUpdatePublishesRevisionsBeforeInstanceStatus(t *testing.T) {
 	}
 }
 
+func TestAlignmentPreservesExistingInstanceSpec(t *testing.T) {
+	its := revisionTestInstanceSet()
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	inst := &workloads.Instance{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Namespace: its.Namespace},
+		Spec:       workloads.InstanceSpec{ScaledDown: ptr.To(true)},
+	}
+	before := inst.DeepCopy()
+	if err := tree.Add(inst); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := generateInstancePlan(tree)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := alignInstances(tree, plan); err != nil {
+		t.Fatal(err)
+	}
+	object, err := tree.Get(inst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(object.(*workloads.Instance).Spec, before.Spec) {
+		t.Fatal("member alignment changed an existing Instance spec")
+	}
+}
+
 func TestFlatOrdinalReassignmentPublishesTargetsAndPreservesInstances(t *testing.T) {
 	its := flatReassignmentInstanceSet()
 	tree := kubebuilderx.NewObjectTree()
@@ -103,9 +132,12 @@ func TestFlatOrdinalReassignmentPublishesTargetsAndPreservesInstances(t *testing
 		t.Fatalf("incomplete revision targets: %#v", revisions)
 	}
 
-	res, err = NewAlignmentReconciler().Reconcile(tree)
-	if err != nil || res != kubebuilderx.Continue {
-		t.Fatalf("alignment did not continue: result=%v err=%v", res, err)
+	plan, err := generateInstancePlan(tree)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := alignInstances(tree, plan); err != nil {
+		t.Fatalf("alignment failed: %v", err)
 	}
 	scaledDown := 0
 	for _, object := range tree.List(&workloads.Instance{}) {

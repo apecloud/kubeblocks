@@ -31,6 +31,19 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
+func TestInstanceMergeClearsScaleDownState(t *testing.T) {
+	scaledDown := true
+	current := &workloads.Instance{Spec: workloads.InstanceSpec{ScaledDown: &scaledDown}}
+	desired := &workloads.Instance{}
+	merged := copyAndMergeInstance(current, desired)
+	if merged == nil || merged.Spec.ScaledDown != nil {
+		t.Fatal("merge did not apply the desired scale-down state")
+	}
+	if current.Spec.ScaledDown == nil || !*current.Spec.ScaledDown {
+		t.Fatal("merge changed the original Instance")
+	}
+}
+
 func TestParseReplicasNMaxUnavailable(t *testing.T) {
 	tests := []struct {
 		name                   string
@@ -150,7 +163,7 @@ func TestUpdateReconcilerKeepsConvergingInstanceInRollingWindow(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if _, err := NewUpdateReconciler().Reconcile(tree); err != nil {
+			if _, err := NewInstanceReconciler().Reconcile(tree); err != nil {
 				t.Fatal(err)
 			}
 			object, err := tree.Get(&workloads.Instance{ObjectMeta: metav1.ObjectMeta{Namespace: its.Namespace, Name: pending.Name}})

@@ -132,6 +132,26 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	return kubebuilderx.Continue, nil
 }
 
+func (r *statusReconciler) reconcileDeletingRuntime(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) error {
+	obj, err := tree.Get(podObj(inst))
+	if err != nil {
+		return err
+	}
+	if obj == nil {
+		r.setPodUnavailableStatus(inst, workloads.InstanceCurrentStateAbsent, inst.Name, "")
+		return nil
+	}
+	pod := obj.(*corev1.Pod)
+	if isTerminating(pod) {
+		r.setPodUnavailableStatus(inst, workloads.InstanceCurrentStateTerminating, pod.Name, getPodRevision(pod))
+		return nil
+	}
+	inst.Status.CurrentState = workloads.InstanceCurrentStatePresent
+	inst.Status.CurrentRevision = getPodRevision(pod)
+	inst.Status.UpToDate = false
+	return nil
+}
+
 func (r *statusReconciler) reconcileRestoreCondition(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) {
 	restoreCond := meta.FindStatusCondition(inst.Status.Conditions, string(workloads.InstanceRestore))
 	if restoreCond != nil && (restoreCond.Status == metav1.ConditionTrue || restoreCond.Status == metav1.ConditionFalse) {

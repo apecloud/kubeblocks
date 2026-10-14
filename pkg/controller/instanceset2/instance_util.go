@@ -453,3 +453,7 @@ func hasObservedAbsentRuntime(inst *workloads.Instance) bool {
 func hasObservedStoppedRuntime(inst *workloads.Instance) bool {
 	return ptr.Deref(inst.Spec.Stop, false) && hasObservedAbsentRuntime(inst)
 }
+
+func isInstanceStopComplete(inst *workloads.Instance) bool {
+	return (ptr.Deref(inst.Spec.Stop, false) || model.IsObjectDeleting(inst)) && hasObservedAbsentRuntime(inst)
+}

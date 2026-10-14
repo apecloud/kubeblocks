@@ -1628,7 +1628,7 @@ func TestInstanceSetStopWaitsForRetiringRuntime(t *testing.T) {
 	for _, policy := range []appsv1.PodManagementPolicyType{appsv1.OrderedReadyPodManagement, appsv1.ParallelPodManagement} {
 		t.Run(string(policy), func(t *testing.T) {
 			its := setStopFixture()
-			its.Spec.PersistentVolumeClaimRetentionPolicy = &kbappsv1.PersistentVolumeClaimRetentionPolicy{WhenScaled: kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType}
+			its.Spec.PersistentVolumeClaimRetentionPolicy = &kbappsv1.PersistentVolumeClaimRetentionPolicy{WhenScaled: kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType}
 			cli := newSetStopClient(t, its)
 			reconcileSetStop(t, cli, 5)
 			held := &corev1.Pod{}
@@ -1637,6 +1637,15 @@ func TestInstanceSetStopWaitsForRetiringRuntime(t *testing.T) {
 			}
 			held.Finalizers = append(held.Finalizers, "test/hold")
 			if err := cli.Update(context.Background(), held); err != nil {
+				t.Fatal(err)
+			}
+			pvc := &corev1.PersistentVolumeClaim{}
+			pvcKey := client.ObjectKey{Namespace: "default", Name: "data-demo-1"}
+			if err := cli.Get(context.Background(), pvcKey, pvc); err != nil {
+				t.Fatal(err)
+			}
+			pvc.Finalizers = []string{"test/hold-pvc"}
+			if err := cli.Update(context.Background(), pvc); err != nil {
 				t.Fatal(err)
 			}
 			mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
@@ -1676,13 +1685,49 @@ func TestInstanceSetStopWaitsForRetiringRuntime(t *testing.T) {
 			if err := cli.Update(context.Background(), held); err != nil {
 				t.Fatal(err)
 			}
+			faulty := &failStopStatusClient{Client: cli, remaining: 1}
+			_, err = (&InstanceReconciler{Client: faulty, Scheme: cli.Scheme(), Recorder: record.NewFakeRecorder(1000)}).Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(child)})
+			if err == nil || faulty.remaining != 0 {
+				t.Fatalf("expected deleting Instance status failure, got %v", err)
+			}
+			if _, err = reconcileSetStopParent(cli); err != nil {
+				t.Fatal(err)
+			}
+			remaining := &workloads.Instance{}
+			if err = cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "demo-0"}, remaining); err != nil || ptr.Deref(remaining.Spec.Stop, false) {
+				t.Fatalf("uncommitted absence released Stop budget: %v", err)
+			}
 			reconcileSetStop(t, cli, 8)
-			if len(listSetStopPods(t, cli)) != 0 || readSetStop(t, cli).Status.Replicas != 0 {
-				t.Fatal("Stop did not converge after retired runtime disappeared")
+			if err := cli.Get(context.Background(), client.ObjectKeyFromObject(held), &corev1.Pod{}); !apierrors.IsNotFound(err) {
+				t.Fatalf("scale-down Pod did not disappear: %v", err)
+			}
+			if err := cli.Get(context.Background(), pvcKey, pvc); err != nil || pvc.DeletionTimestamp.IsZero() {
+				t.Fatalf("fixture did not hold PVC deletion: %v", err)
+			}
+			if err := cli.Get(context.Background(), client.ObjectKeyFromObject(held), child); err != nil || child.DeletionTimestamp.IsZero() || ptr.Deref(child.Spec.Stop, false) {
+				t.Fatalf("scale-down Instance should still be deleting without Stop: %v", err)
+			}
+			if len(listSetStopPods(t, cli)) != 0 {
+				t.Fatal("PVC cleanup blocked Stop after the scale-down Pod disappeared")
+			}
+			if child.Status.CurrentState != workloads.InstanceCurrentStateAbsent || child.Status.ObservedGeneration != child.Generation {
+				t.Fatalf("deleting Instance did not report current Absent state: %#v", child.Status)
+			}
+			result, err = reconcileSetStopParent(cli)
+			if err != nil || result.Requeue || readSetStop(t, cli).Status.Replicas != 0 {
+				t.Fatalf("PVC cleanup prevented Stop completion: result=%#v err=%v", result, err)
+			}
+			pvc.Finalizers = nil
+			if err := cli.Update(context.Background(), pvc); err != nil {
+				t.Fatal(err)
+			}
+			reconcileSetStop(t, cli, 4)
+			if err := cli.Get(context.Background(), client.ObjectKeyFromObject(held), &workloads.Instance{}); !apierrors.IsNotFound(err) {
+				t.Fatalf("scale-down Instance cleanup did not complete: %v", err)
 			}
 			claims := &corev1.PersistentVolumeClaimList{}
-			if err := cli.List(context.Background(), claims); err != nil || len(claims.Items) != 2 {
-				t.Fatalf("Stop changed retained claims: %v", err)
+			if err := cli.List(context.Background(), claims); err != nil || len(claims.Items) != 1 || claims.Items[0].Name != "data-demo-0" {
+				t.Fatalf("Stop changed the remaining Instance claim: %v", err)
 			}
 		})
 	}

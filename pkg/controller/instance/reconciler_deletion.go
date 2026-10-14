@@ -59,6 +59,9 @@ func (r *deletionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebu
 
 func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	inst, _ := tree.GetRoot().(*workloads.Instance)
+	if err := (&statusReconciler{}).reconcileDeletingRuntime(tree, inst); err != nil {
+		return kubebuilderx.Continue, err
+	}
 	if err := r.deleteUnreferencedSharedAssistantObjects(tree, inst); err != nil {
 		return kubebuilderx.Continue, err
 	}

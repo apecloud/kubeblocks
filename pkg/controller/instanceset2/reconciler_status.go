@@ -103,7 +103,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 				Name: templateName,
 			}
 		}
-		if hasObservedStoppedRuntime(inst) {
+		if hasObservedStoppedRuntime(inst) || (isStopRequested(its) && isInstanceStopComplete(inst)) {
 			continue
 		}
 		{

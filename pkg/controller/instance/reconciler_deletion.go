@@ -59,6 +59,9 @@ func (r *deletionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebu
 
 func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	inst, _ := tree.GetRoot().(*workloads.Instance)
+	if err := r.reconcileDeletingRuntime(tree, inst); err != nil {
+		return kubebuilderx.Continue, err
+	}
 	if err := r.deleteUnreferencedSharedAssistantObjects(tree, inst); err != nil {
 		return kubebuilderx.Continue, err
 	}
@@ -77,6 +80,26 @@ func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuild
 	// delete root object
 	tree.DeleteRoot()
 	return kubebuilderx.Continue, nil
+}
+
+func (r *deletionReconciler) reconcileDeletingRuntime(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) error {
+	obj, err := tree.Get(podObj(inst))
+	if err != nil {
+		return err
+	}
+	if obj == nil {
+		setPodUnavailableStatus(inst, workloads.InstanceCurrentStateAbsent, inst.Name, "")
+		return nil
+	}
+	pod := obj.(*corev1.Pod)
+	if isTerminating(pod) {
+		setPodUnavailableStatus(inst, workloads.InstanceCurrentStateTerminating, pod.Name, getPodRevision(pod))
+		return nil
+	}
+	inst.Status.CurrentState = workloads.InstanceCurrentStatePresent
+	inst.Status.CurrentRevision = getPodRevision(pod)
+	inst.Status.UpToDate = false
+	return nil
 }
 
 func (r *deletionReconciler) deleteSecondaryObjects(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, retainPVC bool) (bool, error) {

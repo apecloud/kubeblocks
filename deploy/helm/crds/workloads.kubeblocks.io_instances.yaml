@@ -2505,6 +2505,11 @@ spec:
                     type: object
                 type: object
                 x-kubernetes-map-type: atomic
+              stop:
+                description: |-
+                  Stop the Instance.
+                  If set, all the computing resources will be released.
+                type: boolean
               template:
                 description: PodTemplateSpec describes the data a pod should have
                   when created from a template

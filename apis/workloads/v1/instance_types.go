@@ -128,6 +128,12 @@ type InstanceSpec struct {
 	// +optional
 	LifecycleActions *LifecycleActions `json:"lifecycleActions,omitempty"`
 
+	// Stop the Instance.
+	// If set, all the computing resources will be released.
+	//
+	// +optional
+	Stop *bool `json:"stop,omitempty"`
+
 	// Describe the configs to be reconfigured.
 	//
 	// +optional

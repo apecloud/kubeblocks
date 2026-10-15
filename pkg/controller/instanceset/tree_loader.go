@@ -102,7 +102,7 @@ var _ kubebuilderx.TreeLoader = &treeLoader{}
 
 // Direct PVC references are observations, not resources owned by this controller.
 func loadDataPVCs(ctx context.Context, reader client.Reader, tree *kubebuilderx.ObjectTree) error {
-	if tree.GetRoot() == nil {
+	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return nil
 	}
 	its := tree.GetRoot().(*workloads.InstanceSet)

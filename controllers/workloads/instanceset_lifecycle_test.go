@@ -169,6 +169,56 @@ func (f *lifecycleEntry) bootstrap(t *testing.T, replicas int) {
 	t.Fatalf("bootstrap did not converge: %#v", f.its.Status)
 }
 
+func TestInstanceSetLifecycleDeletionPreservesExternalDataPVC(t *testing.T) {
+	for _, policy := range []apps.PersistentVolumeClaimRetentionPolicyType{"", apps.DeletePersistentVolumeClaimRetentionPolicyType, apps.RetainPersistentVolumeClaimRetentionPolicyType} {
+		t.Run(string(policy), func(t *testing.T) {
+			ctx := context.Background()
+			its := newDataLifecycleITS(1)
+			its.Spec.VolumeClaimTemplates = nil
+			its.Spec.Template.Spec.Volumes = []corev1.Volume{{Name: "data", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "external-data"}}}}
+			if policy != "" {
+				its.Spec.PersistentVolumeClaimRetentionPolicy = &workloads.PersistentVolumeClaimRetentionPolicy{WhenDeleted: policy}
+			}
+			cli := newLifecycleEntryClient(t, its, interceptor.Funcs{})
+			pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "external-data", Namespace: its.Namespace, UID: "external-data", Annotations: map[string]string{"owner": "external"}}}
+			if err := cli.Create(ctx, pvc); err != nil {
+				t.Fatal(err)
+			}
+			f := &lifecycleEntry{cli: cli, its: its}
+			f.bootstrap(t, 1)
+			before := pvc.DeepCopy()
+			if err := cli.Delete(ctx, its); err != nil {
+				t.Fatal(err)
+			}
+			deleted := false
+			for round := 0; round < 8; round++ {
+				r := &InstanceSetReconciler{Client: cli, Scheme: cli.Scheme(), Recorder: record.NewFakeRecorder(100)}
+				if _, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(its)}); err != nil {
+					t.Fatal(err)
+				}
+				if err := cli.Get(ctx, client.ObjectKeyFromObject(its), &workloads.InstanceSet{}); apierrors.IsNotFound(err) {
+					deleted = true
+					break
+				} else if err != nil {
+					t.Fatal(err)
+				}
+			}
+			if !deleted {
+				t.Fatal("external data PVC prevented InstanceSet deletion")
+			}
+			if err := cli.Get(ctx, client.ObjectKeyFromObject(pvc), pvc); err != nil {
+				t.Fatalf("external data PVC was deleted: %v", err)
+			}
+			if pvc.ResourceVersion != before.ResourceVersion || pvc.UID != before.UID || len(pvc.OwnerReferences) != 0 || pvc.Annotations["owner"] != "external" {
+				t.Fatalf("external data PVC was modified: %#v", pvc)
+			}
+			if pods := lifecycleEntryPods(t, cli); len(pods) != 0 {
+				t.Fatalf("owned Pods survived InstanceSet deletion: %v", pods)
+			}
+		})
+	}
+}
+
 func TestInstanceSetLifecycleRetirementRespectsAlignmentAdmission(t *testing.T) {
 	for _, instanceAPI := range []bool{false, true} {
 		for _, policy := range []appsv1.PodManagementPolicyType{appsv1.OrderedReadyPodManagement, appsv1.ParallelPodManagement} {

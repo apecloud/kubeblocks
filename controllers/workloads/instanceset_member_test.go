@@ -22,13 +22,17 @@ package workloads
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	apps "github.com/apecloud/kubeblocks/apis/apps/v1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
@@ -40,6 +44,63 @@ func (a *memberDNSAgent) Close() error { return nil }
 func (a *memberDNSAgent) Action(_ context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
 	a.requests = append(a.requests, req)
 	return proto.ActionResponse{}, nil
+}
+
+type unavailableMemberAgent struct{ calls int }
+
+func (a *unavailableMemberAgent) Close() error { return nil }
+func (a *unavailableMemberAgent) Action(_ context.Context, _ proto.ActionRequest) (proto.ActionResponse, error) {
+	a.calls++
+	return proto.ActionResponse{}, fmt.Errorf("member dispatch failed")
+}
+
+func TestInstanceSetMemberActionUsesValidatedExecutor(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		for _, legacySelector := range []bool{false, true} {
+			t.Run(fmt.Sprintf("instanceAPI=%t/legacySelector=%t", instanceAPI, legacySelector), func(t *testing.T) {
+				ctx := context.Background()
+				f := newMemberLifecycleEntry(t, instanceAPI, 1, appsv1.ParallelPodManagement)
+				f.bootstrap(t, 1)
+				action := f.its.Spec.LifecycleActions.MemberJoin
+				if legacySelector {
+					action.Exec.TargetPodSelector = apps.AnyReplica
+				} else {
+					action.TargetPodSelector = apps.AnyReplica
+				}
+				f.its.Spec.Replicas = ptr.To[int32](3)
+				f.its.Spec.ParallelPodManagementConcurrency = ptr.To(intstr.FromInt(2))
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				for round := 0; round < 12 && len(lifecycleEntryPods(t, f.cli)) < 3; round++ {
+					f.stepWithChildren(t)
+				}
+				if len(lifecycleEntryPods(t, f.cli)) != 3 {
+					t.Fatal("parallel expansion did not create both siblings")
+				}
+				f.setReady(t, f.its.Name+"-1", true)
+				pendingName := f.its.Name + "-2"
+				agent := &unavailableMemberAgent{}
+				kbacli.SetMockClient(agent, nil)
+				defer kbacli.UnsetMockClient()
+				for round := 0; round < 128; round++ {
+					f.step(t)
+					condition := meta.FindStatusCondition(f.its.Status.Conditions, "InstanceLifecycle")
+					if condition != nil && strings.Contains(condition.Message, "member dispatch failed") && strings.Contains(condition.Message, "at pod "+pendingName) {
+						t.Fatalf("action was dispatched to an executor rejected by endpoint validation: %s", condition.Message)
+					}
+					status := f.its.FindInstanceStatus(f.its.Name + "-1")
+					if status == nil || status.MemberJoined == nil || *status.MemberJoined {
+						t.Fatalf("failed membership request changed completion: %#v", status)
+					}
+				}
+				if agent.calls == 0 {
+					t.Fatal("no membership request reached an available executor")
+				}
+			})
+		}
+	}
 }
 
 func TestInstanceSetMemberActionsUseRuntimePodDNS(t *testing.T) {

@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package lifecycle
 
 import (
+	"context"
 	"encoding/json"
 	"reflect"
 	"strings"
@@ -32,8 +33,10 @@ import (
 
 	apps "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
+	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
@@ -155,8 +158,68 @@ func TestMemberOnlyMergesActionsAndPreservesServerConfiguration(t *testing.T) {
 	if actions[0].Name != "reconfigure" || envValue(server, "KB_AGENT_PROBE") != "existing-probe" || envValue(server, "BUSINESS") != "keep" || len(pod.Spec.InitContainers) != 0 {
 		t.Fatal("member-only configuration discarded existing server context")
 	}
-	if err := ValidateExecution(its.Spec.LifecycleActions.MemberJoin, pod, []*corev1.Pod{pod}); err == nil {
+	if _, err := ValidateExecution(its.Spec.LifecycleActions.MemberJoin, pod, []*corev1.Pod{pod}); err == nil {
 		t.Fatal("missing agent endpoint would record success")
+	}
+}
+
+type memberAgent struct{ calls int }
+
+func (a *memberAgent) Close() error { return nil }
+func (a *memberAgent) Action(_ context.Context, _ proto.ActionRequest) (proto.ActionResponse, error) {
+	a.calls++
+	return proto.ActionResponse{}, nil
+}
+
+func TestValidatedExecutionPreservesActionSelection(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		action   *apps.Action
+		podCount int
+		calls    int
+	}{
+		{name: "default", action: testAction("join"), podCount: 2, calls: 1},
+		{name: "any", action: &apps.Action{TargetPodSelector: apps.AnyReplica, Exec: testAction("join").Exec}, podCount: 2, calls: 1},
+		{name: "legacy any", action: &apps.Action{Exec: &apps.ExecAction{Command: []string{"join"}, TargetPodSelector: apps.AnyReplica}}, podCount: 2, calls: 1},
+		{name: "all", action: &apps.Action{TargetPodSelector: apps.AllReplicas, Exec: testAction("join").Exec}, podCount: 2, calls: 2},
+		{name: "single all", action: &apps.Action{TargetPodSelector: apps.AllReplicas, Exec: testAction("join").Exec}, podCount: 1, calls: 1},
+		{name: "role", action: &apps.Action{TargetPodSelector: apps.RoleSelector, MatchingKey: "replica", Exec: testAction("join").Exec}, podCount: 2, calls: 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			its := dataWorkload()
+			its.Spec.LifecycleActions.MemberJoin = tc.action
+			pods := []*corev1.Pod{dataPod(), dataPod()}
+			pods[1].Name = "demo-2"
+			pods = pods[:tc.podCount]
+			for _, pod := range pods {
+				pod.Labels = map[string]string{constant.RoleLabelKey: "replica"}
+				pod.Status.PodIP = "10.0.0.1"
+				pod.Spec.Containers = append(pod.Spec.Containers, corev1.Container{Name: kbagent.ContainerName, Ports: []corev1.ContainerPort{{Name: kbagent.DefaultHTTPPortName, ContainerPort: 3501}}})
+			}
+			opts, err := ValidateExecution(tc.action, pods[0], pods)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if (tc.name == "any" || tc.name == "legacy any") && (opts == nil || opts.TargetPodName == "") {
+				t.Fatal("random executor was not retained for execution")
+			}
+			if tc.name == "single all" && opts != nil {
+				t.Fatal("AllReplicas lost its aggregate-error semantics")
+			}
+			lfa, err := NewLifecycle(its, pods[0], pods)
+			if err != nil {
+				t.Fatal(err)
+			}
+			agent := &memberAgent{}
+			kbacli.SetMockClient(agent, nil)
+			defer kbacli.UnsetMockClient()
+			if err := lfa.MemberJoin(context.Background(), nil, opts); err != nil {
+				t.Fatal(err)
+			}
+			if agent.calls != tc.calls {
+				t.Fatalf("action executed %d times, want %d", agent.calls, tc.calls)
+			}
+		})
 	}
 }
 

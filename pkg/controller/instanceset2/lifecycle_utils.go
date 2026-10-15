@@ -170,7 +170,8 @@ func reconcileMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, 
 	if leave {
 		action = its.Spec.LifecycleActions.MemberLeave
 	}
-	if err := workloadlifecycle.ValidateExecution(action, pod, pods); err != nil {
+	opts, err := workloadlifecycle.ValidateExecution(action, pod, pods)
+	if err != nil {
 		return lifecycleWait(tree, its, err)
 	}
 	lfa, err := newMemberLifecycle(its, pod, pods)
@@ -178,18 +179,19 @@ func reconcileMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, 
 		return lifecycleWait(tree, its, err)
 	}
 	if leave && its.Spec.LifecycleActions.Switchover != nil && exclusiveRole(its, pod) {
-		if err := workloadlifecycle.ValidateExecution(its.Spec.LifecycleActions.Switchover, pod, pods); err != nil {
+		opts, err := workloadlifecycle.ValidateExecution(its.Spec.LifecycleActions.Switchover, pod, pods)
+		if err != nil {
 			return lifecycleWait(tree, its, err)
 		}
-		if err := lfa.Switchover(tree.Context, reader, nil, ""); err != nil {
+		if err := lfa.Switchover(tree.Context, reader, opts, ""); err != nil {
 			return lifecycleWait(tree, its, err)
 		}
 		return lifecycleWait(tree, its, fmt.Errorf("waiting for %s to relinquish its exclusive role", pod.Name))
 	}
 	if leave {
-		err = lfa.MemberLeave(tree.Context, reader, nil)
+		err = lfa.MemberLeave(tree.Context, reader, opts)
 	} else {
-		err = lfa.MemberJoin(tree.Context, reader, nil)
+		err = lfa.MemberJoin(tree.Context, reader, opts)
 	}
 	if err != nil {
 		return lifecycleWait(tree, its, err)

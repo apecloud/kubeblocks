@@ -478,25 +478,32 @@ func FilterTransient(spec *corev1.PodSpec) {
 	}
 }
 
-// ValidateExecution rejects a missing agent before the public lifecycle client can skip it.
-func ValidateExecution(action *apps.Action, target *corev1.Pod, pods []*corev1.Pod) error {
+// ValidateExecution keeps AnyReplica execution on the endpoint validated in this invocation.
+func ValidateExecution(action *apps.Action, target *corev1.Pod, pods []*corev1.Pod) (*publiclifecycle.Options, error) {
 	if target == nil {
-		return fmt.Errorf("member target runtime is absent")
+		return nil, fmt.Errorf("member target runtime is absent")
 	}
 	selected, err := publiclifecycle.SelectTargetPods(pods, target, action)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if len(selected) == 0 {
-		return fmt.Errorf("no available executor for member action")
+		return nil, fmt.Errorf("no available executor for member action")
 	}
 	for _, pod := range selected {
 		port, err := intctrlutil.GetPortByName(*pod, kbagent.ContainerName, kbagent.DefaultHTTPPortName)
 		if err != nil || port <= 0 || pod.Status.PodIP == "" || pod.DeletionTimestamp != nil {
-			return fmt.Errorf("instance %s has no available agent endpoint", pod.Name)
+			return nil, fmt.Errorf("instance %s has no available agent endpoint", pod.Name)
 		}
 	}
-	return nil
+	selector := action.TargetPodSelector
+	if selector == "" && action.Exec != nil {
+		selector = action.Exec.TargetPodSelector
+	}
+	if selector == apps.AnyReplica {
+		return &publiclifecycle.Options{TargetPodName: selected[0].Name}, nil
+	}
+	return nil, nil
 }
 
 // CleanTaskConfigMap preserves unrelated tasks and clears only workload-generated data-copy instructions.

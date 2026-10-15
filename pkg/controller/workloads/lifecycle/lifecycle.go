@@ -592,3 +592,23 @@ func GeneratedTask(spec *corev1.PodSpec) (string, error) {
 	}
 	return "", nil
 }
+
+// CriticalStatusChanged reports facts that must be committed before changing runtime inputs or membership.
+// Ordinary health, revision, and progress observations do not stop the reconciliation chain.
+func CriticalStatusChanged(previous, current []workloads.InstanceStatus) bool {
+	for _, status := range current {
+		for _, old := range previous {
+			if status.PodName != old.PodName {
+				continue
+			}
+			if status.Provisioned != old.Provisioned || !sameBoolResult(status.DataLoaded, old.DataLoaded) || !sameBoolResult(status.MemberJoined, old.MemberJoined) {
+				return true
+			}
+			break
+		}
+	}
+	return false
+}
+func sameBoolResult(a, b *bool) bool {
+	return (a == nil && b == nil) || (a != nil && b != nil && *a == *b)
+}

@@ -25,8 +25,11 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -38,13 +41,10 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-// instanceAlignmentReconciler is responsible for aligning the actual instances(pods) with the desired replicas specified in the spec,
-// including horizontal scaling and recovering from unintended pod deletions etc.
-// only handle instance count, don't care instance revision.
-type instanceAlignmentReconciler struct{}
+type instanceAlignmentReconciler struct{ reader client.Reader }
 
-func NewReplicasAlignmentReconciler() kubebuilderx.Reconciler {
-	return &instanceAlignmentReconciler{}
+func NewReplicasAlignmentReconciler(reader client.Reader) kubebuilderx.Reconciler {
+	return &instanceAlignmentReconciler{reader: reader}
 }
 
 func (r *instanceAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
@@ -127,9 +127,21 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 			}
 		}
 	}
+	runtimeChanged := false
 	var currentAlignedNameList []string
 	for i, name := range newNameList {
 		if _, ok := createNameSet[name]; !ok {
+			pod := oldInstanceMap[name]
+			if changed, err := recreatePendingDataPod(tree, its, pod); err != nil {
+				return lifecycleWait(tree, its, err)
+			} else if changed {
+				return kubebuilderx.RetryAfter(time.Second), nil
+			}
+			if !runtimeChanged {
+				if result, err := reconcileMember(tree, its, pod, true, r.reader); err != nil || result != kubebuilderx.Continue {
+					return result, err
+				}
+			}
 			currentAlignedNameList = append(currentAlignedNameList, name)
 			continue
 		}
@@ -151,6 +163,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if err := tree.Add(newPod); err != nil {
 			return kubebuilderx.Continue, err
 		}
+		runtimeChanged = true
 		currentAlignedNameList = append(currentAlignedNameList, name)
 
 		if isOrderedReady {
@@ -173,6 +186,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 			case err != nil:
 				return kubebuilderx.Continue, err
 			case oldPvc == nil:
+				runtimeChanged = true
 				if err = tree.Add(pvc); err != nil {
 					return kubebuilderx.Continue, err
 				}
@@ -182,6 +196,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 					if err := tryTakeOverExternalPVC(its, pvcObj.(*corev1.PersistentVolumeClaim)); err != nil {
 						return kubebuilderx.Continue, err
 					}
+					runtimeChanged = runtimeChanged || !equality.Semantic.DeepEqual(oldPvc, pvcObj)
 					if err = tree.Update(pvcObj); err != nil {
 						return kubebuilderx.Continue, err
 					}
@@ -190,43 +205,9 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		}
 	}
 
-	if workloadlifecycle.Enabled(its) {
-		// Guard-only recovered Pods wait until the parent observes a new PVC, then restart with a current task.
-		for _, pod := range oldInstanceMap {
-			status := workloadlifecycle.Status(its, pod.Name)
-			if pod.Status.Phase != corev1.PodPending || !newNameSet.Has(pod.Name) || status == nil || status.DataLoaded == nil || *status.DataLoaded || pod.DeletionTimestamp != nil {
-				continue
-			}
-			cleaned := pod.Spec.DeepCopy()
-			changed, err := workloadlifecycle.CleanTask(cleaned)
-			if err != nil {
-				return kubebuilderx.Continue, err
-			}
-			if changed {
-				// Refresh an init worker when its donor address changed; running databases keep their completed init spec.
-				task, err := workloadlifecycle.GeneratedTask(&pod.Spec)
-				if err != nil {
-					return kubebuilderx.Continue, err
-				}
-				desiredPod := pod.DeepCopy()
-				if err := lifecycleCreatePod(tree, its, desiredPod); err != nil {
-					return lifecycleWait(tree, its, err)
-				}
-				current, err := workloadlifecycle.GeneratedTask(&desiredPod.Spec)
-				if err != nil {
-					return kubebuilderx.Continue, err
-				}
-				if task == current {
-					continue
-				}
-			}
-			if err := tree.Delete(pod); err != nil {
-				return kubebuilderx.Continue, err
-			}
-			return kubebuilderx.RetryAfter(time.Second), nil
-		}
+	if workloadlifecycle.Enabled(its) && runtimeChanged {
+		return kubebuilderx.RetryAfter(time.Second), nil
 	}
-
 	// delete useless instances
 	retiredNames := sets.New[string]()
 	priorities := make(map[string]int)
@@ -246,7 +227,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 				pod.Name)
 		}
 		if workloadlifecycle.Enabled(its) && !isStopRequested(its) && !slices.Contains(its.Spec.OfflineInstances, pod.Name) && workloadlifecycle.NeedsLeave(its, workloadlifecycle.Status(its, pod.Name)) {
-			return kubebuilderx.RetryAfter(time.Second), nil
+			return reconcileMember(tree, its, pod, false, r.reader)
 		}
 		if err := tree.Delete(pod); err != nil {
 			return kubebuilderx.Continue, err
@@ -283,14 +264,43 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	}
 
 	if workloadlifecycle.Enabled(its) {
-		for _, status := range its.Status.InstanceStatus {
-			if status.DataLoaded != nil && !*status.DataLoaded && newNameSet.Has(status.PodName) {
-				return kubebuilderx.RetryAfter(2 * time.Second), nil
-			}
-		}
-		return kubebuilderx.RetryAfter(5 * time.Second), nil
+		meta.RemoveStatusCondition(&its.Status.Conditions, "InstanceLifecycle")
 	}
 	return kubebuilderx.Continue, nil
 }
 
 var _ kubebuilderx.Reconciler = &instanceAlignmentReconciler{}
+
+func recreatePendingDataPod(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
+	status := workloadlifecycle.Status(its, pod.Name)
+	if !workloadlifecycle.Enabled(its) || status == nil || status.DataLoaded == nil || *status.DataLoaded || pod.Status.Phase != corev1.PodPending || model.IsObjectDeleting(pod) {
+		return false, nil
+	}
+
+	cleaned := pod.Spec.DeepCopy()
+	changed, err := workloadlifecycle.CleanTask(cleaned)
+	if err != nil {
+		return false, err
+	}
+	if changed {
+		task, err := workloadlifecycle.GeneratedTask(&pod.Spec)
+		if err != nil {
+			return false, err
+		}
+		desiredPod := pod.DeepCopy()
+		if err := lifecycleCreatePod(tree, its, desiredPod); err != nil {
+			return false, err
+		}
+		current, err := workloadlifecycle.GeneratedTask(&desiredPod.Spec)
+		if err != nil {
+			return false, err
+		}
+		if task == current {
+			return false, nil
+		}
+	}
+	if err := tree.Delete(pod); err != nil {
+		return false, err
+	}
+	return true, nil
+}

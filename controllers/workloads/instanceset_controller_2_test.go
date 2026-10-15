@@ -969,6 +969,13 @@ func checkITS2LifecycleDataRecovery(t *testing.T, storage client.Client, onDelet
 	if err := cli.Delete(context.Background(), pvc); err != nil {
 		t.Fatal(err)
 	}
+	its2LifecycleRound(t, r, its)
+	target = its2LifecycleInstance(t, cli, target.Name)
+	guard, task = its2TaskInput(target)
+	stored = its2LifecycleRead(t, cli, its)
+	if guard == "" || task != "" || !ptr.Deref(stored.FindInstanceStatus(target.Name).DataLoaded, false) {
+		t.Fatalf("missing PVC erased prior completion: guard=%s task=%s status=%#v", guard, task, stored.FindInstanceStatus(target.Name))
+	}
 	pvc.ResourceVersion = ""
 	pvc.UID = ""
 	pvc.Annotations = nil
@@ -1057,9 +1064,13 @@ func TestITS2LifecycleOfflineDoesNotLeaveMember(t *testing.T) {
 	agent := &its2LifecycleAgent{}
 	kbacli.SetMockClient(agent, nil)
 	defer kbacli.UnsetMockClient()
-	its2LifecycleRound(t, r, its)
-	its2LifecycleRound(t, r, its)
-	stored = its2LifecycleRead(t, cli, its)
+	for i := 0; i < 6; i++ {
+		its2LifecycleRound(t, r, its)
+		stored = its2LifecycleRead(t, cli, its)
+		if status := stored.FindInstanceStatus("lifecycle-0"); status != nil && status.EffectiveDesiredState() == workloads.InstanceDesiredStateOffline {
+			break
+		}
+	}
 	if len(agent.calls) != 0 {
 		t.Fatalf("offline transition called member action: %v", agent.calls)
 	}
@@ -1072,7 +1083,7 @@ func TestITS2LifecycleOfflineDoesNotLeaveMember(t *testing.T) {
 	if offline == nil || offline.EffectiveDesiredState() != workloads.InstanceDesiredStateOffline || !ptr.Deref(offline.MemberJoined, false) {
 		t.Fatalf("offline transition lost known membership: %#v", stored.Status.InstanceStatus)
 	}
-	if cond := meta.FindStatusCondition(stored.Status.Conditions, "InstanceLifecycle"); cond != nil {
+	if cond := meta.FindStatusCondition(stored.Status.Conditions, "InstanceLifecycle"); cond != nil && cond.Message != "waiting for runtime of member lifecycle-1" {
 		t.Fatalf("offline member was blocked on leave: %#v", cond)
 	}
 }
@@ -1303,6 +1314,11 @@ func TestITS2LifecycleBootstrapPodWithoutLeafStatusNeedsLeave(t *testing.T) {
 	agent := &its2LifecycleAgent{}
 	kbacli.SetMockClient(agent, nil)
 	defer kbacli.UnsetMockClient()
+	its2LifecycleRound(t, r, its)
+	stored = its2LifecycleRead(t, cli, its)
+	if len(agent.calls) != 0 || !stored.FindInstanceStatus(inst.Name).Provisioned || ptr.Deref(its2LifecycleInstance(t, cli, inst.Name).Spec.ScaledDown, false) {
+		t.Fatalf("runtime observation was not committed before membership: calls=%v status=%#v", agent.calls, stored.Status.InstanceStatus)
+	}
 	its2LifecycleRound(t, r, its)
 	stored = its2LifecycleRead(t, cli, its)
 	if len(agent.calls) != 1 || agent.calls[0] != "memberLeave" {

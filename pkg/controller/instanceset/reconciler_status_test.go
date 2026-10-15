@@ -148,7 +148,7 @@ var _ = Describe("status reconciler test", func() {
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 
 			By("replicas alignment")
-			reconciler = NewReplicasAlignmentReconciler()
+			reconciler = NewReplicasAlignmentReconciler(nil)
 			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))

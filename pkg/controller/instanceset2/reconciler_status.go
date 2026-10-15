@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
 	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancestatus"
+	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -50,7 +51,11 @@ type statusReconciler struct{}
 var _ kubebuilderx.Reconciler = &statusReconciler{}
 
 func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
-	if tree.GetRoot() == nil || !model.IsObjectStatusUpdating(tree.GetRoot()) {
+	if tree.GetRoot() == nil {
+		return kubebuilderx.ConditionUnsatisfied
+	}
+	its := tree.GetRoot().(*workloads.InstanceSet)
+	if !model.IsObjectStatusUpdating(its) && !lifecycleStatusEnabled(its) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
 	return kubebuilderx.ConditionSatisfied
@@ -58,6 +63,15 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	summarizeStatus := model.IsObjectStatusUpdating(its)
+	if lifecycleStatusEnabled(its) {
+		if result, err := observeLifecycleStatus(tree); err != nil || result != kubebuilderx.Continue {
+			return result, err
+		}
+	}
+	if !summarizeStatus {
+		return kubebuilderx.Continue, nil
+	}
 
 	instances := tree.List(&workloads.Instance{})
 	var instanceList []*workloads.Instance
@@ -521,4 +535,8 @@ func observationNames(observations []instancestatus.Observation) []string {
 		names = append(names, observation.InstanceName)
 	}
 	return names
+}
+
+func lifecycleStatusEnabled(its *workloads.InstanceSet) bool {
+	return workloadlifecycle.Enabled(its) && !model.IsObjectDeleting(its) && !model.IsReconciliationPaused(its) && !isStopRequested(its)
 }

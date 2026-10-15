@@ -60,7 +60,13 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 	return kubebuilderx.ConditionSatisfied
 }
 
-func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
+func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (result kubebuilderx.Result, reconcileErr error) {
+	defer func() {
+		its := tree.GetRoot().(*workloads.InstanceSet)
+		if reconcileErr == nil && result == kubebuilderx.Continue && lifecycleStatusEnabled(its) {
+			result = kubebuilderx.RetryAfter(5 * time.Second)
+		}
+	}()
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
 	if err != nil {
@@ -85,7 +91,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	oldNameSet := sets.New[string]()
 	oldInstanceMap := make(map[string]*corev1.Pod)
 	var oldPodList []*corev1.Pod
-	result := kubebuilderx.Continue
+	result = kubebuilderx.Continue
 	for _, object := range tree.List(&corev1.Pod{}) {
 		oldNameSet.Insert(object.GetName())
 		pod, _ := object.(*corev1.Pod)

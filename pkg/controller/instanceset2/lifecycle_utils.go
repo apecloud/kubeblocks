@@ -24,7 +24,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,7 +36,6 @@ import (
 	instctrl "github.com/apecloud/kubeblocks/pkg/controller/instance"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -46,25 +44,9 @@ import (
 
 const lifecycleCondition = "InstanceLifecycle"
 
-func NewLifecycleReconciler(reader client.Reader) kubebuilderx.Reconciler {
-	return &lifecycleReconciler{reader: reader}
-}
-
-type lifecycleReconciler struct{ reader client.Reader }
-
-func (r *lifecycleReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
-	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) || model.IsReconciliationPaused(tree.GetRoot()) {
-		return kubebuilderx.ConditionUnsatisfied
-	}
-	if its := tree.GetRoot().(*workloads.InstanceSet); !workloadlifecycle.Enabled(its) || ptr.Deref(its.Spec.Stop, false) {
-		return kubebuilderx.ConditionUnsatisfied
-	}
-	return kubebuilderx.ConditionSatisfied
-}
-
 var newMemberLifecycle = workloadlifecycle.NewLifecycle
 
-func (r *lifecycleReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
+func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its := tree.GetRoot().(*workloads.InstanceSet)
 	assignments, _, err := instancetemplate.BuildAssignments(tree, its)
 	if err != nil {
@@ -83,8 +65,10 @@ func (r *lifecycleReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 	for _, obj := range tree.List(&workloads.Instance{}) {
 		inst := obj.(*workloads.Instance)
 		instances = append(instances, inst)
-		runtimeNames.Insert(inst.Name)
 		resourceNames.Insert(inst.Name)
+		if inst.Status.CurrentState == workloads.InstanceCurrentStatePresent || inst.Status.CurrentState == workloads.InstanceCurrentStateTerminating {
+			runtimeNames.Insert(inst.Name)
+		}
 	}
 	desiredInstances, _, err := buildDesiredInstancesByName(tree, its)
 	if err != nil {
@@ -107,28 +91,25 @@ func (r *lifecycleReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 		}
 	}
 	registered := workloadlifecycle.Register(its, assignments, runtimeNames, resourceNames)
+	previous := its.DeepCopy().Status.InstanceStatus
 	for _, pod := range pods {
 		if status := instanceLifecycleStatus(its, pod.Name); status != nil {
 			status.Provisioned = true
 		}
 	}
-	if registered {
-		return kubebuilderx.RetryAfter(time.Second), nil
+	for _, inst := range instances {
+		if inst.Status.CurrentState == workloads.InstanceCurrentStatePresent || inst.Status.CurrentState == workloads.InstanceCurrentStateTerminating {
+			if status := instanceLifecycleStatus(its, inst.Name); status != nil {
+				status.Provisioned = true
+			}
+		}
 	}
-	// Rebuild allocation and runtime status even when the desired generation changed.
-	if err := setInstanceStatus(tree, its, instances); err != nil {
-		return kubebuilderx.Continue, err
-	}
-	dataChanged := false
 	for i := range its.Status.InstanceStatus {
 		status := &its.Status.InstanceStatus[i]
-		if its.Spec.LifecycleActions.DataLoad == nil || status.EffectiveDesiredState() != workloads.InstanceDesiredStateActive {
+		if its.Spec.LifecycleActions.DataLoad == nil || desiredInstances[status.PodName] == nil {
 			continue
 		}
 		inst := desiredInstances[status.PodName]
-		if inst == nil {
-			return lifecycleWait(tree, its, fmt.Errorf("instance %s has no desired assignment", status.PodName))
-		}
 		pod, err := instctrl.BuildPod(inst)
 		if err != nil {
 			return lifecycleWait(tree, its, err)
@@ -137,97 +118,85 @@ func (r *lifecycleReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 		if err != nil {
 			return lifecycleWait(tree, its, err)
 		}
-		if pvc != nil && workloadlifecycle.ObserveData(status, pvc) {
-			dataChanged = true
+		if pvc != nil {
+			workloadlifecycle.ObserveData(status, pvc)
 		}
 	}
-	if dataChanged {
+	if registered || workloadlifecycle.CriticalStatusChanged(previous, its.Status.InstanceStatus) {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
-	// Cleanup and regeneration change only the Instance input. Commit before membership calls.
-	for _, inst := range instances {
-		status := instanceLifecycleStatus(its, inst.Name)
-		if status == nil || status.DataLoaded == nil || status.EffectiveDesiredState() != workloads.InstanceDesiredStateActive || !inst.DeletionTimestamp.IsZero() || ptr.Deref(inst.Spec.Stop, false) {
-			continue
-		}
-		desired := inst.DeepCopy()
-		if err := refreshInstanceData(tree, its, desired); err != nil {
-			return lifecycleWait(tree, its, err)
-		}
-		if !podSpecsEqual(inst.Spec.Template.Spec, desired.Spec.Template.Spec) || !assistantObjectsEqual(inst.Spec.InstanceAssistantObjects, desired.Spec.InstanceAssistantObjects) {
-			if err := tree.Update(desired); err != nil {
-				return kubebuilderx.Continue, err
-			}
-			return kubebuilderx.RetryAfter(time.Second), nil
-		}
-	}
-	for i := range its.Status.InstanceStatus {
-		status := &its.Status.InstanceStatus[i]
-		active := status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive
-		leave := status.EffectiveDesiredState() == workloads.InstanceDesiredStateReleased && !ptr.Deref(its.Spec.Stop, false) && workloadlifecycle.NeedsLeave(its, status)
-		join := active && status.MemberJoined != nil && !*status.MemberJoined && its.Spec.LifecycleActions.MemberJoin != nil
-		if !join && !leave {
-			continue
-		}
-		if join {
-			current, err := tree.Get(&workloads.Instance{ObjectMeta: metav1.ObjectMeta{Name: status.PodName, Namespace: its.Namespace}})
-			if err != nil {
-				return kubebuilderx.Continue, err
-			}
-			if current == nil || !current.GetDeletionTimestamp().IsZero() || ptr.Deref(current.(*workloads.Instance).Spec.Stop, false) {
-				continue
-			}
-		}
-		if join && status.DataLoaded != nil && !*status.DataLoaded {
-			continue
-		}
-		var pod *corev1.Pod
-		for _, p := range pods {
-			if p.Name == status.PodName {
-				pod = p
-				break
-			}
-		}
-		if pod == nil || !pod.DeletionTimestamp.IsZero() {
-			return lifecycleWait(tree, its, fmt.Errorf("waiting for runtime of member %s", status.PodName))
-		}
-		if join && !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
-			continue
-		}
-		action := its.Spec.LifecycleActions.MemberJoin
-		if leave {
-			action = its.Spec.LifecycleActions.MemberLeave
-		}
-		if err := workloadlifecycle.ValidateExecution(action, pod, pods); err != nil {
-			return lifecycleWait(tree, its, err)
-		}
-		lfa, err := newMemberLifecycle(its, pod, pods)
-		if err != nil {
-			return lifecycleWait(tree, its, err)
-		}
-		if leave && its.Spec.LifecycleActions.Switchover != nil && exclusiveRole(its, pod) {
-			if err := workloadlifecycle.ValidateExecution(its.Spec.LifecycleActions.Switchover, pod, pods); err != nil {
-				return lifecycleWait(tree, its, err)
-			}
-			if err := lfa.Switchover(tree.Context, r.reader, nil, ""); err != nil {
-				return lifecycleWait(tree, its, err)
-			}
-			return lifecycleWait(tree, its, fmt.Errorf("waiting for %s to relinquish its exclusive role", pod.Name))
-		}
-		if leave {
-			err = lfa.MemberLeave(tree.Context, r.reader, nil)
-		} else {
-			err = lfa.MemberJoin(tree.Context, r.reader, nil)
-		}
-		if err != nil {
-			return lifecycleWait(tree, its, err)
-		}
-		status.MemberJoined = ptr.To(!leave)
-		meta.RemoveStatusCondition(&its.Status.Conditions, lifecycleCondition)
-		return kubebuilderx.RetryAfter(time.Second), nil
-	}
-	meta.RemoveStatusCondition(&its.Status.Conditions, lifecycleCondition)
 	return kubebuilderx.Continue, nil
+}
+
+func reconcileMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, inst *workloads.Instance, join bool, reader client.Reader) (kubebuilderx.Result, error) {
+	status := instanceLifecycleStatus(its, inst.Name)
+	if status == nil || !workloadlifecycle.Enabled(its) || isStopRequested(its) {
+		return kubebuilderx.Continue, nil
+	}
+	if join && (its.Spec.LifecycleActions.MemberJoin == nil || status.MemberJoined == nil || *status.MemberJoined) {
+		return kubebuilderx.Continue, nil
+	}
+	if !join && !workloadlifecycle.NeedsLeave(its, status) {
+		return kubebuilderx.Continue, nil
+	}
+	pods := lifecyclePods(tree)
+	leave := !join
+	if join {
+		current, err := tree.Get(&workloads.Instance{ObjectMeta: metav1.ObjectMeta{Name: status.PodName, Namespace: its.Namespace}})
+		if err != nil {
+			return kubebuilderx.Continue, err
+		}
+		if current == nil || !current.GetDeletionTimestamp().IsZero() || ptr.Deref(current.(*workloads.Instance).Spec.Stop, false) {
+			return kubebuilderx.Continue, nil
+		}
+	}
+	if join && status.DataLoaded != nil && !*status.DataLoaded {
+		return kubebuilderx.Continue, nil
+	}
+	var pod *corev1.Pod
+	for _, p := range pods {
+		if p.Name == status.PodName {
+			pod = p
+			break
+		}
+	}
+	if pod == nil || (join && !pod.DeletionTimestamp.IsZero()) {
+		return lifecycleWait(tree, its, fmt.Errorf("waiting for runtime of member %s", status.PodName))
+	}
+	if join && !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
+		return kubebuilderx.Continue, nil
+	}
+	action := its.Spec.LifecycleActions.MemberJoin
+	if leave {
+		action = its.Spec.LifecycleActions.MemberLeave
+	}
+	if err := workloadlifecycle.ValidateExecution(action, pod, pods); err != nil {
+		return lifecycleWait(tree, its, err)
+	}
+	lfa, err := newMemberLifecycle(its, pod, pods)
+	if err != nil {
+		return lifecycleWait(tree, its, err)
+	}
+	if leave && its.Spec.LifecycleActions.Switchover != nil && exclusiveRole(its, pod) {
+		if err := workloadlifecycle.ValidateExecution(its.Spec.LifecycleActions.Switchover, pod, pods); err != nil {
+			return lifecycleWait(tree, its, err)
+		}
+		if err := lfa.Switchover(tree.Context, reader, nil, ""); err != nil {
+			return lifecycleWait(tree, its, err)
+		}
+		return lifecycleWait(tree, its, fmt.Errorf("waiting for %s to relinquish its exclusive role", pod.Name))
+	}
+	if leave {
+		err = lfa.MemberLeave(tree.Context, reader, nil)
+	} else {
+		err = lfa.MemberJoin(tree.Context, reader, nil)
+	}
+	if err != nil {
+		return lifecycleWait(tree, its, err)
+	}
+	status.MemberJoined = ptr.To(!leave)
+	meta.RemoveStatusCondition(&its.Status.Conditions, lifecycleCondition)
+	return kubebuilderx.RetryAfter(time.Second), nil
 }
 
 func lifecycleWait(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, err error) (kubebuilderx.Result, error) {
@@ -375,7 +344,7 @@ func configureInstance(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		if err != nil {
 			return err
 		}
-		loaded := workloads.InstanceStatus{DataLoaded: ptr.To(false)}
+		loaded := workloads.InstanceStatus{DataLoaded: status.DataLoaded}
 		if pvc != nil {
 			workloadlifecycle.ObserveData(&loaded, pvc)
 		}
@@ -410,17 +379,4 @@ func configureInstance(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		}
 	}
 	return nil
-}
-func podSpecsEqual(a, b corev1.PodSpec) bool { return equality.Semantic.DeepEqual(a, b) }
-func assistantObjectsEqual(a, b []workloads.InstanceAssistantObject) bool {
-	return equality.Semantic.DeepEqual(a, b)
-}
-
-// Poll runtime facts because Instances may run in clusters without local Pod/PVC watches.
-func NewLifecyclePollingReconciler() kubebuilderx.Reconciler { return &lifecyclePollingReconciler{} }
-
-type lifecyclePollingReconciler struct{ lifecycleReconciler }
-
-func (r *lifecyclePollingReconciler) Reconcile(_ *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
-	return kubebuilderx.RetryAfter(5 * time.Second), nil
 }

@@ -20,12 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset2
 
 import (
-	"fmt"
+	"slices"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -38,11 +39,11 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-func NewAlignmentReconciler() kubebuilderx.Reconciler {
-	return &alignmentReconciler{}
+func NewAlignmentReconciler(reader client.Reader) kubebuilderx.Reconciler {
+	return &alignmentReconciler{reader: reader}
 }
 
-type alignmentReconciler struct{}
+type alignmentReconciler struct{ reader client.Reader }
 
 var _ kubebuilderx.Reconciler = &alignmentReconciler{}
 
@@ -90,6 +91,7 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 	}
 	createNameSet := newNameSet.Difference(oldNameSet)
 	deleteNameSet := oldNameSet.Difference(newNameSet)
+	runtimeChanged := false
 	for name, inst := range oldInstanceMap {
 		if !newNameSet.Has(name) || model.IsObjectDeleting(inst) || !ptr.Deref(inst.Spec.ScaledDown, false) {
 			continue
@@ -99,6 +101,7 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 		if err := tree.Update(instCopy); err != nil {
 			return kubebuilderx.Continue, err
 		}
+		runtimeChanged = true
 		oldInstanceMap[name] = instCopy
 	}
 	oldInstanceList = tree.List(&workloads.Instance{})
@@ -185,10 +188,37 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 			}
 		}
 
+		runtimeChanged = true
 		if isOrderedReady {
 			break
 		}
 		concurrency--
+	}
+
+	if workloadlifecycle.Enabled(its) && runtimeChanged {
+		return kubebuilderx.RetryAfter(time.Second), nil
+	}
+	for _, name := range newNameList {
+		if createNameSet.Has(name) {
+			continue
+		}
+		inst := oldInstanceMap[name]
+		if !workloadlifecycle.Enabled(its) || model.IsObjectDeleting(inst) || ptr.Deref(inst.Spec.Stop, false) {
+			continue
+		}
+		desired := inst.DeepCopy()
+		if err := refreshInstanceData(tree, its, desired); err != nil {
+			return lifecycleWait(tree, its, err)
+		}
+		if !equality.Semantic.DeepEqual(inst.Spec.Template.Spec, desired.Spec.Template.Spec) || !equality.Semantic.DeepEqual(inst.Spec.InstanceAssistantObjects, desired.Spec.InstanceAssistantObjects) {
+			if err := tree.Update(desired); err != nil {
+				return kubebuilderx.Continue, err
+			}
+			return kubebuilderx.RetryAfter(time.Second), nil
+		}
+		if result, err := reconcileMember(tree, its, inst, true, r.reader); err != nil || result != kubebuilderx.Continue {
+			return result, err
+		}
 	}
 
 	// delete useless instances
@@ -209,9 +239,9 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 				its.Name,
 				inst.Name)
 		}
-		if workloadlifecycle.Enabled(its) && !ptr.Deref(its.Spec.Stop, false) {
-			if status := instanceLifecycleStatus(its, inst.Name); status != nil && status.EffectiveDesiredState() == workloads.InstanceDesiredStateReleased && workloadlifecycle.NeedsLeave(its, status) {
-				return lifecycleWait(tree, its, fmt.Errorf("waiting for member %s to leave", inst.Name))
+		if workloadlifecycle.Enabled(its) && !ptr.Deref(its.Spec.Stop, false) && !slices.Contains(its.Spec.OfflineInstances, inst.Name) {
+			if status := instanceLifecycleStatus(its, inst.Name); workloadlifecycle.NeedsLeave(its, status) {
+				return reconcileMember(tree, its, inst, false, r.reader)
 			}
 		}
 		if model.IsObjectDeleting(inst) || (ptr.Deref(inst.Spec.ScaledDown, false) && equality.Semantic.DeepEqual(
@@ -227,6 +257,9 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 				return kubebuilderx.Continue, err
 			}
 		}
+		if workloadlifecycle.Enabled(its) {
+			return kubebuilderx.RetryAfter(time.Second), nil
+		}
 		if isOrderedReady && !absentRetirement {
 			break
 		}
@@ -235,6 +268,9 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 		}
 	}
 
+	if workloadlifecycle.Enabled(its) {
+		meta.RemoveStatusCondition(&its.Status.Conditions, "InstanceLifecycle")
+	}
 	return kubebuilderx.Continue, nil
 }
 

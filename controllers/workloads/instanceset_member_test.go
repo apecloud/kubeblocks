@@ -26,9 +26,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -59,13 +57,7 @@ func TestInstanceSetMemberActionsUseRuntimePodDNS(t *testing.T) {
 				t.Fatal(err)
 			}
 			for round := 0; round < 12 && len(agent.requests) == 0; round++ {
-				f.step(t)
-				if instanceAPI {
-					leaf := &InstanceReconciler{Client: f.cli, Scheme: f.cli.Scheme(), Recorder: record.NewFakeRecorder(100)}
-					if _, err := leaf.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-1"}}); err != nil {
-						t.Fatal(err)
-					}
-				}
+				f.stepWithChildren(t)
 				for _, pod := range lifecycleEntryPods(t, f.cli) {
 					f.setReady(t, pod.Name, true)
 				}

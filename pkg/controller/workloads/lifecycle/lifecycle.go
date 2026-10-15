@@ -185,7 +185,7 @@ func SourcePod(its *workloads.InstanceSet, pods []*corev1.Pod, target string) (*
 		}
 	}
 	if len(available) > 0 {
-		action := its.Spec.LifecycleActions.DataDump.DeepCopy()
+		action := its.Spec.LifecycleActions.DataDump
 		selector := action.TargetPodSelector
 		if selector == "" && action.Exec != nil {
 			selector = action.Exec.TargetPodSelector

@@ -140,6 +140,5 @@ func memberPodFQDN(namespace, compName string, pod *corev1.Pod) string {
 		}
 		return hostname + "." + intctrlutil.ServiceFQDN(namespace, pod.Spec.Subdomain)
 	}
-	// Preserve the Component naming convention for callers without observed Pod DNS.
 	return intctrlutil.PodFQDN(namespace, compName, pod.Name)
 }

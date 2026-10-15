@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -49,6 +50,52 @@ func podObj(inst *workloads.Instance) *corev1.Pod {
 			Name:      podName(inst),
 		},
 	}
+}
+
+// An absent or terminating Pod cannot provide a valid runtime observation. Clear every Pod-derived field and
+// condition together so values from the previous Pod do not survive the lifecycle transition.
+func setPodUnavailableStatus(inst *workloads.Instance, state workloads.InstanceCurrentState, name, revision string) {
+	inst.Status.CurrentState = state
+	inst.Status.CurrentRevision = revision
+	inst.Status.UpToDate = false
+	inst.Status.Ready = false
+	inst.Status.Available = false
+	inst.Status.Role = ""
+	inst.Status.VolumeExpansion = false
+	inst.Status.Configs = nil
+	meta.SetStatusCondition(&inst.Status.Conditions, *buildReadyCondition(inst, false, name))
+	meta.SetStatusCondition(&inst.Status.Conditions, *buildAvailableCondition(inst, false, name))
+	meta.RemoveStatusCondition(&inst.Status.Conditions, string(workloads.InstanceFailure))
+}
+
+func buildReadyCondition(inst *workloads.Instance, ready bool, notReadyName string) *metav1.Condition {
+	condition := &metav1.Condition{
+		Type:               string(workloads.InstanceReady),
+		Status:             metav1.ConditionTrue,
+		ObservedGeneration: inst.Generation,
+		Reason:             workloads.ReasonReady,
+	}
+	if !ready {
+		condition.Status = metav1.ConditionFalse
+		condition.Reason = workloads.ReasonNotReady
+		condition.Message = notReadyName
+	}
+	return condition
+}
+
+func buildAvailableCondition(inst *workloads.Instance, available bool, notAvailableName string) *metav1.Condition {
+	condition := &metav1.Condition{
+		Type:               string(workloads.InstanceAvailable),
+		Status:             metav1.ConditionTrue,
+		ObservedGeneration: inst.Generation,
+		Reason:             workloads.ReasonAvailable,
+	}
+	if !available {
+		condition.Status = metav1.ConditionFalse
+		condition.Reason = workloads.ReasonNotAvailable
+		condition.Message = notAvailableName
+	}
+	return condition
 }
 
 // getRoleName gets role name of pod

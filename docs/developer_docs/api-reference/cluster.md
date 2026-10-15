@@ -32413,6 +32413,19 @@ LifecycleActions
 </tr>
 <tr>
 <td>
+<code>stop</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Stop the Instance.
+If set, all the computing resources will be released.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>configs</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1.ConfigTemplate">
@@ -34061,6 +34074,19 @@ LifecycleActions
 <td>
 <em>(Optional)</em>
 <p>Defines a set of hooks that customize the behavior of an Instance throughout its lifecycle.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>stop</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Stop the Instance.
+If set, all the computing resources will be released.</p>
 </td>
 </tr>
 <tr>

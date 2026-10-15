@@ -112,6 +112,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	baseSort(newNameList, func(i int) (string, int) {
 		return parseParentNameAndOrdinal(newNameList[i])
 	}, nil, true)
+	workloadlifecycle.SortDataSourcesFirst(its, newNameList)
 	getPredecessor := func(i int) *corev1.Pod {
 		if i <= 0 {
 			return nil

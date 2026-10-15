@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -152,6 +153,22 @@ func ObserveData(status *workloads.InstanceStatus, pvc *corev1.PersistentVolumeC
 	return true
 }
 
+// SortDataSourcesFirst places pending data targets after other instances, preserving order within each group.
+func SortDataSourcesFirst(its *workloads.InstanceSet, names []string) {
+	if !HasData(its) {
+		return
+	}
+	pending := sets.New[string]()
+	for _, status := range its.Status.InstanceStatus {
+		if status.DataLoaded != nil && !*status.DataLoaded {
+			pending.Insert(status.PodName)
+		}
+	}
+	sort.SliceStable(names, func(i, j int) bool {
+		return !pending.Has(names[i]) && pending.Has(names[j])
+	})
+}
+
 func SourcePod(its *workloads.InstanceSet, pods []*corev1.Pod, target string) (*corev1.Pod, error) {
 	candidates := slices.Clone(pods)
 	slices.SortFunc(candidates, func(a, b *corev1.Pod) int { return strings.Compare(a.Name, b.Name) })
@@ -169,8 +186,12 @@ func SourcePod(its *workloads.InstanceSet, pods []*corev1.Pod, target string) (*
 	}
 	if len(available) > 0 {
 		action := its.Spec.LifecycleActions.DataDump.DeepCopy()
-		if action.TargetPodSelector == "" && (action.Exec == nil || action.Exec.TargetPodSelector == "") {
-			action.TargetPodSelector = apps.AnyReplica
+		selector := action.TargetPodSelector
+		if selector == "" && action.Exec != nil {
+			selector = action.Exec.TargetPodSelector
+		}
+		if selector == "" || selector == apps.AnyReplica {
+			return available[0], nil
 		}
 		selected, err := publiclifecycle.SelectTargetPods(available, available[0], action)
 		if err != nil {

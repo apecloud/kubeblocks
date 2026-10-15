@@ -63,7 +63,7 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (result kubebuilderx.Result, reconcileErr error) {
 	defer func() {
 		its := tree.GetRoot().(*workloads.InstanceSet)
-		if reconcileErr == nil && result == kubebuilderx.Continue && lifecycleStatusEnabled(its) {
+		if reconcileErr == nil && result == kubebuilderx.Continue && lifecycleStatusEnabled(its) && !isStopRequested(its) {
 			result = kubebuilderx.RetryAfter(5 * time.Second)
 		}
 	}()

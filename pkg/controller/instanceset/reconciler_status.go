@@ -720,5 +720,5 @@ func isPVCExpansionRunning(pvc *corev1.PersistentVolumeClaim) bool {
 }
 
 func lifecycleStatusEnabled(its *workloads.InstanceSet) bool {
-	return workloadlifecycle.Enabled(its) && !model.IsObjectDeleting(its) && !model.IsReconciliationPaused(its) && !isStopRequested(its)
+	return workloadlifecycle.Enabled(its) && !model.IsObjectDeleting(its) && !model.IsReconciliationPaused(its)
 }

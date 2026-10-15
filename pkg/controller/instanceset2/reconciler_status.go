@@ -538,5 +538,5 @@ func observationNames(observations []instancestatus.Observation) []string {
 }
 
 func lifecycleStatusEnabled(its *workloads.InstanceSet) bool {
-	return workloadlifecycle.Enabled(its) && !model.IsObjectDeleting(its) && !model.IsReconciliationPaused(its) && !isStopRequested(its)
+	return workloadlifecycle.Enabled(its) && !model.IsObjectDeleting(its) && !model.IsReconciliationPaused(its)
 }

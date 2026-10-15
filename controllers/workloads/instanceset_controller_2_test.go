@@ -919,10 +919,18 @@ func checkITS2LifecycleDataRecovery(t *testing.T, storage client.Client, onDelet
 	if target.Spec.LifecycleActions.Worker.Image != "agent:v1" || target.Spec.LifecycleActions.DataLoad.Exec.Command[0] != "true" {
 		t.Fatal("cleanup bypassed normal rollout admission for worker/actions")
 	}
+	foundWorker := false
 	for _, worker := range target.Spec.Template.Spec.InitContainers {
-		if worker.Name == kbagent.ContainerName && worker.Image != "agent:v1" {
+		if worker.Name != kbagent.ContainerName4Worker {
+			continue
+		}
+		foundWorker = true
+		if worker.Image != "agent:v1" {
 			t.Fatal("cleanup bypassed normal worker rollout")
 		}
+	}
+	if !foundWorker {
+		t.Fatal("cleanup removed the data worker")
 	}
 	var remainingTasks []proto.Task
 	if err := json.Unmarshal([]byte(target.Spec.InstanceAssistantObjects[0].ConfigMap.Data[snapshotEnv.Name]), &remainingTasks); err != nil {

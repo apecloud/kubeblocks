@@ -204,7 +204,7 @@ func (u upgradeOpsHandler) getOwnedExpectedContainers(reqCtx intctrlutil.Request
 		}
 		return nil, err
 	}
-	if !component.IsComponentConfigurationPublished(cluster, comp) {
+	if !component.IsComponentGenerationUpToDate(cluster, comp) {
 		return nil, nil
 	}
 	workloads, err := component.ListOwnedWorkloads(reqCtx.Ctx, cli, cluster.Namespace, cluster.Name, compName)

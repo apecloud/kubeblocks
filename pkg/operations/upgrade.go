@@ -21,7 +21,6 @@ package operations
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -109,6 +108,24 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		err           error
 	)
 	compOpsHelper = newComponentOpsHelper(upgradeSpec.Components)
+	legacyDefinitions := map[string]*appsv1.ComponentDefinition{}
+	for _, target := range upgradeSpec.Components {
+		if upgradeTargetHasInstanceVersions(opsRes.Cluster, target.ComponentName) {
+			continue
+		}
+		spec := getComponentSpecOrShardingTemplate(opsRes.Cluster, target.ComponentName)
+		if spec == nil {
+			return opsRes.OpsRequest.Status.Phase, 0, intctrlutil.NewFatalError(fmt.Sprintf("cannot find component %q in cluster %q", target.ComponentName, opsRes.Cluster.Name))
+		}
+		def, err := component.GetCompDefByName(reqCtx.Ctx, cli, spec.ComponentDef)
+		if err != nil {
+			return opsRes.OpsRequest.Status.Phase, 0, err
+		}
+		if err := component.UpdateCompDefinitionImages4ServiceVersion(reqCtx.Ctx, cli, def, spec.ServiceVersion); err != nil {
+			return opsRes.OpsRequest.Status.Phase, 0, err
+		}
+		legacyDefinitions[target.ComponentName] = def
+	}
 	specs, pending, err := u.getUpgradeComponentSpecs(reqCtx, cli, opsRes)
 	if err != nil {
 		return opsRes.OpsRequest.Status.Phase, 0, err
@@ -128,6 +145,10 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		ops *opsv1alpha1.OpsRequest,
 		pod *corev1.Pod,
 		pgRes *progressResource) bool {
+		target := pgRes.compOps.(opsv1alpha1.UpgradeComponent).GetComponentName()
+		if def, ok := legacyDefinitions[target]; ok {
+			return u.podImageApplied(pod, def.Spec.Runtime.Containers)
+		}
 		expected, ok := containersMap[pgRes.fullComponentName]
 		if !ok || expected.pendingOwner {
 			return false
@@ -171,10 +192,44 @@ func (u upgradeOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 	return nil
 }
 
+// upgradeTargetHasInstanceVersions checks desired instance templates before reading owner resources.
+func upgradeTargetHasInstanceVersions(cluster *appsv1.Cluster, name string) bool {
+	hasVersions := func(instances []appsv1.InstanceTemplate) bool {
+		for _, instance := range instances {
+			if instance.ServiceVersion != "" {
+				return true
+			}
+		}
+		return false
+	}
+	for _, spec := range cluster.Spec.ComponentSpecs {
+		if spec.Name == name {
+			return hasVersions(spec.Instances)
+		}
+	}
+	for _, spec := range cluster.Spec.Shardings {
+		if spec.Name != name {
+			continue
+		}
+		if hasVersions(spec.Template.Instances) {
+			return true
+		}
+		for _, template := range spec.ShardTemplates {
+			if hasVersions(template.Instances) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (u upgradeOpsHandler) getUpgradeComponentSpecs(reqCtx intctrlutil.RequestCtx,
 	cli client.Client, opsRes *OpsResource) (map[string]*appsv1.ClusterComponentSpec, bool, error) {
 	specs := map[string]*appsv1.ClusterComponentSpec{}
 	for _, target := range opsRes.OpsRequest.Spec.Upgrade.Components {
+		if !upgradeTargetHasInstanceVersions(opsRes.Cluster, target.ComponentName) {
+			continue
+		}
 		found := false
 		for i := range opsRes.Cluster.Spec.ComponentSpecs {
 			spec := &opsRes.Cluster.Spec.ComponentSpecs[i]
@@ -196,7 +251,7 @@ func (u upgradeOpsHandler) getUpgradeComponentSpecs(reqCtx intctrlutil.RequestCt
 				return nil, true, nil
 			}
 			for _, shard := range shards {
-				if shard.Generation == 0 || shard.Annotations[constant.KubeBlocksGenerationKey] != strconv.FormatInt(opsRes.Cluster.Generation, 10) {
+				if !component.IsComponentConfigurationPublished(opsRes.Cluster, &shard) {
 					return nil, true, nil
 				}
 				name := shard.Labels[constant.KBAppComponentLabelKey]
@@ -225,24 +280,6 @@ func (u upgradeOpsHandler) getExpectedContainersMap(reqCtx intctrlutil.RequestCt
 		if err != nil {
 			return nil, err
 		}
-		heterogeneous := false
-		for _, template := range compSpec.Instances {
-			heterogeneous = heterogeneous || template.ServiceVersion != ""
-		}
-		isShard := true
-		for _, spec := range cluster.Spec.ComponentSpecs {
-			if spec.Name == name {
-				isShard = false
-				break
-			}
-		}
-		if !heterogeneous && !isShard {
-			if err = component.UpdateCompDefinitionImages4ServiceVersion(reqCtx.Ctx, cli, compDef, compSpec.ServiceVersion); err != nil {
-				return nil, err
-			}
-			containersMap[name] = upgradeExpectedImages{definition: compDef, containersByTemplate: map[string][]corev1.Container{"": compDef.Spec.Runtime.Containers}}
-			continue
-		}
 		containersMap[name] = upgradeExpectedImages{definition: compDef, pendingOwner: true}
 		comp := &appsv1.Component{}
 		if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: component.FullName(cluster.Name, name)}, comp); err != nil {
@@ -251,7 +288,7 @@ func (u upgradeOpsHandler) getExpectedContainersMap(reqCtx intctrlutil.RequestCt
 			}
 			continue
 		}
-		if comp.Generation == 0 || comp.Annotations[constant.KubeBlocksGenerationKey] != strconv.FormatInt(cluster.Generation, 10) {
+		if !component.IsComponentConfigurationPublished(cluster, comp) {
 			continue
 		}
 		workloads, err := component.ListOwnedWorkloads(reqCtx.Ctx, cli, cluster.Namespace, cluster.Name, name)

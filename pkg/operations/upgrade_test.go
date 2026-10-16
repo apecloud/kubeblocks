@@ -437,9 +437,14 @@ func TestUpgradeInstanceTemplateVersions(t *testing.T) {
 		flat, shard, wrongStatus       bool
 		unlabeled, alternateDefinition bool
 		ownerRecovery, zeroReplicas    bool
+		legacyShard, missingITS        bool
+		mixed                          bool
 		want                           opsv1alpha1.OpsPhase
 		progress                       string
 	}{
+		{name: "mixed legacy shard and heterogeneous component", legacyShard: true, shard: true, mixed: true, templateImage: "db:v2", want: opsv1alpha1.OpsSucceedPhase, progress: "4/4"},
+		{name: "legacy shard without ITS", legacyShard: true, missingITS: true, shard: true, flat: true, templateImage: "db:v2", want: opsv1alpha1.OpsSucceedPhase, progress: "2/2"},
+		{name: "legacy shard with stale publication", legacyShard: true, shard: true, templateImage: "db:v2", want: opsv1alpha1.OpsSucceedPhase, progress: "2/2"},
 		{name: "zero replicas with unpublished version", version: "1.0.0", zeroReplicas: true, want: opsv1alpha1.OpsSucceedPhase, progress: "0/0"},
 		{name: "zero replica shard with unpublished version", version: "1.0.0", zeroReplicas: true, shard: true, want: opsv1alpha1.OpsSucceedPhase, progress: "0/0"},
 		{name: "shard publication recovery", version: "1.0.0", templateImage: "db:v1", shard: true, ownerRecovery: true, want: opsv1alpha1.OpsSucceedPhase, progress: "2/2"},
@@ -509,6 +514,9 @@ func TestUpgradeInstanceTemplateVersions(t *testing.T) {
 					defaultSpec.Replicas = 3
 				}
 				defaultSpec.Instances = nil
+				if tc.legacyShard {
+					defaultSpec.Replicas = 2
+				}
 				cluster.Spec.ComponentSpecs = nil
 				cluster.Spec.Shardings = []appsv1.ClusterSharding{{
 					Name: target, Shards: 1, Template: defaultSpec,
@@ -622,7 +630,48 @@ func TestUpgradeInstanceTemplateVersions(t *testing.T) {
 				cluster.Spec.Shardings[0].ShardTemplates[0].ServiceVersion = ptr.To("2.0.0")
 				objects = append(objects, alternate)
 			}
+			if tc.legacyShard {
+				cluster.Spec.Shardings[0].ShardTemplates[0].Instances = nil
+				cluster.Spec.Shardings[0].ShardTemplates[0].ServiceVersion = ptr.To("1.0.0")
+				cluster.Spec.Shardings[0].ShardTemplates[0].Replicas = ptr.To(int32(3))
+				owner.Spec.Replicas = 3
+				owner.Annotations[constant.KubeBlocksGenerationKey] = "2"
+				its.Annotations[constant.KubeBlocksGenerationKey] = "4"
+				delete(fixed.Labels, constant.KBAppInstanceTemplateLabelKey)
+			}
+			if tc.mixed {
+				mixedSpec := spec
+				mixedSpec.Name = "other"
+				mixedSpec.Instances = []appsv1.InstanceTemplate{{Name: "fixed", ServiceVersion: "1.0.0"}}
+				cluster.Spec.ComponentSpecs = []appsv1.ClusterComponentSpec{mixedSpec}
+				cluster.Status.Components["other"] = appsv1.ClusterComponentStatus{Phase: appsv1.RunningComponentPhase}
+				ops.Spec.Upgrade.Components = append(ops.Spec.Upgrade.Components, opsv1alpha1.UpgradeComponent{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "other"}})
+				mixedOwner := owner.DeepCopy()
+				mixedOwner.Name = "cluster-other"
+				mixedOwner.Labels = constant.GetCompLabels(cluster.Name, "other")
+				mixedOwner.Annotations = map[string]string{constant.KubeBlocksGenerationKey: "3"}
+				mixedOwner.Spec.Replicas = 2
+				mixedOwner.Spec.Instances = mixedSpec.Instances
+				mixedITS := its.DeepCopy()
+				mixedITS.Name = mixedOwner.Name
+				mixedITS.Labels = mixedOwner.Labels
+				mixedITS.Annotations = map[string]string{constant.KubeBlocksGenerationKey: "5", constant.AppComponentLabelKey: "db", constant.KBAppServiceVersionKey: "2.0.0"}
+				mixedBase := base.DeepCopy()
+				mixedBase.Name = "cluster-other-0"
+				mixedBase.Labels = mixedOwner.Labels
+				mixedFixed := fixed.DeepCopy()
+				mixedFixed.Name = "cluster-other-fixed-0"
+				mixedFixed.Labels = mixedOwner.Labels
+				mixedFixed.Spec.Containers[0].Image = "db:v1"
+				mixedFixed.Status.ContainerStatuses[0].Image = "db:v1"
+				objects = append(objects, mixedOwner, mixedITS, mixedBase, mixedFixed)
+			}
 			cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(ops).WithObjects(objects...).Build()
+			if tc.missingITS {
+				if err := cli.Delete(context.Background(), its); err != nil {
+					t.Fatal(err)
+				}
+			}
 			if tc.ownerRecovery {
 				reconcileWaiting := func() {
 					t.Helper()
@@ -721,7 +770,7 @@ func TestUpgradeZeroShards(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "cluster", Namespace: "ns", Generation: 3},
 		Spec: appsv1.ClusterSpec{Shardings: []appsv1.ClusterSharding{{
 			Name: "shards", Shards: 0,
-			Template: appsv1.ClusterComponentSpec{ComponentDef: "db", ServiceVersion: "2.0.0", Replicas: 2},
+			Template: appsv1.ClusterComponentSpec{ComponentDef: "db", ServiceVersion: "2.0.0", Replicas: 2, Instances: []appsv1.InstanceTemplate{{Name: "fixed", ServiceVersion: "1.0.0"}}},
 		}}},
 	}
 	ops := &opsv1alpha1.OpsRequest{
@@ -737,6 +786,21 @@ func TestUpgradeZeroShards(t *testing.T) {
 		Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsRunningPhase},
 	}
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(ops).WithObjects(cluster, ops).Build()
+	t.Run("without instance versions", func(t *testing.T) {
+		legacyCluster := cluster.DeepCopy()
+		legacyCluster.Spec.Shardings[0].Template.Instances = nil
+		legacyOps := ops.DeepCopy()
+		definition := &appsv1.ComponentDefinition{ObjectMeta: metav1.ObjectMeta{Name: "db"}}
+		legacyClient := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(legacyOps).
+			WithObjects(legacyCluster, legacyOps, definition).Build()
+		phase, requeue, err := (upgradeOpsHandler{}).ReconcileAction(
+			intctrlutil.RequestCtx{Ctx: context.Background()}, legacyClient,
+			&OpsResource{Cluster: legacyCluster, OpsRequest: legacyOps, Recorder: record.NewFakeRecorder(100)},
+		)
+		if err != nil || phase != opsv1alpha1.OpsSucceedPhase || requeue != 0 || legacyOps.Status.Progress != "0/0" {
+			t.Fatalf("phase=%s requeue=%s progress=%s err=%v, want Succeed with 0/0", phase, requeue, legacyOps.Status.Progress, err)
+		}
+	})
 	phase, requeue, err := (upgradeOpsHandler{}).ReconcileAction(
 		intctrlutil.RequestCtx{Ctx: context.Background()}, cli,
 		&OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(100)},

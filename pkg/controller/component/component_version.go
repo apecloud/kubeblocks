@@ -34,6 +34,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -191,7 +192,7 @@ func resolveImagesWithCompVersions4Template(compDef *appsv1.ComponentDefinition,
 			switch {
 			case ok && app.err == nil:
 				if len(image) == 0 || image != app.image {
-					images[name] = app.image
+					images[name] = intctrlutil.ReplaceImageRegistry(app.image)
 				}
 			case ok:
 				err = app.err
@@ -224,11 +225,14 @@ func resolveImagesWithCompVersions4Template(compDef *appsv1.ComponentDefinition,
 					if app.err != nil {
 						return app.err
 					}
+					if len(app.image) == 0 {
+						continue
+					}
 					if image, ok := images[kbagent.ContainerName]; !ok || len(image) == 0 {
-						images[kbagent.ContainerName] = app.image
+						images[kbagent.ContainerName] = intctrlutil.ReplaceImageRegistry(app.image)
 					}
 					if image, ok := images[kbagent.ContainerName4Worker]; !ok || len(image) == 0 {
-						images[kbagent.ContainerName4Worker] = app.image
+						images[kbagent.ContainerName4Worker] = intctrlutil.ReplaceImageRegistry(app.image)
 					}
 				}
 			}

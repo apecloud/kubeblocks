@@ -381,7 +381,7 @@ var _ = Describe("instance template service versions in component transforms", f
 		transCtx := &componentTransformContext{Context: ctx, Client: graphCli, Component: comp, ComponentOrig: comp.DeepCopy(), Logger: logger}
 		load := &componentLoadResourcesTransformer{}
 		Expect(load.Transform(transCtx, graph.NewDAG())).Should(Succeed())
-		Expect(transCtx.SynthesizeComponent.InstanceImages["explicit"]).Should(Equal(map[string]string{"db": "db:2", "setup": "setup:2"}))
+		Expect(transCtx.SynthesizeComponent.InstanceImages["explicit"]).Should(Equal(map[string]string{"db": "docker.io/library/db:2", "setup": "docker.io/library/setup:2"}))
 		Expect(transCtx.SynthesizeComponent.InstanceImages).ShouldNot(HaveKey("inherited"))
 		transform := &componentWorkloadTransformer{Client: cli}
 		dag := graph.NewDAG()
@@ -390,7 +390,7 @@ var _ = Describe("instance template service versions in component transforms", f
 		objects := graphCli.FindAll(dag, &workloads.InstanceSet{})
 		Expect(objects).Should(HaveLen(1))
 		running := objects[0].(*workloads.InstanceSet)
-		Expect(running.Spec.Instances[0].Images).Should(Equal(map[string]string{"db": "db:2", "setup": "setup:2"}))
+		Expect(running.Spec.Instances[0].Images).Should(Equal(map[string]string{"db": "docker.io/library/db:2", "setup": "docker.io/library/setup:2"}))
 		Expect(running.Spec.Instances[1].Images).Should(BeNil())
 		Expect(running.Spec.Template.Spec.Containers[0].Image).Should(Equal(intctrlutil.ReplaceImageRegistry("db:1")))
 		Expect(cli.Create(ctx, running)).Should(Succeed())
@@ -404,7 +404,7 @@ var _ = Describe("instance template service versions in component transforms", f
 		updated := graphCli.FindAll(dag, &workloads.InstanceSet{})
 		Expect(updated).Should(HaveLen(1))
 		Expect(graphCli.IsAction(dag, updated[0], model.ActionUpdatePtr())).Should(BeTrue())
-		Expect(updated[0].(*workloads.InstanceSet).Spec.Instances[0].Images).Should(Equal(map[string]string{"db": "db:3", "setup": "setup:3"}))
+		Expect(updated[0].(*workloads.InstanceSet).Spec.Instances[0].Images).Should(Equal(map[string]string{"db": "docker.io/library/db:3", "setup": "docker.io/library/setup:3"}))
 
 		By("requeueing unavailable template definitions and retrying after they recover")
 		templateDef.Status.Phase = appsv1.UnavailablePhase

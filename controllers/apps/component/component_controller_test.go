@@ -48,8 +48,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -2260,16 +2262,16 @@ var _ = Describe("Component Controller", func() {
 			})
 			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Spec.Instances).Should(HaveLen(2))
-				g.Expect(its.Spec.Instances[0].Images).Should(HaveKeyWithValue(testapps.DefaultMySQLContainerName, "mysql:8.0.31"))
+				g.Expect(its.Spec.Instances[0].Images).Should(HaveKeyWithValue(testapps.DefaultMySQLContainerName, "docker.io/library/mysql:8.0.31"))
 				g.Expect(its.Spec.Instances[1].Images).Should(BeNil())
-				g.Expect(its.Spec.Template.Spec.Containers[0].Image).ShouldNot(Equal("mysql:8.0.31"))
+				g.Expect(its.Spec.Template.Spec.Containers[0].Image).ShouldNot(Equal("docker.io/library/mysql:8.0.31"))
 			})).Should(Succeed())
 			By("updating the persisted template version through the Component controller")
 			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
 				comp.Spec.Instances[0].ServiceVersion = newRelease.ServiceVersion
 			})()).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, its *workloads.InstanceSet) {
-				g.Expect(its.Spec.Instances[0].Images).Should(HaveKeyWithValue(testapps.DefaultMySQLContainerName, "mysql:8.0.32"))
+				g.Expect(its.Spec.Instances[0].Images).Should(HaveKeyWithValue(testapps.DefaultMySQLContainerName, "docker.io/library/mysql:8.0.32"))
 			})).Should(Succeed())
 			By("clearing explicit version and definition to inherit the component image")
 			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
@@ -2382,6 +2384,102 @@ var _ = Describe("Component Controller", func() {
 				g.Expect(c.Image).To(HavePrefix(registry))
 			})).Should(Succeed())
 		})
+
+		DescribeTable("resolves instance template image registries", func(mapping string, customActionImage bool) {
+			const (
+				serviceVersion = "8.0.31"
+				toolsImage     = "docker.io/apecloud/kubeblocks-tools:test"
+				appImage       = "docker.io/apecloud/mysql:8.0.31"
+				initImage      = "docker.io/apecloud/prepare:8.0.31"
+				actionImage    = "docker.io/apecloud/actions:8.0.31"
+			)
+			oldToolsImage := viper.GetString(constant.KBToolsImage)
+			DeferCleanup(func() {
+				viper.Set(constant.KBToolsImage, oldToolsImage)
+			})
+			registryConfig := map[string]any{}
+			expectedPrefix := "docker.io/apecloud/"
+			switch mapping {
+			case "default registry":
+				registryConfig["defaultRegistry"] = registry
+				expectedPrefix = registry + "/apecloud/"
+			case "registry and namespace mapping":
+				registryConfig["registryConfig"] = []map[string]any{
+					{"from": "docker.io", "to": registry, "namespaceMapping": map[string]string{"apecloud": "private"}},
+					{"from": registry, "to": "twice.invalid"},
+				}
+				expectedPrefix = registry + "/private/"
+			}
+			viper.Set(constant.CfgRegistries, registryConfig)
+			viper.Set(constant.KBToolsImage, toolsImage)
+			Expect(intctrlutil.LoadRegistryConfig()).Should(Succeed())
+			Expect(viper.GetString(constant.KBToolsImage)).Should(Equal(expectedPrefix + "kubeblocks-tools:test"))
+
+			By("publishing a service version with runtime and init container images")
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compDefObj), func(def *kbappsv1.ComponentDefinition) {
+				def.Spec.Runtime.InitContainers = []corev1.Container{{Name: "prepare", Image: "docker.io/apecloud/prepare:8.0.30"}}
+				def.Spec.SystemAccounts = nil
+				def.Spec.LifecycleActions = &kbappsv1.ComponentLifecycleActions{
+					MemberJoin: &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"true"}}},
+				}
+			})()).Should(Succeed())
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compVerObj), func(ver *kbappsv1.ComponentVersion) {
+				ver.Spec.Releases[0].Images[testapps.DefaultMySQLContainerName] = "docker.io/apecloud/mysql:8.0.30"
+				release := kbappsv1.ComponentVersionRelease{
+					Name: serviceVersion, ServiceVersion: serviceVersion,
+					Images: map[string]string{testapps.DefaultMySQLContainerName: appImage, "prepare": initImage},
+				}
+				if customActionImage {
+					release.Images["memberJoin"] = actionImage
+				}
+				ver.Spec.Releases = append(ver.Spec.Releases, release)
+				ver.Spec.CompatibilityRules[0].Releases = append(ver.Spec.CompatibilityRules[0].Releases, release.Name)
+			})()).Should(Succeed())
+
+			By("reconciling a component with an instance-specific service version")
+			createCompObj(defaultCompName, compDefObj.Name, func(f *testapps.MockComponentFactory) {
+				f.SetServiceVersion(compDefObj.Spec.ServiceVersion).
+					AddInstances(kbappsv1.InstanceTemplate{
+						Name: "canary", Replicas: ptr.To(int32(1)), CompDef: compDefObj.Name, ServiceVersion: serviceVersion,
+					})
+			})
+
+			expectedActionImage := expectedPrefix + "kubeblocks-tools:test"
+			if customActionImage {
+				expectedActionImage = expectedPrefix + "actions:8.0.31"
+			}
+			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Spec.Template.Spec.Containers[0].Image).Should(Equal(expectedPrefix + "mysql:8.0.30"))
+				g.Expect(its.Spec.Template.Spec.InitContainers).Should(ContainElement(And(
+					HaveField("Name", "prepare"), HaveField("Image", expectedPrefix+"prepare:8.0.30"))))
+				g.Expect(its.Spec.Instances).Should(HaveLen(1))
+				g.Expect(its.Spec.Instances[0].Images).Should(Equal(map[string]string{
+					testapps.DefaultMySQLContainerName: expectedPrefix + "mysql:8.0.31",
+					"prepare":                          expectedPrefix + "prepare:8.0.31",
+					kbagent.ContainerName:              expectedActionImage,
+					kbagent.ContainerName4Worker:       expectedActionImage,
+				}))
+				templates := instanceset.BuildInstanceTemplateExts(&instanceset.InstanceSetExt{
+					Its: its, InstanceTemplates: instanceset.BuildInstanceTemplates(*its.Spec.Replicas, its.Spec.Instances, nil),
+				})
+				g.Expect(templates).Should(HaveLen(1))
+				g.Expect(templates[0].Spec.Containers).Should(ContainElement(And(
+					HaveField("Name", testapps.DefaultMySQLContainerName), HaveField("Image", expectedPrefix+"mysql:8.0.31"))))
+				g.Expect(templates[0].Spec.InitContainers).Should(ContainElement(And(
+					HaveField("Name", "prepare"), HaveField("Image", expectedPrefix+"prepare:8.0.31"))))
+				g.Expect(templates[0].Spec.Containers).Should(ContainElement(And(
+					HaveField("Name", kbagent.ContainerName), HaveField("Image", expectedActionImage))))
+				g.Expect(templates[0].Spec.InitContainers).Should(ContainElement(And(
+					HaveField("Name", kbagent.ContainerName4Worker), HaveField("Image", expectedActionImage))))
+			})).Should(Succeed())
+		},
+			Entry("no mapping, default tools", "none", false),
+			Entry("no mapping, explicit action", "none", true),
+			Entry("default registry, default tools", "default registry", false),
+			Entry("default registry, explicit action", "default registry", true),
+			Entry("registry and namespace mapping, default tools", "registry and namespace mapping", false),
+			Entry("registry and namespace mapping, explicit action", "registry and namespace mapping", true),
+		)
 
 		It("handles running its and upgrade", func() {
 			createCompObj(defaultCompName, compDefObj.Name, func(f *testapps.MockComponentFactory) {

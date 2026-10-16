@@ -34,6 +34,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -191,7 +192,7 @@ func resolveImagesWithCompVersions4Template(compDef *appsv1.ComponentDefinition,
 			switch {
 			case ok && app.err == nil:
 				if len(image) == 0 || image != app.image {
-					images[name] = app.image
+					images[name] = intctrlutil.ReplaceImageRegistry(app.image)
 				}
 			case ok:
 				err = app.err
@@ -224,11 +225,15 @@ func resolveImagesWithCompVersions4Template(compDef *appsv1.ComponentDefinition,
 					if app.err != nil {
 						return app.err
 					}
-					if image, ok := images[kbagent.ContainerName]; !ok || len(image) == 0 {
-						images[kbagent.ContainerName] = app.image
+					if len(app.image) == 0 {
+						continue
 					}
-					if image, ok := images[kbagent.ContainerName4Worker]; !ok || len(image) == 0 {
-						images[kbagent.ContainerName4Worker] = app.image
+					image := intctrlutil.ReplaceImageRegistry(app.image)
+					if agentImage, ok := images[kbagent.ContainerName]; !ok || len(agentImage) == 0 {
+						images[kbagent.ContainerName] = image
+					}
+					if workerImage, ok := images[kbagent.ContainerName4Worker]; !ok || len(workerImage) == 0 {
+						images[kbagent.ContainerName4Worker] = image
 					}
 				}
 			}
@@ -236,6 +241,7 @@ func resolveImagesWithCompVersions4Template(compDef *appsv1.ComponentDefinition,
 		if hasExecAction && len(images[kbagent.ContainerName]) == 0 {
 			// Instance template image overrides are applied directly to Pod containers without passing
 			// through buildKBAgentContainer, so materialize the default tools image here.
+			// LoadRegistryConfig has already applied registry configuration to this image.
 			image := viper.GetString(constant.KBToolsImage)
 			images[kbagent.ContainerName] = image
 			images[kbagent.ContainerName4Worker] = image

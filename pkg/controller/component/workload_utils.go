@@ -41,6 +41,23 @@ func ListOwnedWorkloads(ctx context.Context, cli client.Reader, namespace, clust
 	return listWorkloads(ctx, cli, namespace, clusterName, compName)
 }
 
+// IsWorkloadVersionUpdated checks the default definition and service version published by the owner.
+// A consumed generation alone can also represent a deferred image update during stop or start.
+func IsWorkloadVersionUpdated(comp *appsv1.Component, its *workloads.InstanceSet) bool {
+	expected := map[string]string{
+		constant.KubeBlocksGenerationKey: strconv.FormatInt(comp.Generation, 10),
+		constant.AppComponentLabelKey:    comp.Spec.CompDef,
+		constant.KBAppServiceVersionKey:  comp.Spec.ServiceVersion,
+	}
+	for key, value := range expected {
+		published, ok := its.Annotations[key]
+		if !ok || published != value {
+			return false
+		}
+	}
+	return true
+}
+
 func ListOwnedPods(ctx context.Context, cli client.Reader, namespace, clusterName, compName string,
 	opts ...client.ListOption) ([]*corev1.Pod, error) {
 	return listPods(ctx, cli, namespace, clusterName, compName, nil, opts...)

@@ -33,6 +33,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // CompatibleCompVersions4Definition returns all component versions that are compatible with specified component definition.
@@ -100,9 +103,21 @@ func UpdateCompDefinitionImages4ServiceVersion(ctx context.Context, cli client.R
 	return resolveImagesWithCompVersions(compDef, compVersions, serviceVersion)
 }
 
+func ResolveInstanceTemplateImages4ServiceVersion(ctx context.Context, cli client.Reader,
+	compDef *appsv1.ComponentDefinition, serviceVersion string) (map[string]string, error) {
+	compVersions, err := CompatibleCompVersions4Definition(ctx, cli, compDef)
+	if err != nil {
+		return nil, err
+	}
+	if len(compVersions) == 0 {
+		return nil, nil
+	}
+	return resolveImagesWithCompVersions4Template(compDef, compVersions, serviceVersion)
+}
+
 func resolveImagesWithCompVersions(compDef *appsv1.ComponentDefinition,
 	compVersions []*appsv1.ComponentVersion, serviceVersion string) error {
-	appsInDef := covertImagesFromCompDefinition(compDef)
+	appsInDef := convertImagesFromCompDefinition(compDef)
 	appsInVer, err := findMatchedImagesFromCompVersions(compVersions, serviceVersion)
 	if err != nil {
 		return err
@@ -158,7 +173,82 @@ func resolveImagesWithCompVersions(compDef *appsv1.ComponentDefinition,
 	return nil
 }
 
-func covertImagesFromCompDefinition(compDef *appsv1.ComponentDefinition) map[string]appNameVersionImage {
+func resolveImagesWithCompVersions4Template(compDef *appsv1.ComponentDefinition,
+	compVersions []*appsv1.ComponentVersion, serviceVersion string) (map[string]string, error) {
+	appsInDef := convertImagesFromCompDefinition(compDef)
+	appsInVer, err := findMatchedImagesFromCompVersions(compVersions, serviceVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	images := make(map[string]string)
+	apps := checkNMergeImages(serviceVersion, appsInDef, appsInVer)
+
+	if err = func() error {
+		checkNUpdateImage := func(name, image string) error {
+			var err error
+			app, ok := apps[name]
+			switch {
+			case ok && app.err == nil:
+				if len(image) == 0 || image != app.image {
+					images[name] = app.image
+				}
+			case ok:
+				err = app.err
+			default:
+				err = fmt.Errorf("no matched image found for container %s", name)
+			}
+			return err
+		}
+		for _, c := range compDef.Spec.Runtime.InitContainers {
+			if err := checkNUpdateImage(c.Name, c.Image); err != nil {
+				return err
+			}
+		}
+		for _, c := range compDef.Spec.Runtime.Containers {
+			if err := checkNUpdateImage(c.Name, c.Image); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return nil, err
+	}
+
+	if err = func() error {
+		hasExecAction := false
+		for name, action := range actionsToResolveImage(compDef) {
+			if action != nil && action.Exec != nil {
+				hasExecAction = true
+				if app, ok := apps[name]; ok {
+					if app.err != nil {
+						return app.err
+					}
+					if image, ok := images[kbagent.ContainerName]; !ok || len(image) == 0 {
+						images[kbagent.ContainerName] = app.image
+					}
+					if image, ok := images[kbagent.ContainerName4Worker]; !ok || len(image) == 0 {
+						images[kbagent.ContainerName4Worker] = app.image
+					}
+				}
+			}
+		}
+		if hasExecAction && len(images[kbagent.ContainerName]) == 0 {
+			// Instance template image overrides are applied directly to Pod containers without passing
+			// through buildKBAgentContainer, so materialize the default tools image here.
+			image := viper.GetString(constant.KBToolsImage)
+			images[kbagent.ContainerName] = image
+			images[kbagent.ContainerName4Worker] = image
+		}
+		return nil
+	}(); err != nil {
+		return nil, err
+	}
+
+	return images, nil
+}
+
+func convertImagesFromCompDefinition(compDef *appsv1.ComponentDefinition) map[string]appNameVersionImage {
 	apps := make(map[string]appNameVersionImage)
 
 	// containers

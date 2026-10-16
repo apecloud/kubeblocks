@@ -71,6 +71,19 @@ func (t *componentLoadResourcesTransformer) transformForNativeComponent(transCtx
 		message := fmt.Sprintf("build synthesized component for %s failed: %s", comp.Name, err.Error())
 		return intctrlutil.NewRequeueError(appsutil.RequeueDuration, message)
 	}
+	for _, tpl := range comp.Spec.Instances {
+		if len(tpl.ServiceVersion) > 0 {
+			tplCompDef, err := getNCheckCompDefinition(ctx, cli, tpl.CompDef)
+			if err != nil {
+				return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
+			}
+			images, err := component.ResolveInstanceTemplateImages4ServiceVersion(ctx, cli, tplCompDef, tpl.ServiceVersion)
+			if err != nil {
+				return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
+			}
+			synthesizedComp.InstanceImages[tpl.Name] = images
+		}
+	}
 	transCtx.SynthesizeComponent = synthesizedComp
 
 	runningITS, err := t.runningInstanceSetObject(transCtx, synthesizedComp)

@@ -33,6 +33,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -545,5 +546,99 @@ var _ = Describe("resolve CompDefinition and ServiceVersion", func() {
 			Expect(resolvedServiceVersion).Should(Equal(testapps.ServiceVersion("v2")))
 			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
 		})
+	})
+})
+
+var _ = Describe("instance template service versions in cluster normalization", func() {
+	DescribeTable("resolves, writes back, and propagates template versions", func(sharded bool) {
+		scheme := runtime.NewScheme()
+		Expect(appsv1.AddToScheme(scheme)).Should(Succeed())
+		def := testapps.NewComponentDefinitionFactory("template-db-v1").SetServiceVersion("1.0.0").
+			AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).GetObject()
+		otherDef := def.DeepCopy()
+		otherDef.Name = "template-db-v2"
+		ver := &appsv1.ComponentVersion{ObjectMeta: metav1.ObjectMeta{
+			Name: "template-db", Labels: map[string]string{def.Name: def.Name, otherDef.Name: otherDef.Name},
+		}, Spec: appsv1.ComponentVersionSpec{
+			CompatibilityRules: []appsv1.ComponentVersionCompatibilityRule{{CompDefs: []string{def.Name, otherDef.Name}, Releases: []string{"r1", "r2", "r3"}}},
+			Releases: []appsv1.ComponentVersionRelease{
+				{Name: "r1", ServiceVersion: "1.0.0"}, {Name: "r2", ServiceVersion: "2.0.0"}, {Name: "r3", ServiceVersion: "3.0.0"},
+			},
+		}, Status: appsv1.ComponentVersionStatus{Phase: appsv1.AvailablePhase}}
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(def, otherDef, ver).Build()
+		cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, "template-cluster", "").GetObject()
+		cluster.Generation = 1
+		spec := appsv1.ClusterComponentSpec{Name: "db", ComponentDef: def.Name, ServiceVersion: "1.0.0", Replicas: 3,
+			Instances: []appsv1.InstanceTemplate{{Name: "explicit", ServiceVersion: "2.0.0", CompDef: "^template-db-v2$"}, {Name: "inherited"}},
+		}
+		if sharded {
+			cluster.Spec.Shardings = []appsv1.ClusterSharding{{Name: "db", Template: spec, Shards: 1}}
+		} else {
+			cluster.Spec.ComponentSpecs = []appsv1.ClusterComponentSpec{spec}
+		}
+		graphCli := model.NewGraphClient(cli)
+		normalize := func() *clusterTransformContext {
+			transCtx := &clusterTransformContext{Context: ctx, Client: graphCli, Logger: logger,
+				Cluster: cluster.DeepCopy(), OrigCluster: cluster.DeepCopy()}
+			Expect((&clusterNormalizationTransformer{}).Transform(transCtx, graph.NewDAG())).Should(Succeed())
+			cluster = transCtx.Cluster.DeepCopy()
+			return transCtx
+		}
+		currentSpec := func() *appsv1.ClusterComponentSpec {
+			if sharded {
+				return &cluster.Spec.Shardings[0].Template
+			}
+			return &cluster.Spec.ComponentSpecs[0]
+		}
+		transCtx := normalize()
+		Expect(currentSpec().Instances[0].CompDef).Should(Equal(otherDef.Name))
+		Expect(currentSpec().Instances[0].ServiceVersion).Should(Equal("2.0.0"))
+		Expect(currentSpec().Instances[1].ServiceVersion).Should(BeEmpty())
+		Expect(currentSpec().Instances[1].CompDef).Should(BeEmpty())
+		Expect(transCtx.componentDefs).Should(HaveKey(otherDef.Name))
+
+		By("creating Components through the cluster transformer")
+		dag := graph.NewDAG()
+		graphCli.Root(dag, transCtx.Cluster, transCtx.Cluster, model.ActionStatusPtr())
+		Expect((&clusterComponentTransformer{}).Transform(transCtx, dag)).Should(Succeed())
+		objects := graphCli.FindAll(dag, &appsv1.Component{})
+		Expect(objects).Should(HaveLen(1))
+		running := objects[0].(*appsv1.Component)
+		Expect(running.Spec.Instances).Should(Equal(currentSpec().Instances))
+		Expect(cli.Create(ctx, running)).Should(Succeed())
+
+		By("preserving explicit template version after a component upgrade")
+		currentSpec().ServiceVersion = "3.0.0"
+		normalize()
+		Expect(currentSpec().Instances[0].ServiceVersion).Should(Equal("2.0.0"))
+		Expect(currentSpec().Instances[1].ServiceVersion).Should(BeEmpty())
+		By("resolving latest when only serviceVersion is cleared")
+		currentSpec().Instances[0].ServiceVersion = ""
+		normalize()
+		Expect(currentSpec().Instances[0].ServiceVersion).Should(Equal("3.0.0"))
+		Expect(currentSpec().Instances[0].CompDef).Should(Equal(otherDef.Name))
+		By("inheriting when serviceVersion and compDef are both cleared")
+		currentSpec().Instances[0].ServiceVersion, currentSpec().Instances[0].CompDef = "", ""
+		normalize()
+		Expect(currentSpec().Instances[0].ServiceVersion).Should(BeEmpty())
+		Expect(currentSpec().Instances[0].CompDef).Should(BeEmpty())
+	}, Entry("component", false), Entry("sharding", true))
+
+	It("retries normalization after correcting an invalid template version", func() {
+		scheme := runtime.NewScheme()
+		Expect(appsv1.AddToScheme(scheme)).Should(Succeed())
+		def := testapps.NewComponentDefinitionFactory("template-retry").SetServiceVersion("1.0.0").
+			AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).GetObject()
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(def).Build()
+		cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, "template-retry", "").GetObject()
+		cluster.Spec.ComponentSpecs = []appsv1.ClusterComponentSpec{{Name: "db", ComponentDef: def.Name, ServiceVersion: "1.0.0",
+			Instances: []appsv1.InstanceTemplate{{Name: "bad", ServiceVersion: "invalid"}}}}
+		transCtx := &clusterTransformContext{Context: ctx, Client: cli, Cluster: cluster.DeepCopy(), OrigCluster: cluster.DeepCopy()}
+		Expect((&clusterNormalizationTransformer{}).Transform(transCtx, graph.NewDAG())).ShouldNot(Succeed())
+		Expect(transCtx.Cluster.Spec).Should(Equal(cluster.Spec))
+		Expect(transCtx.Cluster.Status.Conditions).Should(ContainElement(HaveField("Status", metav1.ConditionFalse)))
+		transCtx.Cluster.Spec.ComponentSpecs[0].Instances[0].ServiceVersion = "1.0.0"
+		Expect((&clusterNormalizationTransformer{}).Transform(transCtx, graph.NewDAG())).Should(Succeed())
+		Expect(transCtx.Cluster.Spec.ComponentSpecs[0].Instances[0].CompDef).Should(Equal(def.Name))
 	})
 })

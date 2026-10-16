@@ -720,6 +720,13 @@ spec:
                         - name
                         type: object
                       type: array
+                    images:
+                      additionalProperties:
+                        type: string
+                      description: |-
+                        Specifies the container images to override in the default template.
+                        Keys are the container names.
+                      type: object
                     labels:
                       additionalProperties:
                         type: string

@@ -159,6 +159,7 @@ func getInstanceTemplates(synthesizedComp *component.SynthesizedComponent) []wor
 	for i := range instances {
 		instanceTemplates[i] = workloads.InstanceTemplate{
 			Name:                 instances[i].Name,
+			Images:               synthesizedComp.InstanceImages[instances[i].Name],
 			Replicas:             instances[i].Replicas,
 			Ordinals:             instances[i].Ordinals,
 			Annotations:          instances[i].Annotations,

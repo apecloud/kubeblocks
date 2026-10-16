@@ -828,6 +828,53 @@ var _ = Describe("Cluster Controller", func() {
 			testClusterComponentWithTopology(defaultTopology.Name, defaultCompName, setServiceVersion, compDefObj.Name, defaultServiceVersion)
 		})
 
+		DescribeTable("persists instance template service versions through Cluster reconciliation", func(sharded bool) {
+			createClusterObjNoWait("", func(f *testapps.MockClusterFactory) {
+				spec := appsv1.ClusterComponentSpec{Name: defaultCompName, ComponentDef: compDefObj.Name,
+					ServiceVersion: defaultServiceVersion, Replicas: 2,
+					Instances: []appsv1.InstanceTemplate{{Name: "explicit", ServiceVersion: latestServiceVersion}, {Name: "inherited"}}}
+				if sharded {
+					f.Get().Spec.Shardings = []appsv1.ClusterSharding{{Name: defaultCompName, Shards: 1, Template: spec}}
+				} else {
+					f.Get().Spec.ComponentSpecs = []appsv1.ClusterComponentSpec{spec}
+				}
+			})
+			getSpec := func(cluster *appsv1.Cluster) *appsv1.ClusterComponentSpec {
+				if sharded {
+					return &cluster.Spec.Shardings[0].Template
+				}
+				return &cluster.Spec.ComponentSpecs[0]
+			}
+			checkPersisted := func(version, definition string) {
+				Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+					spec := getSpec(cluster)
+					g.Expect(spec.Instances[0].ServiceVersion).Should(Equal(version))
+					g.Expect(spec.Instances[0].CompDef).Should(Equal(definition))
+					g.Expect(spec.Instances[1].ServiceVersion).Should(BeEmpty())
+				})).Should(Succeed())
+				Eventually(func(g Gomega) {
+					components := &appsv1.ComponentList{}
+					g.Expect(testCtx.Cli.List(testCtx.Ctx, components, client.InNamespace(clusterKey.Namespace),
+						client.MatchingLabels{constant.AppInstanceLabelKey: clusterKey.Name})).Should(Succeed())
+					g.Expect(components.Items).Should(HaveLen(1))
+					g.Expect(components.Items[0].Spec.Instances[0].ServiceVersion).Should(Equal(version))
+					g.Expect(components.Items[0].Spec.Instances[0].CompDef).Should(Equal(definition))
+					g.Expect(components.Items[0].Spec.Instances[1].ServiceVersion).Should(BeEmpty())
+				}).Should(Succeed())
+			}
+			checkPersisted(latestServiceVersion, compDefObj.Name)
+			By("changing the desired instance template version")
+			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1.Cluster) {
+				getSpec(cluster).Instances[0].ServiceVersion = defaultServiceVersion
+			})()).Should(Succeed())
+			checkPersisted(defaultServiceVersion, compDefObj.Name)
+			By("clearing version and definition to restore inheritance")
+			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1.Cluster) {
+				getSpec(cluster).Instances[0].ServiceVersion, getSpec(cluster).Instances[0].CompDef = "", ""
+			})()).Should(Succeed())
+			checkPersisted("", "")
+		}, Entry("component", false), Entry("sharding", true))
+
 		It("create multiple templates cluster", func() {
 			testClusterComponent(defaultCompName, compDefObj.Name, createClusterObjWithMultipleTemplates)
 		})

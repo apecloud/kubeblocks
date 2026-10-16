@@ -2238,6 +2238,48 @@ var _ = Describe("Component Controller", func() {
 			createDefinitionObjects()
 		})
 
+		It("reconciles instance template service versions to persisted InstanceSet images", func() {
+			release := kbappsv1.ComponentVersionRelease{Name: "8.0.31", ServiceVersion: "8.0.31",
+				Images: map[string]string{testapps.DefaultMySQLContainerName: "mysql:8.0.31"}}
+			newRelease := kbappsv1.ComponentVersionRelease{Name: "8.0.32", ServiceVersion: "8.0.32",
+				Images: map[string]string{testapps.DefaultMySQLContainerName: "mysql:8.0.32"}}
+			verKey := client.ObjectKeyFromObject(compVerObj)
+			Expect(testapps.GetAndChangeObj(&testCtx, verKey, func(ver *kbappsv1.ComponentVersion) {
+				ver.Spec.Releases = append(ver.Spec.Releases, release, newRelease)
+				ver.Spec.CompatibilityRules[0].Releases = append(ver.Spec.CompatibilityRules[0].Releases, release.Name, newRelease.Name)
+			})()).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, verKey, func(g Gomega, ver *kbappsv1.ComponentVersion) {
+				g.Expect(ver.Status.ObservedGeneration).Should(Equal(ver.Generation))
+				g.Expect(ver.Status.Phase).Should(Equal(kbappsv1.AvailablePhase))
+			})).Should(Succeed())
+			createCompObj(defaultCompName, compDefObj.Name, func(f *testapps.MockComponentFactory) {
+				f.SetServiceVersion(compDefObj.Spec.ServiceVersion).SetReplicas(2)
+				f.Get().Spec.Instances = []kbappsv1.InstanceTemplate{
+					{Name: "explicit", CompDef: compDefObj.Name, ServiceVersion: release.ServiceVersion}, {Name: "inherited"},
+				}
+			})
+			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Spec.Instances).Should(HaveLen(2))
+				g.Expect(its.Spec.Instances[0].Images).Should(HaveKeyWithValue(testapps.DefaultMySQLContainerName, "mysql:8.0.31"))
+				g.Expect(its.Spec.Instances[1].Images).Should(BeNil())
+				g.Expect(its.Spec.Template.Spec.Containers[0].Image).ShouldNot(Equal("mysql:8.0.31"))
+			})).Should(Succeed())
+			By("updating the persisted template version through the Component controller")
+			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+				comp.Spec.Instances[0].ServiceVersion = newRelease.ServiceVersion
+			})()).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Spec.Instances[0].Images).Should(HaveKeyWithValue(testapps.DefaultMySQLContainerName, "mysql:8.0.32"))
+			})).Should(Succeed())
+			By("clearing explicit version and definition to inherit the component image")
+			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+				comp.Spec.Instances[0].ServiceVersion, comp.Spec.Instances[0].CompDef = "", ""
+			})()).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Spec.Instances[0].Images).Should(BeNil())
+			})).Should(Succeed())
+		})
+
 		testImageUnchangedAfterNewReleasePublished := func(release kbappsv1.ComponentVersionRelease) {
 			prevRelease := compVerObj.Spec.Releases[0]
 

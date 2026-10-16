@@ -37,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	kbagentproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -350,3 +351,85 @@ func TestExpandInstanceVolumes(t *testing.T) {
 		})
 	}
 }
+
+var _ = Describe("instance template service versions in component transforms", func() {
+	It("loads images, creates InstanceSet overrides, and updates existing templates", func() {
+		scheme := runtime.NewScheme()
+		Expect(appsv1.AddToScheme(scheme)).Should(Succeed())
+		Expect(workloads.AddToScheme(scheme)).Should(Succeed())
+		Expect(corev1.AddToScheme(scheme)).Should(Succeed())
+		def := testapps.NewComponentDefinitionFactory("template-images").SetServiceVersion("1.0.0").
+			SetRuntime(&corev1.Container{Name: "db", Image: "db:1"}).GetObject()
+		def.Spec.Runtime.InitContainers = []corev1.Container{{Name: "setup", Image: "setup:1"}}
+		def.Status.Phase = appsv1.AvailablePhase
+		templateDef := def.DeepCopy()
+		templateDef.Name = "template-images-v2"
+		ver := &appsv1.ComponentVersion{ObjectMeta: metav1.ObjectMeta{Name: "template-images", Labels: map[string]string{def.Name: def.Name, templateDef.Name: templateDef.Name}},
+			Spec: appsv1.ComponentVersionSpec{Releases: []appsv1.ComponentVersionRelease{
+				{Name: "r2", ServiceVersion: "2.0.0", Images: map[string]string{"db": "db:2", "setup": "setup:2"}},
+				{Name: "r3", ServiceVersion: "3.0.0", Images: map[string]string{"db": "db:3", "setup": "setup:3"}},
+			}}, Status: appsv1.ComponentVersionStatus{Phase: appsv1.AvailablePhase}}
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(def, templateDef, ver).WithObjects(def, templateDef, ver).Build()
+		cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, "template-images", "").GetObject()
+		cluster.UID = "cluster-uid"
+		comp, err := component.BuildComponent(cluster, &appsv1.ClusterComponentSpec{Name: "db", ComponentDef: def.Name,
+			ServiceVersion: "1.0.0", Replicas: 2, Instances: []appsv1.InstanceTemplate{
+				{Name: "explicit", CompDef: templateDef.Name, ServiceVersion: "2.0.0"}, {Name: "inherited"},
+			}}, nil, nil)
+		Expect(err).Should(Succeed())
+		graphCli := model.NewGraphClient(cli)
+		transCtx := &componentTransformContext{Context: ctx, Client: graphCli, Component: comp, ComponentOrig: comp.DeepCopy(), Logger: logger}
+		load := &componentLoadResourcesTransformer{}
+		Expect(load.Transform(transCtx, graph.NewDAG())).Should(Succeed())
+		Expect(transCtx.SynthesizeComponent.InstanceImages["explicit"]).Should(Equal(map[string]string{"db": "db:2", "setup": "setup:2"}))
+		Expect(transCtx.SynthesizeComponent.InstanceImages).ShouldNot(HaveKey("inherited"))
+		transform := &componentWorkloadTransformer{Client: cli}
+		dag := graph.NewDAG()
+		graphCli.Root(dag, comp, comp, model.ActionStatusPtr())
+		Expect(transform.Transform(transCtx, dag)).Should(Succeed())
+		objects := graphCli.FindAll(dag, &workloads.InstanceSet{})
+		Expect(objects).Should(HaveLen(1))
+		running := objects[0].(*workloads.InstanceSet)
+		Expect(running.Spec.Instances[0].Images).Should(Equal(map[string]string{"db": "db:2", "setup": "setup:2"}))
+		Expect(running.Spec.Instances[1].Images).Should(BeNil())
+		Expect(running.Spec.Template.Spec.Containers[0].Image).Should(Equal(intctrlutil.ReplaceImageRegistry("db:1")))
+		Expect(cli.Create(ctx, running)).Should(Succeed())
+
+		By("updating an existing InstanceSet when the template version changes")
+		comp.Spec.Instances[0].ServiceVersion = "3.0.0"
+		Expect(load.Transform(transCtx, graph.NewDAG())).Should(Succeed())
+		dag = graph.NewDAG()
+		graphCli.Root(dag, comp, comp, model.ActionStatusPtr())
+		Expect(transform.Transform(transCtx, dag)).Should(Succeed())
+		updated := graphCli.FindAll(dag, &workloads.InstanceSet{})
+		Expect(updated).Should(HaveLen(1))
+		Expect(graphCli.IsAction(dag, updated[0], model.ActionUpdatePtr())).Should(BeTrue())
+		Expect(updated[0].(*workloads.InstanceSet).Spec.Instances[0].Images).Should(Equal(map[string]string{"db": "db:3", "setup": "setup:3"}))
+
+		By("requeueing unavailable template definitions and retrying after they recover")
+		templateDef.Status.Phase = appsv1.UnavailablePhase
+		Expect(cli.Status().Update(ctx, templateDef)).Should(Succeed())
+		err = load.Transform(transCtx, graph.NewDAG())
+		Expect(intctrlutil.IsRequeueError(err)).Should(BeTrue())
+		templateDef.Status.Phase = appsv1.AvailablePhase
+		Expect(cli.Status().Update(ctx, templateDef)).Should(Succeed())
+		Expect(load.Transform(transCtx, graph.NewDAG())).Should(Succeed())
+		By("requeueing unavailable component versions and retrying after they recover")
+		ver.Status.Phase = appsv1.UnavailablePhase
+		Expect(cli.Status().Update(ctx, ver)).Should(Succeed())
+		err = load.Transform(transCtx, graph.NewDAG())
+		Expect(intctrlutil.IsRequeueError(err)).Should(BeTrue())
+		ver.Status.Phase = appsv1.AvailablePhase
+		Expect(cli.Status().Update(ctx, ver)).Should(Succeed())
+		Expect(load.Transform(transCtx, graph.NewDAG())).Should(Succeed())
+		By("requeueing invalid or missing template images")
+		comp.Spec.Instances[0].ServiceVersion = "invalid"
+		err = load.Transform(transCtx, graph.NewDAG())
+		Expect(intctrlutil.IsRequeueError(err)).Should(BeTrue())
+		comp.Spec.Instances[0].ServiceVersion = "4.0.0"
+		err = load.Transform(transCtx, graph.NewDAG())
+		Expect(intctrlutil.IsRequeueError(err)).Should(BeTrue())
+		comp.Spec.Instances[0].ServiceVersion = "2.0.0"
+		Expect(load.Transform(transCtx, graph.NewDAG())).Should(Succeed())
+	})
+})

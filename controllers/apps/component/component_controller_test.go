@@ -2307,7 +2307,6 @@ var _ = Describe("Component Controller", func() {
 			case "registry and namespace mapping":
 				registryConfig["registryConfig"] = []map[string]any{
 					{"from": "docker.io", "to": registry, "namespaceMapping": map[string]string{"apecloud": "private"}},
-					// A second application of the mapping must be observable.
 					{"from": registry, "to": "twice.invalid"},
 				}
 				expectedPrefix = registry + "/private/"

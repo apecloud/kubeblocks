@@ -21,7 +21,6 @@ package operations
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -205,11 +204,7 @@ func (u upgradeOpsHandler) getOwnedExpectedContainers(reqCtx intctrlutil.Request
 		}
 		return nil, err
 	}
-	generationMatches := func(annotations map[string]string, generation int64) bool {
-		value, err := strconv.ParseInt(annotations[constant.KubeBlocksGenerationKey], 10, 64)
-		return err == nil && value == generation
-	}
-	if !generationMatches(comp.Annotations, cluster.Generation) {
+	if !component.IsComponentConfigurationPublished(cluster, comp) {
 		return nil, nil
 	}
 	workloads, err := component.ListOwnedWorkloads(reqCtx.Ctx, cli, cluster.Namespace, cluster.Name, compName)

@@ -54,6 +54,12 @@ func GetClusterUID(comp *appsv1.Component) (string, error) {
 	return getCompAnnotationValue(comp, constant.KBAppClusterUIDKey)
 }
 
+// IsComponentConfigurationPublished reports whether the Cluster's current configuration
+// has been published to the Component. It does not indicate reconciliation completion.
+func IsComponentConfigurationPublished(cluster *appsv1.Cluster, comp *appsv1.Component) bool {
+	return comp.Generation > 0 && comp.Annotations[constant.KubeBlocksGenerationKey] == strconv.FormatInt(cluster.Generation, 10)
+}
+
 // BuildComponent builds a new Component object from cluster component spec and definition.
 func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSpec, labels, annotations map[string]string) (*appsv1.Component, error) {
 	compBuilder := builder.NewComponentBuilder(cluster.Namespace, FullName(cluster.Name, compSpec.Name), compSpec.ComponentDef).

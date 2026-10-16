@@ -330,6 +330,35 @@ func TestDataTaskUsesObservedSourceAddressWhenHeadlessDNSIsUnavailable(t *testin
 	}
 }
 
+func TestDataSourceRetirementUsesMembershipResult(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		status workloads.InstanceStatus
+		usable bool
+	}{
+		{name: "retiring bootstrap", status: workloads.InstanceStatus{DesiredState: workloads.InstanceDesiredStateReleased}, usable: true},
+		{name: "retiring member", status: workloads.InstanceStatus{DesiredState: workloads.InstanceDesiredStateReleased, MemberJoined: ptr.To(true)}, usable: true},
+		{name: "left member", status: workloads.InstanceStatus{DesiredState: workloads.InstanceDesiredStateReleased, MemberJoined: ptr.To(false)}},
+		{name: "offline member", status: workloads.InstanceStatus{DesiredState: workloads.InstanceDesiredStateOffline, MemberJoined: ptr.To(true)}},
+		{name: "loading member", status: workloads.InstanceStatus{DesiredState: workloads.InstanceDesiredStateActive, DataLoaded: ptr.To(false)}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			its := dataWorkload()
+			tc.status.PodName = "demo-0"
+			its.Status.InstanceStatus = []workloads.InstanceStatus{tc.status}
+			pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "demo-0"}, Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: kbagent.ContainerName, Ports: []corev1.ContainerPort{{Name: kbagent.DefaultStreamingPortName, ContainerPort: 3502}}}}}, Status: corev1.PodStatus{Phase: corev1.PodRunning, PodIP: "10.0.0.1", Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}}}
+			source, err := SourcePod(its, []*corev1.Pod{pod}, "demo-1")
+			if tc.usable {
+				if err != nil || source != pod {
+					t.Fatalf("live source was rejected: %v", err)
+				}
+			} else if err == nil || source != nil {
+				t.Fatalf("unusable source was selected: %v %v", source, err)
+			}
+		})
+	}
+}
+
 func TestTaskCleanupMatchesExactRuntimeDataResult(t *testing.T) {
 	own := &proto.DataLoadResult{Namespace: "one", PVCName: "data"}
 	other := &proto.DataLoadResult{Namespace: "two", PVCName: "data"}

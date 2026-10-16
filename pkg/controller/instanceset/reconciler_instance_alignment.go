@@ -227,8 +227,13 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 				its.Name,
 				pod.Name)
 		}
-		if workloadlifecycle.Enabled(its) && !isStopRequested(its) && !slices.Contains(its.Spec.OfflineInstances, pod.Name) && workloadlifecycle.NeedsLeave(its, workloadlifecycle.Status(its, pod.Name)) {
-			return reconcileMember(tree, its, pod, false, r.reader)
+		if workloadlifecycle.Enabled(its) && !isStopRequested(its) && !slices.Contains(its.Spec.OfflineInstances, pod.Name) {
+			if workloadlifecycle.HasPendingData(its) {
+				return kubebuilderx.RetryAfter(time.Second), nil
+			}
+			if workloadlifecycle.NeedsLeave(its, workloadlifecycle.Status(its, pod.Name)) {
+				return reconcileMember(tree, its, pod, false, r.reader)
+			}
 		}
 		if err := tree.Delete(pod); err != nil {
 			return kubebuilderx.Continue, err

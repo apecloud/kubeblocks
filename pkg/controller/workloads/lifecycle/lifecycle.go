@@ -54,6 +54,15 @@ func HasData(its *workloads.InstanceSet) bool {
 	return its.Spec.LifecycleActions != nil && (its.Spec.LifecycleActions.DataDump != nil || its.Spec.LifecycleActions.DataLoad != nil)
 }
 
+func HasPendingData(its *workloads.InstanceSet) bool {
+	if !HasData(its) {
+		return false
+	}
+	return slices.ContainsFunc(its.Status.InstanceStatus, func(status workloads.InstanceStatus) bool {
+		return status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive && status.DataLoaded != nil && !*status.DataLoaded
+	})
+}
+
 func Validate(its *workloads.InstanceSet) error {
 	if !Enabled(its) {
 		return nil
@@ -177,8 +186,14 @@ func SourcePod(its *workloads.InstanceSet, pods []*corev1.Pod, target string) (*
 		if pod.Name == target || pod.DeletionTimestamp != nil || !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
 			continue
 		}
-		if status := Status(its, pod.Name); status != nil && (status.EffectiveDesiredState() != workloads.InstanceDesiredStateActive || (status.DataLoaded != nil && !*status.DataLoaded)) {
-			continue
+		if status := Status(its, pod.Name); status != nil {
+			state := status.EffectiveDesiredState()
+			if state == workloads.InstanceDesiredStateOffline || (status.DataLoaded != nil && !*status.DataLoaded) {
+				continue
+			}
+			if state == workloads.InstanceDesiredStateReleased && status.MemberJoined != nil && !*status.MemberJoined {
+				continue
+			}
 		}
 		if _, err := intctrlutil.GetPortByName(*pod, kbagent.ContainerName, kbagent.DefaultStreamingPortName); err == nil {
 			available = append(available, pod)

@@ -241,6 +241,9 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 				inst.Name)
 		}
 		if workloadlifecycle.Enabled(its) && !ptr.Deref(its.Spec.Stop, false) && !slices.Contains(its.Spec.OfflineInstances, inst.Name) {
+			if workloadlifecycle.HasPendingData(its) {
+				return kubebuilderx.RetryAfter(time.Second), nil
+			}
 			if status := instanceLifecycleStatus(its, inst.Name); workloadlifecycle.NeedsLeave(its, status) {
 				return reconcileMember(tree, its, inst, false, r.reader)
 			}

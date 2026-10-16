@@ -251,7 +251,7 @@ var _ = Describe("instance template image resolution", func() {
 		Expect(images).Should(BeNil())
 		images, err = resolveImagesWithCompVersions4Template(def, []*appsv1.ComponentVersion{ver}, "2.0.0")
 		Expect(err).Should(Succeed())
-		Expect(images).Should(Equal(map[string]string{"db": "db:2", "setup": "setup:2", kbagent.ContainerName: "action:2", kbagent.ContainerName4Worker: "action:2"}))
+		Expect(images).Should(Equal(map[string]string{"db": "docker.io/library/db:2", "setup": "docker.io/library/setup:2", kbagent.ContainerName: "docker.io/library/action:2", kbagent.ContainerName4Worker: "docker.io/library/action:2"}))
 		Expect(def).Should(Equal(before))
 		By("using the configured tools image for actions without an explicit image")
 		oldTools := viper.GetString(constant.KBToolsImage)
@@ -267,6 +267,6 @@ var _ = Describe("instance template image resolution", func() {
 		def.Spec.LifecycleActions.PostProvision.Exec.Image = "action:fixed"
 		images, err = resolveImagesWithCompVersions4Template(def, []*appsv1.ComponentVersion{ver}, "2.0.0")
 		Expect(err).Should(Succeed())
-		Expect(images[kbagent.ContainerName]).Should(Equal("action:fixed"))
+		Expect(images[kbagent.ContainerName]).Should(Equal("docker.io/library/action:fixed"))
 	})
 })

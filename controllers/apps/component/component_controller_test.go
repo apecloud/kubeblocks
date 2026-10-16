@@ -48,7 +48,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
@@ -2262,16 +2262,16 @@ var _ = Describe("Component Controller", func() {
 			})
 			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Spec.Instances).Should(HaveLen(2))
-				g.Expect(its.Spec.Instances[0].Images).Should(HaveKeyWithValue(testapps.DefaultMySQLContainerName, "mysql:8.0.31"))
+				g.Expect(its.Spec.Instances[0].Images).Should(HaveKeyWithValue(testapps.DefaultMySQLContainerName, "docker.io/library/mysql:8.0.31"))
 				g.Expect(its.Spec.Instances[1].Images).Should(BeNil())
-				g.Expect(its.Spec.Template.Spec.Containers[0].Image).ShouldNot(Equal("mysql:8.0.31"))
+				g.Expect(its.Spec.Template.Spec.Containers[0].Image).ShouldNot(Equal("docker.io/library/mysql:8.0.31"))
 			})).Should(Succeed())
 			By("updating the persisted template version through the Component controller")
 			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
 				comp.Spec.Instances[0].ServiceVersion = newRelease.ServiceVersion
 			})()).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, its *workloads.InstanceSet) {
-				g.Expect(its.Spec.Instances[0].Images).Should(HaveKeyWithValue(testapps.DefaultMySQLContainerName, "mysql:8.0.32"))
+				g.Expect(its.Spec.Instances[0].Images).Should(HaveKeyWithValue(testapps.DefaultMySQLContainerName, "docker.io/library/mysql:8.0.32"))
 			})).Should(Succeed())
 			By("clearing explicit version and definition to inherit the component image")
 			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
@@ -2385,7 +2385,7 @@ var _ = Describe("Component Controller", func() {
 			})).Should(Succeed())
 		})
 
-		DescribeTable("resolves instance template image registries", func(mapping string, customActionImage, enableInstanceAPI bool) {
+		DescribeTable("resolves instance template image registries", func(mapping string, customActionImage bool) {
 			const (
 				serviceVersion = "8.0.31"
 				toolsImage     = "docker.io/apecloud/kubeblocks-tools:test"
@@ -2443,7 +2443,6 @@ var _ = Describe("Component Controller", func() {
 					AddInstances(kbappsv1.InstanceTemplate{
 						Name: "canary", Replicas: ptr.To(int32(1)), CompDef: compDefObj.Name, ServiceVersion: serviceVersion,
 					})
-				f.GetObject().Spec.EnableInstanceAPI = ptr.To(enableInstanceAPI)
 			})
 
 			expectedActionImage := expectedPrefix + "kubeblocks-tools:test"
@@ -2451,7 +2450,6 @@ var _ = Describe("Component Controller", func() {
 				expectedActionImage = expectedPrefix + "actions:8.0.31"
 			}
 			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, its *workloads.InstanceSet) {
-				g.Expect(its.Spec.EnableInstanceAPI).Should(Equal(ptr.To(enableInstanceAPI)))
 				g.Expect(its.Spec.Template.Spec.Containers[0].Image).Should(Equal(expectedPrefix + "mysql:8.0.30"))
 				g.Expect(its.Spec.Template.Spec.InitContainers).Should(ContainElement(And(
 					HaveField("Name", "prepare"), HaveField("Image", expectedPrefix+"prepare:8.0.30"))))
@@ -2462,9 +2460,9 @@ var _ = Describe("Component Controller", func() {
 					kbagent.ContainerName:              expectedActionImage,
 					kbagent.ContainerName4Worker:       expectedActionImage,
 				}))
-				ext, err := instancetemplate.BuildInstanceSetExt(its, nil)
-				g.Expect(err).ShouldNot(HaveOccurred())
-				templates := instancetemplate.BuildInstanceTemplateExt(ext)
+				templates := instanceset.BuildInstanceTemplateExts(&instanceset.InstanceSetExt{
+					Its: its, InstanceTemplates: instanceset.BuildInstanceTemplates(*its.Spec.Replicas, its.Spec.Instances, nil),
+				})
 				g.Expect(templates).Should(HaveLen(1))
 				g.Expect(templates[0].Spec.Containers).Should(ContainElement(And(
 					HaveField("Name", testapps.DefaultMySQLContainerName), HaveField("Image", expectedPrefix+"mysql:8.0.31"))))
@@ -2476,18 +2474,12 @@ var _ = Describe("Component Controller", func() {
 					HaveField("Name", kbagent.ContainerName4Worker), HaveField("Image", expectedActionImage))))
 			})).Should(Succeed())
 		},
-			Entry("no mapping, default tools, Pod API", "none", false, false),
-			Entry("no mapping, default tools, Instance API", "none", false, true),
-			Entry("no mapping, explicit action, Pod API", "none", true, false),
-			Entry("no mapping, explicit action, Instance API", "none", true, true),
-			Entry("default registry, default tools, Pod API", "default registry", false, false),
-			Entry("default registry, default tools, Instance API", "default registry", false, true),
-			Entry("default registry, explicit action, Pod API", "default registry", true, false),
-			Entry("default registry, explicit action, Instance API", "default registry", true, true),
-			Entry("registry and namespace mapping, default tools, Pod API", "registry and namespace mapping", false, false),
-			Entry("registry and namespace mapping, default tools, Instance API", "registry and namespace mapping", false, true),
-			Entry("registry and namespace mapping, explicit action, Pod API", "registry and namespace mapping", true, false),
-			Entry("registry and namespace mapping, explicit action, Instance API", "registry and namespace mapping", true, true),
+			Entry("no mapping, default tools", "none", false),
+			Entry("no mapping, explicit action", "none", true),
+			Entry("default registry, default tools", "default registry", false),
+			Entry("default registry, explicit action", "default registry", true),
+			Entry("registry and namespace mapping, default tools", "registry and namespace mapping", false),
+			Entry("registry and namespace mapping, explicit action", "registry and namespace mapping", true),
 		)
 
 		It("handles running its and upgrade", func() {

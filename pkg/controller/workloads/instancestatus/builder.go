@@ -50,11 +50,9 @@ type Observation struct {
 	VolumeExpansion bool
 }
 
-// ResourceObservation contains current owned resources that retain an instance status entry.
+// ResourceObservation identifies current resources that retain an instance status entry.
 type ResourceObservation struct {
-	InstanceName    string
-	InstancePresent bool
-	StorageCleanup  bool
+	InstanceName string
 }
 
 // Input contains the independently produced desired and observed dimensions used to build InstanceStatus.
@@ -149,9 +147,7 @@ func Build(input Input) ([]workloads.InstanceStatus, error) {
 		if resource.InstanceName == "" {
 			return nil, fmt.Errorf("resource has an empty instance name")
 		}
-		if resource.InstancePresent || resource.StorageCleanup {
-			names[resource.InstanceName] = struct{}{}
-		}
+		names[resource.InstanceName] = struct{}{}
 	}
 	for name, old := range previousByName {
 		if ptr.Deref(old.MemberJoined, false) || (input.RequireMemberLeave && old.Provisioned && old.MemberJoined == nil) {

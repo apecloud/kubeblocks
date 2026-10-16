@@ -456,7 +456,7 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		associated := owner == nil && shouldCloneInstanceAssistantObjects(its) &&
 			inst.Spec.InstanceSetName == its.Name && inst.Labels[WorkloadsInstanceLabelKey] == its.Name
 		if owned || associated {
-			resources = append(resources, instancestatus.ResourceObservation{InstanceName: inst.Name, InstancePresent: true})
+			resources = append(resources, instancestatus.ResourceObservation{InstanceName: inst.Name})
 		}
 		if _, ok := seenInstances[inst.Name]; ok {
 			return fmt.Errorf("duplicate Instance object for %q", inst.Name)
@@ -506,11 +506,16 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	}
 
 	for _, pod := range lifecyclePods(tree) {
-		resources = append(resources, instancestatus.ResourceObservation{InstanceName: pod.Name, InstancePresent: true})
+		resources = append(resources, instancestatus.ResourceObservation{InstanceName: pod.Name})
 		if previous := instanceLifecycleStatus(its, pod.Name); previous != nil {
 			previous.Provisioned = true
 		}
 	}
+	pendingResources, err := pendingDataResourceObservations(tree, its)
+	if err != nil {
+		return err
+	}
+	resources = append(resources, pendingResources...)
 	requireLeave := its.Spec.LifecycleActions != nil && its.Spec.LifecycleActions.MemberLeave != nil
 	statuses, err := instancestatus.Build(instancestatus.Input{
 		RequireMemberLeave: requireLeave,

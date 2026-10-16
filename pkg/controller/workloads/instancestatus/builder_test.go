@@ -447,20 +447,12 @@ func TestBuildReleasedRetentionUsesMembershipAndCurrentResources(t *testing.T) {
 	if err != nil || len(result) != 0 {
 		t.Fatalf("provisioned/data facts retained a released identity with unknown membership: %#v err=%v", result, err)
 	}
-	for _, resource := range []ResourceObservation{{InstanceName: "demo-0", InstancePresent: true}, {InstanceName: "demo-0", StorageCleanup: true}, {InstanceName: "demo-0"}} {
-		result, err = Build(Input{Resources: []ResourceObservation{resource}})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !resource.InstancePresent && !resource.StorageCleanup {
-			if len(result) != 0 {
-				t.Fatalf("empty resource flags retained a status: %#v", result)
-			}
-			continue
-		}
-		if len(result) != 1 || result[0].Provisioned || result[0].CurrentState != workloads.InstanceCurrentStateAbsent || result[0].DesiredState != workloads.InstanceDesiredStateReleased {
-			t.Fatalf("resource existence was treated as observed runtime: %#v", result)
-		}
+	result, err = Build(Input{Resources: []ResourceObservation{{InstanceName: "demo-0"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result) != 1 || result[0].Provisioned || result[0].CurrentState != workloads.InstanceCurrentStateAbsent || result[0].DesiredState != workloads.InstanceDesiredStateReleased {
+		t.Fatalf("resource existence was treated as observed runtime: %#v", result)
 	}
 }
 

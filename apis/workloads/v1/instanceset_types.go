@@ -619,7 +619,8 @@ type InstanceStatus struct {
 
 	// DesiredState describes whether the instance should be running (Active), is retained without running (Offline),
 	// or is no longer allocated and is kept while its runtime is observed, owned resources require cleanup,
-	// membership is joined, or provisioned bootstrap membership still needs a configured Leave (Released).
+	// data loading is incomplete on an existing data PVC, membership is joined,
+	// or provisioned bootstrap membership still needs a configured Leave (Released).
 	// An empty value from an older object is treated as Active.
 	//
 	// +optional

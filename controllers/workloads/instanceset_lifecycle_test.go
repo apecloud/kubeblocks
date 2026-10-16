@@ -1046,7 +1046,6 @@ func TestInstanceSetLifecycleRetainedPendingDataRecovery(t *testing.T) {
 				if guard == "" || task == "" || len(agent.calls) != 0 {
 					t.Fatalf("re-expansion did not restore the task and startup guard before joining: guard=%s task=%s calls=%v", guard, task, agent.calls)
 				}
-				// The worker's PVC result is the durable completion signal; no database copy runs here.
 				f.markDataLoaded(t, target.Name)
 				for round := 0; round < 8; round++ {
 					f.stepWithChildren(t)
@@ -1088,7 +1087,6 @@ func TestInstanceSetLifecycleRetiresMemberWithoutPod(t *testing.T) {
 			if err := f.cli.Get(ctx, pvcKey, &corev1.PersistentVolumeClaim{}); err != nil {
 				t.Fatal(err)
 			}
-			// Model a completed Pod deletion before its controller gets a chance to recreate it.
 			target.Finalizers = nil
 			if err := f.cli.Update(ctx, target); err != nil {
 				t.Fatal(err)
@@ -1211,7 +1209,6 @@ func TestInstanceSetLifecycleFreshPVCRecoveryWithMinReadySeconds(t *testing.T) {
 			if err := f.cli.Delete(ctx, target); err != nil {
 				t.Fatal(err)
 			}
-			// Storage recovery replaces the PVC while no Pod uses it, before the parent observes the loss.
 			pvc.Finalizers = nil
 			if err := f.cli.Update(ctx, pvc); err != nil {
 				t.Fatal(err)

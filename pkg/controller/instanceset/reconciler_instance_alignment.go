@@ -128,6 +128,11 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		}
 	}
 	retirementNames := deleteNameSet.Clone()
+	for _, status := range its.Status.InstanceStatus {
+		if !newNameSet.Has(status.PodName) && workloadlifecycle.NeedsLeave(its, &status) {
+			retirementNames.Insert(status.PodName)
+		}
+	}
 	for _, pvc := range tree.List(&corev1.PersistentVolumeClaim{}) {
 		name := pvc.GetLabels()[constant.KBAppPodNameLabelKey]
 		if name != "" && !newNameSet.Has(name) {
@@ -136,31 +141,41 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	}
 	retire := func(names sets.Set[string]) (kubebuilderx.Result, error) {
 		waiting := false
+		candidates := sets.List(names)
+		baseSort(candidates, func(i int) (string, int) {
+			return parseParentNameAndOrdinal(candidates[i])
+		}, nil, false)
 		retiredNames := sets.New[string]()
-		priorities := make(map[string]int)
-		sortObjects(oldInstanceList, priorities, false)
-		for _, object := range oldInstanceList {
-			pod, _ := object.(*corev1.Pod)
-			if !names.Has(pod.Name) {
+		for _, name := range candidates {
+			pod := oldInstanceMap[name]
+			absent := pod == nil
+			if absent && !workloadlifecycle.NeedsLeave(its, workloadlifecycle.Status(its, name)) {
 				continue
 			}
 			if !isOrderedReady && concurrency <= 0 {
 				break
 			}
-			if isOrderedReady && !intctrlutil.IsPodReady(pod) {
+			if isOrderedReady && !absent && !intctrlutil.IsPodReady(pod) {
 				tree.EventRecorder.Eventf(its, corev1.EventTypeWarning, "InstanceSet %s/%s is waiting for Pod %s to be Ready",
 					its.Namespace,
 					its.Name,
 					pod.Name)
 			}
-			if workloadlifecycle.Enabled(its) && !isStopRequested(its) && !slices.Contains(its.Spec.OfflineInstances, pod.Name) {
-				if workloadlifecycle.RetirementBlocked(its, workloadlifecycle.Status(its, pod.Name)) {
+			if workloadlifecycle.Enabled(its) && !isStopRequested(its) && !slices.Contains(its.Spec.OfflineInstances, name) {
+				if workloadlifecycle.RetirementBlocked(its, workloadlifecycle.Status(its, name)) {
 					waiting = true
 					continue
 				}
-				if workloadlifecycle.NeedsLeave(its, workloadlifecycle.Status(its, pod.Name)) {
+				if workloadlifecycle.NeedsLeave(its, workloadlifecycle.Status(its, name)) {
+					if absent {
+						pod = &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: its.Namespace},
+							Spec: corev1.PodSpec{Hostname: name, Subdomain: getHeadlessSvcName(its.Name)}}
+					}
 					return reconcileMember(tree, its, pod, false, r.reader)
 				}
+			}
+			if absent {
+				continue
 			}
 			if err := tree.Delete(pod); err != nil {
 				return kubebuilderx.Continue, err

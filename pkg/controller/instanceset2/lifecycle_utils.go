@@ -37,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
+	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancestatus"
 	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
@@ -234,6 +235,56 @@ func exclusiveRole(its *workloads.InstanceSet, pod *corev1.Pod) bool {
 }
 
 type lifecycleReaderKey struct{}
+
+func pendingDataResourceObservations(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) ([]instancestatus.ResourceObservation, error) {
+	if !workloadlifecycle.HasData(its) {
+		return nil, nil
+	}
+	ext, err := instancetemplate.BuildInstanceSetExt(its, tree)
+	if err != nil {
+		return nil, err
+	}
+	var resources []instancestatus.ResourceObservation
+	for i := range its.Status.InstanceStatus {
+		status := &its.Status.InstanceStatus[i]
+		if status.DataLoaded == nil || *status.DataLoaded {
+			continue
+		}
+		obj, err := tree.Get(&workloads.Instance{ObjectMeta: metav1.ObjectMeta{Name: status.PodName, Namespace: its.Namespace}})
+		if err != nil {
+			return nil, err
+		}
+		var inst *workloads.Instance
+		if obj != nil {
+			inst = obj.(*workloads.Instance)
+		} else if status.TemplateName != nil {
+			if template := instancetemplate.GetInstanceTemplateExt(ext, *status.TemplateName); template != nil {
+				inst, err = buildInstanceByTemplate(tree, status.PodName, template, its)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+		if inst == nil {
+			continue
+		}
+		pod, err := instctrl.BuildPod(inst)
+		if err != nil {
+			return nil, err
+		}
+		pvc, err := dataPVC(tree, its, pod)
+		if err != nil {
+			return nil, err
+		}
+		if pvc != nil {
+			workloadlifecycle.ObserveData(status, pvc)
+			if !*status.DataLoaded {
+				resources = append(resources, instancestatus.ResourceObservation{InstanceName: status.PodName})
+			}
+		}
+	}
+	return resources, nil
+}
 
 func dataPVC(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod) (*corev1.PersistentVolumeClaim, error) {
 	name, err := workloadlifecycle.DataPVCName(its, pod)

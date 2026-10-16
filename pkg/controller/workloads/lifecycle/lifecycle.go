@@ -54,12 +54,19 @@ func HasData(its *workloads.InstanceSet) bool {
 	return its.Spec.LifecycleActions != nil && (its.Spec.LifecycleActions.DataDump != nil || its.Spec.LifecycleActions.DataLoad != nil)
 }
 
-func HasPendingData(its *workloads.InstanceSet) bool {
-	if !HasData(its) {
+func RetirementBlocked(its *workloads.InstanceSet, old *workloads.InstanceStatus) bool {
+	if !Enabled(its) || old == nil || old.EffectiveDesiredState() == workloads.InstanceDesiredStateOffline {
 		return false
 	}
+	established := ptr.Deref(old.MemberJoined, false) || (old.MemberJoined == nil && old.Provisioned)
+	donor := established && (old.DataLoaded == nil || *old.DataLoaded)
 	return slices.ContainsFunc(its.Status.InstanceStatus, func(status workloads.InstanceStatus) bool {
-		return status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive && status.DataLoaded != nil && !*status.DataLoaded
+		if status.EffectiveDesiredState() != workloads.InstanceDesiredStateActive {
+			return false
+		}
+		pendingData := donor && HasData(its) && status.DataLoaded != nil && !*status.DataLoaded
+		pendingJoin := established && its.Spec.LifecycleActions.MemberJoin != nil && status.MemberJoined != nil && !*status.MemberJoined
+		return pendingData || pendingJoin
 	})
 }
 

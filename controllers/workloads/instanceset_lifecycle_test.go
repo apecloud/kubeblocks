@@ -169,6 +169,160 @@ func (f *lifecycleEntry) bootstrap(t *testing.T, replicas int) {
 	t.Fatalf("bootstrap did not converge: %#v", f.its.Status)
 }
 
+func (f *lifecycleEntry) markDataLoaded(t *testing.T, name string) {
+	t.Helper()
+	ctx := context.Background()
+	pod := &corev1.Pod{}
+	if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: name}, pod); err != nil {
+		t.Fatal(err)
+	}
+	pvcName, err := workloadlifecycle.DataPVCName(f.its, pod)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pvc := &corev1.PersistentVolumeClaim{}
+	if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: pvcName}, pvc); err != nil {
+		t.Fatal(err)
+	}
+	if pvc.Annotations == nil {
+		pvc.Annotations = map[string]string{}
+	}
+	pvc.Annotations[proto.DataLoadedAnnotationKey] = "true"
+	if err := f.cli.Update(ctx, pvc); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestInstanceSetLifecycleReplacementWaitsForJoin(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		for _, data := range []bool{false, true} {
+			t.Run(fmt.Sprintf("instanceAPI=%t/data=%t", instanceAPI, data), func(t *testing.T) {
+				ctx := context.Background()
+				var f *lifecycleEntry
+				if data {
+					f = newDataLifecycleEntry(t, instanceAPI, 1, appsv1.OrderedReadyPodManagement)
+				} else {
+					f = newMemberLifecycleEntry(t, instanceAPI, 1, appsv1.OrderedReadyPodManagement)
+				}
+				f.bootstrap(t, 1)
+				sourceName, targetName := f.its.Name+"-0", f.its.Name+"-1"
+				agent := &its2LifecycleAgent{}
+				kbacli.SetMockClient(agent, nil)
+				defer kbacli.UnsetMockClient()
+				f.its.Spec.Ordinals = workloads.Ordinals{Discrete: []int32{1}}
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				for round := 0; round < 12; round++ {
+					f.stepWithChildren(t)
+					if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: targetName}, &corev1.Pod{}); err == nil {
+						break
+					} else if !apierrors.IsNotFound(err) {
+						t.Fatal(err)
+					}
+				}
+				if data {
+					f.markDataLoaded(t, targetName)
+				}
+				for round := 0; round < 8; round++ {
+					f.stepWithChildren(t)
+				}
+				if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: sourceName}, &corev1.Pod{}); err != nil || len(agent.calls) != 0 {
+					t.Fatalf("old member retired before replacement joined: %v calls=%v", err, agent.calls)
+				}
+				f.setReady(t, targetName, true)
+				for round := 0; round < 12; round++ {
+					f.stepWithChildren(t)
+				}
+				if len(agent.calls) != 2 || agent.calls[0] != "memberJoin" || agent.calls[1] != "memberLeave" {
+					t.Fatalf("replacement did not join before leave: %v", agent.calls)
+				}
+				if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: sourceName}, &corev1.Pod{}); !apierrors.IsNotFound(err) {
+					t.Fatalf("joined replacement did not release old member: %v", err)
+				}
+			})
+		}
+	}
+}
+
+func TestInstanceSetLifecyclePendingCopiesAllowCancellationAndOffline(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		for _, operation := range []struct{ offline, loaded, noSource bool }{{}, {loaded: true}, {noSource: true}, {offline: true}} {
+			t.Run(fmt.Sprintf("instanceAPI=%t/offline=%t/loaded=%t/noSource=%t", instanceAPI, operation.offline, operation.loaded, operation.noSource), func(t *testing.T) {
+				ctx := context.Background()
+				bootstrap := 1
+				if operation.offline {
+					bootstrap = 2
+				}
+				f := newDataLifecycleEntry(t, instanceAPI, int32(bootstrap), appsv1.ParallelPodManagement)
+				if operation.offline {
+					f.its.Spec.LifecycleActions.DataDump.TargetPodSelector = apps.OrdinalSelector
+					f.its.Spec.LifecycleActions.DataDump.MatchingKey = "0"
+					if err := f.cli.Update(ctx, f.its); err != nil {
+						t.Fatal(err)
+					}
+				}
+				f.bootstrap(t, bootstrap)
+				agent := &its2LifecycleAgent{}
+				kbacli.SetMockClient(agent, nil)
+				defer kbacli.UnsetMockClient()
+				f.its.Spec.Replicas = ptr.To[int32](3)
+				f.its.Spec.ParallelPodManagementConcurrency = ptr.To(intstr.FromInt(3))
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				for round := 0; round < 8; round++ {
+					f.stepWithChildren(t)
+				}
+				for _, pod := range lifecycleEntryPods(t, f.cli) {
+					if pod.Name == f.its.Name+"-0" || (operation.offline && pod.Name == f.its.Name+"-1") {
+						continue
+					}
+					pod.Status.Phase = corev1.PodPending
+					if err := f.cli.Status().Update(ctx, &pod); err != nil {
+						t.Fatal(err)
+					}
+				}
+				removeName := f.its.Name + "-2"
+				pendingName := f.its.Name + "-1"
+				if operation.noSource {
+					f.its.Spec.LifecycleActions.DataDump.TargetPodSelector = apps.OrdinalSelector
+					f.its.Spec.LifecycleActions.DataDump.MatchingKey = "99"
+				}
+				if operation.loaded {
+					f.markDataLoaded(t, removeName)
+					for round := 0; round < 6; round++ {
+						f.stepWithChildren(t)
+					}
+				}
+				if operation.offline {
+					removeName = f.its.Name + "-0"
+					pendingName = f.its.Name + "-2"
+					f.its.Spec.OfflineInstances = []string{removeName}
+				} else {
+					f.its.Spec.Replicas = ptr.To[int32](2)
+				}
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				for round := 0; round < 16; round++ {
+					f.stepWithChildren(t)
+				}
+				if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: removeName}, &corev1.Pod{}); !apierrors.IsNotFound(err) {
+					t.Fatalf("another pending copy blocked requested runtime removal: %v", err)
+				}
+				status := f.its.FindInstanceStatus(pendingName)
+				if status == nil || status.DataLoaded == nil || *status.DataLoaded || len(agent.calls) != 0 {
+					t.Fatalf("uncompleted copy changed result or membership: %#v calls=%v", status, agent.calls)
+				}
+			})
+		}
+	}
+}
+
 func TestInstanceSetLifecycleDeletionPreservesExternalDataPVC(t *testing.T) {
 	for _, policy := range []apps.PersistentVolumeClaimRetentionPolicyType{"", apps.DeletePersistentVolumeClaimRetentionPolicyType, apps.RetainPersistentVolumeClaimRetentionPolicyType} {
 		t.Run(string(policy), func(t *testing.T) {

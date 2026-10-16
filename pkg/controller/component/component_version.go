@@ -241,9 +241,9 @@ func resolveImagesWithCompVersions4Template(compDef *appsv1.ComponentDefinition,
 		if hasExecAction && len(images[kbagent.ContainerName]) == 0 {
 			// Instance template image overrides are applied directly to Pod containers without passing
 			// through buildKBAgentContainer, so materialize the default tools image here.
-			mappedToolsImage := viper.GetString(constant.KBToolsImage)
-			images[kbagent.ContainerName] = mappedToolsImage
-			images[kbagent.ContainerName4Worker] = mappedToolsImage
+			image := viper.GetString(constant.KBToolsImage)
+			images[kbagent.ContainerName] = image
+			images[kbagent.ContainerName4Worker] = image
 		}
 		return nil
 	}(); err != nil {

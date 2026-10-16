@@ -228,12 +228,11 @@ func resolveImagesWithCompVersions4Template(compDef *appsv1.ComponentDefinition,
 					if len(app.image) == 0 {
 						continue
 					}
-					image := intctrlutil.ReplaceImageRegistry(app.image)
-					if agentImage, ok := images[kbagent.ContainerName]; !ok || len(agentImage) == 0 {
-						images[kbagent.ContainerName] = image
+					if image, ok := images[kbagent.ContainerName]; !ok || len(image) == 0 {
+						images[kbagent.ContainerName] = intctrlutil.ReplaceImageRegistry(app.image)
 					}
-					if workerImage, ok := images[kbagent.ContainerName4Worker]; !ok || len(workerImage) == 0 {
-						images[kbagent.ContainerName4Worker] = image
+					if image, ok := images[kbagent.ContainerName4Worker]; !ok || len(image) == 0 {
+						images[kbagent.ContainerName4Worker] = intctrlutil.ReplaceImageRegistry(app.image)
 					}
 				}
 			}

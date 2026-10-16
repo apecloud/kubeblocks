@@ -25,16 +25,26 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
+	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type upgradeOpsHandler struct{}
+
+type upgradeExpectedImages struct {
+	definition           *appsv1.ComponentDefinition
+	containersByTemplate map[string][]corev1.Container
+	pendingOwner         bool
+}
 
 var _ OpsHandler = upgradeOpsHandler{}
 
@@ -93,30 +103,78 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
 	upgradeSpec := opsRes.OpsRequest.Spec.Upgrade
 	var (
-		compOpsHelper   componentOpsHelper
-		componentDefMap map[string]*appsv1.ComponentDefinition
-		err             error
+		compOpsHelper componentOpsHelper
+		containersMap map[string]upgradeExpectedImages
+		err           error
 	)
 	compOpsHelper = newComponentOpsHelper(upgradeSpec.Components)
-	if componentDefMap, err = u.getComponentDefMapWithUpdatedImages(reqCtx, cli, opsRes); err != nil {
+	legacyDefinitions := map[string]*appsv1.ComponentDefinition{}
+	for _, target := range upgradeSpec.Components {
+		if upgradeTargetHasInstanceVersions(opsRes.Cluster, target.ComponentName) {
+			continue
+		}
+		spec := getComponentSpecOrShardingTemplate(opsRes.Cluster, target.ComponentName)
+		if spec == nil {
+			return opsRes.OpsRequest.Status.Phase, 0, intctrlutil.NewFatalError(fmt.Sprintf("cannot find component %q in cluster %q", target.ComponentName, opsRes.Cluster.Name))
+		}
+		def, err := component.GetCompDefByName(reqCtx.Ctx, cli, spec.ComponentDef)
+		if err != nil {
+			return opsRes.OpsRequest.Status.Phase, 0, err
+		}
+		if err := component.UpdateCompDefinitionImages4ServiceVersion(reqCtx.Ctx, cli, def, spec.ServiceVersion); err != nil {
+			return opsRes.OpsRequest.Status.Phase, 0, err
+		}
+		legacyDefinitions[target.ComponentName] = def
+	}
+	specs, pending, err := u.getUpgradeComponentSpecs(reqCtx, cli, opsRes)
+	if err != nil {
 		return opsRes.OpsRequest.Status.Phase, 0, err
+	}
+	if pending {
+		return opsv1alpha1.OpsRunningPhase, time.Second, nil
+	}
+	if containersMap, err = u.getExpectedContainersMap(reqCtx, cli, opsRes.Cluster, specs); err != nil {
+		return opsRes.OpsRequest.Status.Phase, 0, err
+	}
+	for name, expected := range containersMap {
+		if expected.pendingOwner && specs[name].Replicas > 0 {
+			return opsv1alpha1.OpsRunningPhase, time.Second, nil
+		}
 	}
 	podApplyCompOps := func(
 		ops *opsv1alpha1.OpsRequest,
 		pod *corev1.Pod,
 		pgRes *progressResource) bool {
-		upgradeComponent := pgRes.compOps.(opsv1alpha1.UpgradeComponent)
-		compDef, ok := componentDefMap[upgradeComponent.GetComponentName()]
-		if !ok {
-			return true
+		target := pgRes.compOps.(opsv1alpha1.UpgradeComponent).GetComponentName()
+		if def, ok := legacyDefinitions[target]; ok {
+			return u.podImageApplied(pod, def.Spec.Runtime.Containers)
 		}
-		return u.podImageApplied(pod, compDef.Spec.Runtime.Containers)
+		expected, ok := containersMap[pgRes.fullComponentName]
+		if !ok || expected.pendingOwner {
+			return false
+		}
+		templateName, labeled := instancetemplate.TemplateNameFromLabels(pod.Labels)
+		if !labeled {
+			if specs[pgRes.fullComponentName].FlatInstanceOrdinal {
+				return false
+			}
+			templateName = appsv1.GetInstanceTemplateName(opsRes.Cluster.Name, pgRes.fullComponentName, pod.Name)
+		}
+		containers, ok := expected.containersByTemplate[templateName]
+		if !ok {
+			containers = expected.containersByTemplate[""]
+		}
+		return u.podImageApplied(pod, containers)
 	}
 	handleUpgradeProgress := func(reqCtx intctrlutil.RequestCtx,
 		cli client.Client,
 		opsRes *OpsResource,
 		pgRes *progressResource,
 		compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
+		if spec, ok := specs[pgRes.fullComponentName]; ok {
+			pgRes.clusterComponent = spec
+			pgRes.componentDef = containersMap[pgRes.fullComponentName].definition
+		}
 		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, podApplyCompOps)
 	}
 	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "upgrade", handleUpgradeProgress)
@@ -134,28 +192,126 @@ func (u upgradeOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 	return nil
 }
 
-// getComponentDefMapWithUpdatedImages gets the desired componentDefinition map
-// that is updated with the corresponding images of the ComponentDefinition and service version.
-func (u upgradeOpsHandler) getComponentDefMapWithUpdatedImages(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	opsRes *OpsResource) (map[string]*appsv1.ComponentDefinition, error) {
-	compDefMap := map[string]*appsv1.ComponentDefinition{}
-	for _, v := range opsRes.OpsRequest.Spec.Upgrade.Components {
-		compSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, v.ComponentName)
-		if compSpec == nil {
-			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`"can not found the component "%s" in the cluster "%s"`,
-				v.ComponentName, opsRes.Cluster.Name))
+// upgradeTargetHasInstanceVersions checks desired instance templates before reading owner resources.
+func upgradeTargetHasInstanceVersions(cluster *appsv1.Cluster, name string) bool {
+	hasVersions := func(instances []appsv1.InstanceTemplate) bool {
+		for _, instance := range instances {
+			if instance.ServiceVersion != "" {
+				return true
+			}
 		}
+		return false
+	}
+	for _, spec := range cluster.Spec.ComponentSpecs {
+		if spec.Name == name {
+			return hasVersions(spec.Instances)
+		}
+	}
+	for _, spec := range cluster.Spec.Shardings {
+		if spec.Name != name {
+			continue
+		}
+		if hasVersions(spec.Template.Instances) {
+			return true
+		}
+		for _, template := range spec.ShardTemplates {
+			if hasVersions(template.Instances) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (u upgradeOpsHandler) getUpgradeComponentSpecs(reqCtx intctrlutil.RequestCtx,
+	cli client.Client, opsRes *OpsResource) (map[string]*appsv1.ClusterComponentSpec, bool, error) {
+	specs := map[string]*appsv1.ClusterComponentSpec{}
+	for _, target := range opsRes.OpsRequest.Spec.Upgrade.Components {
+		if !upgradeTargetHasInstanceVersions(opsRes.Cluster, target.ComponentName) {
+			continue
+		}
+		found := false
+		for i := range opsRes.Cluster.Spec.ComponentSpecs {
+			spec := &opsRes.Cluster.Spec.ComponentSpecs[i]
+			if spec.Name == target.ComponentName {
+				specs[spec.Name] = spec
+				found = true
+			}
+		}
+		for i := range opsRes.Cluster.Spec.Shardings {
+			spec := &opsRes.Cluster.Spec.Shardings[i]
+			if spec.Name != target.ComponentName {
+				continue
+			}
+			shards, err := sharding.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, spec.Name)
+			if err != nil {
+				return nil, false, err
+			}
+			if len(shards) != int(spec.Shards) {
+				return nil, true, nil
+			}
+			for _, shard := range shards {
+				if !component.IsComponentGenerationUpToDate(opsRes.Cluster, &shard) {
+					return nil, true, nil
+				}
+				name := shard.Labels[constant.KBAppComponentLabelKey]
+				specs[name] = &appsv1.ClusterComponentSpec{
+					Name: name, ComponentDef: shard.Spec.CompDef, ServiceVersion: shard.Spec.ServiceVersion,
+					Replicas: shard.Spec.Replicas, Instances: shard.Spec.Instances,
+					FlatInstanceOrdinal: shard.Spec.FlatInstanceOrdinal,
+				}
+			}
+			found = true
+		}
+		if !found {
+			return nil, false, intctrlutil.NewFatalError(fmt.Sprintf("cannot find component %q in cluster %q", target.ComponentName, opsRes.Cluster.Name))
+		}
+	}
+	return specs, false, nil
+}
+
+func (u upgradeOpsHandler) getExpectedContainersMap(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	cluster *appsv1.Cluster,
+	specs map[string]*appsv1.ClusterComponentSpec) (map[string]upgradeExpectedImages, error) {
+	containersMap := map[string]upgradeExpectedImages{}
+	for name, compSpec := range specs {
 		compDef, err := component.GetCompDefByName(reqCtx.Ctx, cli, compSpec.ComponentDef)
 		if err != nil {
 			return nil, err
 		}
-		if err = component.UpdateCompDefinitionImages4ServiceVersion(reqCtx.Ctx, cli, compDef, compSpec.ServiceVersion); err != nil {
+		containersMap[name] = upgradeExpectedImages{definition: compDef, pendingOwner: true}
+		comp := &appsv1.Component{}
+		if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: component.FullName(cluster.Name, name)}, comp); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return nil, err
+			}
+			continue
+		}
+		if !component.IsComponentGenerationUpToDate(cluster, comp) {
+			continue
+		}
+		workloads, err := component.ListOwnedWorkloads(reqCtx.Ctx, cli, cluster.Namespace, cluster.Name, name)
+		if err != nil {
 			return nil, err
 		}
-		compDefMap[v.ComponentName] = compDef
+		if len(workloads) != 1 || !component.IsWorkloadVersionUpdated(comp, workloads[0]) {
+			continue
+		}
+		its := workloads[0]
+		templates := map[string][]corev1.Container{"": its.Spec.Template.Spec.Containers}
+		for _, template := range its.Spec.Instances {
+			containers := append([]corev1.Container(nil), its.Spec.Template.Spec.Containers...)
+			for i := range containers {
+				if image := template.Images[containers[i].Name]; image != "" {
+					containers[i].Image = image
+				}
+			}
+			templates[template.Name] = containers
+		}
+		containersMap[name] = upgradeExpectedImages{definition: compDef, containersByTemplate: templates}
 	}
-	return compDefMap, nil
+	return containersMap, nil
 }
 
 // podImageApplied checks if the pod has applied the new image.

@@ -20,15 +20,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"context"
+	"testing"
+	"time"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -419,3 +430,416 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		// TODO: add case with ClusterDefinition and topology
 	})
 })
+
+func TestUpgradeInstanceTemplateVersions(t *testing.T) {
+	for _, tc := range []struct {
+		name, version, templateImage   string
+		flat, shard, wrongStatus       bool
+		unlabeled, alternateDefinition bool
+		ownerRecovery, zeroReplicas    bool
+		legacyShard, missingITS        bool
+		mixed                          bool
+		want                           opsv1alpha1.OpsPhase
+		progress                       string
+	}{
+		{name: "mixed legacy shard and heterogeneous component", legacyShard: true, shard: true, mixed: true, templateImage: "db:v2", want: opsv1alpha1.OpsSucceedPhase, progress: "4/4"},
+		{name: "legacy shard without ITS", legacyShard: true, missingITS: true, shard: true, flat: true, templateImage: "db:v2", want: opsv1alpha1.OpsSucceedPhase, progress: "2/2"},
+		{name: "legacy shard with stale publication", legacyShard: true, shard: true, templateImage: "db:v2", want: opsv1alpha1.OpsSucceedPhase, progress: "2/2"},
+		{name: "zero replicas with unpublished version", version: "1.0.0", zeroReplicas: true, want: opsv1alpha1.OpsSucceedPhase, progress: "0/0"},
+		{name: "zero replica shard with unpublished version", version: "1.0.0", zeroReplicas: true, shard: true, want: opsv1alpha1.OpsSucceedPhase, progress: "0/0"},
+		{name: "shard publication recovery", version: "1.0.0", templateImage: "db:v1", shard: true, ownerRecovery: true, want: opsv1alpha1.OpsSucceedPhase, progress: "2/2"},
+		{name: "owner publication recovery", version: "1.0.0", templateImage: "db:v1", ownerRecovery: true, want: opsv1alpha1.OpsSucceedPhase, progress: "2/2"},
+		{name: "fixed template", version: "1.0.0", templateImage: "db:owner", want: opsv1alpha1.OpsSucceedPhase, progress: "2/2"},
+		{name: "wrong template image", version: "1.0.0", templateImage: "db:wrong", want: opsv1alpha1.OpsRunningPhase, progress: "1/2"},
+		{name: "old running image", version: "1.0.0", templateImage: "db:v1", wrongStatus: true, want: opsv1alpha1.OpsRunningPhase, progress: "1/2"},
+		{name: "empty differential inherits default", version: "0.0.0", templateImage: "db:v2", want: opsv1alpha1.OpsSucceedPhase, progress: "2/2"},
+		{name: "flat fixed template", version: "1.0.0", templateImage: "db:v1", flat: true, want: opsv1alpha1.OpsSucceedPhase, progress: "2/2"},
+		{name: "flat template without ownership label", version: "1.0.0", templateImage: "db:v1", flat: true, unlabeled: true, want: opsv1alpha1.OpsRunningPhase, progress: "1/2"},
+		{name: "shard instance template", version: "1.0.0", templateImage: "db:v1", shard: true, want: opsv1alpha1.OpsSucceedPhase, progress: "2/2"},
+		{name: "shard wrong image", version: "1.0.0", templateImage: "db:wrong", shard: true, want: opsv1alpha1.OpsRunningPhase, progress: "1/2"},
+		{name: "shard definition determines readiness", version: "1.0.0", templateImage: "db:v1", shard: true, alternateDefinition: true, want: opsv1alpha1.OpsSucceedPhase, progress: "2/2"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			for _, add := range []func(*runtime.Scheme) error{
+				corev1.AddToScheme, appsv1.AddToScheme, opsv1alpha1.AddToScheme, workloads.AddToScheme,
+			} {
+				if err := add(scheme); err != nil {
+					t.Fatal(err)
+				}
+			}
+			def := &appsv1.ComponentDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "db"},
+				Spec: appsv1.ComponentDefinitionSpec{
+					Runtime: corev1.PodSpec{Containers: []corev1.Container{{Name: "db", Image: "db:base"}}},
+				},
+			}
+			ver := &appsv1.ComponentVersion{
+				ObjectMeta: metav1.ObjectMeta{Name: "db", Labels: map[string]string{"db": "db"}},
+				Spec: appsv1.ComponentVersionSpec{
+					CompatibilityRules: []appsv1.ComponentVersionCompatibilityRule{
+						{CompDefs: []string{"db"}, Releases: []string{"r0", "r1", "r2"}},
+					},
+					Releases: []appsv1.ComponentVersionRelease{
+						{Name: "r0", ServiceVersion: "0.0.0", Images: map[string]string{"db": "db:base"}},
+						{Name: "r1", ServiceVersion: "1.0.0", Images: map[string]string{"db": "db:v1"}},
+						{Name: "r2", ServiceVersion: "2.0.0", Images: map[string]string{"db": "db:v2"}},
+					},
+				},
+				Status: appsv1.ComponentVersionStatus{Phase: appsv1.AvailablePhase},
+			}
+			spec := appsv1.ClusterComponentSpec{
+				Name: "db", ComponentDef: "db", ServiceVersion: "2.0.0", Replicas: 2,
+				FlatInstanceOrdinal: tc.flat,
+				Instances:           []appsv1.InstanceTemplate{{Name: "fixed", CompDef: "db", ServiceVersion: tc.version}},
+			}
+			if tc.zeroReplicas {
+				spec.Replicas = 0
+				spec.Instances[0].Replicas = ptr.To(int32(0))
+			}
+			cluster := &appsv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster", Namespace: "ns", Generation: 3},
+				Spec:       appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{spec}},
+				Status: appsv1.ClusterStatus{
+					Components: map[string]appsv1.ClusterComponentStatus{"db": {Phase: appsv1.RunningComponentPhase}},
+				},
+			}
+			target, componentName := "db", "db"
+			var shardLabels map[string]string
+			if tc.shard {
+				target, componentName = "shards", "shards-abc"
+				defaultSpec := spec
+				defaultSpec.Name = "shards"
+				if !tc.zeroReplicas {
+					defaultSpec.Replicas = 3
+				}
+				defaultSpec.Instances = nil
+				if tc.legacyShard {
+					defaultSpec.Replicas = 2
+				}
+				cluster.Spec.ComponentSpecs = nil
+				cluster.Spec.Shardings = []appsv1.ClusterSharding{{
+					Name: target, Shards: 1, Template: defaultSpec,
+					ShardTemplates: []appsv1.ShardTemplate{{
+						Name: "special", Shards: ptr.To(int32(1)), Replicas: ptr.To(spec.Replicas), Instances: spec.Instances,
+					}},
+				}}
+				cluster.Status.Shardings = map[string]appsv1.ClusterShardingStatus{
+					target: {Phase: appsv1.RunningComponentPhase},
+				}
+				labels := constant.GetCompLabels(cluster.Name, componentName)
+				labels[constant.KBAppShardingNameLabelKey] = target
+				labels[constant.KBAppShardTemplateLabelKey] = "special"
+				shardLabels = labels
+			}
+			ops := &opsv1alpha1.OpsRequest{
+				ObjectMeta: metav1.ObjectMeta{Name: "upgrade", Namespace: "ns"},
+				Spec: opsv1alpha1.OpsRequestSpec{
+					Type: opsv1alpha1.UpgradeType,
+					SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{
+						Upgrade: &opsv1alpha1.Upgrade{Components: []opsv1alpha1.UpgradeComponent{{
+							ComponentOps: opsv1alpha1.ComponentOps{ComponentName: target},
+						}}},
+					},
+				},
+				Status: opsv1alpha1.OpsRequestStatus{
+					Phase: opsv1alpha1.OpsRunningPhase, StartTimestamp: metav1.NewTime(time.Now()),
+				},
+			}
+			pod := func(name, image string) *corev1.Pod {
+				return &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: name, Namespace: "ns", Labels: constant.GetCompLabels("cluster", componentName),
+					},
+					Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "db", Image: image}}},
+					Status: corev1.PodStatus{
+						Phase:             corev1.PodRunning,
+						Conditions:        []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
+						ContainerStatuses: []corev1.ContainerStatus{{Name: "db", Image: image, Ready: true}},
+					},
+				}
+			}
+			base := pod("cluster-"+componentName+"-0", "db:v2")
+			base.Labels[constant.KBAppInstanceTemplateLabelKey] = ""
+			fixed := pod("cluster-"+componentName+"-fixed-0", tc.templateImage)
+			if tc.flat {
+				fixed.Name = "cluster-" + componentName + "-1"
+				fixed.Labels[constant.KBAppInstanceTemplateLabelKey] = "fixed"
+			}
+			if tc.wrongStatus {
+				fixed.Status.ContainerStatuses[0].Image = "db:old"
+			}
+			if tc.unlabeled {
+				delete(fixed.Labels, constant.KBAppInstanceTemplateLabelKey)
+			}
+			owner := &appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-" + componentName, Namespace: "ns", Generation: 5,
+					Labels:      constant.GetCompLabels(cluster.Name, componentName),
+					Annotations: map[string]string{constant.KubeBlocksGenerationKey: "3"},
+				},
+			}
+			if shardLabels != nil {
+				owner.Labels = shardLabels
+			}
+			owner.Spec = appsv1.ComponentSpec{
+				CompDef: spec.ComponentDef, ServiceVersion: spec.ServiceVersion, Replicas: spec.Replicas,
+				Instances: spec.Instances, FlatInstanceOrdinal: spec.FlatInstanceOrdinal,
+			}
+			images := map[string]string{"db": "db:v1"}
+			if tc.version == "0.0.0" {
+				images = nil
+			}
+			if tc.name == "fixed template" {
+				images["db"] = "db:owner"
+			}
+			its := &workloads.InstanceSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: owner.Name, Namespace: "ns", Labels: owner.Labels,
+					Annotations: map[string]string{
+						constant.KubeBlocksGenerationKey: "5", constant.AppComponentLabelKey: owner.Spec.CompDef,
+						constant.KBAppServiceVersionKey: owner.Spec.ServiceVersion,
+					},
+				},
+				Spec: workloads.InstanceSetSpec{
+					Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
+						Containers: []corev1.Container{{Name: "db", Image: "db:v2"}},
+					}},
+					Instances: []workloads.InstanceTemplate{{Name: "fixed", Images: images}},
+				},
+			}
+			objects := []client.Object{def, ver, cluster, ops, owner, its}
+			if tc.zeroReplicas {
+				owner.Spec.Stop = ptr.To(true)
+				its.Spec.Replicas = ptr.To(int32(0))
+				its.Spec.Stop = ptr.To(true)
+				its.Spec.Instances[0].Replicas = ptr.To(int32(0))
+				its.Annotations[constant.KBAppServiceVersionKey] = "1.0.0"
+			} else {
+				objects = append(objects, base, fixed)
+			}
+			if tc.alternateDefinition {
+				alternate := def.DeepCopy()
+				alternate.Name = "alternate"
+				def.Spec.Roles = []appsv1.ReplicaRole{{Name: "leader"}}
+				ver.Labels[alternate.Name] = alternate.Name
+				ver.Spec.CompatibilityRules[0].CompDefs = append(ver.Spec.CompatibilityRules[0].CompDefs, alternate.Name)
+				owner.Spec.CompDef = alternate.Name
+				its.Annotations[constant.AppComponentLabelKey] = alternate.Name
+				cluster.Spec.Shardings[0].ShardTemplates[0].CompDef = ptr.To(alternate.Name)
+				cluster.Spec.Shardings[0].ShardTemplates[0].ServiceVersion = ptr.To("2.0.0")
+				objects = append(objects, alternate)
+			}
+			if tc.legacyShard {
+				cluster.Spec.Shardings[0].ShardTemplates[0].Instances = nil
+				cluster.Spec.Shardings[0].ShardTemplates[0].ServiceVersion = ptr.To("1.0.0")
+				cluster.Spec.Shardings[0].ShardTemplates[0].Replicas = ptr.To(int32(3))
+				owner.Spec.Replicas = 3
+				owner.Annotations[constant.KubeBlocksGenerationKey] = "2"
+				its.Annotations[constant.KubeBlocksGenerationKey] = "4"
+				delete(fixed.Labels, constant.KBAppInstanceTemplateLabelKey)
+			}
+			if tc.mixed {
+				mixedSpec := spec
+				mixedSpec.Name = "other"
+				mixedSpec.Instances = []appsv1.InstanceTemplate{{Name: "fixed", ServiceVersion: "1.0.0"}}
+				cluster.Spec.ComponentSpecs = []appsv1.ClusterComponentSpec{mixedSpec}
+				cluster.Status.Components["other"] = appsv1.ClusterComponentStatus{Phase: appsv1.RunningComponentPhase}
+				ops.Spec.Upgrade.Components = append(ops.Spec.Upgrade.Components, opsv1alpha1.UpgradeComponent{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "other"}})
+				mixedOwner := owner.DeepCopy()
+				mixedOwner.Name = "cluster-other"
+				mixedOwner.Labels = constant.GetCompLabels(cluster.Name, "other")
+				mixedOwner.Annotations = map[string]string{constant.KubeBlocksGenerationKey: "3"}
+				mixedOwner.Spec.Replicas = 2
+				mixedOwner.Spec.Instances = mixedSpec.Instances
+				mixedITS := its.DeepCopy()
+				mixedITS.Name = mixedOwner.Name
+				mixedITS.Labels = mixedOwner.Labels
+				mixedITS.Annotations = map[string]string{constant.KubeBlocksGenerationKey: "5", constant.AppComponentLabelKey: "db", constant.KBAppServiceVersionKey: "2.0.0"}
+				mixedBase := base.DeepCopy()
+				mixedBase.Name = "cluster-other-0"
+				mixedBase.Labels = mixedOwner.Labels
+				mixedFixed := fixed.DeepCopy()
+				mixedFixed.Name = "cluster-other-fixed-0"
+				mixedFixed.Labels = mixedOwner.Labels
+				mixedFixed.Spec.Containers[0].Image = "db:v1"
+				mixedFixed.Status.ContainerStatuses[0].Image = "db:v1"
+				objects = append(objects, mixedOwner, mixedITS, mixedBase, mixedFixed)
+			}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(ops).WithObjects(objects...).Build()
+			if tc.missingITS {
+				if err := cli.Delete(context.Background(), its); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if tc.ownerRecovery {
+				reconcileWaiting := func() {
+					t.Helper()
+					phase, requeue, err := (upgradeOpsHandler{}).ReconcileAction(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(100)})
+					if err != nil || phase != opsv1alpha1.OpsRunningPhase || requeue <= 0 {
+						t.Fatalf("owner wait phase=%s requeue=%s err=%v", phase, requeue, err)
+					}
+				}
+				if tc.shard {
+					if err := cli.Delete(context.Background(), owner); err != nil {
+						t.Fatal(err)
+					}
+					reconcileWaiting()
+					owner.ResourceVersion = ""
+					if err := cli.Create(context.Background(), owner); err != nil {
+						t.Fatal(err)
+					}
+					cluster.Spec.Shardings[0].ShardTemplates[0].Replicas = ptr.To(int32(2))
+					cluster.Spec.Shardings[0].ShardTemplates[0].Instances[0].ServiceVersion = "1.0.0"
+					owner.Spec.Replicas = 0
+					owner.Spec.Instances = nil
+				}
+				owner.Annotations[constant.KubeBlocksGenerationKey] = "2"
+				if err := cli.Update(context.Background(), owner); err != nil {
+					t.Fatal(err)
+				}
+				reconcileWaiting()
+				reconcileWaiting()
+				if tc.shard {
+					owner.Spec.Replicas = 2
+					owner.Spec.Instances = spec.Instances
+				}
+				owner.Annotations[constant.KubeBlocksGenerationKey] = "3"
+				if err := cli.Update(context.Background(), owner); err != nil {
+					t.Fatal(err)
+				}
+				its.Annotations[constant.KubeBlocksGenerationKey] = "4"
+				if err := cli.Update(context.Background(), its); err != nil {
+					t.Fatal(err)
+				}
+				reconcileWaiting()
+				reconcileWaiting()
+				if err := cli.Delete(context.Background(), its); err != nil {
+					t.Fatal(err)
+				}
+				reconcileWaiting()
+				reconcileWaiting()
+				its.ResourceVersion = ""
+				its.Annotations[constant.KubeBlocksGenerationKey] = "5"
+				its.Annotations[constant.KBAppServiceVersionKey] = "1.0.0"
+				if err := cli.Create(context.Background(), its); err != nil {
+					t.Fatal(err)
+				}
+				reconcileWaiting()
+				its.Annotations[constant.KBAppServiceVersionKey] = owner.Spec.ServiceVersion
+				if err := cli.Update(context.Background(), its); err != nil {
+					t.Fatal(err)
+				}
+				fixed.Spec.Containers[0].Image = "db:wrong"
+				if err := cli.Update(context.Background(), fixed); err != nil {
+					t.Fatal(err)
+				}
+				phase, _, err := (upgradeOpsHandler{}).ReconcileAction(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(100)})
+				if err != nil || phase != opsv1alpha1.OpsRunningPhase || ops.Status.Progress != "1/2" {
+					t.Fatalf("wrong image phase=%s progress=%s err=%v", phase, ops.Status.Progress, err)
+				}
+				fixed.Spec.Containers[0].Image = "db:v1"
+				if err := cli.Update(context.Background(), fixed); err != nil {
+					t.Fatal(err)
+				}
+			}
+			phase, _, err := (upgradeOpsHandler{}).ReconcileAction(
+				intctrlutil.RequestCtx{Ctx: context.Background()}, cli,
+				&OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(100)},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if phase != tc.want || ops.Status.Progress != tc.progress {
+				t.Fatalf("phase=%s progress=%s, want %s %s", phase, ops.Status.Progress, tc.want, tc.progress)
+			}
+		})
+	}
+}
+
+func TestUpgradeZeroShards(t *testing.T) {
+	scheme := runtime.NewScheme()
+	for _, add := range []func(*runtime.Scheme) error{
+		appsv1.AddToScheme, opsv1alpha1.AddToScheme,
+	} {
+		if err := add(scheme); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cluster := &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "cluster", Namespace: "ns", Generation: 3},
+		Spec: appsv1.ClusterSpec{Shardings: []appsv1.ClusterSharding{{
+			Name: "shards", Shards: 0,
+			Template: appsv1.ClusterComponentSpec{ComponentDef: "db", ServiceVersion: "2.0.0", Replicas: 2, Instances: []appsv1.InstanceTemplate{{Name: "fixed", ServiceVersion: "1.0.0"}}},
+		}}},
+	}
+	ops := &opsv1alpha1.OpsRequest{
+		ObjectMeta: metav1.ObjectMeta{Name: "upgrade", Namespace: "ns"},
+		Spec: opsv1alpha1.OpsRequestSpec{
+			Type: opsv1alpha1.UpgradeType,
+			SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{
+				Upgrade: &opsv1alpha1.Upgrade{Components: []opsv1alpha1.UpgradeComponent{{
+					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "shards"},
+				}}},
+			},
+		},
+		Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsRunningPhase},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(ops).WithObjects(cluster, ops).Build()
+	t.Run("without instance versions", func(t *testing.T) {
+		legacyCluster := cluster.DeepCopy()
+		legacyCluster.Spec.Shardings[0].Template.Instances = nil
+		legacyOps := ops.DeepCopy()
+		definition := &appsv1.ComponentDefinition{ObjectMeta: metav1.ObjectMeta{Name: "db"}}
+		legacyClient := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(legacyOps).
+			WithObjects(legacyCluster, legacyOps, definition).Build()
+		phase, requeue, err := (upgradeOpsHandler{}).ReconcileAction(
+			intctrlutil.RequestCtx{Ctx: context.Background()}, legacyClient,
+			&OpsResource{Cluster: legacyCluster, OpsRequest: legacyOps, Recorder: record.NewFakeRecorder(100)},
+		)
+		if err != nil || phase != opsv1alpha1.OpsSucceedPhase || requeue != 0 || legacyOps.Status.Progress != "0/0" {
+			t.Fatalf("phase=%s requeue=%s progress=%s err=%v, want Succeed with 0/0", phase, requeue, legacyOps.Status.Progress, err)
+		}
+	})
+	phase, requeue, err := (upgradeOpsHandler{}).ReconcileAction(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, cli,
+		&OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(100)},
+	)
+	if err != nil || phase != opsv1alpha1.OpsSucceedPhase || requeue != 0 || ops.Status.Progress != "0/0" {
+		t.Fatalf("phase=%s requeue=%s progress=%s err=%v, want Succeed with 0/0", phase, requeue, ops.Status.Progress, err)
+	}
+	if _, err := GetOpsManager().Reconcile(intctrlutil.RequestCtx{Ctx: context.Background()}, cli,
+		&OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(100)}); err != nil {
+		t.Fatal(err)
+	}
+	stored := &opsv1alpha1.OpsRequest{}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(ops), stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored.Status.Phase != opsv1alpha1.OpsSucceedPhase || stored.Status.Progress != "0/0" {
+		t.Fatalf("persisted phase=%s progress=%s, want Succeed with 0/0", stored.Status.Phase, stored.Status.Progress)
+	}
+	cluster.Spec.Shardings[0].Shards = 1
+	pending := ops.DeepCopy()
+	pending.Name = "pending"
+	pending.ResourceVersion = ""
+	pending.Status = opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsRunningPhase, StartTimestamp: metav1.Now()}
+	if err := cli.Create(context.Background(), pending); err != nil {
+		t.Fatal(err)
+	}
+	pendingRes := &OpsResource{Cluster: cluster, OpsRequest: pending, Recorder: record.NewFakeRecorder(100)}
+	if requeue, err := GetOpsManager().Reconcile(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, pendingRes); err != nil || requeue <= 0 {
+		t.Fatalf("missing shard requeue=%s err=%v, want a retry", requeue, err)
+	}
+	pending.Spec.TimeoutSeconds = ptr.To(int32(1))
+	pending.Status.StartTimestamp = metav1.NewTime(time.Now().Add(-2 * time.Second))
+	if _, err := GetOpsManager().Reconcile(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, pendingRes); err != nil {
+		t.Fatal(err)
+	}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(pending), stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored.Status.Phase != opsv1alpha1.OpsAbortedPhase {
+		t.Fatalf("missing shard timed out with phase=%s, want Aborted", stored.Status.Phase)
+	}
+}

@@ -53,7 +53,13 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 	return kubebuilderx.ConditionSatisfied
 }
 
-func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
+func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (result kubebuilderx.Result, reconcileErr error) {
+	defer func() {
+		its := tree.GetRoot().(*workloads.InstanceSet)
+		if reconcileErr == nil && result == kubebuilderx.Continue && lifecycleStatusEnabled(its) && !isStopRequested(its) {
+			result = kubebuilderx.RetryAfter(5 * time.Second)
+		}
+	}()
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
 	if err != nil {
@@ -128,6 +134,9 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		desired, err := buildInstanceByTemplate(tree, inst.Name, nameToTemplateMap[inst.Name], its)
 		if err != nil {
 			return kubebuilderx.Continue, err
+		}
+		if err := configureInstance(tree, its, desired, true); err != nil {
+			return lifecycleWait(tree, its, err)
 		}
 		desiredInstanceMap[inst.Name] = desired
 	}

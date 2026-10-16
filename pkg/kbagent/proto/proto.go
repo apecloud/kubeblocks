@@ -147,4 +147,14 @@ type NewReplicaTask struct {
 	Replicas       string            `json:"replicas"`                 // replicas to load the data
 	Parameters     map[string]string `json:"parameters,omitempty"`     // parameters for data dump and load
 	TimeoutSeconds *int32            `json:"timeoutSeconds,omitempty"` // TODO: not implemented
+	DataLoadResult *DataLoadResult   `json:"dataLoadResult,omitempty"`
+}
+
+// DataLoadedAnnotationKey records completed data loading on the target data PVC.
+const DataLoadedAnnotationKey = "workloads.kubeblocks.io/data-loaded"
+
+// DataLoadResult identifies the data PVC in the worker's runtime cluster.
+type DataLoadResult struct {
+	Namespace string `json:"namespace"`
+	PVCName   string `json:"pvcName"`
 }

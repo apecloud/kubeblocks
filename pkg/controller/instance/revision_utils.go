@@ -38,6 +38,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 )
 
 const (
@@ -178,6 +179,7 @@ func BuildPodRevision(inst *workloads.Instance) (string, error) {
 
 func buildInstancePodRevision(template *corev1.PodTemplateSpec, parent *workloads.Instance) (string, error) {
 	podTemplate := filterInPlaceFields(template)
+	workloadlifecycle.FilterTransient(&podTemplate.Spec)
 	inst := builder.NewInstanceBuilder(parent.Namespace, parent.Name).
 		SetUID(parent.UID).
 		AddAnnotationsInMap(parent.Annotations).

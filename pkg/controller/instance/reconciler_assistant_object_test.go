@@ -21,6 +21,7 @@ package instance
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -32,6 +33,8 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
 const (
@@ -270,4 +273,61 @@ func ordinalConfigMap(name string) *corev1.ConfigMap {
 		constant.KBAppMultiClusterObjectProvisionPolicyKey: constant.KBAppMultiClusterObjectProvisionOrdinal,
 	}
 	return cm
+}
+
+func TestAssistantRebuildClearsOnlyCompletedInstanceDataTask(t *testing.T) {
+	result := &proto.DataLoadResult{Namespace: testNamespace, PVCName: "data-target"}
+	guard, err := kbagent.BuildEnv4DataLoadResult(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tasks := []proto.Task{
+		{UID: "completed", NewReplica: &proto.NewReplicaTask{DataLoadResult: result}},
+		{UID: "other-instance", NewReplica: &proto.NewReplicaTask{DataLoadResult: &proto.DataLoadResult{Namespace: testNamespace, PVCName: "data-other"}}},
+		{UID: "legacy", NewReplica: &proto.NewReplicaTask{}},
+	}
+	taskEnv, err := kbagent.BuildEnv4Worker(tasks)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assistant := sharedConfigMapAssistantObject("cluster-component-env", "v1")
+	assistant.ConfigMap.Data[taskEnv.Name] = taskEnv.Value
+	inst := newTestInstance("cluster-component-0", assistant)
+	inst.Spec.Template.Spec.InitContainers = []corev1.Container{{Name: kbagent.ContainerName4Worker, Env: []corev1.EnvVar{*guard}}}
+	tree := newTestTree(inst)
+	if err := tree.Add(&corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: result.PVCName, Namespace: result.Namespace, Annotations: map[string]string{proto.DataLoadedAnnotationKey: "true"}}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewAssistantObjectReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	obj, err := tree.Get(assistant.ConfigMap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cm := obj.(*corev1.ConfigMap)
+	var retained []proto.Task
+	if err := json.Unmarshal([]byte(cm.Data[taskEnv.Name]), &retained); err != nil {
+		t.Fatal(err)
+	}
+	if len(retained) != 2 || retained[0].UID != "other-instance" || retained[1].UID != "legacy" {
+		t.Fatalf("snapshot cleanup removed unrelated task: %#v", retained)
+	}
+	if inst.Spec.InstanceAssistantObjects[0].ConfigMap.Data[taskEnv.Name] != taskEnv.Value {
+		t.Fatal("Instance rewrote parent-owned assistant snapshot")
+	}
+	// Rebuilding a deleted runtime ConfigMap must apply the same cleanup repeatedly.
+	if err := tree.Delete(cm); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewAssistantObjectReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	obj, err = tree.Get(assistant.ConfigMap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if obj.(*corev1.ConfigMap).Data[taskEnv.Name] != cm.Data[taskEnv.Name] {
+		t.Fatal("ConfigMap recreation restored stale completed task")
+	}
 }

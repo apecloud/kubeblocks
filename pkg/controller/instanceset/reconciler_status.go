@@ -31,12 +31,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancestatus"
+	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -50,7 +52,11 @@ func NewStatusReconciler() kubebuilderx.Reconciler {
 }
 
 func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
-	if tree.GetRoot() == nil || !model.IsObjectStatusUpdating(tree.GetRoot()) {
+	if tree.GetRoot() == nil {
+		return kubebuilderx.ConditionUnsatisfied
+	}
+	its := tree.GetRoot().(*workloads.InstanceSet)
+	if !model.IsObjectStatusUpdating(its) && !lifecycleStatusEnabled(its) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
 	return kubebuilderx.ConditionSatisfied
@@ -58,6 +64,16 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	summarizeStatus := model.IsObjectStatusUpdating(its)
+	if lifecycleStatusEnabled(its) {
+		if result, err := observeLifecycleStatus(tree); err != nil || result != kubebuilderx.Continue {
+			return result, err
+		}
+	}
+	if !summarizeStatus {
+		return kubebuilderx.Continue, nil
+	}
+
 	stopping := isStopRequested(its)
 	// 1. get all pods
 	pods := tree.List(&corev1.Pod{})
@@ -537,8 +553,14 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		}
 	}
 	syncObservationPVCStatus(tree, observations)
+	resources, err := statusResourceObservations(tree, its)
+	if err != nil {
+		return err
+	}
 
 	statuses, err := instancestatus.Build(instancestatus.Input{
+		RequireMemberLeave: its.Spec.LifecycleActions != nil && its.Spec.LifecycleActions.MemberLeave != nil,
+		Resources:          resources,
 		Previous:           its.Status.InstanceStatus,
 		DesiredAssignments: desiredTemplateAssignments,
 		Offline:            offlineNames,
@@ -551,6 +573,70 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	}
 	its.Status.InstanceStatus = statuses
 	return nil
+}
+
+func statusResourceObservations(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) ([]instancestatus.ResourceObservation, error) {
+	if tree == nil {
+		return nil, nil
+	}
+	var resources []instancestatus.ResourceObservation
+	retain := its.Spec.PersistentVolumeClaimRetentionPolicy != nil &&
+		its.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled == kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType
+	for _, object := range tree.List(&corev1.PersistentVolumeClaim{}) {
+		pvc := object.(*corev1.PersistentVolumeClaim)
+		owner := metav1.GetControllerOf(pvc)
+		name := pvc.Labels[constant.KBAppPodNameLabelKey]
+		if owner == nil || owner.UID != its.UID || name == "" || (retain && pvc.DeletionTimestamp.IsZero()) {
+			continue
+		}
+		resources = append(resources, instancestatus.ResourceObservation{InstanceName: name})
+	}
+	if !workloadlifecycle.HasData(its) {
+		return resources, nil
+	}
+	ext, err := instancetemplate.BuildInstanceSetExt(its, tree)
+	if err != nil {
+		return nil, err
+	}
+	for i := range its.Status.InstanceStatus {
+		status := &its.Status.InstanceStatus[i]
+		if status.DataLoaded == nil || *status.DataLoaded {
+			continue
+		}
+		obj, err := tree.Get(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: status.PodName, Namespace: its.Namespace}})
+		if err != nil {
+			return nil, err
+		}
+		var pod *corev1.Pod
+		if obj != nil {
+			pod = obj.(*corev1.Pod)
+		} else if status.TemplateName != nil {
+			if template := instancetemplate.GetInstanceTemplateExt(ext, *status.TemplateName); template != nil {
+				pod, err = buildInstancePodByTemplate(status.PodName, template, its, "")
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+		if pod == nil {
+			continue
+		}
+		name, err := workloadlifecycle.DataPVCName(its, pod)
+		if err != nil {
+			return nil, err
+		}
+		obj, err = tree.Get(&corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: pod.Namespace}})
+		if err != nil {
+			return nil, err
+		}
+		if obj != nil {
+			workloadlifecycle.ObserveData(status, obj.(*corev1.PersistentVolumeClaim))
+			if !*status.DataLoaded {
+				resources = append(resources, instancestatus.ResourceObservation{InstanceName: status.PodName})
+			}
+		}
+	}
+	return resources, nil
 }
 
 func observePodRuntime(its *workloads.InstanceSet, pod *corev1.Pod, roles map[string]workloads.ReplicaRole) (instancestatus.Observation, error) {
@@ -680,4 +766,8 @@ func isPVCExpansionRunning(pvc *corev1.PersistentVolumeClaim) bool {
 	requested, requestedOK := pvc.Spec.Resources.Requests[corev1.ResourceStorage]
 	capacity, capacityOK := pvc.Status.Capacity[corev1.ResourceStorage]
 	return requestedOK && capacityOK && capacity.Cmp(requested) < 0
+}
+
+func lifecycleStatusEnabled(its *workloads.InstanceSet) bool {
+	return workloadlifecycle.Enabled(its) && !model.IsObjectDeleting(its) && !model.IsReconciliationPaused(its)
 }

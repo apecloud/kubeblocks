@@ -55,9 +55,9 @@ func GetClusterUID(comp *appsv1.Component) (string, error) {
 	return getCompAnnotationValue(comp, constant.KBAppClusterUIDKey)
 }
 
-// IsComponentConfigurationPublished reports whether the Cluster owner has published
-// its current configuration to the Component. It does not indicate upgrade completion.
-func IsComponentConfigurationPublished(cluster *appsv1.Cluster, comp *appsv1.Component) bool {
+// IsComponentGenerationUpToDate reports whether the Cluster owner has published
+// the Component for the current Cluster generation. It does not indicate upgrade completion.
+func IsComponentGenerationUpToDate(cluster *appsv1.Cluster, comp *appsv1.Component) bool {
 	return comp.Generation > 0 && comp.Annotations[constant.KubeBlocksGenerationKey] == strconv.FormatInt(cluster.Generation, 10)
 }
 

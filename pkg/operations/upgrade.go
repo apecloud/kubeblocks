@@ -251,7 +251,7 @@ func (u upgradeOpsHandler) getUpgradeComponentSpecs(reqCtx intctrlutil.RequestCt
 				return nil, true, nil
 			}
 			for _, shard := range shards {
-				if !component.IsComponentConfigurationPublished(opsRes.Cluster, &shard) {
+				if !component.IsComponentGenerationUpToDate(opsRes.Cluster, &shard) {
 					return nil, true, nil
 				}
 				name := shard.Labels[constant.KBAppComponentLabelKey]
@@ -288,7 +288,7 @@ func (u upgradeOpsHandler) getExpectedContainersMap(reqCtx intctrlutil.RequestCt
 			}
 			continue
 		}
-		if !component.IsComponentConfigurationPublished(cluster, comp) {
+		if !component.IsComponentGenerationUpToDate(cluster, comp) {
 			continue
 		}
 		workloads, err := component.ListOwnedWorkloads(reqCtx.Ctx, cli, cluster.Namespace, cluster.Name, name)

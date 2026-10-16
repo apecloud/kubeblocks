@@ -192,30 +192,30 @@ var _ = Describe("Component", func() {
 	})
 })
 
-func TestIsComponentConfigurationPublished(t *testing.T) {
+func TestIsComponentGenerationUpToDate(t *testing.T) {
 	cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster", Namespace: "default", Generation: 3}}
 	comp, err := BuildComponent(cluster, &appsv1.ClusterComponentSpec{Name: "db", ComponentDef: "db"}, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	comp.Generation = 1
-	if !IsComponentConfigurationPublished(cluster, comp) {
+	if !IsComponentGenerationUpToDate(cluster, comp) {
 		t.Fatal("configuration produced by BuildComponent must be published")
 	}
 	cluster.Generation++
-	if IsComponentConfigurationPublished(cluster, comp) {
+	if IsComponentGenerationUpToDate(cluster, comp) {
 		t.Fatal("an older Cluster configuration must not be accepted")
 	}
 	cluster.Generation--
 	for _, annotations := range []map[string]string{nil, {}, {constant.KubeBlocksGenerationKey: "invalid"}} {
 		comp.Annotations = annotations
-		if IsComponentConfigurationPublished(cluster, comp) {
+		if IsComponentGenerationUpToDate(cluster, comp) {
 			t.Fatal("missing or invalid publication must not be accepted")
 		}
 	}
 	comp.Annotations = map[string]string{constant.KubeBlocksGenerationKey: "3"}
 	comp.Generation = 0
-	if IsComponentConfigurationPublished(cluster, comp) {
+	if IsComponentGenerationUpToDate(cluster, comp) {
 		t.Fatal("an unpersisted Component must not be accepted")
 	}
 }

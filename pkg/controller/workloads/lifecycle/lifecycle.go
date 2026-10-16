@@ -505,6 +505,9 @@ func ValidateExecution(action *apps.Action, target *corev1.Pod, pods []*corev1.P
 	if target == nil {
 		return nil, fmt.Errorf("member target runtime is absent")
 	}
+	if len(pods) == 0 {
+		return nil, fmt.Errorf("no available executor for member action")
+	}
 	selected, err := publiclifecycle.SelectTargetPods(pods, target, action)
 	if err != nil {
 		return nil, err

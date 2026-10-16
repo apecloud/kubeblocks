@@ -161,8 +161,13 @@ func reconcileMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, 
 			break
 		}
 	}
-	if pod == nil || (join && !pod.DeletionTimestamp.IsZero()) {
+	if join && (pod == nil || !pod.DeletionTimestamp.IsZero()) {
 		return lifecycleWait(tree, its, fmt.Errorf("waiting for runtime of member %s", status.PodName))
+	}
+	if pod == nil {
+		// Leave may run on a peer after Stop removed the member's Pod.
+		pod = &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: inst.Name, Namespace: inst.Namespace},
+			Spec: corev1.PodSpec{Hostname: inst.Spec.Template.Spec.Hostname, Subdomain: inst.Spec.Template.Spec.Subdomain}}
 	}
 	if join && !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
 		return kubebuilderx.Continue, nil

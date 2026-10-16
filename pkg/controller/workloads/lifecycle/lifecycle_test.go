@@ -22,6 +22,7 @@ package lifecycle
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -218,6 +219,27 @@ func TestValidatedExecutionPreservesActionSelection(t *testing.T) {
 			}
 			if agent.calls != tc.calls {
 				t.Fatalf("action executed %d times, want %d", agent.calls, tc.calls)
+			}
+		})
+	}
+}
+
+func TestValidatedExecutionWaitsWithoutExecutors(t *testing.T) {
+	for _, legacy := range []bool{false, true} {
+		t.Run(fmt.Sprintf("legacy=%t", legacy), func(t *testing.T) {
+			defer func() {
+				if got := recover(); got != nil {
+					t.Fatalf("missing executor must return an error instead of panic: %v", got)
+				}
+			}()
+			action := testAction("leave")
+			if legacy {
+				action.Exec.TargetPodSelector = apps.AnyReplica
+			} else {
+				action.TargetPodSelector = apps.AnyReplica
+			}
+			if _, err := ValidateExecution(action, dataPod(), nil); err == nil {
+				t.Fatal("missing executor was accepted")
 			}
 		})
 	}

@@ -39,6 +39,7 @@ import (
 	apps "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
@@ -1115,6 +1116,176 @@ func TestInstanceSetLifecycleRetiresMemberWithoutPod(t *testing.T) {
 				t.Fatalf("completed Leave did not clean the released PVC: %v", err)
 			}
 		})
+	}
+}
+
+func TestInstanceSetLifecycleLeaveWaitsWithoutExecutor(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		for _, policy := range []appsv1.PodManagementPolicyType{appsv1.OrderedReadyPodManagement, appsv1.ParallelPodManagement} {
+			t.Run(fmt.Sprintf("instanceAPI=%t/%s", instanceAPI, policy), func(t *testing.T) {
+				defer func() {
+					if got := recover(); got != nil {
+						t.Fatalf("missing executor must wait instead of panic: %v", got)
+					}
+				}()
+				ctx := context.Background()
+				f := newMemberLifecycleEntry(t, instanceAPI, 1, policy)
+				f.its.Spec.LifecycleActions.MemberLeave.TargetPodSelector = apps.AnyReplica
+				f.its.Spec.VolumeClaimTemplates = newDataLifecycleITS(1).Spec.VolumeClaimTemplates
+				f.its.Spec.PersistentVolumeClaimRetentionPolicy = &workloads.PersistentVolumeClaimRetentionPolicy{WhenScaled: apps.DeletePersistentVolumeClaimRetentionPolicyType}
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				f.bootstrap(t, 1)
+				agent := &its2LifecycleAgent{}
+				kbacli.SetMockClient(agent, nil)
+				defer kbacli.UnsetMockClient()
+				key := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-0"}
+				pod := &corev1.Pod{}
+				if err := f.cli.Get(ctx, key, pod); err != nil {
+					t.Fatal(err)
+				}
+				// Observe completed Pod deletion before its controller gets a chance to recreate it.
+				pod.Finalizers = nil
+				if err := f.cli.Update(ctx, pod); err != nil {
+					t.Fatal(err)
+				}
+				if err := f.cli.Delete(ctx, pod); err != nil {
+					t.Fatal(err)
+				}
+				f.its.Spec.Replicas = ptr.To[int32](0)
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				for round := 0; round < 6; round++ {
+					result := f.step(t)
+					status := f.its.FindInstanceStatus(key.Name)
+					if !workloadlifecycle.NeedsLeave(f.its, status) || result.RequeueAfter == 0 || len(agent.calls) != 0 {
+						t.Fatalf("missing executor lost the pending Leave or retry: status=%#v result=%#v calls=%v", status, result, agent.calls)
+					}
+				}
+				pvcKey := client.ObjectKey{Namespace: key.Namespace, Name: "data-" + key.Name}
+				if err := f.cli.Get(ctx, pvcKey, &corev1.PersistentVolumeClaim{}); err != nil {
+					t.Fatalf("waiting for Leave removed storage: %v", err)
+				}
+				f.its.Spec.Replicas = ptr.To[int32](1)
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				f.bootstrap(t, 1)
+				f.its.Spec.Replicas = ptr.To[int32](0)
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				for round := 0; round < 16; round++ {
+					f.stepWithChildren(t)
+				}
+				if len(agent.calls) != 1 || agent.calls[0] != "memberLeave" || f.its.FindInstanceStatus(key.Name) != nil {
+					t.Fatalf("restored executor did not finish Leave: calls=%v status=%#v", agent.calls, f.its.FindInstanceStatus(key.Name))
+				}
+				if err := f.cli.Get(ctx, pvcKey, &corev1.PersistentVolumeClaim{}); !apierrors.IsNotFound(err) {
+					t.Fatalf("completed Leave did not clean storage: %v", err)
+				}
+			})
+		}
+	}
+}
+
+func TestInstanceSetLifecycleStopScaleThenResume(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		for _, policy := range []appsv1.PodManagementPolicyType{appsv1.OrderedReadyPodManagement, appsv1.ParallelPodManagement} {
+			for _, retention := range []apps.PersistentVolumeClaimRetentionPolicyType{apps.DeletePersistentVolumeClaimRetentionPolicyType, apps.RetainPersistentVolumeClaimRetentionPolicyType} {
+				t.Run(fmt.Sprintf("instanceAPI=%t/%s/%s", instanceAPI, policy, retention), func(t *testing.T) {
+					ctx := context.Background()
+					f := newMemberLifecycleEntry(t, instanceAPI, 2, policy)
+					f.its.Spec.LifecycleActions.MemberLeave.TargetPodSelector = apps.AnyReplica
+					f.its.Spec.VolumeClaimTemplates = newDataLifecycleITS(2).Spec.VolumeClaimTemplates
+					f.its.Spec.PersistentVolumeClaimRetentionPolicy = &workloads.PersistentVolumeClaimRetentionPolicy{WhenScaled: retention}
+					if err := f.cli.Update(ctx, f.its); err != nil {
+						t.Fatal(err)
+					}
+					f.bootstrap(t, 2)
+					key := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-1"}
+					pod := &corev1.Pod{}
+					if err := f.cli.Get(ctx, key, pod); err != nil {
+						t.Fatal(err)
+					}
+					wantDNS := pod.Spec.Hostname + "." + intctrlutil.ServiceFQDN(pod.Namespace, pod.Spec.Subdomain)
+					failed := &unavailableMemberAgent{}
+					kbacli.SetMockClient(failed, nil)
+					defer kbacli.UnsetMockClient()
+					f.its.Spec.Stop = ptr.To(true)
+					f.its.Generation++
+					if err := f.cli.Update(ctx, f.its); err != nil {
+						t.Fatal(err)
+					}
+					for round := 0; round < 24; round++ {
+						f.stepWithChildren(t)
+					}
+					if pods := lifecycleEntryPods(t, f.cli); len(pods) != 0 {
+						t.Fatalf("Stop did not remove all Pods: %v", pods)
+					}
+					f.its.Spec.Replicas = ptr.To[int32](1)
+					f.its.Generation++
+					if err := f.cli.Update(ctx, f.its); err != nil {
+						t.Fatal(err)
+					}
+					for round := 0; round < 8; round++ {
+						f.stepWithChildren(t)
+					}
+					if failed.calls != 0 {
+						t.Fatalf("Stop executed membership actions: %d", failed.calls)
+					}
+					f.its.Spec.Stop = ptr.To(false)
+					f.its.Generation++
+					if err := f.cli.Update(ctx, f.its); err != nil {
+						t.Fatal(err)
+					}
+					for round := 0; round < 24; round++ {
+						f.stepWithChildren(t)
+						for _, current := range lifecycleEntryPods(t, f.cli) {
+							if current.Name == f.its.Name+"-0" {
+								f.setReady(t, current.Name, true)
+							}
+						}
+					}
+					if failed.calls == 0 || !workloadlifecycle.NeedsLeave(f.its, f.its.FindInstanceStatus(key.Name)) {
+						t.Fatalf("resumed peer did not retry the failed Leave: calls=%d status=%#v", failed.calls, f.its.FindInstanceStatus(key.Name))
+					}
+					pvcKey := client.ObjectKey{Namespace: key.Namespace, Name: "data-" + key.Name}
+					if err := f.cli.Get(ctx, pvcKey, &corev1.PersistentVolumeClaim{}); err != nil {
+						t.Fatalf("failed Leave removed storage: %v", err)
+					}
+					agent := &memberDNSAgent{}
+					kbacli.SetMockClient(agent, nil)
+					for round := 0; round < 16; round++ {
+						f.stepWithChildren(t)
+					}
+					assertMemberDNSRequest(t, agent.requests, "memberLeave", "KB_LEAVE_MEMBER_POD_FQDN", key.Name, wantDNS)
+					if status := f.its.FindInstanceStatus(key.Name); status != nil {
+						t.Fatalf("completed Leave retained the released identity: %#v", status)
+					}
+					if instanceAPI {
+						if err := f.cli.Get(ctx, key, &workloads.Instance{}); !apierrors.IsNotFound(err) {
+							t.Fatalf("completed Leave retained the excluded Instance: %v", err)
+						}
+					}
+					if err := f.cli.Get(ctx, key, &corev1.Pod{}); !apierrors.IsNotFound(err) {
+						t.Fatalf("completed retirement retained a Pod: %v", err)
+					}
+					storageErr := f.cli.Get(ctx, pvcKey, &corev1.PersistentVolumeClaim{})
+					if retention == apps.DeletePersistentVolumeClaimRetentionPolicyType && !apierrors.IsNotFound(storageErr) {
+						t.Fatalf("WhenScaled=Delete did not remove storage: %v", storageErr)
+					}
+					if retention == apps.RetainPersistentVolumeClaimRetentionPolicyType && storageErr != nil {
+						t.Fatalf("WhenScaled=Retain did not preserve storage: %v", storageErr)
+					}
+				})
+			}
+		}
 	}
 }
 

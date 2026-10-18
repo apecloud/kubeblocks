@@ -288,8 +288,15 @@ func (t *componentStatusTransformer) hasFailedPod() (bool, componentMessageMap) 
 		return true, messages
 	}
 
-	// check InstanceReady condition
-	if !meta.IsStatusConditionTrue(t.runningITS.Status.Conditions, string(workloads.InstanceReady)) {
+	// InstanceReady only describes the observed replicas: a stopped workload can
+	// retain Ready=True for zero pods. Do not use that old timestamp to fail Start
+	// before the current workload has been applied and all desired pods are ready.
+	if !t.isWorkloadUpdated() || t.runningITS.Status.ReadyReplicas != *t.runningITS.Spec.Replicas {
+		return false, nil
+	}
+	condition := meta.FindStatusCondition(t.runningITS.Status.Conditions, string(workloads.InstanceReady))
+	if condition == nil || condition.Status != metav1.ConditionTrue ||
+		condition.ObservedGeneration != t.runningITS.Generation {
 		return false, nil
 	}
 
@@ -298,7 +305,6 @@ func (t *componentStatusTransformer) hasFailedPod() (bool, componentMessageMap) 
 		return false, nil
 	}
 	probeTimeoutDuration := time.Duration(defaultRoleProbeTimeoutAfterPodsReady) * time.Second
-	condition := meta.FindStatusCondition(t.runningITS.Status.Conditions, string(workloads.InstanceReady))
 	if time.Now().After(condition.LastTransitionTime.Add(probeTimeoutDuration)) {
 		messages.setObjectMessage(workloads.InstanceSetKind, t.runningITS.Name, "Role probe timeout, check whether the application is available")
 		return true, messages

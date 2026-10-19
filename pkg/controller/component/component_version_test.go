@@ -295,6 +295,8 @@ func TestInstanceTemplateResolvedImages(t *testing.T) {
 		actionImage        string
 		versionActionImage string
 		wantAction         string
+		runtimeName        string
+		initName           string
 		registry           bool
 	}{
 		{name: "definition defaults without ComponentVersion", serviceVersion: "1.0.0", actionImage: "docker.io/apecloud/action:1"},
@@ -302,6 +304,10 @@ func TestInstanceTemplateResolvedImages(t *testing.T) {
 		{name: "release images equal definition defaults", withVersion: true, serviceVersion: "1.0.0", actionImage: "docker.io/apecloud/action:1", wantAction: "docker.io/apecloud/action:1"},
 		{name: "release overrides runtime and action images", withVersion: true, serviceVersion: "2.0.0", versionActionImage: "docker.io/apecloud/action:2", wantAction: "docker.io/apecloud/action:2"},
 		{name: "no version keeps semantic version bypass and inherited actions", serviceVersion: "legacy-version"},
+		{name: "runtime name matches action with no image", serviceVersion: "1.0.0", runtimeName: "memberjoin"},
+		{name: "runtime name matches action with custom image", serviceVersion: "1.0.0", runtimeName: "memberjoin", actionImage: "docker.io/apecloud/action:1"},
+		{name: "init name matches action with no image", serviceVersion: "1.0.0", initName: "memberjoin"},
+		{name: "init name matches action with custom image", serviceVersion: "1.0.0", initName: "memberjoin", actionImage: "docker.io/apecloud/action:1"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			g := NewWithT(t)
@@ -319,9 +325,16 @@ func TestInstanceTemplateResolvedImages(t *testing.T) {
 			oldTools := viperx.GetString(constant.KBToolsImage)
 			t.Cleanup(func() { viperx.Set(constant.KBToolsImage, oldTools) })
 			viperx.Set(constant.KBToolsImage, "tools:default")
+			runtimeName, initName := tc.runtimeName, tc.initName
+			if runtimeName == "" {
+				runtimeName = "db"
+			}
+			if initName == "" {
+				initName = "prepare"
+			}
 			def := testapps.NewComponentDefinitionFactory("template-images").SetServiceVersion("1.0.0").
-				SetRuntime(&corev1.Container{Name: "db", Image: "docker.io/apecloud/db:1"}).GetObject()
-			def.Spec.Runtime.InitContainers = []corev1.Container{{Name: "prepare", Image: "docker.io/apecloud/prepare:1"}}
+				SetRuntime(&corev1.Container{Name: runtimeName, Image: "docker.io/apecloud/db:1"}).GetObject()
+			def.Spec.Runtime.InitContainers = []corev1.Container{{Name: initName, Image: "docker.io/apecloud/prepare:1"}}
 			if !tc.withVersion {
 				def.Spec.Runtime.Containers = append(def.Spec.Runtime.Containers, corev1.Container{Name: "empty"})
 			}
@@ -358,7 +371,7 @@ func TestInstanceTemplateResolvedImages(t *testing.T) {
 				suffix = "2"
 			}
 			actionImage := strings.Replace(tc.wantAction, "docker.io/apecloud/", prefix, 1)
-			wantImages := map[string]string{"db": prefix + "db:" + suffix, "prepare": prefix + "prepare:" + suffix}
+			wantImages := map[string]string{runtimeName: prefix + "db:" + suffix, initName: prefix + "prepare:" + suffix}
 			if tc.withVersion {
 				wantImages[kbagent.ContainerName] = actionImage
 				wantImages[kbagent.ContainerName4Worker] = actionImage

@@ -2955,6 +2955,47 @@ spec:
                           description: Specifies the name of the Component as defined
                             in the cluster.spec
                           type: string
+                        instances:
+                          description: |-
+                            Specifies upgrades for existing named instance templates. Each target applies to all replicas of that template.
+                            For a component, targets refer to spec.componentSpecs[].instances.
+                            For a sharding, targets refer to spec.shardings[].template.instances.
+                            Targets do not select overrides in spec.shardings[].shardTemplates[].instances.
+                          items:
+                            description: |-
+                              UpgradeInstanceTemplate defines version changes for an existing named instance template.
+                              An omitted field preserves its stored value; an explicit empty string clears it.
+                              When both values are empty, the template inherits the component's runtime.
+                              Otherwise, the Cluster controller resolves and backfills a compatible definition and version pair.
+                            properties:
+                              componentDefinitionName:
+                                description: Specifies the ComponentDefinition name
+                                  for the instance template, using an exact match.
+                                maxLength: 64
+                                type: string
+                              name:
+                                description: |-
+                                  Specifies an instance template name, not a Pod name.
+                                  For a component, it refers to spec.componentSpecs[].instances[].name.
+                                  For a sharding, it refers to spec.shardings[].template.instances[].name.
+                                maxLength: 54
+                                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                                type: string
+                              serviceVersion:
+                                description: Specifies the service version for the
+                                  instance template, using semantic version syntax.
+                                maxLength: 32
+                                type: string
+                            required:
+                            - name
+                            type: object
+                            x-kubernetes-validations:
+                            - message: at least one componentDefinitionName or serviceVersion
+                              rule: has(self.componentDefinitionName) || has(self.serviceVersion)
+                          type: array
+                          x-kubernetes-list-map-keys:
+                          - name
+                          x-kubernetes-list-type: map
                         serviceVersion:
                           description: |-
                             Specifies the version of the Service expected to be provisioned by this Component.
@@ -2967,8 +3008,10 @@ spec:
                       - componentName
                       type: object
                       x-kubernetes-validations:
-                      - message: at least one componentDefinitionName or serviceVersion
+                      - message: at least one componentDefinitionName, serviceVersion
+                          or instance template upgrade
                         rule: has(self.componentDefinitionName) || has(self.serviceVersion)
+                          || (has(self.instances) && size(self.instances) > 0)
                     maxItems: 1024
                     type: array
                     x-kubernetes-list-map-keys:

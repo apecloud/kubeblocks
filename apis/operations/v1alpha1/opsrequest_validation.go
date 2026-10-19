@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -213,6 +214,15 @@ func (r *OpsRequest) validateUpgrade(ctx context.Context, k8sClient client.Clien
 	}
 	if len(r.Spec.Upgrade.Components) == 0 {
 		return notEmptyError("spec.upgrade.components")
+	}
+	for _, v := range r.Spec.Upgrade.Components {
+		for _, instance := range v.Instances {
+			if instance.ServiceVersion != nil && *instance.ServiceVersion != "" {
+				if _, err := version.ParseSemantic(*instance.ServiceVersion); err != nil {
+					return invalidValueError(v.ComponentName, fmt.Sprintf("instance template %q serviceVersion \"%s\" is not a valid semantic version: %s", instance.Name, *instance.ServiceVersion, err.Error()))
+				}
+			}
+		}
 	}
 	return nil
 }

@@ -60,7 +60,6 @@ type SynthesizedComponent struct {
 	EnvVars                          []corev1.EnvVar                        `json:"envVars,omitempty"`
 	EnvFromSources                   []corev1.EnvFromSource                 `json:"envFromSources,omitempty"`
 	Instances                        []kbappsv1.InstanceTemplate            `json:"instances,omitempty"`
-	InstanceImageDefaults            map[string][]string                    // selected runtime/init defaults, before registry mapping
 	InstanceImages                   map[string]map[string]string           `json:"instanceImages,omitempty"`
 	OfflineInstances                 []string                               `json:"offlineInstances,omitempty"`
 	Roles                            []kbappsv1.ReplicaRole                 `json:"roles,omitempty"`

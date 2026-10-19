@@ -20,14 +20,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"context"
+	"strings"
+	"testing"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -277,3 +284,89 @@ var _ = Describe("Component Version", func() {
 		})
 	})
 })
+
+func TestInstanceTemplateResolvedImages(t *testing.T) {
+	for _, tc := range []struct {
+		name               string
+		withVersion        bool
+		serviceVersion     string
+		actionImage        string
+		versionActionImage string
+		wantAction         string
+		registry           bool
+	}{
+		{name: "definition defaults without ComponentVersion", serviceVersion: "1.0.0", actionImage: "docker.io/apecloud/action:1", wantAction: "docker.io/apecloud/action:1"},
+		{name: "definition defaults with registry replacement", registry: true, serviceVersion: "1.0.0", actionImage: "docker.io/apecloud/action:1", wantAction: "docker.io/apecloud/action:1"},
+		{name: "release images equal definition defaults", withVersion: true, serviceVersion: "1.0.0", actionImage: "docker.io/apecloud/action:1", wantAction: "docker.io/apecloud/action:1"},
+		{name: "release overrides runtime and action images", withVersion: true, serviceVersion: "2.0.0", versionActionImage: "docker.io/apecloud/action:2", wantAction: "docker.io/apecloud/action:2"},
+		{name: "no version keeps semantic version bypass and tools default", serviceVersion: "legacy-version", wantAction: "tools:default"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewWithT(t)
+			prefix := "docker.io/apecloud/"
+			if tc.registry {
+				oldRegistries := viperx.Get(constant.CfgRegistries)
+				t.Cleanup(func() {
+					viperx.Set(constant.CfgRegistries, oldRegistries)
+					g.Expect(intctrlutil.LoadRegistryConfig()).Should(Succeed())
+				})
+				viperx.Set(constant.CfgRegistries, map[string]any{"defaultRegistry": "mirror.invalid"})
+				g.Expect(intctrlutil.LoadRegistryConfig()).Should(Succeed())
+				prefix = "mirror.invalid/apecloud/"
+			}
+			oldTools := viperx.GetString(constant.KBToolsImage)
+			t.Cleanup(func() { viperx.Set(constant.KBToolsImage, oldTools) })
+			viperx.Set(constant.KBToolsImage, "tools:default")
+			def := testapps.NewComponentDefinitionFactory("template-images").SetServiceVersion("1.0.0").
+				SetRuntime(&corev1.Container{Name: "db", Image: "docker.io/apecloud/db:1"}).GetObject()
+			def.Spec.Runtime.InitContainers = []corev1.Container{{Name: "prepare", Image: "docker.io/apecloud/prepare:1"}}
+			if !tc.withVersion {
+				def.Spec.Runtime.Containers = append(def.Spec.Runtime.Containers, corev1.Container{Name: "empty"})
+			}
+			def.Spec.LifecycleActions = &appsv1.ComponentLifecycleActions{MemberJoin: &appsv1.Action{
+				Exec: &appsv1.ExecAction{Image: tc.actionImage, Command: []string{"true"}},
+			}}
+			scheme := runtime.NewScheme()
+			g.Expect(appsv1.AddToScheme(scheme)).Should(Succeed())
+			cb := fake.NewClientBuilder().WithScheme(scheme)
+			if tc.withVersion {
+				images := map[string]string{"db": "docker.io/apecloud/db:2", "prepare": "docker.io/apecloud/prepare:2"}
+				if tc.versionActionImage != "" {
+					images["memberJoin"] = tc.versionActionImage
+				}
+				ver := &appsv1.ComponentVersion{
+					ObjectMeta: metav1.ObjectMeta{Name: "releases", Labels: map[string]string{def.Name: def.Name}},
+					Spec: appsv1.ComponentVersionSpec{Releases: []appsv1.ComponentVersionRelease{
+						{Name: "r1", ServiceVersion: "1.0.0", Images: map[string]string{"db": "docker.io/apecloud/db:1", "prepare": "docker.io/apecloud/prepare:1"}},
+						{Name: "r2", ServiceVersion: "2.0.0", Images: images},
+					}},
+					Status: appsv1.ComponentVersionStatus{Phase: appsv1.AvailablePhase},
+				}
+				cb.WithObjects(ver)
+			}
+			cli := cb.Build()
+			before := def.DeepCopy()
+			parent := def.DeepCopy()
+			g.Expect(UpdateCompDefinitionImages4ServiceVersion(context.Background(), cli, parent, "2.0.0")).Should(Succeed())
+			parentBefore := parent.DeepCopy()
+			images, err := ResolveInstanceTemplateImages4ServiceVersion(context.Background(), cli, def, tc.serviceVersion)
+			g.Expect(err).Should(Succeed())
+			suffix := "1"
+			if tc.serviceVersion == "2.0.0" {
+				suffix = "2"
+			}
+			actionImage := strings.Replace(tc.wantAction, "docker.io/apecloud/", prefix, 1)
+			g.Expect(images).Should(Equal(map[string]string{
+				"db":                         prefix + "db:" + suffix,
+				"prepare":                    prefix + "prepare:" + suffix,
+				kbagent.ContainerName:        actionImage,
+				kbagent.ContainerName4Worker: actionImage,
+			}))
+			g.Expect(def).Should(Equal(before))
+			g.Expect(parent).Should(Equal(parentBefore))
+			if !tc.withVersion {
+				g.Expect(parent).Should(Equal(before))
+			}
+		})
+	}
+}

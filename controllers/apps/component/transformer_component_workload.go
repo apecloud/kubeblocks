@@ -133,8 +133,6 @@ type instanceTemplateImageSelection struct {
 	RuntimeDefaults []string `json:"d,omitempty"`
 }
 
-// Profile IDs refer to the Instances order persisted in the same InstanceSet.
-// Zero denotes inheritance; positive IDs address the exact selection dictionary.
 type instanceTemplateImageSelectionState struct {
 	Selections []instanceTemplateImageSelection `json:"s,omitempty"`
 	Templates  []uint32                         `json:"t,omitempty"`
@@ -297,8 +295,6 @@ func reconcileInstanceTemplateImages(synth *component.SynthesizedComponent, old,
 	return writeInstanceTemplateImageSelections(desired, selections)
 }
 
-// Start publishes only the stop flag. Keep the consumed Component generation
-// behind any named selection or effective image update deferred by that write.
 func instanceTemplateImagePublicationPending(old, desired *workloads.InstanceSet) (bool, error) {
 	previous, marked, err := readInstanceTemplateImageSelections(old)
 	if err != nil {
@@ -308,7 +304,6 @@ func instanceTemplateImagePublicationPending(old, desired *workloads.InstanceSet
 	if err != nil {
 		return false, err
 	}
-	// Apply the existing parent-image policy before comparing the effective named images.
 	desired = desired.DeepCopy()
 	checkNRollbackProtoImages(old, desired)
 	names := sets.New[string]()
@@ -323,7 +318,6 @@ func instanceTemplateImagePublicationPending(old, desired *workloads.InstanceSet
 		selected, isSelected := current[name]
 		if isSelected && !wasSelected && !marked && selected.CompDef == old.Annotations[constant.AppComponentLabelKey] &&
 			selected.ServiceVersion == old.Annotations[constant.KBAppServiceVersionKey] {
-			// A released, unmarked parent-equivalent selection can adopt existing refs.
 			prior, wasSelected = selected, true
 		}
 		imageNames := sets.New[string]()

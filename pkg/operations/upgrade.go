@@ -139,10 +139,15 @@ func (u upgradeOpsHandler) targetsUnchanged(opsRes *OpsResource) bool {
 				}
 				found = true
 				componentDef := ptr.Deref(upgradeInstance.ComponentDefinitionName, "")
+				serviceVersion := ptr.Deref(upgradeInstance.ServiceVersion, "")
+				if upgradeInstance.ComponentDefinitionName != nil && upgradeInstance.ServiceVersion != nil && componentDef == "" && serviceVersion == "" {
+					if instance.CompDef != "" || instance.ServiceVersion != "" {
+						return false
+					}
+				}
 				if componentDef != "" && instance.CompDef != componentDef {
 					return false
 				}
-				serviceVersion := ptr.Deref(upgradeInstance.ServiceVersion, "")
 				if serviceVersion != "" && instance.ServiceVersion != serviceVersion {
 					return false
 				}

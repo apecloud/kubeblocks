@@ -26,6 +26,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -238,8 +239,143 @@ var _ = Describe("Upgrade OpsRequest", func() {
 	}
 
 	Context("Test OpsRequest", func() {
-		DescribeTable("completes an upgrade with an instance template service version", func(templateVersion, templateRelease string, sharding bool) {
+		DescribeTable("updates only selected instance template version fields", func(sharding, parent bool, compDef, version *string) {
 			compDef1, compDef2, opsRes := initOpsResWithComponentDef(true)
+			if compDef != nil && *compDef != "" {
+				compDef = &compDef2.Name
+			}
+			targetName := defaultCompName
+			if sharding {
+				targetName = "sharding"
+			}
+			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(cluster *appsv1.Cluster) {
+				cluster.Spec.ComponentSpecs[0].Instances = []appsv1.InstanceTemplate{
+					{Name: "canary", CompDef: compDef1.Name, ServiceVersion: "1.0.0", Replicas: pointer.Int32(1),
+						Ordinals: appsv1.Ordinals{Discrete: []int32{7}}, Labels: map[string]string{"role": "canary"},
+						Annotations:      map[string]string{"annotation": "preserved"},
+						SchedulingPolicy: &appsv1.SchedulingPolicy{NodeSelector: map[string]string{"zone": "a"}},
+						Resources:        &corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("100m")}},
+						Env:              []corev1.EnvVar{{Name: "PRESERVED", Value: "yes"}},
+						VolumeClaimTemplates: []appsv1.ClusterComponentVolumeClaimTemplate{{Name: "data", Spec: appsv1.PersistentVolumeClaimSpec{
+							AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+							Resources:   corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}},
+						}}}},
+					{Name: "stable", Replicas: pointer.Int32(1)},
+					{Name: "untouched", CompDef: compDef1.Name, ServiceVersion: "1.0.0", Replicas: pointer.Int32(1)},
+				}
+				if sharding {
+					cluster.Spec.Shardings = []appsv1.ClusterSharding{{Name: targetName, Shards: 2, Template: *cluster.Spec.ComponentSpecs[0].DeepCopy()}}
+				}
+			})).Should(Succeed())
+			before := opsRes.Cluster.DeepCopy()
+			expected := getComponentSpecOrShardingTemplate(before, targetName).DeepCopy()
+			upgrade := opsv1alpha1.UpgradeComponent{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: targetName},
+				Instances: []opsv1alpha1.UpgradeInstanceTemplate{
+					{Name: "canary", ComponentDefinitionName: compDef, ServiceVersion: version},
+					{Name: "stable", ServiceVersion: pointer.String("2.0.0")},
+				}}
+			if compDef != nil {
+				expected.Instances[0].CompDef = *compDef
+			}
+			if version != nil {
+				expected.Instances[0].ServiceVersion = *version
+			}
+			expected.Instances[1].ServiceVersion = "2.0.0"
+			if parent {
+				upgrade.ComponentDefinitionName, upgrade.ServiceVersion = &compDef2.Name, pointer.String(serviceVer2)
+				expected.ComponentDef, expected.ServiceVersion = compDef2.Name, serviceVer2
+			}
+			opsRes.OpsRequest = createUpgradeOpsRequest(opsRes.Cluster, opsv1alpha1.Upgrade{Components: []opsv1alpha1.UpgradeComponent{upgrade}})
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			persisted := &appsv1.Cluster{}
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.Cluster), persisted)).Should(Succeed())
+			Expect(getComponentSpecOrShardingTemplate(persisted, targetName)).Should(Equal(expected))
+			if sharding {
+				Expect(persisted.Spec.ComponentSpecs).Should(Equal(before.Spec.ComponentSpecs))
+				Expect(persisted.Spec.Shardings[0].Shards).Should(Equal(before.Spec.Shardings[0].Shards))
+			}
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			Expect(opsRes.OpsRequest.Status.LastConfiguration.Components[targetName].Instances).
+				Should(Equal(getComponentSpecOrShardingTemplate(before, targetName).Instances))
+			By("repeating the registered action from persisted state")
+			opsRes.Cluster = persisted
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(persisted), persisted)).Should(Succeed())
+			Expect(getComponentSpecOrShardingTemplate(persisted, targetName)).Should(Equal(expected))
+			Expect(opsRes.OpsRequest.Status.LastConfiguration.Components[targetName].Instances).
+				Should(Equal(getComponentSpecOrShardingTemplate(before, targetName).Instances))
+		},
+			Entry("component definition only", false, false, pointer.String("new-template-def"), nil),
+			Entry("component version only", false, false, nil, pointer.String("2.0.0")),
+			Entry("component both fields with parent upgrade", false, true, pointer.String("new-template-def"), pointer.String("2.0.0")),
+			Entry("component clears definition without parent exception", false, false, pointer.String(""), nil),
+			Entry("component clears version", false, false, nil, pointer.String("")),
+			Entry("component resets both fields", false, false, pointer.String(""), pointer.String("")),
+			Entry("sharding definition only", true, false, pointer.String("new-template-def"), nil),
+			Entry("sharding version only", true, false, nil, pointer.String("2.0.0")),
+			Entry("sharding both fields with parent upgrade", true, true, pointer.String("new-template-def"), pointer.String("2.0.0")),
+			Entry("sharding resets both fields", true, false, pointer.String(""), pointer.String("")),
+		)
+
+		DescribeTable("revalidates instance template targets before applying a queued upgrade", func(sharding bool) {
+			_, compDef2, opsRes := initOpsResWithComponentDef(true)
+			targetName := defaultCompName
+			if sharding {
+				targetName = "sharding"
+			}
+			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(cluster *appsv1.Cluster) {
+				cluster.Spec.ComponentSpecs[0].Instances = []appsv1.InstanceTemplate{{Name: "canary", Replicas: pointer.Int32(1)}}
+				if sharding {
+					cluster.Spec.Shardings = []appsv1.ClusterSharding{{Name: targetName, Shards: 1, Template: *cluster.Spec.ComponentSpecs[0].DeepCopy()}}
+				}
+			})).Should(Succeed())
+			opsRes.OpsRequest = createUpgradeOpsRequest(opsRes.Cluster, opsv1alpha1.Upgrade{Components: []opsv1alpha1.UpgradeComponent{{
+				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: targetName}, ComponentDefinitionName: &compDef2.Name,
+				Instances: []opsv1alpha1.UpgradeInstanceTemplate{{Name: "canary", ServiceVersion: pointer.String("2.0.0")}},
+			}}})
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			By("removing the target before the next pre-action turn")
+			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(cluster *appsv1.Cluster) {
+				if sharding {
+					cluster.Spec.Shardings[0].Template.Instances = nil
+				} else {
+					cluster.Spec.ComponentSpecs[0].Instances = nil
+				}
+			})).Should(Succeed())
+			before := getComponentSpecOrShardingTemplate(opsRes.Cluster, targetName).DeepCopy()
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.Cluster), opsRes.Cluster)).Should(Succeed())
+			Expect(getComponentSpecOrShardingTemplate(opsRes.Cluster, targetName)).Should(Equal(before))
+		}, Entry("component", false), Entry("sharding", true))
+
+		DescribeTable("completes an upgrade with an instance template service version", func(templateVersion, templateRelease string, sharding bool, targets []opsv1alpha1.UpgradeInstanceTemplate) {
+			compDef1, compDef2, opsRes := initOpsResWithComponentDef(true)
+			upgrade := opsv1alpha1.UpgradeComponent{
+				ComponentDefinitionName: &compDef2.Name, ServiceVersion: pointer.String(serviceVer2), Instances: targets,
+			}
+			ownerCompDef, ownerVersion, baseRelease := compDef2.Name, serviceVer2, release3
+			if len(targets) > 0 {
+				upgrade.ComponentDefinitionName, upgrade.ServiceVersion = nil, nil
+				ownerCompDef, ownerVersion, baseRelease = compDef1.Name, serviceVer0, release0
+				for i := range upgrade.Instances {
+					if definition := upgrade.Instances[i].ComponentDefinitionName; definition != nil && *definition != "" {
+						upgrade.Instances[i].ComponentDefinitionName = &compDef2.Name
+					}
+				}
+			}
 			DeferCleanup(func() {
 				selector := client.MatchingLabels{constant.AppInstanceLabelKey: clusterName}
 				testapps.ClearResources(&testCtx, generics.InstanceSetSignature, client.InNamespace(testCtx.DefaultNamespace), selector)
@@ -261,17 +397,13 @@ var _ = Describe("Upgrade OpsRequest", func() {
 					}}
 				}
 			})).Should(Succeed())
-			opsRes.OpsRequest = createUpgradeOpsRequest(opsRes.Cluster, opsv1alpha1.Upgrade{
-				Components: []opsv1alpha1.UpgradeComponent{{
-					ComponentOps:            opsv1alpha1.ComponentOps{ComponentName: targetName},
-					ComponentDefinitionName: &compDef2.Name, ServiceVersion: pointer.String(serviceVer2),
-				}},
-			})
+			upgrade.ComponentOps = opsv1alpha1.ComponentOps{ComponentName: targetName}
+			opsRes.OpsRequest = createUpgradeOpsRequest(opsRes.Cluster, opsv1alpha1.Upgrade{Components: []opsv1alpha1.UpgradeComponent{upgrade}})
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			makeUpgradeOpsIsRunning(reqCtx, opsRes)
 			mockComponentIsOperating(opsRes.Cluster, appsv1.RunningComponentPhase, defaultCompName)
 			if sharding {
-				testapps.NewComponentFactory(testCtx.DefaultNamespace, clusterName+"-"+componentName, compDef2.Name).
+				testapps.NewComponentFactory(testCtx.DefaultNamespace, clusterName+"-"+componentName, ownerCompDef).
 					AddLabels(constant.AppInstanceLabelKey, clusterName).
 					AddLabels(constant.KBAppClusterUIDKey, string(opsRes.Cluster.UID)).
 					AddLabels(constant.KBAppShardingNameLabelKey, targetName).
@@ -286,7 +418,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			comp := &appsv1.Component{}
 			compKey := client.ObjectKey{Namespace: testCtx.DefaultNamespace, Name: clusterName + "-" + componentName}
 			if err := k8sClient.Get(ctx, compKey, comp); err != nil {
-				comp = testapps.NewComponentFactory(testCtx.DefaultNamespace, compKey.Name, compDef2.Name).
+				comp = testapps.NewComponentFactory(testCtx.DefaultNamespace, compKey.Name, ownerCompDef).
 					AddLabels(constant.AppInstanceLabelKey, clusterName).
 					AddLabels(constant.KBAppComponentLabelKey, componentName).SetReplicas(3).Create(&testCtx).Get()
 			}
@@ -302,7 +434,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 				clusterName + "-" + componentName + "-1",
 				clusterName + "-" + componentName + "-pinned-0",
 			} {
-				image := testapps.AppImage(testapps.AppName, release3)
+				image := testapps.AppImage(testapps.AppName, baseRelease)
 				if name == clusterName+"-"+componentName+"-pinned-0" {
 					image = testapps.AppImage(testapps.AppName, release0)
 				}
@@ -321,13 +453,13 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			assertPending()
 			Expect(testapps.ChangeObj(&testCtx, comp, func(comp *appsv1.Component) {
 				comp.Annotations[constant.KubeBlocksGenerationKey] = strconv.FormatInt(opsRes.Cluster.Generation, 10)
-				comp.Spec.ServiceVersion = serviceVer2
+				comp.Spec.ServiceVersion = ownerVersion
 			})).Should(Succeed())
 			By("waiting for the owned workload to exist")
 			assertPending()
 			its := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace, comp.Name, clusterName, componentName).
 				SetReplicas(3).AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName,
-				Image: testapps.AppImage(testapps.AppName, release3)}).Create(&testCtx).Get()
+				Image: testapps.AppImage(testapps.AppName, baseRelease)}).Create(&testCtx).Get()
 			By("waiting for the workload to consume the Component generation")
 			Expect(testapps.ChangeObj(&testCtx, its, func(its *workloads.InstanceSet) {
 				its.Annotations = map[string]string{constant.KubeBlocksGenerationKey: strconv.FormatInt(comp.Generation-1, 10)}
@@ -339,7 +471,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			Expect(testapps.ChangeObj(&testCtx, its, func(its *workloads.InstanceSet) {
 				its.Annotations[constant.KubeBlocksGenerationKey] = strconv.FormatInt(comp.Generation, 10)
 				its.Annotations[constant.AppComponentLabelKey] = comp.Spec.CompDef
-				its.Annotations[constant.KBAppServiceVersionKey] = serviceVer0
+				its.Annotations[constant.KBAppServiceVersionKey] = "not-the-owner-version"
 			})).Should(Succeed())
 			assertPending()
 			Expect(testapps.ChangeObj(&testCtx, its, func(its *workloads.InstanceSet) {
@@ -373,9 +505,21 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			Expect(phase).Should(Equal(opsv1alpha1.OpsSucceedPhase))
 			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("3/3"))
 		},
-			Entry("keeps the explicitly pinned version", serviceVer1, release4, false),
-			Entry("uses published owner images even when version parsing produces no overrides", serviceVer0, release3, false),
-			Entry("uses the actual shard component name for template ownership", serviceVer1, release4, true),
+			Entry("keeps the explicitly pinned version", serviceVer1, release4, false, nil),
+			Entry("uses published owner images even when version parsing produces no overrides", serviceVer0, release3, false, nil),
+			Entry("uses the actual shard component name for template ownership", serviceVer1, release4, true, nil),
+			Entry("waits for owner images after a definition-only template change", "", release4, false,
+				[]opsv1alpha1.UpgradeInstanceTemplate{{Name: "pinned", ComponentDefinitionName: pointer.String("resolved-template-def")}}),
+			Entry("waits for owner images after resetting both template fields", serviceVer1, release3, false,
+				[]opsv1alpha1.UpgradeInstanceTemplate{{Name: "pinned", ComponentDefinitionName: pointer.String(""), ServiceVersion: pointer.String("")}}),
+			Entry("waits for owner images after a shard template definition-only change", "", release4, true,
+				[]opsv1alpha1.UpgradeInstanceTemplate{{Name: "pinned", ComponentDefinitionName: pointer.String("resolved-template-def")}}),
+			Entry("waits for owner images after resetting both shard template fields", serviceVer1, release3, true,
+				[]opsv1alpha1.UpgradeInstanceTemplate{{Name: "pinned", ComponentDefinitionName: pointer.String(""), ServiceVersion: pointer.String("")}}),
+			Entry("waits for owner images after a version-only template change", "", release4, false,
+				[]opsv1alpha1.UpgradeInstanceTemplate{{Name: "pinned", ServiceVersion: pointer.String("2.0.0")}}),
+			Entry("waits for owner images after changing both shard template fields", serviceVer1, release4, true,
+				[]opsv1alpha1.UpgradeInstanceTemplate{{Name: "pinned", ComponentDefinitionName: pointer.String("resolved-template-def"), ServiceVersion: pointer.String("2.0.0")}}),
 		)
 
 		It("Test upgrade OpsRequest with ComponentDef and no ComponentVersion", func() {

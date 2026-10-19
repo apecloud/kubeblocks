@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -213,7 +214,10 @@ func TestValidateUpgradeInstanceServiceVersion(t *testing.T) {
 					Instances:      tc.instances,
 				}}}},
 			}}
-			err := ops.ValidateOps(context.Background(), nil, &appsv1.Cluster{})
+			cluster := &appsv1.Cluster{Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{
+				Name: "db", Instances: []appsv1.InstanceTemplate{{Name: "canary"}},
+			}}}}
+			err := ops.ValidateOps(context.Background(), nil, cluster)
 			if (err != nil) != tc.wantError {
 				t.Fatalf("ValidateOps() error = %v, want error %v", err, tc.wantError)
 			}
@@ -245,5 +249,44 @@ func TestUpgradeInstanceTemplateFieldPresence(t *testing.T) {
 	*copy.Instances[0].ServiceVersion = "17.5.0"
 	if *component.Instances[0].ServiceVersion != "" {
 		t.Fatal("deep copy shares the instance version pointer")
+	}
+}
+
+func TestValidateUpgradeInstanceTargets(t *testing.T) {
+	for _, sharding := range []bool{false, true} {
+		for _, tc := range []struct {
+			name      string
+			owner     string
+			target    string
+			wantError bool
+		}{
+			{name: "existing template", owner: "db", target: "canary"},
+			{name: "missing template", owner: "db", target: "missing", wantError: true},
+			{name: "missing owner", owner: "missing", target: "canary", wantError: true},
+			{name: "parent only preserves existing validation", owner: "missing"},
+		} {
+			t.Run(fmt.Sprintf("%s/sharding=%v", tc.name, sharding), func(t *testing.T) {
+				spec := appsv1.ClusterComponentSpec{Name: "db", Instances: []appsv1.InstanceTemplate{{Name: "canary"}, {Name: "stable"}}}
+				cluster := &appsv1.Cluster{}
+				if sharding {
+					cluster.Spec.Shardings = []appsv1.ClusterSharding{{Name: "db", Template: spec}}
+				} else {
+					cluster.Spec.ComponentSpecs = []appsv1.ClusterComponentSpec{spec}
+				}
+				upgrade := UpgradeComponent{ComponentOps: ComponentOps{ComponentName: tc.owner}, ServiceVersion: ptr.To("17.5")}
+				if tc.target != "" {
+					upgrade.Instances = []UpgradeInstanceTemplate{{Name: tc.target, ComponentDefinitionName: ptr.To("")}}
+				}
+				ops := &OpsRequest{Spec: OpsRequestSpec{Type: UpgradeType,
+					SpecificOpsRequest: SpecificOpsRequest{Upgrade: &Upgrade{Components: []UpgradeComponent{upgrade}}}}}
+				err := ops.ValidateOps(context.Background(), nil, cluster)
+				if (err != nil) != tc.wantError {
+					t.Fatalf("ValidateOps() error = %v, want error %v", err, tc.wantError)
+				}
+				if err != nil && !strings.Contains(err.Error(), tc.target) {
+					t.Fatalf("error does not identify the missing template: %v", err)
+				}
+			})
+		}
 	}
 }

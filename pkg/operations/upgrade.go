@@ -70,6 +70,21 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		if upgradeComp.ServiceVersion != nil {
 			compSpec.ServiceVersion = *upgradeComp.ServiceVersion
 		}
+		for _, target := range upgradeComp.Instances {
+			for i := range compSpec.Instances {
+				instance := &compSpec.Instances[i]
+				if instance.Name != target.Name {
+					continue
+				}
+				if target.ComponentDefinitionName != nil {
+					instance.CompDef = *target.ComponentDefinitionName
+				}
+				if target.ServiceVersion != nil {
+					instance.ServiceVersion = *target.ServiceVersion
+				}
+				break
+			}
+		}
 		return nil
 	}); err != nil {
 		return err
@@ -129,7 +144,7 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		opsRes *OpsResource,
 		pgRes *progressResource,
 		compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
-		if hasInstanceTemplateServiceVersion(pgRes.clusterComponent) {
+		if len(pgRes.compOps.(opsv1alpha1.UpgradeComponent).Instances) > 0 || hasInstanceTemplateServiceVersion(pgRes.clusterComponent) {
 			templates, err := u.getOwnedExpectedContainers(reqCtx, cli, opsRes.Cluster, pgRes.fullComponentName)
 			if err != nil {
 				return 0, 0, err
@@ -150,10 +165,14 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 func (u upgradeOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.Upgrade.Components)
 	compOpsHelper.saveLastConfigurations(opsRes, func(compSpec appsv1.ClusterComponentSpec, comOps ComponentOpsInterface) opsv1alpha1.LastComponentConfiguration {
-		return opsv1alpha1.LastComponentConfiguration{
+		lastConfig := opsv1alpha1.LastComponentConfiguration{
 			ComponentDefinitionName: compSpec.ComponentDef,
 			ServiceVersion:          compSpec.ServiceVersion,
 		}
+		if len(comOps.(opsv1alpha1.UpgradeComponent).Instances) > 0 {
+			lastConfig.Instances = compSpec.DeepCopy().Instances
+		}
+		return lastConfig
 	})
 	return nil
 }
@@ -168,7 +187,7 @@ func (u upgradeOpsHandler) getExpectedContainersMap(reqCtx intctrlutil.RequestCt
 			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`"can not found the component "%s" in the cluster "%s"`,
 				v.ComponentName, opsRes.Cluster.Name))
 		}
-		if hasInstanceTemplateServiceVersion(compSpec) {
+		if len(v.Instances) > 0 || hasInstanceTemplateServiceVersion(compSpec) {
 			continue
 		}
 		compDef, err := component.GetCompDefByName(reqCtx.Ctx, cli, compSpec.ComponentDef)

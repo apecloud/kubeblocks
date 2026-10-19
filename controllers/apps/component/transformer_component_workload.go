@@ -20,9 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"reflect"
 	"slices"
 	"strings"
@@ -129,24 +133,118 @@ func (t *componentWorkloadTransformer) reconcileWorkload(ctx context.Context, cl
 	return nil
 }
 
-const instanceTemplateImageSelectionsAnnotation = "apps.kubeblocks.io/instance-template-image-selections"
+const (
+	instanceTemplateImageSelectionsAnnotation = "apps.kubeblocks.io/instance-template-image-selections"
+	instanceTemplateImageSelectionsVersion    = "v1:"
+)
 
 type instanceTemplateImageSelection struct {
-	CompDef         string   `json:"compDef"`
-	ServiceVersion  string   `json:"serviceVersion"`
-	RuntimeDefaults []string `json:"runtimeDefaults,omitempty"`
+	CompDef         string   `json:"c"`
+	ServiceVersion  string   `json:"v"`
+	RuntimeDefaults []string `json:"d,omitempty"`
+}
+
+// Profile IDs refer to the Instances order persisted in the same InstanceSet.
+// Zero denotes inheritance; positive IDs address the exact selection dictionary.
+type instanceTemplateImageSelectionState struct {
+	Selections []instanceTemplateImageSelection `json:"s,omitempty"`
+	Templates  []uint32                         `json:"t,omitempty"`
+}
+
+func readInstanceTemplateImageSelections(its *workloads.InstanceSet) (map[string]instanceTemplateImageSelection, bool, error) {
+	selections := map[string]instanceTemplateImageSelection{}
+	if its == nil {
+		return selections, false, nil
+	}
+	value, marked := its.Annotations[instanceTemplateImageSelectionsAnnotation]
+	if !marked {
+		return selections, false, nil
+	}
+	if !strings.HasPrefix(value, instanceTemplateImageSelectionsVersion) {
+		return nil, true, fmt.Errorf("read instance template image selections: unsupported encoding")
+	}
+	encoded := strings.NewReader(strings.TrimPrefix(value, instanceTemplateImageSelectionsVersion))
+	compressed, err := gzip.NewReader(base64.NewDecoder(base64.StdEncoding, encoded))
+	if err != nil {
+		return nil, true, fmt.Errorf("read instance template image selections: %w", err)
+	}
+	defer compressed.Close()
+	var state *instanceTemplateImageSelectionState
+	decoder := json.NewDecoder(compressed)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&state); err != nil {
+		return nil, true, fmt.Errorf("read instance template image selections: %w", err)
+	}
+	if state == nil {
+		return nil, true, fmt.Errorf("read instance template image selections: null state")
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		return nil, true, fmt.Errorf("read instance template image selections: trailing data")
+	}
+	if len(state.Selections) == 0 && len(state.Templates) == 0 {
+		return selections, true, nil
+	}
+	if len(state.Templates) != len(its.Spec.Instances) {
+		return nil, true, fmt.Errorf("read instance template image selections: template alignment mismatch")
+	}
+	for _, selection := range state.Selections {
+		if selection.CompDef == "" || selection.ServiceVersion == "" {
+			return nil, true, fmt.Errorf("read instance template image selections: incomplete selection")
+		}
+	}
+	for i, id := range state.Templates {
+		if int64(id) > int64(len(state.Selections)) {
+			return nil, true, fmt.Errorf("read instance template image selections: invalid profile ID %d", id)
+		}
+		if id > 0 {
+			selections[its.Spec.Instances[i].Name] = state.Selections[id-1]
+		}
+	}
+	return selections, true, nil
+}
+
+func writeInstanceTemplateImageSelections(its *workloads.InstanceSet, selections map[string]instanceTemplateImageSelection) error {
+	state := instanceTemplateImageSelectionState{}
+	if len(selections) > 0 {
+		state.Templates = make([]uint32, len(its.Spec.Instances))
+		profiles := map[string]uint32{}
+		for i, tpl := range its.Spec.Instances {
+			selection, selected := selections[tpl.Name]
+			if !selected {
+				continue
+			}
+			profile, err := json.Marshal(selection)
+			if err != nil {
+				return err
+			}
+			id, exists := profiles[string(profile)]
+			if !exists {
+				state.Selections = append(state.Selections, selection)
+				id = uint32(len(state.Selections))
+				profiles[string(profile)] = id
+			}
+			state.Templates[i] = id
+		}
+	}
+	var buffer bytes.Buffer
+	compressed := gzip.NewWriter(&buffer)
+	if err := json.NewEncoder(compressed).Encode(state); err != nil {
+		return err
+	}
+	if err := compressed.Close(); err != nil {
+		return err
+	}
+	if its.Annotations == nil {
+		its.Annotations = make(map[string]string)
+	}
+	its.Annotations[instanceTemplateImageSelectionsAnnotation] = instanceTemplateImageSelectionsVersion + base64.StdEncoding.EncodeToString(buffer.Bytes())
+	return nil
 }
 
 func reconcileInstanceTemplateImages(synth *component.SynthesizedComponent, old, desired *workloads.InstanceSet) error {
-	previous := map[string]instanceTemplateImageSelection{}
-	marked := false
-	if old != nil {
-		if value, ok := old.Annotations[instanceTemplateImageSelectionsAnnotation]; ok {
-			marked = true
-			if err := json.Unmarshal([]byte(value), &previous); err != nil {
-				return fmt.Errorf("read instance template image selections: %w", err)
-			}
-		}
+	previous, marked, err := readInstanceTemplateImageSelections(old)
+	if err != nil {
+		return err
 	}
 	selections := map[string]instanceTemplateImageSelection{}
 	for _, selected := range synth.Instances {
@@ -204,18 +302,10 @@ func reconcileInstanceTemplateImages(synth *component.SynthesizedComponent, old,
 			}
 		}
 	}
-	if len(selections) == 0 && !marked {
+	if len(desired.Spec.Instances) == 0 && !marked && (old == nil || len(old.Spec.Instances) == 0) {
 		return nil
 	}
-	value, err := json.Marshal(selections)
-	if err != nil {
-		return err
-	}
-	if desired.Annotations == nil {
-		desired.Annotations = make(map[string]string)
-	}
-	desired.Annotations[instanceTemplateImageSelectionsAnnotation] = string(value)
-	return nil
+	return writeInstanceTemplateImageSelections(desired, selections)
 }
 
 func (t *componentWorkloadTransformer) buildInstanceSetPlacementAnnotation(comp *appsv1.Component, its *workloads.InstanceSet) {

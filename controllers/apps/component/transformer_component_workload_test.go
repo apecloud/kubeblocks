@@ -17,7 +17,6 @@ package component
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -555,11 +554,9 @@ func TestReconcileInstanceTemplateImages(t *testing.T) {
 		return synth, old, desired
 	}
 	mark := func(old *workloads.InstanceSet, selection instanceTemplateImageSelection) {
-		data, err := json.Marshal(map[string]instanceTemplateImageSelection{"canary": selection})
-		if err != nil {
+		if err := writeInstanceTemplateImageSelections(old, map[string]instanceTemplateImageSelection{"canary": selection}); err != nil {
 			t.Fatal(err)
 		}
-		old.Annotations[instanceTemplateImageSelectionsAnnotation] = string(data)
 	}
 	for _, tc := range []struct {
 		name     string
@@ -593,8 +590,8 @@ func TestReconcileInstanceTemplateImages(t *testing.T) {
 			s.Instances[0].ServiceVersion = "2.0"
 		}},
 		{name: "new template uses current registry", setup: func(_ *component.SynthesizedComponent, o, _ *workloads.InstanceSet) {
-			mark(o, pair)
 			o.Spec.Instances = nil
+			mark(o, pair)
 		}},
 		{name: "override becomes default uses current image", setup: func(_ *component.SynthesizedComponent, o, _ *workloads.InstanceSet) {
 			p := pair
@@ -628,8 +625,9 @@ func TestReconcileInstanceTemplateImages(t *testing.T) {
 			}
 			g.Expect(d.Spec.Instances[0].Images).Should(Equal(map[string]string{"db": db, "prepare": init, "kbagent": "new-tools"}))
 			g.Expect(o).Should(Equal(before))
-			var state map[string]instanceTemplateImageSelection
-			g.Expect(json.Unmarshal([]byte(d.Annotations[instanceTemplateImageSelectionsAnnotation]), &state)).Should(Succeed())
+			state, marked, err := readInstanceTemplateImageSelections(d)
+			g.Expect(err).Should(Succeed())
+			g.Expect(marked).Should(BeTrue())
 			g.Expect(state["canary"].CompDef).Should(Equal(s.Instances[0].CompDef))
 			g.Expect(state["canary"].ServiceVersion).Should(Equal(s.Instances[0].ServiceVersion))
 			g.Expect(state["canary"].RuntimeDefaults).Should(ConsistOf(s.InstanceImageDefaults["canary"]))
@@ -649,10 +647,13 @@ func TestReconcileInstanceTemplateImages(t *testing.T) {
 		s.Instances[0].ServiceVersion = ""
 		d.Spec.Instances[0].Images = nil
 		g.Expect(reconcileInstanceTemplateImages(s, o, d)).Should(Succeed())
-		g.Expect(d.Annotations[instanceTemplateImageSelectionsAnnotation]).Should(Equal("{}"))
+		state, marked, err := readInstanceTemplateImageSelections(d)
+		g.Expect(err).Should(Succeed())
+		g.Expect(marked).Should(BeTrue())
+		g.Expect(state).Should(BeEmpty())
 		merged, err := copyAndMergeITS(o, d)
 		g.Expect(err).Should(Succeed())
-		g.Expect(merged.Annotations[instanceTemplateImageSelectionsAnnotation]).Should(Equal("{}"))
+		g.Expect(merged.Annotations[instanceTemplateImageSelectionsAnnotation]).Should(Equal(d.Annotations[instanceTemplateImageSelectionsAnnotation]))
 		g.Expect(merged.Spec.Instances[0].Images).Should(BeNil())
 		s, _, d = build()
 		g.Expect(reconcileInstanceTemplateImages(s, merged, d)).Should(Succeed())
@@ -660,7 +661,10 @@ func TestReconcileInstanceTemplateImages(t *testing.T) {
 		s.Instances = nil
 		d.Spec.Instances = nil
 		g.Expect(reconcileInstanceTemplateImages(s, o, d)).Should(Succeed())
-		g.Expect(d.Annotations[instanceTemplateImageSelectionsAnnotation]).Should(Equal("{}"))
+		state, marked, err = readInstanceTemplateImageSelections(d)
+		g.Expect(err).Should(Succeed())
+		g.Expect(marked).Should(BeTrue())
+		g.Expect(state).Should(BeEmpty())
 	})
 	t.Run("parent only leaves metadata untouched", func(t *testing.T) {
 		g := NewWithT(t)

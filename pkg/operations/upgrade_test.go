@@ -1141,7 +1141,10 @@ func TestUpgradeInstanceTemplateOwnerConvergence(t *testing.T) {
 			for _, container := range pod.Spec.Containers {
 				pod.Status.ContainerStatuses = append(pod.Status.ContainerStatuses, corev1.ContainerStatus{Name: container.Name, Image: container.Image, ImageID: "containerd://sha256:1234", Ready: true})
 			}
-			pod.Spec.InitContainers[0].Image = "setup:old"
+			pod.Spec.InitContainers[0].Image = def.Spec.Runtime.InitContainers[0].Image
+			if tc.clear || tc.legacy {
+				pod.Spec.InitContainers[0].Image = targetInit
+			}
 			if tc.deferred {
 				pod.Spec.InitContainers[0].Image = "docker.io/apecloud/kubeblocks-tools:1.0.0"
 				pod.Spec.InitContainers[0].Command = kbagent.LegacyInitCommand()

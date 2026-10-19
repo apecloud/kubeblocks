@@ -31,6 +31,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
@@ -42,6 +43,7 @@ type upgradeOpsHandler struct{}
 
 type upgradeExpectedImages struct {
 	definition           *appsv1.ComponentDefinition
+	workload             *workloads.InstanceSet
 	containersByTemplate map[string][]corev1.Container
 	pendingOwner         bool
 }
@@ -160,13 +162,23 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		ops *opsv1alpha1.OpsRequest,
 		pod *corev1.Pod,
 		pgRes *progressResource) bool {
-		target := pgRes.compOps.(opsv1alpha1.UpgradeComponent).GetComponentName()
+		request := pgRes.compOps.(opsv1alpha1.UpgradeComponent)
+		target := request.GetComponentName()
 		if def, ok := legacyDefinitions[target]; ok {
 			return u.podImageApplied(pod, def.Spec.Runtime.Containers)
 		}
 		expected, ok := containersMap[pgRes.fullComponentName]
 		if !ok || expected.pendingOwner {
 			return false
+		}
+		if len(request.Instances) > 0 {
+			status := expected.workload.FindInstanceStatus(pod.Name)
+			if expected.workload.Status.ObservedGeneration != expected.workload.Generation ||
+				status == nil || !status.UpToDate ||
+				status.EffectiveDesiredState() != workloads.InstanceDesiredStateActive ||
+				status.EffectiveCurrentState() != workloads.InstanceCurrentStatePresent {
+				return false
+			}
 		}
 		templateName, labeled := instancetemplate.TemplateNameFromLabels(pod.Labels)
 		if !labeled {
@@ -328,7 +340,7 @@ func (u upgradeOpsHandler) getExpectedContainersMap(reqCtx intctrlutil.RequestCt
 			}
 			templates[template.Name] = containers
 		}
-		containersMap[name] = upgradeExpectedImages{definition: compDef, containersByTemplate: templates}
+		containersMap[name] = upgradeExpectedImages{definition: compDef, workload: its, containersByTemplate: templates}
 	}
 	return containersMap, nil
 }

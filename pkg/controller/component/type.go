@@ -63,6 +63,7 @@ type SynthesizedComponent struct {
 	Instances                        []kbappsv1.InstanceTemplate            `json:"instances,omitempty"`
 	Ordinals                         kbappsv1.Ordinals
 	FlatInstanceOrdinal              bool
+	InstanceImageDefaults            map[string][]string             // selected runtime/init defaults, before registry mapping
 	InstanceImages                   map[string]map[string]string    `json:"instanceImages,omitempty"`
 	OfflineInstances                 []string                        `json:"offlineInstances,omitempty"`
 	Roles                            []kbappsv1.ReplicaRole          `json:"roles,omitempty"`

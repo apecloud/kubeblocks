@@ -21,7 +21,10 @@ package component
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
@@ -102,12 +105,105 @@ func (t *componentWorkloadTransformer) reconcileWorkload(ctx context.Context, cl
 		protoITS.Spec.Template.Spec.InitContainers[i].Image = intctrlutil.ReplaceImageRegistry(container.Image)
 	}
 
+	if err := reconcileInstanceTemplateImages(synthesizedComp, runningITS, protoITS); err != nil {
+		return err
+	}
+
 	t.buildInstanceSetPlacementAnnotation(comp, protoITS)
 
 	if err := t.reconcileReplicasStatus(ctx, cli, synthesizedComp, runningITS, protoITS); err != nil {
 		return err
 	}
 
+	return nil
+}
+
+const instanceTemplateImageSelectionsAnnotation = "apps.kubeblocks.io/instance-template-image-selections"
+
+type instanceTemplateImageSelection struct {
+	CompDef         string   `json:"compDef"`
+	ServiceVersion  string   `json:"serviceVersion"`
+	RuntimeDefaults []string `json:"runtimeDefaults,omitempty"`
+}
+
+func reconcileInstanceTemplateImages(synth *component.SynthesizedComponent, old, desired *workloads.InstanceSet) error {
+	previous := map[string]instanceTemplateImageSelection{}
+	marked := false
+	if old != nil {
+		if value, ok := old.Annotations[instanceTemplateImageSelectionsAnnotation]; ok {
+			marked = true
+			if err := json.Unmarshal([]byte(value), &previous); err != nil {
+				return fmt.Errorf("read instance template image selections: %w", err)
+			}
+		}
+	}
+	selections := map[string]instanceTemplateImageSelection{}
+	for _, selected := range synth.Instances {
+		if len(selected.ServiceVersion) == 0 {
+			continue
+		}
+		selection := instanceTemplateImageSelection{CompDef: selected.CompDef, ServiceVersion: selected.ServiceVersion,
+			RuntimeDefaults: slices.Clone(synth.InstanceImageDefaults[selected.Name])}
+		slices.Sort(selection.RuntimeDefaults)
+		selections[selected.Name] = selection
+		if old == nil {
+			continue
+		}
+		var oldTemplate *workloads.InstanceTemplate
+		for i := range old.Spec.Instances {
+			if old.Spec.Instances[i].Name == selected.Name {
+				oldTemplate = &old.Spec.Instances[i]
+				break
+			}
+		}
+		if oldTemplate == nil {
+			continue
+		}
+		prior, known := previous[selected.Name]
+		same := known && prior.CompDef == selection.CompDef && prior.ServiceVersion == selection.ServiceVersion
+		// Released workloads have no per-template identity. Only missing overrides on
+		// a selection equal to the persisted parent can safely inherit its old images.
+		unrecordedParentSelection := !marked && selection.CompDef == old.Annotations[constant.AppComponentLabelKey] &&
+			selection.ServiceVersion == old.Annotations[constant.KBAppServiceVersionKey]
+		for i := range desired.Spec.Instances {
+			tpl := &desired.Spec.Instances[i]
+			if tpl.Name != selected.Name {
+				continue
+			}
+			for _, name := range selection.RuntimeDefaults {
+				if _, exists := tpl.Images[name]; !exists {
+					continue
+				}
+				oldImage, overridden := oldTemplate.Images[name]
+				if !(same && slices.Contains(prior.RuntimeDefaults, name)) && !(unrecordedParentSelection && !overridden) {
+					continue
+				}
+				if !overridden {
+					for _, containers := range [][]corev1.Container{old.Spec.Template.Spec.InitContainers, old.Spec.Template.Spec.Containers} {
+						for _, container := range containers {
+							if container.Name == name {
+								oldImage = container.Image
+							}
+						}
+					}
+				}
+				if len(oldImage) > 0 {
+					tpl.Images[name] = oldImage
+				}
+			}
+		}
+	}
+	if len(selections) == 0 && !marked {
+		return nil
+	}
+	value, err := json.Marshal(selections)
+	if err != nil {
+		return err
+	}
+	if desired.Annotations == nil {
+		desired.Annotations = make(map[string]string)
+	}
+	desired.Annotations[instanceTemplateImageSelectionsAnnotation] = string(value)
 	return nil
 }
 

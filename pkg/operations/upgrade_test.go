@@ -174,6 +174,9 @@ func TestUpgradeInstanceTemplates(t *testing.T) {
 					if _, err := GetOpsManager().Do(reqCtx, cli, res); err != nil {
 						t.Fatal(err)
 					}
+					if err := cli.Status().Update(ctx, res.OpsRequest); err != nil {
+						t.Fatal(err)
+					}
 					reload()
 				}
 				got := getComponentSpecOrShardingTemplate(res.Cluster, "pg")
@@ -365,6 +368,20 @@ func TestUpgradeInstanceTemplateTargetsUnchanged(t *testing.T) {
 						Instances: []opsv1alpha1.UpgradeInstanceTemplate{{Name: "canary", ComponentDefinitionName: tc.definition, ServiceVersion: tc.version}},
 					}}},
 				}}}}
+			observed := res.Cluster.DeepCopy()
+			res.Cluster.Name, res.Cluster.Namespace = "demo", "default"
+			res.Cluster.Spec.ComponentSpecs[0].Instances = []appsv1.InstanceTemplate{{Name: "canary", CompDef: "pg-canary", ServiceVersion: "18.0.0"}}
+			scheme := runtime.NewScheme()
+			for _, add := range []func(*runtime.Scheme) error{appsv1.AddToScheme, opsv1alpha1.AddToScheme} {
+				if err := add(scheme); err != nil {
+					t.Fatal(err)
+				}
+			}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(res.Cluster).Build()
+			if err := (upgradeOpsHandler{}).Action(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, res); err != nil {
+				t.Fatal(err)
+			}
+			res.Cluster = observed
 			if got := (upgradeOpsHandler{}).targetsUnchanged(res); got != tc.want {
 				t.Fatalf("targets unchanged = %t, want %t", got, tc.want)
 			}
@@ -996,6 +1013,9 @@ func TestUpgradeInstanceTemplateOwnerConvergence(t *testing.T) {
 			}
 			handler := GetOpsManager().OpsMap[opsv1alpha1.UpgradeType].OpsHandler
 			if err := handler.Action(reqCtx, cli, resource()); err != nil {
+				t.Fatal(err)
+			}
+			if err := cli.Status().Update(ctx, ops); err != nil {
 				t.Fatal(err)
 			}
 			spec = *getComponentSpecOrShardingTemplate(cluster, targetName).DeepCopy()

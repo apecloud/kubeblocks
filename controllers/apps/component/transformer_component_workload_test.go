@@ -36,11 +36,14 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	kbagentproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("Component Workload Operations Test", func() {
@@ -433,3 +436,105 @@ var _ = Describe("instance template service versions in component transforms", f
 		Expect(load.Transform(transCtx, graph.NewDAG())).Should(Succeed())
 	})
 })
+
+func TestInstanceTemplateRegistryPreservedOnReconcile(t *testing.T) {
+	for _, withVersion := range []bool{false, true} {
+		name := "without-cv"
+		if withVersion {
+			name = "equal-default-cv"
+		}
+		t.Run(name, func(t *testing.T) {
+			g := NewWithT(t)
+			oldRegistry := viper.Get(constant.CfgRegistries)
+			t.Cleanup(func() {
+				viper.Set(constant.CfgRegistries, oldRegistry)
+				g.Expect(intctrlutil.LoadRegistryConfig()).To(Succeed())
+			})
+			viper.Set(constant.CfgRegistries, map[string]any{})
+			g.Expect(intctrlutil.LoadRegistryConfig()).To(Succeed())
+			scheme := runtime.NewScheme()
+			g.Expect(appsv1.AddToScheme(scheme)).To(Succeed())
+			g.Expect(workloads.AddToScheme(scheme)).To(Succeed())
+			g.Expect(corev1.AddToScheme(scheme)).To(Succeed())
+			def := testapps.NewComponentDefinitionFactory("registry-pin").SetServiceVersion("1.0.0").SetRuntime(&corev1.Container{Name: "db", Image: "docker.io/apecloud/db:1"}).GetObject()
+			def.Spec.Runtime.InitContainers = []corev1.Container{{Name: "setup", Image: "docker.io/apecloud/setup:1"}}
+			def.Spec.LifecycleActions = nil
+			def.Status.Phase = appsv1.AvailablePhase
+			cb := fake.NewClientBuilder().WithScheme(scheme).WithObjects(def)
+			if withVersion {
+				ver := &appsv1.ComponentVersion{ObjectMeta: metav1.ObjectMeta{Name: "registry-pin", Labels: map[string]string{def.Name: def.Name}}, Spec: appsv1.ComponentVersionSpec{Releases: []appsv1.ComponentVersionRelease{{Name: "r1", ServiceVersion: "1.0.0", Images: map[string]string{"db": "docker.io/apecloud/db:1", "setup": "docker.io/apecloud/setup:1"}}}}, Status: appsv1.ComponentVersionStatus{Phase: appsv1.AvailablePhase}}
+				cb.WithObjects(ver)
+			}
+			cli := cb.Build()
+			cluster := testapps.NewClusterFactory("default", "registry-pin", "").GetObject()
+			cluster.UID = "cluster-uid"
+			comp, err := component.BuildComponent(cluster, &appsv1.ClusterComponentSpec{Name: "db", ComponentDef: def.Name, ServiceVersion: "1.0.0", Replicas: 1, Instances: []appsv1.InstanceTemplate{{Name: "explicit", CompDef: def.Name, ServiceVersion: "1.0.0"}}}, nil, nil)
+			g.Expect(err).To(Succeed())
+			graphCli := model.NewGraphClient(cli)
+			transform := &componentWorkloadTransformer{Client: cli}
+			reconcile := func() *workloads.InstanceSet {
+				transCtx := &componentTransformContext{Context: context.Background(), Client: graphCli, Component: comp, ComponentOrig: comp.DeepCopy(), Logger: logger}
+				g.Expect((&componentLoadResourcesTransformer{}).Transform(transCtx, graph.NewDAG())).To(Succeed())
+				dag := graph.NewDAG()
+				graphCli.Root(dag, comp, comp, model.ActionStatusPtr())
+				g.Expect(transform.Transform(transCtx, dag)).To(Succeed())
+				objs := graphCli.FindAll(dag, &workloads.InstanceSet{})
+				if len(objs) == 0 {
+					return nil
+				}
+				return objs[0].(*workloads.InstanceSet)
+			}
+			running := reconcile()
+			g.Expect(running).NotTo(BeNil())
+			g.Expect(cli.Create(context.Background(), running)).To(Succeed())
+			tree := kubebuilderx.NewObjectTree()
+			tree.Logger = logger
+			tree.Context = context.Background()
+			tree.SetRoot(running)
+			_, err = instanceset.NewRevisionUpdateReconciler().Reconcile(tree)
+			g.Expect(err).To(Succeed())
+			_, err = instanceset.NewReplicasAlignmentReconciler().Reconcile(tree)
+			g.Expect(err).To(Succeed())
+			pods := tree.List(&corev1.Pod{})
+			g.Expect(pods).To(HaveLen(1))
+			livePod := pods[0].(*corev1.Pod)
+			initialUpdated, err := instanceset.IsPodUpdated(running, livePod)
+			g.Expect(err).To(Succeed())
+			g.Expect(initialUpdated).To(BeTrue())
+			viper.Set(constant.CfgRegistries, map[string]any{"defaultRegistry": "mirror.invalid"})
+			g.Expect(intctrlutil.LoadRegistryConfig()).To(Succeed())
+			comp.Annotations["unrelated"] = "changed"
+			changed := reconcile()
+			if changed == nil {
+				changed = running
+			}
+			tree.SetRoot(changed)
+			_, err = instanceset.NewRevisionUpdateReconciler().Reconcile(tree)
+			g.Expect(err).To(Succeed())
+			unchanged, err := instanceset.IsPodUpdated(changed, livePod)
+			g.Expect(err).To(Succeed())
+			if !unchanged {
+				t.Errorf("registry-only reconciliation now classifies the existing Pod as requiring an update")
+			}
+			g.Expect(tree.Delete(livePod)).To(Succeed())
+			_, err = instanceset.NewReplicasAlignmentReconciler().Reconcile(tree)
+			g.Expect(err).To(Succeed())
+			replacements := tree.List(&corev1.Pod{})
+			g.Expect(replacements).To(HaveLen(1))
+			replacement := replacements[0].(*corev1.Pod)
+			if replacement.Spec.Containers[0].Image != "docker.io/apecloud/db:1" {
+				t.Errorf("natural replacement changes pinned runtime registry: %s", replacement.Spec.Containers[0].Image)
+			}
+			if replacement.Spec.InitContainers[0].Image != "docker.io/apecloud/setup:1" {
+				t.Errorf("natural replacement changes pinned init registry: %s", replacement.Spec.InitContainers[0].Image)
+			}
+			templates := instanceset.BuildInstanceTemplateExts(&instanceset.InstanceSetExt{Its: changed, InstanceTemplates: instanceset.BuildInstanceTemplates(*changed.Spec.Replicas, changed.Spec.Instances, nil)})
+			if got := templates[0].Spec.Containers[0].Image; got != "docker.io/apecloud/db:1" {
+				t.Errorf("registry-only reconcile changed effective selected runtime: %s; parent image=%s; overrides=%v", got, changed.Spec.Template.Spec.Containers[0].Image, changed.Spec.Instances[0].Images)
+			}
+			if got := templates[0].Spec.InitContainers[0].Image; got != "docker.io/apecloud/setup:1" {
+				t.Errorf("registry-only reconcile changed effective selected init: %s", got)
+			}
+		})
+	}
+}

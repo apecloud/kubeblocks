@@ -288,6 +288,13 @@ func (t *componentStatusTransformer) hasFailedPod() (bool, componentMessageMap) 
 		return true, messages
 	}
 
+	// A stopped or updating workload can retain InstanceReady=True from an earlier
+	// generation, including when there are no pods. Only use its ready timestamp
+	// for the role-probe deadline once the desired workload is updated and ready.
+	if !t.isWorkloadUpdated() || t.runningITS.Status.ReadyReplicas != *t.runningITS.Spec.Replicas {
+		return false, nil
+	}
+
 	// check InstanceReady condition
 	if !meta.IsStatusConditionTrue(t.runningITS.Status.Conditions, string(workloads.InstanceReady)) {
 		return false, nil

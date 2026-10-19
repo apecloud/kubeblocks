@@ -18,6 +18,9 @@ package v1alpha1
 
 import (
 	"context"
+	"encoding/json"
+	"reflect"
+	"strings"
 	"testing"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -222,4 +225,118 @@ func TestValidateUpgradeServiceVersion(t *testing.T) {
 
 func strPtr(s string) *string {
 	return &s
+}
+
+func TestValidateUpgradeInstanceServiceVersion(t *testing.T) {
+	tests := []struct {
+		name    string
+		version *string
+		wantErr bool
+	}{
+		{name: "omitted version"},
+		{name: "empty version", version: ptr.To("")},
+		{name: "three parts", version: ptr.To("17.5.0")},
+		{name: "v prefix", version: ptr.To("v17.5.0")},
+		{name: "prerelease", version: ptr.To("17.5.0-alpha.1")},
+		{name: "build metadata", version: ptr.To("17.5.0+build123")},
+		{name: "missing patch", version: ptr.To("17.5"), wantErr: true},
+		{name: "random text", version: ptr.To("not-a-version"), wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ops := &OpsRequest{Spec: OpsRequestSpec{Type: UpgradeType, SpecificOpsRequest: SpecificOpsRequest{
+				Upgrade: &Upgrade{Components: []UpgradeComponent{{
+					ComponentOps: ComponentOps{ComponentName: "pg"},
+					Instances: []UpgradeInstanceTemplate{{Name: "canary", ComponentDefinitionName: ptr.To("postgresql-17"),
+						ServiceVersion: tt.version}},
+				}}},
+			}}}
+			before := ops.DeepCopy()
+			err := ops.ValidateOps(context.Background(), nil, nil)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("ValidateOps() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr && (!strings.Contains(err.Error(), "canary") || !strings.Contains(err.Error(), *tt.version)) {
+				t.Errorf("validation error does not identify the template and version: %v", err)
+			}
+			if !reflect.DeepEqual(ops, before) {
+				t.Error("validation changed the request")
+			}
+		})
+	}
+}
+
+func TestValidateUpgradeMixedTargets(t *testing.T) {
+	tests := []struct {
+		name       string
+		components []UpgradeComponent
+		wantErr    bool
+	}{
+		{
+			name: "multiple templates with invalid later version",
+			components: []UpgradeComponent{{ComponentOps: ComponentOps{ComponentName: "pg"}, Instances: []UpgradeInstanceTemplate{
+				{Name: "stable", ServiceVersion: ptr.To("17.4.0")},
+				{Name: "canary", ServiceVersion: ptr.To("17.5")},
+			}}},
+			wantErr: true,
+		},
+		{
+			name: "parent and template upgrades across components",
+			components: []UpgradeComponent{
+				{ComponentOps: ComponentOps{ComponentName: "pg"}, ServiceVersion: ptr.To("17.5.0"), Instances: []UpgradeInstanceTemplate{
+					{Name: "stable", ServiceVersion: ptr.To("")},
+					{Name: "canary", ServiceVersion: ptr.To("17.6.0")},
+				}},
+				{ComponentOps: ComponentOps{ComponentName: "redis"}, Instances: []UpgradeInstanceTemplate{
+					{Name: "canary", ServiceVersion: ptr.To("7.2.0")},
+				}},
+			},
+		},
+		{
+			name: "invalid template on later component",
+			components: []UpgradeComponent{
+				{ComponentOps: ComponentOps{ComponentName: "pg"}, ServiceVersion: ptr.To("17.5.0")},
+				{ComponentOps: ComponentOps{ComponentName: "redis"}, Instances: []UpgradeInstanceTemplate{
+					{Name: "canary", ServiceVersion: ptr.To("7.2")},
+				}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid parent with valid template",
+			components: []UpgradeComponent{{ComponentOps: ComponentOps{ComponentName: "pg"}, ServiceVersion: ptr.To("17.5"),
+				Instances: []UpgradeInstanceTemplate{{Name: "canary", ServiceVersion: ptr.To("17.6.0")}}}},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ops := &OpsRequest{Spec: OpsRequestSpec{Type: UpgradeType, SpecificOpsRequest: SpecificOpsRequest{
+				Upgrade: &Upgrade{Components: tt.components},
+			}}}
+			if err := ops.ValidateOps(context.Background(), nil, nil); (err != nil) != tt.wantErr {
+				t.Errorf("ValidateOps() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestUpgradeInstanceTemplateJSONPreservesOverrides(t *testing.T) {
+	for _, target := range []UpgradeInstanceTemplate{
+		{Name: "canary", ComponentDefinitionName: ptr.To("postgresql-17")},
+		{Name: "canary", ServiceVersion: ptr.To("17.5.0")},
+		{Name: "canary", ComponentDefinitionName: ptr.To(""), ServiceVersion: ptr.To("")},
+	} {
+		data, err := json.Marshal(target)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var decoded UpgradeInstanceTemplate
+		if err := json.Unmarshal(data, &decoded); err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(decoded, target) {
+			t.Errorf("JSON round trip changed override presence: got %#v, want %#v", decoded, target)
+		}
+	}
 }

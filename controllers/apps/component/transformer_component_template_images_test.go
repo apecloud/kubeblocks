@@ -16,9 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -175,7 +179,8 @@ func TestFirstExplicitParentTemplateSelection(t *testing.T) {
 	}
 }
 
-func buildLargeTemplateWorkload(t *testing.T) *workloads.InstanceSet {
+func buildLargeTemplateWorkload(t *testing.T, profile string) *workloads.InstanceSet {
+	t.Helper()
 	const replicas = int32(3000)
 	scheme := runtime.NewScheme()
 	for _, f := range []func(*runtime.Scheme) error{corev1.AddToScheme, appsv1.AddToScheme, workloads.AddToScheme} {
@@ -184,10 +189,26 @@ func buildLargeTemplateWorkload(t *testing.T) *workloads.InstanceSet {
 		}
 	}
 	def := &appsv1.ComponentDefinition{ObjectMeta: metav1.ObjectMeta{Name: "selected-postgres-17-v1"}, Spec: appsv1.ComponentDefinitionSpec{ServiceVersion: "17.0.0", Runtime: corev1.PodSpec{Containers: []corev1.Container{{Name: "db", Image: "docker.io/postgres:17"}}, InitContainers: []corev1.Container{{Name: "prepare", Image: "docker.io/prepare:1"}}}}, Status: appsv1.ComponentDefinitionStatus{Phase: appsv1.AvailablePhase}}
+	if profile == "long-common" {
+		def.Name = strings.Repeat("d", 63)
+		def.Spec.ServiceVersion = "17.0.0-" + strings.Repeat("a", 25)
+	}
+	if profile == "long-common" || profile == "diverse-long-containers" {
+		def.Spec.Runtime.Containers[0].Name = strings.Repeat("d", 63)
+		def.Spec.Runtime.InitContainers[0].Name = strings.Repeat("p", 63)
+	}
+	objects := []client.Object{def}
 	cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", UID: types.UID("cluster-uid")}, Spec: appsv1.ClusterSpec{TerminationPolicy: appsv1.Delete}}
 	spec := &appsv1.ClusterComponentSpec{Name: "db", ComponentDef: def.Name, ServiceVersion: def.Spec.ServiceVersion, Replicas: replicas}
 	for i := int32(0); i < replicas; i++ {
-		spec.Instances = append(spec.Instances, appsv1.InstanceTemplate{Name: fmt.Sprintf("replica-%04d", i), Replicas: ptr.To(int32(1)), CompDef: def.Name, ServiceVersion: def.Spec.ServiceVersion, Env: []corev1.EnvVar{{Name: "REPLICA_ID", Value: fmt.Sprint(i)}}})
+		selectedName := def.Name
+		if strings.HasPrefix(profile, "diverse") {
+			selected := def.DeepCopy()
+			selected.Name = strings.Repeat("d", 58) + fmt.Sprintf("%05d", i)
+			selectedName = selected.Name
+			objects = append(objects, selected)
+		}
+		spec.Instances = append(spec.Instances, appsv1.InstanceTemplate{Name: fmt.Sprintf("replica-%04d", i), Replicas: ptr.To(int32(1)), CompDef: selectedName, ServiceVersion: def.Spec.ServiceVersion, Env: []corev1.EnvVar{{Name: "REPLICA_ID", Value: fmt.Sprint(i)}}})
 	}
 	comp, err := component.BuildComponent(cluster, spec, nil, nil)
 	if err != nil {
@@ -197,7 +218,8 @@ func buildLargeTemplateWorkload(t *testing.T) *workloads.InstanceSet {
 	if err := validateCompReplicas(comp, def); err != nil {
 		t.Fatal(err)
 	}
-	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(def, comp).Build()
+	objects = append(objects, comp)
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
 	gc := model.NewGraphClient(cli)
 	ctx := &componentTransformContext{Context: context.Background(), Client: gc, Component: comp, ComponentOrig: comp.DeepCopy(), Logger: logr.Discard()}
 	dag := graph.NewDAG()
@@ -217,23 +239,26 @@ func buildLargeTemplateWorkload(t *testing.T) *workloads.InstanceSet {
 }
 
 func TestTemplateImageSelectionAnnotationBudget(t *testing.T) {
-	its := buildLargeTemplateWorkload(t)
-	data, err := json.Marshal(its)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var budget int
-	for k, v := range its.Annotations {
-		budget += len(k) + len(v)
-	}
-	t.Logf("replicas=%d templates=%d workload JSON bytes=%d annotation bytes=%d", *its.Spec.Replicas, len(its.Spec.Instances), len(data), budget)
-	if err := apivalidation.ValidateAnnotationsSize(its.Annotations); err != nil {
-		t.Fatalf("generated workload cannot pass API metadata validation: %v", err)
+	for _, profile := range []string{"shared", "long-common", "diverse", "diverse-long-containers"} {
+		t.Run(profile, func(t *testing.T) {
+			its := buildLargeTemplateWorkload(t, profile)
+			data, err := json.Marshal(its)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var budget int
+			for k, v := range its.Annotations {
+				budget += len(k) + len(v)
+			}
+			t.Logf("replicas=%d templates=%d workload JSON bytes=%d annotation bytes=%d", *its.Spec.Replicas, len(its.Spec.Instances), len(data), budget)
+			if err := apivalidation.ValidateAnnotationsSize(its.Annotations); err != nil {
+				t.Fatalf("generated workload cannot pass API metadata validation: %v", err)
+			}
+		})
 	}
 }
 
 func TestTemplateImageSelectionAnnotationAPI(t *testing.T) {
-	its := buildLargeTemplateWorkload(t)
 	env := &envtest.Environment{CRDDirectoryPaths: []string{"../../../config/crd/bases"}, ErrorIfCRDPathMissing: true}
 	cfg, err := env.Start()
 	if err != nil {
@@ -259,10 +284,16 @@ func TestTemplateImageSelectionAnnotationAPI(t *testing.T) {
 	if err := cli.Create(context.Background(), ns); err != nil {
 		t.Fatal(err)
 	}
-	its.Namespace = ns.Name
-	err = cli.Create(context.Background(), its)
-	if err != nil {
-		t.Fatalf("API rejected generated workload: %v", err)
+	for _, profile := range []string{"shared", "long-common", "diverse", "diverse-long-containers"} {
+		t.Run(profile, func(t *testing.T) {
+			its := buildLargeTemplateWorkload(t, profile)
+			its.Namespace = ns.Name
+			its.Name = profile
+			err := cli.Create(context.Background(), its)
+			if err != nil {
+				t.Fatalf("API rejected generated workload: %v", err)
+			}
+		})
 	}
 }
 
@@ -381,4 +412,174 @@ func TestStartDefersTemplatePublicationGeneration(t *testing.T) {
 		t.Fatalf("normal reconcile generation=%s", got)
 	}
 	updateStatus(2, appsv1.RunningComponentPhase)
+}
+
+func TestTemplateImageSelectionReorderAndRemoval(t *testing.T) {
+	synth := &component.SynthesizedComponent{Instances: []appsv1.InstanceTemplate{{Name: "a", CompDef: "selected", ServiceVersion: "1.0.0"}, {Name: "b", CompDef: "selected", ServiceVersion: "2.0.0"}, {Name: "inherited"}}, InstanceImageDefaults: map[string][]string{"a": {"db"}, "b": {"db"}}}
+	old := &workloads.InstanceSet{Spec: workloads.InstanceSetSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "db", Image: "parent"}}}}, Instances: []workloads.InstanceTemplate{{Name: "a", Images: map[string]string{"db": "exact-a"}}, {Name: "b", Images: map[string]string{"db": "exact-b"}}, {Name: "inherited"}}}}
+	if err := reconcileInstanceTemplateImages(synth, nil, old); err != nil {
+		t.Fatal(err)
+	}
+	desired := old.DeepCopy()
+	desired.Spec.Instances = []workloads.InstanceTemplate{{Name: "b", Images: map[string]string{"db": "fresh-b"}}, {Name: "inherited"}, {Name: "a", Images: map[string]string{"db": "fresh-a"}}}
+	if err := reconcileInstanceTemplateImages(synth, old, desired); err != nil {
+		t.Fatal(err)
+	}
+	if desired.Spec.Instances[0].Images["db"] != "exact-b" || desired.Spec.Instances[2].Images["db"] != "exact-a" {
+		t.Fatalf("reorder crossed image ownership: %#v", desired.Spec.Instances)
+	}
+	// Persisted alignment must decode by the names in this newly published order.
+	selections, marked, err := readInstanceTemplateImageSelections(desired)
+	if err != nil || !marked || selections["a"].ServiceVersion != "1.0.0" || selections["b"].ServiceVersion != "2.0.0" {
+		t.Fatalf("reordered selections: %#v, marked=%v, err=%v", selections, marked, err)
+	}
+	old = desired
+	synth.Instances = []appsv1.InstanceTemplate{{Name: "a", CompDef: "selected", ServiceVersion: "1.0.0"}}
+	desired = old.DeepCopy()
+	desired.Spec.Instances = desired.Spec.Instances[2:]
+	if err := reconcileInstanceTemplateImages(synth, old, desired); err != nil {
+		t.Fatal(err)
+	}
+	selections, _, err = readInstanceTemplateImageSelections(desired)
+	if err != nil || len(selections) != 1 || selections["a"].ServiceVersion != "1.0.0" {
+		t.Fatalf("removed selection persisted: %#v, err=%v", selections, err)
+	}
+}
+
+func TestTemplateImagePublicationPending(t *testing.T) {
+	selected := instanceTemplateImageSelection{CompDef: "selected", ServiceVersion: "1.0.0", RuntimeDefaults: []string{"db"}}
+	for _, tc := range []struct {
+		name    string
+		setup   func(*workloads.InstanceSet, *workloads.InstanceSet)
+		pending bool
+	}{
+		{name: "same selection and effective image"},
+		{name: "provenance-only eligible names change", setup: func(_, desired *workloads.InstanceSet) {
+			p := selected
+			p.RuntimeDefaults = nil
+			if err := writeInstanceTemplateImageSelections(desired, map[string]instanceTemplateImageSelection{"canary": p}); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{name: "same identity new CV image", setup: func(_, desired *workloads.InstanceSet) { desired.Spec.Instances[0].Images["db"] = "next" }, pending: true},
+		{name: "different identity same effective image", setup: func(_, desired *workloads.InstanceSet) {
+			p := selected
+			p.ServiceVersion = "2.0.0"
+			if err := writeInstanceTemplateImageSelections(desired, map[string]instanceTemplateImageSelection{"canary": p}); err != nil {
+				t.Fatal(err)
+			}
+		}, pending: true},
+		{name: "clear selection", setup: func(_, desired *workloads.InstanceSet) {
+			if err := writeInstanceTemplateImageSelections(desired, nil); err != nil {
+				t.Fatal(err)
+			}
+			desired.Spec.Instances[0].Images = nil
+		}, pending: true},
+		{name: "remove selection", setup: func(_, desired *workloads.InstanceSet) {
+			if err := writeInstanceTemplateImageSelections(desired, nil); err != nil {
+				t.Fatal(err)
+			}
+			desired.Spec.Instances = nil
+		}, pending: true},
+		{name: "inherited-only parent change", setup: func(old, desired *workloads.InstanceSet) {
+			for _, its := range []*workloads.InstanceSet{old, desired} {
+				if err := writeInstanceTemplateImageSelections(its, nil); err != nil {
+					t.Fatal(err)
+				}
+			}
+			desired.Spec.Template.Spec.Containers[0].Image = "next"
+		}},
+		{name: "released parent-equivalent adoption", setup: func(old, _ *workloads.InstanceSet) {
+			delete(old.Annotations, instanceTemplateImageSelectionsAnnotation)
+			old.Spec.Instances[0].Images = nil
+		}},
+		{name: "released parent-equivalent changed effective image", setup: func(old, desired *workloads.InstanceSet) {
+			delete(old.Annotations, instanceTemplateImageSelectionsAnnotation)
+			old.Spec.Instances[0].Images = nil
+			desired.Spec.Instances[0].Images["db"] = "next"
+		}, pending: true},
+		{name: "unrelated parent kbagent image", setup: func(_, desired *workloads.InstanceSet) {
+			desired.Spec.Template.Spec.Containers = append(desired.Spec.Template.Spec.Containers, corev1.Container{Name: "kbagent", Image: "new-tools"})
+		}},
+		{name: "ordinary parent registry freeze", setup: func(_, desired *workloads.InstanceSet) {
+			desired.Spec.Template.Spec.Containers[1].Image = "new-registry/sidecar:1"
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			old := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{constant.AppComponentLabelKey: selected.CompDef, constant.KBAppServiceVersionKey: selected.ServiceVersion, constant.KubeBlocksGenerationKey: "1"}}, Spec: workloads.InstanceSetSpec{Stop: ptr.To(true), Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "db", Image: "old"}, {Name: "sidecar", Image: "old-registry/sidecar:1"}}}}, Instances: []workloads.InstanceTemplate{{Name: "canary", Images: map[string]string{"db": "old"}}}}}
+			if err := writeInstanceTemplateImageSelections(old, map[string]instanceTemplateImageSelection{"canary": selected}); err != nil {
+				t.Fatal(err)
+			}
+			desired := old.DeepCopy()
+			desired.Annotations[constant.KubeBlocksGenerationKey] = "2"
+			desired.Spec.Stop = nil
+			if tc.setup != nil {
+				tc.setup(old, desired)
+			}
+			pending, err := instanceTemplateImagePublicationPending(old, desired)
+			if err != nil || pending != tc.pending {
+				t.Fatalf("pending=%v want=%v err=%v", pending, tc.pending, err)
+			}
+			(&componentWorkloadTransformer{}).handleWorkloadStartNStop(&componentTransformContext{}, &component.SynthesizedComponent{}, old, &desired, pending)
+			expectedGeneration := "2"
+			if tc.pending {
+				expectedGeneration = "1"
+			}
+			if desired.Annotations[constant.KubeBlocksGenerationKey] != expectedGeneration || ptr.Deref(desired.Spec.Stop, false) {
+				t.Fatalf("Start generation/stop: %#v", desired)
+			}
+		})
+	}
+}
+
+func TestReadTemplateImageSelectionBoundary(t *testing.T) {
+	for _, value := range []string{"null", "", `{"canary":{"compDef":"selected","serviceVersion":"1.0.0"}}`, `{"s":[{"c":"selected","v":"1.0.0"}],"t":[]}`, `{"s":[{"c":"selected","v":"1.0.0"}],"t":[2]}`, `{"t":[-1]}`, `{"s":[{"v":"1.0.0"}],"t":[1]}`, `{} {}`} {
+		t.Run(value, func(t *testing.T) {
+			its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{instanceTemplateImageSelectionsAnnotation: encodeTemplateImageSelectionTestState(t, value)}}, Spec: workloads.InstanceSetSpec{Instances: []workloads.InstanceTemplate{{Name: "canary"}}}}
+			if _, marked, err := readInstanceTemplateImageSelections(its); !marked || err == nil {
+				t.Fatalf("malformed owned state accepted: marked=%v err=%v", marked, err)
+			}
+		})
+	}
+}
+
+// Encode intentionally malformed JSON states to exercise the private decoder boundary.
+func encodeTemplateImageSelectionTestState(t *testing.T, value string) string {
+	t.Helper()
+	var buffer bytes.Buffer
+	compressed := gzip.NewWriter(&buffer)
+	if _, err := compressed.Write([]byte(value)); err != nil {
+		t.Fatal(err)
+	}
+	if err := compressed.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return instanceTemplateImageSelectionsVersion + base64.StdEncoding.EncodeToString(buffer.Bytes())
+}
+
+func TestReadTemplateImageSelectionEncoding(t *testing.T) {
+	valid := encodeTemplateImageSelectionTestState(t, `{}`)
+	raw, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(valid, instanceTemplateImageSelectionsVersion))
+	if err != nil {
+		t.Fatal(err)
+	}
+	corrupt := bytes.Clone(raw)
+	corrupt[len(corrupt)-8] ^= 1
+	for name, value := range map[string]string{
+		"unversioned prior map":     `{"canary":{"compDef":"selected","serviceVersion":"1.0.0"}}`,
+		"unversioned compact state": `{"s":[],"t":[]}`,
+		"unknown version":           "v2:" + strings.TrimPrefix(valid, instanceTemplateImageSelectionsVersion),
+		"invalid base64":            instanceTemplateImageSelectionsVersion + "$$",
+		"invalid gzip":              instanceTemplateImageSelectionsVersion + base64.StdEncoding.EncodeToString([]byte("not gzip")),
+		"checksum failure":          instanceTemplateImageSelectionsVersion + base64.StdEncoding.EncodeToString(corrupt),
+		"truncated gzip":            instanceTemplateImageSelectionsVersion + base64.StdEncoding.EncodeToString(raw[:len(raw)-1]),
+		"gzip trailing data":        instanceTemplateImageSelectionsVersion + base64.StdEncoding.EncodeToString(append(bytes.Clone(raw), 'x')),
+	} {
+		t.Run(name, func(t *testing.T) {
+			its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{instanceTemplateImageSelectionsAnnotation: value}}}
+			if _, marked, err := readInstanceTemplateImageSelections(its); !marked || err == nil {
+				t.Fatalf("malformed encoding accepted: marked=%v err=%v", marked, err)
+			}
+		})
+	}
 }

@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -2224,8 +2223,9 @@ var _ = Describe("Component Controller", func() {
 					g.Expect(its.Spec.Template.Spec.Containers[0].Image).Should(Equal("old.example/apecloud/mysql:8.0.30"))
 					g.Expect(its.Spec.Instances).Should(HaveLen(1))
 					g.Expect(its.Spec.EnableInstanceAPI).Should(Equal(ptr.To(enableInstanceAPI)))
-					var selections map[string]instanceTemplateImageSelection
-					g.Expect(json.Unmarshal([]byte(its.Annotations[instanceTemplateImageSelectionsAnnotation]), &selections)).Should(Succeed())
+					selections, marked, err := readInstanceTemplateImageSelections(its)
+					g.Expect(err).Should(Succeed())
+					g.Expect(marked).Should(BeTrue())
 					g.Expect(selections["canary"]).Should(Equal(instanceTemplateImageSelection{CompDef: compDefObj.Name, ServiceVersion: compDefObj.Spec.ServiceVersion, RuntimeDefaults: []string{testapps.DefaultMySQLContainerName, "prepare"}}))
 					g.Expect(its.Spec.Template.Annotations).ShouldNot(HaveKey(instanceTemplateImageSelectionsAnnotation))
 					g.Expect(its.Spec.Instances[0].Annotations).ShouldNot(HaveKey(instanceTemplateImageSelectionsAnnotation))

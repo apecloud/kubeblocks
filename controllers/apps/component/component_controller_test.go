@@ -2483,6 +2483,80 @@ var _ = Describe("Component Controller", func() {
 			testReconfigureAction(defaultCompName, compDefObj.Name, fileTemplate)
 		})
 
+		DescribeTable("inherits instance template reconfigure runtime without ComponentVersion", func(enableInstanceAPI, registry bool) {
+			const customImage = "docker.io/apecloud/reconfigure:1"
+			const initImage = "docker.io/apecloud/prepare:1"
+			if registry {
+				oldRegistries := viper.Get(constant.CfgRegistries)
+				oldTools := viper.GetString(constant.KBToolsImage)
+				DeferCleanup(func() {
+					viper.Set(constant.CfgRegistries, oldRegistries)
+					viper.Set(constant.KBToolsImage, oldTools)
+					Expect(intctrlutil.LoadRegistryConfig()).Should(Succeed())
+				})
+				viper.Set(constant.CfgRegistries, map[string]any{"defaultRegistry": "mirror.invalid"})
+				Expect(intctrlutil.LoadRegistryConfig()).Should(Succeed())
+			}
+			Expect(testCtx.Cli.Delete(testCtx.Ctx, compVerObj)).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(compVerObj), &kbappsv1.ComponentVersion{}, false)).Should(Succeed())
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compDefObj), func(def *kbappsv1.ComponentDefinition) {
+				def.Spec.SystemAccounts = nil
+				def.Spec.Runtime.InitContainers = []corev1.Container{{Name: "prepare", Image: initImage}}
+				def.Spec.LifecycleActions = &kbappsv1.ComponentLifecycleActions{MemberJoin: &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"true"}}}}
+			})()).Should(Succeed())
+			createCompObj(defaultCompName, compDefObj.Name, func(f *testapps.MockComponentFactory) {
+				f.SetServiceVersion(compDefObj.Spec.ServiceVersion).
+					AddInstances(kbappsv1.InstanceTemplate{Name: "canary", Replicas: ptr.To(int32(1)), CompDef: compDefObj.Name, ServiceVersion: compDefObj.Spec.ServiceVersion}).
+					SetConfigs([]kbappsv1.ClusterComponentConfig{{Name: ptr.To(fileTemplate), Reconfigure: &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Image: customImage, Container: testapps.DefaultMySQLContainerName, Command: []string{"/opt/actions/reload"}}}}})
+				f.GetObject().Spec.EnableInstanceAPI = ptr.To(enableInstanceAPI)
+			})
+			expectedRetry := ""
+			checkImages := func(selected bool) {
+				Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, its *workloads.InstanceSet) {
+					g.Expect(its.Spec.EnableInstanceAPI).Should(Equal(ptr.To(enableInstanceAPI)))
+					g.Expect(its.Spec.Instances).Should(HaveLen(1))
+					g.Expect(its.Spec.Instances[0].Annotations["retry-template-images"]).Should(Equal(expectedRetry))
+					ext, err := instancetemplate.BuildInstanceSetExt(its, nil)
+					g.Expect(err).Should(Succeed())
+					templates := instancetemplate.BuildInstanceTemplateExt(ext)
+					g.Expect(templates).Should(HaveLen(1))
+					pod := templates[0].Spec
+					g.Expect(pod.Containers).Should(ContainElement(And(HaveField("Name", kbagent.ContainerName),
+						HaveField("Image", intctrlutil.ReplaceImageRegistry(customImage)), HaveField("Command", ContainElement(kbagent.SharedBinaryPath)),
+						HaveField("VolumeMounts", ContainElement(corev1.VolumeMount{Name: fileTemplate, MountPath: "/var/run/app/conf/log"})))))
+					g.Expect(pod.InitContainers).Should(ContainElement(And(HaveField("Name", kbagent.ContainerName4Worker), HaveField("Image", intctrlutil.ReplaceImageRegistry(customImage)))))
+					for _, container := range append(its.Spec.Template.Spec.Containers, its.Spec.Template.Spec.InitContainers...) {
+						if container.Name == kbagent.ContainerName || container.Name == kbagent.ContainerName4Worker || container.Name == kbagent.InitContainerName {
+							g.Expect(append(pod.Containers, pod.InitContainers...)).Should(ContainElement(container))
+						}
+					}
+					if selected {
+						g.Expect(its.Spec.Instances[0].Images).Should(Equal(map[string]string{
+							testapps.DefaultMySQLContainerName: intctrlutil.ReplaceImageRegistry(compDefObj.Spec.Runtime.Containers[0].Image), "prepare": intctrlutil.ReplaceImageRegistry(initImage),
+						}))
+					} else {
+						g.Expect(its.Spec.Instances[0].Images).Should(BeEmpty())
+					}
+				})).Should(Succeed())
+			}
+			checkImages(true)
+			expectedRetry = "true"
+			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+				comp.Spec.Instances[0].Annotations = map[string]string{"retry-template-images": expectedRetry}
+			})()).Should(Succeed())
+			checkImages(true)
+			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+				comp.Spec.Instances[0].CompDef = ""
+				comp.Spec.Instances[0].ServiceVersion = ""
+			})()).Should(Succeed())
+			checkImages(false)
+		},
+			Entry("Pod API", false, false),
+			Entry("Instance API", true, false),
+			Entry("registry replacement, Pod API", false, true),
+			Entry("registry replacement, Instance API", true, true),
+		)
+
 		It("reconfigure - action udf", func() {
 			testReconfigureActionUDF(defaultCompName, compDefObj.Name, fileTemplate)
 		})

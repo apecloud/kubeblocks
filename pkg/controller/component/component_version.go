@@ -104,14 +104,12 @@ func UpdateCompDefinitionImages4ServiceVersion(ctx context.Context, cli client.R
 	return resolveImagesWithCompVersions(compDef, compVersions, serviceVersion)
 }
 
+// ResolveInstanceTemplateImages4ServiceVersion returns the selected runtime and action images to overlay on the parent runtime.
 func ResolveInstanceTemplateImages4ServiceVersion(ctx context.Context, cli client.Reader,
 	compDef *appsv1.ComponentDefinition, serviceVersion string) (map[string]string, error) {
 	compVersions, err := CompatibleCompVersions4Definition(ctx, cli, compDef)
 	if err != nil {
 		return nil, err
-	}
-	if len(compVersions) == 0 {
-		return nil, nil
 	}
 	return resolveImagesWithCompVersions4Template(compDef, compVersions, serviceVersion)
 }
@@ -176,38 +174,41 @@ func resolveImagesWithCompVersions(compDef *appsv1.ComponentDefinition,
 
 func resolveImagesWithCompVersions4Template(compDef *appsv1.ComponentDefinition,
 	compVersions []*appsv1.ComponentVersion, serviceVersion string) (map[string]string, error) {
-	appsInDef := convertImagesFromCompDefinition(compDef)
-	appsInVer, err := findMatchedImagesFromCompVersions(compVersions, serviceVersion)
-	if err != nil {
-		return nil, err
+	apps := convertImagesFromCompDefinition(compDef)
+	if len(compVersions) > 0 {
+		appsInVer, err := findMatchedImagesFromCompVersions(compVersions, serviceVersion)
+		if err != nil {
+			return nil, err
+		}
+		apps = checkNMergeImages(serviceVersion, apps, appsInVer)
 	}
 
 	images := make(map[string]string)
-	apps := checkNMergeImages(serviceVersion, appsInDef, appsInVer)
+	var err error
 
 	if err = func() error {
-		checkNUpdateImage := func(name, image string) error {
+		checkNAddImage := func(name string) error {
 			var err error
 			app, ok := apps[name]
 			switch {
 			case ok && app.err == nil:
-				if len(image) == 0 || image != app.image {
+				if len(app.image) > 0 {
 					images[name] = intctrlutil.ReplaceImageRegistry(app.image)
 				}
 			case ok:
 				err = app.err
-			default:
+			case len(compVersions) > 0:
 				err = fmt.Errorf("no matched image found for container %s", name)
 			}
 			return err
 		}
 		for _, c := range compDef.Spec.Runtime.InitContainers {
-			if err := checkNUpdateImage(c.Name, c.Image); err != nil {
+			if err := checkNAddImage(c.Name); err != nil {
 				return err
 			}
 		}
 		for _, c := range compDef.Spec.Runtime.Containers {
-			if err := checkNUpdateImage(c.Name, c.Image); err != nil {
+			if err := checkNAddImage(c.Name); err != nil {
 				return err
 			}
 		}

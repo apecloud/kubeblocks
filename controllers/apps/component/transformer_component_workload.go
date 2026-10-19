@@ -144,8 +144,6 @@ type instanceTemplateImageSelection struct {
 	RuntimeDefaults []string `json:"d,omitempty"`
 }
 
-// Profile IDs refer to the Instances order persisted in the same InstanceSet.
-// Zero denotes inheritance; positive IDs address the exact selection dictionary.
 type instanceTemplateImageSelectionState struct {
 	Selections []instanceTemplateImageSelection `json:"s,omitempty"`
 	Templates  []uint32                         `json:"t,omitempty"`

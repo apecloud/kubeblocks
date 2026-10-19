@@ -1176,7 +1176,6 @@ func TestUpgradeInstanceTemplateOwnerConvergence(t *testing.T) {
 			}
 			reconcile := func(want opsv1alpha1.OpsPhase) {
 				t.Helper()
-				// A new resource and registered handler observe only persisted state on every retry.
 				if err := cli.Get(ctx, client.ObjectKeyFromObject(cluster), cluster); err != nil {
 					t.Fatal(err)
 				}
@@ -1221,7 +1220,6 @@ func TestUpgradeInstanceTemplateOwnerConvergence(t *testing.T) {
 				t.Fatalf("updated Pod not applied by owner: %#v", status)
 			}
 			currentStatus := *its.Status.DeepCopy()
-			// Missing, stale, and non-current publications cannot complete the new request.
 			for _, state := range []string{"missing", "stale", "not applied", "offline", "terminating"} {
 				its.Status = *currentStatus.DeepCopy()
 				switch state {

@@ -2584,6 +2584,52 @@ var _ = Describe("Component Controller", func() {
 			testReconfigureAction(defaultCompName, compDefObj.Name, fileTemplate)
 		})
 
+		DescribeTable("inherits instance template reconfigure runtime without ComponentVersion", func(enableInstanceAPI bool) {
+			const customImage = "example.com/reconfigure:1"
+			Expect(testCtx.Cli.Delete(testCtx.Ctx, compVerObj)).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(compVerObj), &kbappsv1.ComponentVersion{}, false)).Should(Succeed())
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compDefObj), func(def *kbappsv1.ComponentDefinition) {
+				def.Spec.SystemAccounts = nil
+				def.Spec.Runtime.InitContainers = []corev1.Container{{Name: "prepare", Image: "example.com/prepare:1"}}
+				def.Spec.LifecycleActions = &kbappsv1.ComponentLifecycleActions{MemberJoin: &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"true"}}}}
+			})()).Should(Succeed())
+			createCompObj(defaultCompName, compDefObj.Name, func(f *testapps.MockComponentFactory) {
+				f.SetServiceVersion(compDefObj.Spec.ServiceVersion).
+					AddInstances(kbappsv1.InstanceTemplate{Name: "canary", Replicas: ptr.To(int32(1)), CompDef: compDefObj.Name, ServiceVersion: compDefObj.Spec.ServiceVersion}).
+					SetConfigs([]kbappsv1.ClusterComponentConfig{{Name: ptr.To(fileTemplate), Reconfigure: ptr.To(true),
+						ReconfigureAction: &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Image: customImage, Container: testapps.DefaultMySQLContainerName, Command: []string{"/opt/actions/reload"}}},
+					}})
+				f.GetObject().Spec.EnableInstanceAPI = ptr.To(enableInstanceAPI)
+			})
+			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Spec.EnableInstanceAPI).Should(Equal(ptr.To(enableInstanceAPI)))
+				g.Expect(its.Spec.Configs).Should(HaveLen(1))
+				g.Expect(its.Spec.Configs[0].Reconfigure).Should(Equal(compObj.Spec.Configs[0].ReconfigureAction))
+				g.Expect(its.Spec.Configs[0].ReconfigureActionName).Should(Equal("reconfigure-user-" + fileTemplate))
+				g.Expect(its.Spec.Instances).Should(HaveLen(1))
+				ext, err := instancetemplate.BuildInstanceSetExt(its, nil)
+				g.Expect(err).Should(Succeed())
+				templates := instancetemplate.BuildInstanceTemplateExt(ext)
+				g.Expect(templates).Should(HaveLen(1))
+				pod := templates[0].Spec
+				g.Expect(pod.Containers).Should(ContainElement(And(HaveField("Name", kbagent.ContainerName),
+					HaveField("Image", customImage), HaveField("Command", ContainElement(kbagent.SharedBinaryPath)),
+					HaveField("VolumeMounts", ContainElement(corev1.VolumeMount{Name: fileTemplate, MountPath: "/var/run/app/conf/log"})))))
+				g.Expect(pod.InitContainers).Should(ContainElement(And(HaveField("Name", kbagent.ContainerName4Worker), HaveField("Image", customImage))))
+				for _, container := range append(its.Spec.Template.Spec.Containers, its.Spec.Template.Spec.InitContainers...) {
+					if container.Name == kbagent.ContainerName || container.Name == kbagent.ContainerName4Worker || container.Name == kbagent.InitContainerName {
+						g.Expect(append(pod.Containers, pod.InitContainers...)).Should(ContainElement(container))
+					}
+				}
+				g.Expect(its.Spec.Instances[0].Images).Should(Equal(map[string]string{
+					testapps.DefaultMySQLContainerName: compDefObj.Spec.Runtime.Containers[0].Image, "prepare": "example.com/prepare:1",
+				}))
+			})).Should(Succeed())
+		},
+			Entry("Pod API", false),
+			Entry("Instance API", true),
+		)
+
 		It("reconfigure - action udf", func() {
 			testReconfigureActionUDF(defaultCompName, compDefObj.Name, fileTemplate)
 		})

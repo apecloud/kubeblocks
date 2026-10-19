@@ -77,11 +77,12 @@ func (t *componentLoadResourcesTransformer) transformForNativeComponent(transCtx
 			if err != nil {
 				return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 			}
-			images, err := component.ResolveInstanceTemplateImages4ServiceVersion(ctx, cli, tplCompDef, tpl.ServiceVersion)
+			images, defaults, err := component.ResolveInstanceTemplateImagesAndDefaults4ServiceVersion(ctx, cli, tplCompDef, tpl.ServiceVersion)
 			if err != nil {
 				return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 			}
 			synthesizedComp.InstanceImages[tpl.Name] = images
+			synthesizedComp.InstanceImageDefaults[tpl.Name] = defaults
 		}
 	}
 	transCtx.SynthesizeComponent = synthesizedComp

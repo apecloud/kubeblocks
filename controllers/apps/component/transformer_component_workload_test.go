@@ -17,6 +17,7 @@ package component
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -28,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -537,4 +539,161 @@ func TestInstanceTemplateRegistryPreservedOnReconcile(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestReconcileInstanceTemplateImages(t *testing.T) {
+	pair := instanceTemplateImageSelection{CompDef: "selected", ServiceVersion: "1.0", RuntimeDefaults: []string{"db", "prepare"}}
+	fresh := map[string]string{"db": "new.example/team-b/db:1", "prepare": "new.example/team-b/prepare:1", "kbagent": "new-tools"}
+	build := func() (*component.SynthesizedComponent, *workloads.InstanceSet, *workloads.InstanceSet) {
+		synth := &component.SynthesizedComponent{Instances: []appsv1.InstanceTemplate{{Name: "canary", CompDef: pair.CompDef, ServiceVersion: pair.ServiceVersion}}, InstanceImageDefaults: map[string][]string{"canary": {"db", "prepare"}}}
+		old := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{constant.AppComponentLabelKey: pair.CompDef, constant.KBAppServiceVersionKey: pair.ServiceVersion}}, Spec: workloads.InstanceSetSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "db", Image: "old.example/team-a/db:1"}, {Name: "kbagent", Image: "old-tools"}}, InitContainers: []corev1.Container{{Name: "prepare", Image: "old.example/team-a/prepare:1"}}}}, Instances: []workloads.InstanceTemplate{{Name: "canary"}}}}
+		desired := old.DeepCopy()
+		desired.Spec.Instances[0].Images = map[string]string{}
+		for k, v := range fresh {
+			desired.Spec.Instances[0].Images[k] = v
+		}
+		return synth, old, desired
+	}
+	mark := func(old *workloads.InstanceSet, selection instanceTemplateImageSelection) {
+		data, err := json.Marshal(map[string]instanceTemplateImageSelection{"canary": selection})
+		if err != nil {
+			t.Fatal(err)
+		}
+		old.Annotations[instanceTemplateImageSelectionsAnnotation] = string(data)
+	}
+	for _, tc := range []struct {
+		name     string
+		setup    func(*component.SynthesizedComponent, *workloads.InstanceSet, *workloads.InstanceSet)
+		db, init string
+	}{
+		{name: "legacy nil map adopts parent", db: "old.example/team-a/db:1", init: "old.example/team-a/prepare:1"},
+		{name: "legacy action-only map adopts parent", setup: func(_ *component.SynthesizedComponent, o, _ *workloads.InstanceSet) {
+			o.Spec.Instances[0].Images = map[string]string{"kbagent": "old-tools"}
+		}, db: "old.example/team-a/db:1", init: "old.example/team-a/prepare:1"},
+		{name: "legacy distinct selected definition is corrected", setup: func(s *component.SynthesizedComponent, _, _ *workloads.InstanceSet) {
+			s.Instances[0].CompDef = "different"
+		}},
+		{name: "legacy existing CV override stays fresh", setup: func(_ *component.SynthesizedComponent, o, _ *workloads.InstanceSet) {
+			o.Spec.Instances[0].Images = map[string]string{"db": "old-override", "prepare": "old-prepare"}
+		}},
+		{name: "known same selection freezes exact refs", setup: func(_ *component.SynthesizedComponent, o, _ *workloads.InstanceSet) {
+			mark(o, pair)
+			o.Spec.Instances[0].Images = map[string]string{"db": "old.example/custom/db:1", "prepare": "old.example/custom/prepare:1"}
+		}, db: "old.example/custom/db:1", init: "old.example/custom/prepare:1"},
+		{name: "independent parent upgrade retains selection", setup: func(_ *component.SynthesizedComponent, o, d *workloads.InstanceSet) {
+			mark(o, pair)
+			d.Annotations[constant.AppComponentLabelKey] = "new-parent"
+		}, db: "old.example/team-a/db:1", init: "old.example/team-a/prepare:1"},
+		{name: "explicit definition change keeps new namespace with same tag", setup: func(s *component.SynthesizedComponent, o, _ *workloads.InstanceSet) {
+			mark(o, pair)
+			s.Instances[0].CompDef = "new-definition"
+		}},
+		{name: "explicit service version change", setup: func(s *component.SynthesizedComponent, o, _ *workloads.InstanceSet) {
+			mark(o, pair)
+			s.Instances[0].ServiceVersion = "2.0"
+		}},
+		{name: "new template uses current registry", setup: func(_ *component.SynthesizedComponent, o, _ *workloads.InstanceSet) {
+			mark(o, pair)
+			o.Spec.Instances = nil
+		}},
+		{name: "override becomes default uses current image", setup: func(_ *component.SynthesizedComponent, o, _ *workloads.InstanceSet) {
+			p := pair
+			p.RuntimeDefaults = []string{"prepare"}
+			mark(o, p)
+			o.Spec.Instances[0].Images = map[string]string{"db": "old-override"}
+		}, init: "old.example/team-a/prepare:1"},
+		{name: "default becomes override uses current image", setup: func(s *component.SynthesizedComponent, o, _ *workloads.InstanceSet) {
+			mark(o, pair)
+			s.InstanceImageDefaults["canary"] = []string{"prepare"}
+		}, init: "old.example/team-a/prepare:1"},
+		{name: "no continuously eligible entries stays fresh", setup: func(s *component.SynthesizedComponent, o, _ *workloads.InstanceSet) {
+			mark(o, pair)
+			s.InstanceImageDefaults["canary"] = nil
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewWithT(t)
+			s, o, d := build()
+			if tc.setup != nil {
+				tc.setup(s, o, d)
+			}
+			before := o.DeepCopy()
+			g.Expect(reconcileInstanceTemplateImages(s, o, d)).Should(Succeed())
+			db, init := tc.db, tc.init
+			if db == "" {
+				db = fresh["db"]
+			}
+			if init == "" {
+				init = fresh["prepare"]
+			}
+			g.Expect(d.Spec.Instances[0].Images).Should(Equal(map[string]string{"db": db, "prepare": init, "kbagent": "new-tools"}))
+			g.Expect(o).Should(Equal(before))
+			var state map[string]instanceTemplateImageSelection
+			g.Expect(json.Unmarshal([]byte(d.Annotations[instanceTemplateImageSelectionsAnnotation]), &state)).Should(Succeed())
+			g.Expect(state["canary"].CompDef).Should(Equal(s.Instances[0].CompDef))
+			g.Expect(state["canary"].ServiceVersion).Should(Equal(s.Instances[0].ServiceVersion))
+			g.Expect(state["canary"].RuntimeDefaults).Should(ConsistOf(s.InstanceImageDefaults["canary"]))
+			_, _, retry := build()
+			g.Expect(reconcileInstanceTemplateImages(s, o, retry)).Should(Succeed())
+			g.Expect(retry.Spec.Instances).Should(Equal(d.Spec.Instances))
+			_, _, restarted := build()
+			g.Expect(reconcileInstanceTemplateImages(s, d, restarted)).Should(Succeed())
+			g.Expect(restarted.Spec.Instances).Should(Equal(d.Spec.Instances))
+		})
+	}
+	t.Run("clear remove and reselect", func(t *testing.T) {
+		g := NewWithT(t)
+		s, o, d := build()
+		mark(o, pair)
+		s.Instances[0].CompDef = ""
+		s.Instances[0].ServiceVersion = ""
+		d.Spec.Instances[0].Images = nil
+		g.Expect(reconcileInstanceTemplateImages(s, o, d)).Should(Succeed())
+		g.Expect(d.Annotations[instanceTemplateImageSelectionsAnnotation]).Should(Equal("{}"))
+		merged, err := copyAndMergeITS(o, d)
+		g.Expect(err).Should(Succeed())
+		g.Expect(merged.Annotations[instanceTemplateImageSelectionsAnnotation]).Should(Equal("{}"))
+		g.Expect(merged.Spec.Instances[0].Images).Should(BeNil())
+		s, _, d = build()
+		g.Expect(reconcileInstanceTemplateImages(s, merged, d)).Should(Succeed())
+		g.Expect(d.Spec.Instances[0].Images).Should(Equal(fresh))
+		s.Instances = nil
+		d.Spec.Instances = nil
+		g.Expect(reconcileInstanceTemplateImages(s, o, d)).Should(Succeed())
+		g.Expect(d.Annotations[instanceTemplateImageSelectionsAnnotation]).Should(Equal("{}"))
+	})
+	t.Run("parent only leaves metadata untouched", func(t *testing.T) {
+		g := NewWithT(t)
+		s, _, d := build()
+		s.Instances = nil
+		d.Spec.Instances = nil
+		g.Expect(reconcileInstanceTemplateImages(s, nil, d)).Should(Succeed())
+		g.Expect(d.Annotations).ShouldNot(HaveKey(instanceTemplateImageSelectionsAnnotation))
+	})
+	t.Run("malformed owned state blocks publication", func(t *testing.T) {
+		g := NewWithT(t)
+		s, o, d := build()
+		o.Annotations[instanceTemplateImageSelectionsAnnotation] = "invalid"
+		g.Expect(reconcileInstanceTemplateImages(s, o, d)).ShouldNot(Succeed())
+	})
+	t.Run("stop and start retain images with their identity", func(t *testing.T) {
+		g := NewWithT(t)
+		s, o, d := build()
+		mark(o, pair)
+		s.Stop = ptr.To(true)
+		s.Instances[0].CompDef = "next"
+		g.Expect(reconcileInstanceTemplateImages(s, o, d)).Should(Succeed())
+		transCtx := &componentTransformContext{}
+		transformer := &componentWorkloadTransformer{}
+		_, _, err := transformer.handleWorkloadStartNStop(transCtx, s, o, &d)
+		g.Expect(err).Should(Succeed())
+		g.Expect(d.Annotations[instanceTemplateImageSelectionsAnnotation]).Should(Equal(o.Annotations[instanceTemplateImageSelectionsAnnotation]))
+		g.Expect(d.Spec.Instances[0].Images).Should(Equal(o.Spec.Instances[0].Images))
+		o.Annotations[stopReplicasSnapshotKey] = "{}"
+		s.Stop = nil
+		_, _, err = transformer.handleWorkloadStartNStop(transCtx, s, o, &d)
+		g.Expect(err).Should(Succeed())
+		g.Expect(d.Annotations[instanceTemplateImageSelectionsAnnotation]).Should(Equal(o.Annotations[instanceTemplateImageSelectionsAnnotation]))
+		g.Expect(d.Spec.Instances[0].Images).Should(Equal(o.Spec.Instances[0].Images))
+	})
 }

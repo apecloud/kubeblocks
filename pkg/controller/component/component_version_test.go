@@ -257,7 +257,7 @@ var _ = Describe("instance template image resolution", func() {
 		images, err := ResolveInstanceTemplateImages4ServiceVersion(ctx, testCtx.Cli, def, "2.0.0")
 		Expect(err).Should(Succeed())
 		Expect(images).Should(Equal(map[string]string{"db": "docker.io/library/db:1", "setup": "docker.io/library/setup:1"}))
-		images, err = resolveImagesWithCompVersions4Template(def, []*appsv1.ComponentVersion{ver}, "2.0.0")
+		images, _, err = resolveImagesWithCompVersions4Template(def, []*appsv1.ComponentVersion{ver}, "2.0.0")
 		Expect(err).Should(Succeed())
 		Expect(images).Should(Equal(map[string]string{"db": "docker.io/library/db:2", "setup": "docker.io/library/setup:2", kbagent.ContainerName: "docker.io/library/action:2", kbagent.ContainerName4Worker: "docker.io/library/action:2"}))
 		Expect(def).Should(Equal(before))
@@ -267,13 +267,13 @@ var _ = Describe("instance template image resolution", func() {
 		viper.Set(constant.KBToolsImage, "tools:default")
 		def.Spec.LifecycleActions.PostProvision.Exec.Image = ""
 		delete(ver.Spec.Releases[0].Images, "postProvision")
-		images, err = resolveImagesWithCompVersions4Template(def, []*appsv1.ComponentVersion{ver}, "2.0.0")
+		images, _, err = resolveImagesWithCompVersions4Template(def, []*appsv1.ComponentVersion{ver}, "2.0.0")
 		Expect(err).Should(Succeed())
 		Expect(images[kbagent.ContainerName]).Should(Equal("tools:default"))
 		Expect(images[kbagent.ContainerName4Worker]).Should(Equal("tools:default"))
 		By("retaining the definition image for an action absent from the release")
 		def.Spec.LifecycleActions.PostProvision.Exec.Image = "action:fixed"
-		images, err = resolveImagesWithCompVersions4Template(def, []*appsv1.ComponentVersion{ver}, "2.0.0")
+		images, _, err = resolveImagesWithCompVersions4Template(def, []*appsv1.ComponentVersion{ver}, "2.0.0")
 		Expect(err).Should(Succeed())
 		Expect(images[kbagent.ContainerName]).Should(Equal("docker.io/library/action:fixed"))
 	})
@@ -356,6 +356,14 @@ func TestInstanceTemplateResolvedImages(t *testing.T) {
 				want[kbagent.ContainerName4Worker] = actionImage
 			}
 			g.Expect(images).Should(Equal(want))
+			resolved, defaults, err := ResolveInstanceTemplateImagesAndDefaults4ServiceVersion(context.Background(), cli, def, tc.serviceVersion)
+			g.Expect(err).Should(Succeed())
+			g.Expect(resolved).Should(Equal(images))
+			if tc.withVersion && tc.serviceVersion == "2.0.0" {
+				g.Expect(defaults).Should(BeEmpty())
+			} else {
+				g.Expect(defaults).Should(ConsistOf("db", "prepare"))
+			}
 			g.Expect(def).Should(Equal(before))
 			g.Expect(parent).Should(Equal(parentBefore))
 			if !tc.withVersion {
@@ -394,4 +402,28 @@ func TestInstanceTemplateRuntimeActionNameCollision(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestInstanceTemplateDefaultsBeforeRegistryMapping(t *testing.T) {
+	g := NewWithT(t)
+	oldRegistries, oldTools := viper.Get(constant.CfgRegistries), viper.GetString(constant.KBToolsImage)
+	t.Cleanup(func() {
+		viper.Set(constant.CfgRegistries, oldRegistries)
+		g.Expect(intctrlutil.LoadRegistryConfig()).Should(Succeed())
+		viper.Set(constant.KBToolsImage, oldTools)
+	})
+	viper.Set(constant.CfgRegistries, map[string]any{"registryConfig": []map[string]any{
+		{"from": "source-a.example", "to": "mirror.example", "namespaceMapping": map[string]string{"team-a": "private"}},
+		{"from": "source-b.example", "to": "mirror.example", "namespaceMapping": map[string]string{"team-b": "private"}},
+	}})
+	g.Expect(intctrlutil.LoadRegistryConfig()).Should(Succeed())
+	def := testapps.NewComponentDefinitionFactory("template-default-provenance").SetServiceVersion("1.0.0").SetRuntime(&corev1.Container{Name: "db", Image: "source-a.example/team-a/db:1"}).GetObject()
+	ver := &appsv1.ComponentVersion{ObjectMeta: metav1.ObjectMeta{Name: "releases", Labels: map[string]string{def.Name: def.Name}}, Spec: appsv1.ComponentVersionSpec{Releases: []appsv1.ComponentVersionRelease{{Name: "r1", ServiceVersion: "1.0.0", Images: map[string]string{"db": "source-b.example/team-b/db:1"}}}}, Status: appsv1.ComponentVersionStatus{Phase: appsv1.AvailablePhase}}
+	scheme := runtime.NewScheme()
+	g.Expect(appsv1.AddToScheme(scheme)).Should(Succeed())
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(ver).Build()
+	images, defaults, err := ResolveInstanceTemplateImagesAndDefaults4ServiceVersion(context.Background(), cli, def, "1.0.0")
+	g.Expect(err).Should(Succeed())
+	g.Expect(images["db"]).Should(Equal(intctrlutil.ReplaceImageRegistry(def.Spec.Runtime.Containers[0].Image)))
+	g.Expect(defaults).Should(BeEmpty())
 }

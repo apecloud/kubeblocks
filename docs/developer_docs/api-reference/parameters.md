@@ -3243,7 +3243,8 @@ string
 <td>
 <em>(Optional)</em>
 <p>Specifies the top-level key in the &lsquo;configSchema.cue&rsquo; that organizes the validation rules for parameters.
-This key must exist within the CUE script defined in &lsquo;configSchema.cue&rsquo;.</p>
+This key must exist within the CUE script defined in &lsquo;configSchema.cue&rsquo;.
+If not specified, the first schema found will be used.</p>
 </td>
 </tr>
 <tr>

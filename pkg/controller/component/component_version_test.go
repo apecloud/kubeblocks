@@ -21,6 +21,7 @@ package component
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -255,7 +256,7 @@ var _ = Describe("instance template image resolution", func() {
 		By("returning definition defaults when no compatible ComponentVersion exists")
 		images, err := ResolveInstanceTemplateImages4ServiceVersion(ctx, testCtx.Cli, def, "2.0.0")
 		Expect(err).Should(Succeed())
-		Expect(images).Should(Equal(map[string]string{"db": "docker.io/library/db:1", "setup": "docker.io/library/setup:1", kbagent.ContainerName: "docker.io/library/action:1", kbagent.ContainerName4Worker: "docker.io/library/action:1"}))
+		Expect(images).Should(Equal(map[string]string{"db": "docker.io/library/db:1", "setup": "docker.io/library/setup:1"}))
 		images, err = resolveImagesWithCompVersions4Template(def, []*appsv1.ComponentVersion{ver}, "2.0.0")
 		Expect(err).Should(Succeed())
 		Expect(images).Should(Equal(map[string]string{"db": "docker.io/library/db:2", "setup": "docker.io/library/setup:2", kbagent.ContainerName: "docker.io/library/action:2", kbagent.ContainerName4Worker: "docker.io/library/action:2"}))
@@ -288,11 +289,11 @@ func TestInstanceTemplateResolvedImages(t *testing.T) {
 		wantAction         string
 		registry           bool
 	}{
-		{name: "definition defaults without ComponentVersion", serviceVersion: "1.0.0", actionImage: "docker.io/apecloud/action:1", wantAction: "docker.io/apecloud/action:1"},
-		{name: "definition defaults with registry replacement", registry: true, serviceVersion: "1.0.0", actionImage: "docker.io/apecloud/action:1", wantAction: "docker.io/apecloud/action:1"},
+		{name: "definition defaults without ComponentVersion", serviceVersion: "1.0.0", actionImage: "docker.io/apecloud/action:1"},
+		{name: "definition defaults with registry replacement", registry: true, serviceVersion: "1.0.0", actionImage: "docker.io/apecloud/action:1"},
 		{name: "release images equal definition defaults", withVersion: true, serviceVersion: "1.0.0", actionImage: "docker.io/apecloud/action:1", wantAction: "docker.io/apecloud/action:1"},
 		{name: "release overrides runtime and action images", withVersion: true, serviceVersion: "2.0.0", versionActionImage: "docker.io/apecloud/action:2", wantAction: "docker.io/apecloud/action:2"},
-		{name: "no version keeps semantic version bypass and tools default", serviceVersion: "legacy-version", wantAction: "tools:default"},
+		{name: "no version keeps semantic version bypass and action inheritance", serviceVersion: "legacy-version"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			g := NewWithT(t)
@@ -348,18 +349,49 @@ func TestInstanceTemplateResolvedImages(t *testing.T) {
 			if tc.serviceVersion == "2.0.0" {
 				suffix = "2"
 			}
-			actionImage := strings.Replace(tc.wantAction, "docker.io/apecloud/", prefix, 1)
-			g.Expect(images).Should(Equal(map[string]string{
-				"db":                         prefix + "db:" + suffix,
-				"prepare":                    prefix + "prepare:" + suffix,
-				kbagent.ContainerName:        actionImage,
-				kbagent.ContainerName4Worker: actionImage,
-			}))
+			want := map[string]string{"db": prefix + "db:" + suffix, "prepare": prefix + "prepare:" + suffix}
+			if tc.withVersion {
+				actionImage := strings.Replace(tc.wantAction, "docker.io/apecloud/", prefix, 1)
+				want[kbagent.ContainerName] = actionImage
+				want[kbagent.ContainerName4Worker] = actionImage
+			}
+			g.Expect(images).Should(Equal(want))
 			g.Expect(def).Should(Equal(before))
 			g.Expect(parent).Should(Equal(parentBefore))
 			if !tc.withVersion {
 				g.Expect(parent).Should(Equal(before))
 			}
 		})
+	}
+}
+
+func TestInstanceTemplateRuntimeActionNameCollision(t *testing.T) {
+	for _, initContainer := range []bool{false, true} {
+		for _, actionImage := range []string{"", "docker.io/apecloud/action:1"} {
+			t.Run(fmt.Sprintf("init=%t/actionImage=%s", initContainer, actionImage), func(t *testing.T) {
+				g := NewWithT(t)
+				scheme := runtime.NewScheme()
+				g.Expect(appsv1.AddToScheme(scheme)).Should(Succeed())
+				cli := fake.NewClientBuilder().WithScheme(scheme).Build()
+				def := testapps.NewComponentDefinitionFactory("image-name-collision").SetServiceVersion("1.0.0").GetObject()
+				container := corev1.Container{Name: "memberjoin", Image: "docker.io/apecloud/db:1"}
+				if initContainer {
+					def.Spec.Runtime.InitContainers = []corev1.Container{container}
+					def.Spec.Runtime.Containers = []corev1.Container{{Name: "db", Image: "docker.io/apecloud/db:1"}}
+				} else {
+					def.Spec.Runtime.Containers = []corev1.Container{container}
+				}
+				def.Spec.LifecycleActions = &appsv1.ComponentLifecycleActions{MemberJoin: &appsv1.Action{
+					Exec: &appsv1.ExecAction{Image: actionImage, Command: []string{"true"}},
+				}}
+				images, err := ResolveInstanceTemplateImages4ServiceVersion(context.Background(), cli, def, "1.0.0")
+				g.Expect(err).Should(Succeed())
+				want := map[string]string{container.Name: container.Image}
+				if initContainer {
+					want["db"] = "docker.io/apecloud/db:1"
+				}
+				g.Expect(images).Should(Equal(want))
+			})
+		}
 	}
 }

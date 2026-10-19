@@ -2560,6 +2560,141 @@ var _ = Describe("Component Controller", func() {
 			Entry("registry and namespace mapping, explicit action", "registry and namespace mapping", true),
 		)
 
+		DescribeTable("inherits action runtime without ComponentVersion", func(source string, noLifecycleExec, registryMapping, execContainer bool) {
+			const imagePrefix = "docker.io/apecloud/"
+			const toolsImage = imagePrefix + "kubeblocks-tools:inherit"
+			const actionImage = imagePrefix + "reconfigure:inherit"
+			oldTools := viper.GetString(constant.KBToolsImage)
+			DeferCleanup(func() { viper.Set(constant.KBToolsImage, oldTools) })
+			viper.Set(constant.KBToolsImage, toolsImage)
+			prefix := imagePrefix
+			if registryMapping {
+				viper.Set(constant.CfgRegistries, map[string]any{"registryConfig": []map[string]any{
+					{"from": "docker.io", "to": registry, "namespaceMapping": map[string]string{"apecloud": "private"}},
+					{"from": registry, "to": "twice.invalid"},
+				}})
+				Expect(intctrlutil.LoadRegistryConfig()).Should(Succeed())
+				prefix = registry + "/private/"
+			}
+
+			def := testapps.NewComponentDefinitionFactory("inherited-action-parent").SetServiceVersion("1.0.0").
+				SetRuntime(&corev1.Container{Name: "db", Image: imagePrefix + "db:1",
+					VolumeMounts: []corev1.VolumeMount{{Name: "data", MountPath: "/data"}},
+				}).GetObject()
+			def.Spec.Runtime.Volumes = []corev1.Volume{{Name: "data", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}}}
+			def.Spec.Runtime.InitContainers = []corev1.Container{{Name: "prepare", Image: imagePrefix + "prepare:1"}}
+			if !noLifecycleExec {
+				def.Spec.LifecycleActions = &kbappsv1.ComponentLifecycleActions{MemberJoin: &kbappsv1.Action{
+					Exec: &kbappsv1.ExecAction{Command: []string{"true"}},
+				}}
+			}
+			action := &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Image: actionImage, Command: []string{"/opt/reconfigure"}}}
+			if execContainer {
+				action.Exec.Container = "db"
+			}
+			switch source {
+			case "lifecycle":
+				def.Spec.LifecycleActions.MemberJoin = action
+			case "config":
+				cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "inherited-action-files", Namespace: testCtx.DefaultNamespace},
+					Data: map[string]string{"reload": "true"}}
+				Expect(testCtx.CreateObj(testCtx.Ctx, cm)).Should(Succeed())
+				tpl := kbappsv1.ComponentFileTemplate{Name: "reload", Template: cm.Name, Namespace: cm.Namespace, VolumeName: "reload"}
+				def.Spec.Runtime.Containers[0].VolumeMounts = append(def.Spec.Runtime.Containers[0].VolumeMounts,
+					corev1.VolumeMount{Name: "reload", MountPath: "/etc/reload"})
+				def.Spec.Configs = []kbappsv1.ComponentFileTemplate{tpl}
+			}
+			selected := def.DeepCopy()
+			selected.Name = "inherited-action-selected"
+			selected.Spec.ServiceVersion = "2.0.0"
+			selected.Spec.Runtime.Containers[0].Image = imagePrefix + "db:2"
+			selected.Spec.Runtime.InitContainers[0].Image = imagePrefix + "prepare:2"
+			if source == "lifecycle" {
+				selected.Spec.LifecycleActions.MemberJoin.Exec.Image = imagePrefix + "selected-action:2"
+			}
+			Expect(testCtx.CreateObj(testCtx.Ctx, def)).Should(Succeed())
+			Expect(testCtx.CreateObj(testCtx.Ctx, selected)).Should(Succeed())
+			createCompObj(defaultCompName, def.Name, func(f *testapps.MockComponentFactory) {
+				f.SetServiceVersion("1.0.0").AddInstances(kbappsv1.InstanceTemplate{
+					Name: "canary", Replicas: ptr.To(int32(1)), CompDef: selected.Name, ServiceVersion: "2.0.0",
+				})
+				if source == "config" {
+					f.SetConfigs([]kbappsv1.ClusterComponentConfig{{Name: ptr.To("reload"), Reconfigure: action}})
+				}
+			})
+
+			checkRuntime := func(selected, retried bool) {
+				Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, its *workloads.InstanceSet) {
+					g.Expect(its.Spec.Instances).Should(HaveLen(1))
+					if retried {
+						g.Expect(its.Spec.Instances[0].Annotations).Should(HaveKeyWithValue("action-image-retry", "true"))
+					}
+					app, init := prefix+"db:1", prefix+"prepare:1"
+					if selected {
+						app, init = prefix+"db:2", prefix+"prepare:2"
+						g.Expect(its.Spec.Instances[0].Images).Should(Equal(map[string]string{"db": app, "prepare": init}))
+					} else {
+						g.Expect(its.Spec.Instances[0].Images).Should(BeEmpty())
+					}
+					templates := instanceset.BuildInstanceTemplateExts(&instanceset.InstanceSetExt{
+						Its: its, InstanceTemplates: instanceset.BuildInstanceTemplates(*its.Spec.Replicas, its.Spec.Instances, nil),
+					})
+					g.Expect(templates).Should(HaveLen(1))
+					effective := templates[0].Spec
+					g.Expect(effective.Containers).Should(ContainElement(And(HaveField("Name", "db"), HaveField("Image", app))))
+					g.Expect(effective.InitContainers).Should(ContainElement(And(HaveField("Name", "prepare"), HaveField("Image", init))))
+					wantImage, wantCommand := prefix+"reconfigure:inherit", kbagent.SharedBinaryPath
+					if source == "tools" {
+						wantImage, wantCommand = prefix+"kubeblocks-tools:inherit", kbagent.BinaryPath
+						g.Expect(effective.InitContainers).ShouldNot(ContainElement(HaveField("Name", kbagent.InitContainerName)))
+					} else {
+						g.Expect(effective.InitContainers).Should(ContainElement(And(HaveField("Name", kbagent.InitContainerName),
+							HaveField("Command", kbagent.InitCommand()),
+							HaveField("VolumeMounts", ContainElement(kbagent.SharedVolumeMount())))))
+					}
+					g.Expect(effective.Containers).Should(ContainElement(And(HaveField("Name", kbagent.ContainerName),
+						HaveField("Image", wantImage), HaveField("Command", []string{wantCommand}))))
+					g.Expect(effective.InitContainers).Should(ContainElement(And(HaveField("Name", kbagent.ContainerName4Worker),
+						HaveField("Image", wantImage), HaveField("Command", []string{wantCommand}))))
+					for _, parent := range append(its.Spec.Template.Spec.Containers, its.Spec.Template.Spec.InitContainers...) {
+						if parent.Name != kbagent.ContainerName && parent.Name != kbagent.ContainerName4Worker && parent.Name != kbagent.InitContainerName {
+							continue
+						}
+						g.Expect(append(effective.Containers, effective.InitContainers...)).Should(ContainElement(parent))
+						if parent.Name == kbagent.InitContainerName {
+							continue
+						}
+						g.Expect(parent.Image).Should(Equal(wantImage))
+						g.Expect(parent.Command).Should(Equal([]string{wantCommand}))
+						if source != "tools" {
+							g.Expect(parent.VolumeMounts).Should(ContainElement(kbagent.SharedVolumeMount()))
+						}
+						if execContainer {
+							g.Expect(parent.VolumeMounts).Should(ContainElement(corev1.VolumeMount{Name: "data", MountPath: "/data"}))
+						}
+					}
+				})).Should(Succeed())
+			}
+			checkRuntime(true, false)
+			By("reconciling again with the same selected images")
+			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+				comp.Spec.Instances[0].Annotations = map[string]string{"action-image-retry": "true"}
+			})()).Should(Succeed())
+			checkRuntime(true, true)
+			By("clearing the selection and inheriting the complete parent runtime")
+			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+				comp.Spec.Instances[0].CompDef = ""
+				comp.Spec.Instances[0].ServiceVersion = ""
+			})()).Should(Succeed())
+			checkRuntime(false, true)
+		},
+			Entry("user config reconfigure and lifecycle exec", "config", false, false, false),
+			Entry("default lifecycle tools", "tools", false, false, false),
+			Entry("parent lifecycle image with a distinct selected action", "lifecycle", false, false, false),
+			Entry("config reconfigure without lifecycle exec", "config", true, false, false),
+			Entry("config exec container mounts and registry mapping", "config", false, true, true),
+		)
+
 		It("handles running its and upgrade", func() {
 			createCompObj(defaultCompName, compDefObj.Name, func(f *testapps.MockComponentFactory) {
 				f.SetServiceVersion(compDefObj.Spec.ServiceVersion)

@@ -140,10 +140,16 @@ func (u upgradeOpsHandler) targetsUnchanged(opsRes *OpsResource) bool {
 				found = true
 				componentDef := ptr.Deref(upgradeInstance.ComponentDefinitionName, "")
 				serviceVersion := ptr.Deref(upgradeInstance.ServiceVersion, "")
-				if upgradeInstance.ComponentDefinitionName != nil && upgradeInstance.ServiceVersion != nil && componentDef == "" && serviceVersion == "" {
-					if instance.CompDef != "" || instance.ServiceVersion != "" {
-						return false
+				inherited := upgradeInstance.ComponentDefinitionName != nil && upgradeInstance.ServiceVersion != nil && componentDef == "" && serviceVersion == ""
+				for _, original := range opsRes.OpsRequest.Status.LastConfiguration.Components[upgrade.ComponentName].InstanceTemplates {
+					if original.Name == upgradeInstance.Name {
+						inherited = ptr.Deref(upgradeInstance.ComponentDefinitionName, original.CompDef) == "" &&
+							ptr.Deref(upgradeInstance.ServiceVersion, original.ServiceVersion) == ""
+						break
 					}
+				}
+				if inherited && (instance.CompDef != "" || instance.ServiceVersion != "") {
+					return false
 				}
 				if componentDef != "" && instance.CompDef != componentDef {
 					return false

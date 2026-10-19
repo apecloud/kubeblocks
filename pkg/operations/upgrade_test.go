@@ -28,6 +28,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	k8sappsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -443,22 +444,24 @@ var _ = Describe("Upgrade OpsRequest", func() {
 				Expect(phase).Should(Equal(opsv1alpha1.OpsRunningPhase))
 				Expect(requeue).Should(BeNumerically(">", 0))
 			}
-			for _, name := range []string{
-				clusterName + "-" + componentName + "-0",
-				clusterName + "-" + componentName + "-1",
-				clusterName + "-" + componentName + "-pinned-0",
-			} {
-				image := testapps.AppImage(testapps.AppName, baseRelease)
-				if name == clusterName+"-"+componentName+"-pinned-0" {
-					image = testapps.AppImage(testapps.AppName, release0)
+			if len(upgrade.Instances) == 0 {
+				for _, name := range []string{
+					clusterName + "-" + componentName + "-0",
+					clusterName + "-" + componentName + "-1",
+					clusterName + "-" + componentName + "-pinned-0",
+				} {
+					image := testapps.AppImage(testapps.AppName, baseRelease)
+					if name == clusterName+"-"+componentName+"-pinned-0" {
+						image = testapps.AppImage(testapps.AppName, release0)
+					}
+					pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterName, componentName, name, "")
+					Expect(testapps.ChangeObj(&testCtx, pod, func(pod *corev1.Pod) {
+						pod.Spec.Containers[0].Image = image
+					})).Should(Succeed())
+					Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
+						pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: testapps.DefaultMySQLContainerName, Image: image}}
+					})).Should(Succeed())
 				}
-				pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterName, componentName, name, "")
-				Expect(testapps.ChangeObj(&testCtx, pod, func(pod *corev1.Pod) {
-					pod.Spec.Containers[0].Image = image
-				})).Should(Succeed())
-				Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
-					pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: testapps.DefaultMySQLContainerName, Image: image}}
-				})).Should(Succeed())
 			}
 			By("waiting for the Component to consume the Cluster generation")
 			Expect(testapps.ChangeObj(&testCtx, comp, func(comp *appsv1.Component) {
@@ -477,6 +480,9 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			By("waiting for the workload to consume the Component generation")
 			Expect(testapps.ChangeObj(&testCtx, its, func(its *workloads.InstanceSet) {
 				its.Annotations = map[string]string{constant.KubeBlocksGenerationKey: strconv.FormatInt(comp.Generation-1, 10)}
+				if len(upgrade.Instances) > 0 {
+					its.Spec.PodManagementPolicy = k8sappsv1.ParallelPodManagement
+				}
 				its.Spec.Instances = []workloads.InstanceTemplate{{Name: "pinned", Replicas: pointer.Int32(1),
 					Images: map[string]string{testapps.DefaultMySQLContainerName: testapps.AppImage(testapps.AppName, release0)}}}
 			})).Should(Succeed())
@@ -493,6 +499,30 @@ var _ = Describe("Upgrade OpsRequest", func() {
 				its.Annotations[constant.KBAppServiceVersionKey] = comp.Spec.ServiceVersion
 				its.Spec.Instances[0].Images[testapps.DefaultMySQLContainerName] = ownerImage
 			})).Should(Succeed())
+			if len(upgrade.Instances) > 0 {
+				tree := kubebuilderx.NewObjectTree()
+				tree.SetRoot(its)
+				for _, reconciler := range []kubebuilderx.Reconciler{instanceset.NewRevisionUpdateReconciler(), instanceset.NewReplicasAlignmentReconciler()} {
+					_, err := reconciler.Reconcile(tree)
+					Expect(err).ShouldNot(HaveOccurred())
+				}
+				Expect(k8sClient.Status().Update(ctx, its)).Should(Succeed())
+				pods := tree.List(&corev1.Pod{})
+				Expect(pods).Should(HaveLen(3))
+				for _, object := range pods {
+					pod := object.(*corev1.Pod)
+
+					if pod.Name == clusterName+"-"+componentName+"-pinned-0" {
+						pod.Spec.Containers[0].Image = testapps.AppImage(testapps.AppName, release0)
+					}
+					Expect(k8sClient.Create(ctx, pod)).Should(Succeed())
+					Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
+						pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}
+						pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: pod.Spec.Containers[0].Name, Image: pod.Spec.Containers[0].Image}}
+					})).Should(Succeed())
+				}
+			}
+
 			By("waiting while the template Pod still has the old spec and status images")
 			phase, _, err := (upgradeOpsHandler{}).ReconcileAction(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
@@ -849,7 +879,6 @@ func TestUpgradeTemplateInitProgress(t *testing.T) {
 				return GetOpsManager().OpsMap[opsv1alpha1.UpgradeType].OpsHandler.ReconcileAction(reqCtx, cli, res)
 			}
 			if tc.ownerError {
-				// Inject an invalid persisted revision encoding at the public owner boundary.
 				its.Status.UpdateRevisions = map[string]string{"zstd": "invalid!"}
 				g.Expect(cli.Update(ctx, its)).To(Succeed())
 				phase, _, err := reconcile()
@@ -859,7 +888,7 @@ func TestUpgradeTemplateInitProgress(t *testing.T) {
 				g.Expect(cli.Update(ctx, its)).To(Succeed())
 			}
 			for i := 0; i < 2; i++ {
-				phase, _, err := reconcile()
+				phase, requeue, err := reconcile()
 				g.Expect(err).NotTo(HaveOccurred())
 				if tc.legacy {
 					g.Expect(phase).To(Equal(opsv1alpha1.OpsSucceedPhase))
@@ -867,6 +896,7 @@ func TestUpgradeTemplateInitProgress(t *testing.T) {
 				}
 				g.Expect(phase).To(Equal(opsv1alpha1.OpsRunningPhase))
 				g.Expect(res.OpsRequest.Status.Progress).To(Equal("0/1"))
+				g.Expect(requeue).To(BeNumerically(">", 0))
 			}
 			if !tc.deferred {
 				pod.Spec.InitContainers = desiredPod.Spec.InitContainers

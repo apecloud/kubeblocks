@@ -252,7 +252,10 @@ func TestValidateUpgradeInstanceServiceVersion(t *testing.T) {
 				}}},
 			}}}
 			before := ops.DeepCopy()
-			err := ops.ValidateOps(context.Background(), nil, nil)
+			cluster := &appsv1.Cluster{Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{
+				Name: "pg", Instances: []appsv1.InstanceTemplate{{Name: "canary"}},
+			}}}}
+			err := ops.ValidateOps(context.Background(), nil, cluster)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("ValidateOps() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -314,7 +317,11 @@ func TestValidateUpgradeMixedTargets(t *testing.T) {
 			ops := &OpsRequest{Spec: OpsRequestSpec{Type: UpgradeType, SpecificOpsRequest: SpecificOpsRequest{
 				Upgrade: &Upgrade{Components: tt.components},
 			}}}
-			if err := ops.ValidateOps(context.Background(), nil, nil); (err != nil) != tt.wantErr {
+			cluster := &appsv1.Cluster{Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{
+				{Name: "pg", Instances: []appsv1.InstanceTemplate{{Name: "stable"}, {Name: "canary"}}},
+				{Name: "redis", Instances: []appsv1.InstanceTemplate{{Name: "canary"}}},
+			}}}
+			if err := ops.ValidateOps(context.Background(), nil, cluster); (err != nil) != tt.wantErr {
 				t.Errorf("ValidateOps() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -338,5 +345,53 @@ func TestUpgradeInstanceTemplateJSONPreservesOverrides(t *testing.T) {
 		if !reflect.DeepEqual(decoded, target) {
 			t.Errorf("JSON round trip changed override presence: got %#v, want %#v", decoded, target)
 		}
+	}
+}
+
+func TestValidateUpgradeInstanceTargets(t *testing.T) {
+	for _, tc := range []struct {
+		name, owner, template, wantError                 string
+		shard, independent, emptyIndependent, parentOnly bool
+	}{
+		{name: "component", owner: "db", template: "canary"},
+		{name: "missing component template", owner: "db", template: "missing", wantError: "missing"},
+		{name: "missing owner", owner: "missing", template: "canary", wantError: "canary"},
+		{name: "sharding", owner: "shards", template: "canary", shard: true},
+		{name: "missing sharding template", owner: "shards", template: "missing", shard: true, wantError: "missing"},
+		{name: "independent instances", owner: "shards", template: "canary", shard: true, independent: true, wantError: "special"},
+		{name: "empty independent instances", owner: "shards", template: "canary", shard: true, emptyIndependent: true, wantError: "special"},
+		{name: "old parent request", owner: "shards", shard: true, independent: true, parentOnly: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			spec := appsv1.ClusterComponentSpec{Name: "db", Instances: []appsv1.InstanceTemplate{{Name: "canary"}}}
+			cluster := &appsv1.Cluster{Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{spec}}}
+			if tc.shard {
+				cluster.Spec.ComponentSpecs = nil
+				cluster.Spec.Shardings = []appsv1.ClusterSharding{{Name: "shards", Shards: 1, Template: spec,
+					ShardTemplates: []appsv1.ShardTemplate{{Name: "special", Replicas: ptr.To(int32(2)), ServiceVersion: ptr.To("2.0.0")}},
+				}}
+				if tc.independent {
+					cluster.Spec.Shardings[0].ShardTemplates[0].Instances = []appsv1.InstanceTemplate{{Name: "canary"}}
+				}
+				if tc.emptyIndependent {
+					cluster.Spec.Shardings[0].ShardTemplates[0].Instances = []appsv1.InstanceTemplate{}
+				}
+			}
+			target := UpgradeComponent{ComponentOps: ComponentOps{ComponentName: tc.owner}}
+			if !tc.parentOnly {
+				target.Instances = []UpgradeInstanceTemplate{{Name: tc.template, ComponentDefinitionName: ptr.To("db-v2")}}
+			}
+			ops := &OpsRequest{Spec: OpsRequestSpec{Type: UpgradeType, SpecificOpsRequest: SpecificOpsRequest{
+				Upgrade: &Upgrade{Components: []UpgradeComponent{target}},
+			}}}
+			err := ops.ValidateOps(context.Background(), nil, cluster)
+			if tc.wantError == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else if err == nil || !strings.Contains(err.Error(), tc.wantError) {
+				t.Fatalf("error = %v, want %q", err, tc.wantError)
+			}
+		})
 	}
 }

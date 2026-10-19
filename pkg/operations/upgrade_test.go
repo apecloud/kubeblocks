@@ -21,6 +21,7 @@ package operations
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
 
@@ -28,6 +29,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -439,9 +441,14 @@ func TestUpgradeInstanceTemplateVersions(t *testing.T) {
 		ownerRecovery, zeroReplicas    bool
 		legacyShard, missingITS        bool
 		mixed                          bool
+		targetInstances                []opsv1alpha1.UpgradeInstanceTemplate
 		want                           opsv1alpha1.OpsPhase
 		progress                       string
 	}{
+		{name: "definition-only template target waits for owner", targetInstances: []opsv1alpha1.UpgradeInstanceTemplate{{Name: "fixed", ComponentDefinitionName: ptr.To("db")}}, ownerRecovery: true, templateImage: "db:v2", want: opsv1alpha1.OpsSucceedPhase, progress: "2/2"},
+		{name: "reset template target waits for owner", targetInstances: []opsv1alpha1.UpgradeInstanceTemplate{{Name: "fixed", ComponentDefinitionName: ptr.To(""), ServiceVersion: ptr.To("")}}, ownerRecovery: true, templateImage: "db:v2", want: opsv1alpha1.OpsSucceedPhase, progress: "2/2"},
+		{name: "sharding reset template target waits for owner", targetInstances: []opsv1alpha1.UpgradeInstanceTemplate{{Name: "fixed", ComponentDefinitionName: ptr.To(""), ServiceVersion: ptr.To("")}}, shard: true, ownerRecovery: true, templateImage: "db:v2", want: opsv1alpha1.OpsSucceedPhase, progress: "2/2"},
+		{name: "definition-only template target wrong image", targetInstances: []opsv1alpha1.UpgradeInstanceTemplate{{Name: "fixed", ComponentDefinitionName: ptr.To("db")}}, templateImage: "db:wrong", want: opsv1alpha1.OpsRunningPhase, progress: "1/2"},
 		{name: "mixed legacy shard and heterogeneous component", legacyShard: true, shard: true, mixed: true, templateImage: "db:v2", want: opsv1alpha1.OpsSucceedPhase, progress: "4/4"},
 		{name: "legacy shard without ITS", legacyShard: true, missingITS: true, shard: true, flat: true, templateImage: "db:v2", want: opsv1alpha1.OpsSucceedPhase, progress: "2/2"},
 		{name: "legacy shard with stale publication", legacyShard: true, shard: true, templateImage: "db:v2", want: opsv1alpha1.OpsSucceedPhase, progress: "2/2"},
@@ -546,6 +553,21 @@ func TestUpgradeInstanceTemplateVersions(t *testing.T) {
 					Phase: opsv1alpha1.OpsRunningPhase, StartTimestamp: metav1.NewTime(time.Now()),
 				},
 			}
+			if len(tc.targetInstances) > 0 {
+				if tc.shard {
+					cluster.Spec.Shardings[0].Template.Instances = spec.Instances
+					cluster.Spec.Shardings[0].ShardTemplates[0].Instances = nil
+				}
+				ops.Spec.Upgrade.Components[0].Instances = tc.targetInstances
+				for _, targetInstance := range tc.targetInstances {
+					if targetInstance.ComponentDefinitionName != nil {
+						spec.Instances[0].CompDef = *targetInstance.ComponentDefinitionName
+					}
+					if targetInstance.ServiceVersion != nil {
+						spec.Instances[0].ServiceVersion = *targetInstance.ServiceVersion
+					}
+				}
+			}
 			pod := func(name, image string) *corev1.Pod {
 				return &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
@@ -586,8 +608,12 @@ func TestUpgradeInstanceTemplateVersions(t *testing.T) {
 				CompDef: spec.ComponentDef, ServiceVersion: spec.ServiceVersion, Replicas: spec.Replicas,
 				Instances: spec.Instances, FlatInstanceOrdinal: spec.FlatInstanceOrdinal,
 			}
+			if len(tc.targetInstances) > 0 && spec.Instances[0].CompDef != "" {
+				owner.Spec.Instances = spec.DeepCopy().Instances
+				owner.Spec.Instances[0].ServiceVersion = "2.0.0"
+			}
 			images := map[string]string{"db": "db:v1"}
-			if tc.version == "0.0.0" {
+			if tc.version == "0.0.0" || len(tc.targetInstances) > 0 {
 				images = nil
 			}
 			if tc.name == "fixed template" {
@@ -690,7 +716,9 @@ func TestUpgradeInstanceTemplateVersions(t *testing.T) {
 						t.Fatal(err)
 					}
 					cluster.Spec.Shardings[0].ShardTemplates[0].Replicas = ptr.To(int32(2))
-					cluster.Spec.Shardings[0].ShardTemplates[0].Instances[0].ServiceVersion = "1.0.0"
+					if len(tc.targetInstances) == 0 {
+						cluster.Spec.Shardings[0].ShardTemplates[0].Instances[0].ServiceVersion = "1.0.0"
+					}
 					owner.Spec.Replicas = 0
 					owner.Spec.Instances = nil
 				}
@@ -738,7 +766,7 @@ func TestUpgradeInstanceTemplateVersions(t *testing.T) {
 				if err != nil || phase != opsv1alpha1.OpsRunningPhase || ops.Status.Progress != "1/2" {
 					t.Fatalf("wrong image phase=%s progress=%s err=%v", phase, ops.Status.Progress, err)
 				}
-				fixed.Spec.Containers[0].Image = "db:v1"
+				fixed.Spec.Containers[0].Image = tc.templateImage
 				if err := cli.Update(context.Background(), fixed); err != nil {
 					t.Fatal(err)
 				}
@@ -841,5 +869,138 @@ func TestUpgradeZeroShards(t *testing.T) {
 	}
 	if stored.Status.Phase != opsv1alpha1.OpsAbortedPhase {
 		t.Fatalf("missing shard timed out with phase=%s, want Aborted", stored.Status.Phase)
+	}
+}
+
+func TestUpgradeNamedInstanceTemplates(t *testing.T) {
+	for _, shard := range []bool{false, true} {
+		name := "component"
+		if shard {
+			name = "sharding"
+		}
+		t.Run(name, func(t *testing.T) {
+			for _, tc := range []struct {
+				name                            string
+				parentDefinition, parentVersion *string
+				targets                         []opsv1alpha1.UpgradeInstanceTemplate
+				missingBeforeAction             bool
+			}{
+				{name: "template removed before action", missingBeforeAction: true, targets: []opsv1alpha1.UpgradeInstanceTemplate{{Name: "canary", ServiceVersion: ptr.To("2.0.0")}}},
+				{name: "definition only", targets: []opsv1alpha1.UpgradeInstanceTemplate{{Name: "canary", ComponentDefinitionName: ptr.To("db-v2")}}},
+				{name: "version only", targets: []opsv1alpha1.UpgradeInstanceTemplate{{Name: "canary", ServiceVersion: ptr.To("2.0.0")}}},
+				{name: "both and multiple", targets: []opsv1alpha1.UpgradeInstanceTemplate{
+					{Name: "canary", ComponentDefinitionName: ptr.To("db-v2"), ServiceVersion: ptr.To("2.0.0")},
+					{Name: "stable", ServiceVersion: ptr.To("1.1.0")},
+				}},
+				{name: "reset overrides", targets: []opsv1alpha1.UpgradeInstanceTemplate{{Name: "canary", ComponentDefinitionName: ptr.To(""), ServiceVersion: ptr.To("")}}},
+				{name: "mixed parent", parentDefinition: ptr.To("db-v3"), parentVersion: ptr.To("3.0.0"), targets: []opsv1alpha1.UpgradeInstanceTemplate{{Name: "canary", ServiceVersion: ptr.To("2.0.0")}}},
+				{name: "parent empty definition exception", parentDefinition: ptr.To(""), parentVersion: ptr.To(""), targets: []opsv1alpha1.UpgradeInstanceTemplate{{Name: "canary", ComponentDefinitionName: ptr.To("")}}},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					ctx := context.Background()
+					scheme := runtime.NewScheme()
+					for _, add := range []func(*runtime.Scheme) error{corev1.AddToScheme, appsv1.AddToScheme, opsv1alpha1.AddToScheme} {
+						if err := add(scheme); err != nil {
+							t.Fatal(err)
+						}
+					}
+					spec := appsv1.ClusterComponentSpec{Name: "db", ComponentDef: "db-v1", ServiceVersion: "1.0.0", Replicas: 3,
+						Instances: []appsv1.InstanceTemplate{
+							{Name: "stable", CompDef: "db-v1", ServiceVersion: "1.0.0", Replicas: ptr.To(int32(1))},
+							{Name: "canary", CompDef: "db-v1", ServiceVersion: "1.0.0", Replicas: ptr.To(int32(1)), Canary: ptr.To(true),
+								Ordinals: appsv1.Ordinals{Discrete: []int32{7}}, Labels: map[string]string{"custom": "label"}, Annotations: map[string]string{"custom": "annotation"},
+								Resources:            &corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")}},
+								SchedulingPolicy:     &appsv1.SchedulingPolicy{NodeSelector: map[string]string{"disk": "ssd"}},
+								VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{Name: "data"}}, Env: []corev1.EnvVar{{Name: "KEEP", Value: "value"}}},
+							{Name: "sibling", ServiceVersion: "0.9.0", Replicas: ptr.To(int32(1))},
+						},
+					}
+					cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster", Namespace: "ns"},
+						Spec:   appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{spec, {Name: "other", ComponentDef: "other", Replicas: 1}}},
+						Status: appsv1.ClusterStatus{Phase: appsv1.RunningClusterPhase},
+					}
+					targetName := "db"
+					if shard {
+						targetName = "shards"
+						cluster.Spec.ComponentSpecs = cluster.Spec.ComponentSpecs[1:]
+						cluster.Spec.Shardings = []appsv1.ClusterSharding{{Name: targetName, Shards: 1, Template: spec,
+							ShardTemplates: []appsv1.ShardTemplate{{Name: "special", Replicas: ptr.To(int32(2)), ServiceVersion: ptr.To("2.0.0")}},
+						}}
+					}
+					before := cluster.DeepCopy()
+					ops := &opsv1alpha1.OpsRequest{ObjectMeta: metav1.ObjectMeta{Name: "upgrade", Namespace: "ns"},
+						Spec: opsv1alpha1.OpsRequestSpec{ClusterName: cluster.Name, Type: opsv1alpha1.UpgradeType,
+							SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{Upgrade: &opsv1alpha1.Upgrade{Components: []opsv1alpha1.UpgradeComponent{{
+								ComponentOps: opsv1alpha1.ComponentOps{ComponentName: targetName}, ComponentDefinitionName: tc.parentDefinition, ServiceVersion: tc.parentVersion, Instances: tc.targets,
+							}}}},
+						}, Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsPendingPhase},
+					}
+					cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(cluster, ops).WithObjects(cluster, ops).Build()
+					reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+					res := &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(100)}
+					for i := 0; i < 3; i++ {
+						if i == 1 && tc.missingBeforeAction {
+							getComponentSpecOrShardingTemplate(cluster, targetName).Instances[1].Name = "removed"
+							if err := cli.Update(ctx, cluster); err != nil {
+								t.Fatal(err)
+							}
+						}
+						if _, err := GetOpsManager().Do(reqCtx, cli, res); err != nil {
+							t.Fatal(err)
+						}
+						if err := cli.Get(ctx, client.ObjectKeyFromObject(cluster), cluster); err != nil {
+							t.Fatal(err)
+						}
+						if err := cli.Get(ctx, client.ObjectKeyFromObject(ops), ops); err != nil {
+							t.Fatal(err)
+						}
+					}
+					if tc.missingBeforeAction {
+						beforeSpec := getComponentSpecOrShardingTemplate(before, targetName)
+						beforeSpec.Instances[1].Name = "removed"
+						if ops.Status.Phase != opsv1alpha1.OpsFailedPhase || !reflect.DeepEqual(cluster.Spec, before.Spec) {
+							t.Fatalf("removed template request phase=%s, cluster=%#v", ops.Status.Phase, cluster.Spec)
+						}
+						return
+					}
+					want := before.DeepCopy()
+					wantedSpec := &want.Spec.ComponentSpecs[0]
+					if shard {
+						wantedSpec = &want.Spec.Shardings[0].Template
+					}
+					if tc.parentDefinition != nil && *tc.parentDefinition != "" {
+						wantedSpec.ComponentDef = *tc.parentDefinition
+					}
+					if tc.parentVersion != nil {
+						wantedSpec.ServiceVersion = *tc.parentVersion
+					}
+					for _, target := range tc.targets {
+						for i := range wantedSpec.Instances {
+							instance := &wantedSpec.Instances[i]
+							if instance.Name != target.Name {
+								continue
+							}
+							if target.ComponentDefinitionName != nil {
+								instance.CompDef = *target.ComponentDefinitionName
+							}
+							if target.ServiceVersion != nil {
+								instance.ServiceVersion = *target.ServiceVersion
+							}
+						}
+					}
+					if !reflect.DeepEqual(cluster.Spec, want.Spec) {
+						t.Fatalf("cluster spec = %#v, want %#v", cluster.Spec, want.Spec)
+					}
+					last := ops.Status.LastConfiguration.Components[targetName]
+					if last.ComponentDefinitionName != spec.ComponentDef || last.ServiceVersion != spec.ServiceVersion || !reflect.DeepEqual(last.Instances, spec.Instances) {
+						t.Fatalf("last configuration = %#v, want original template configuration", last)
+					}
+					last.Instances[1].Labels["custom"] = "changed"
+					if !reflect.DeepEqual(getComponentSpecOrShardingTemplate(cluster, targetName).Instances, wantedSpec.Instances) {
+						t.Fatal("last configuration aliases desired templates")
+					}
+				})
+			}
+		})
 	}
 }

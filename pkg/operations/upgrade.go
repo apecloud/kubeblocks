@@ -78,6 +78,21 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		if upgradeComp.ServiceVersion != nil {
 			compSpec.ServiceVersion = *upgradeComp.ServiceVersion
 		}
+		for _, target := range upgradeComp.Instances {
+			for i := range compSpec.Instances {
+				instance := &compSpec.Instances[i]
+				if instance.Name != target.Name {
+					continue
+				}
+				if target.ComponentDefinitionName != nil {
+					instance.CompDef = *target.ComponentDefinitionName
+				}
+				if target.ServiceVersion != nil {
+					instance.ServiceVersion = *target.ServiceVersion
+				}
+				break
+			}
+		}
 		return nil
 	}); err != nil {
 		return err
@@ -110,7 +125,7 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	compOpsHelper = newComponentOpsHelper(upgradeSpec.Components)
 	legacyDefinitions := map[string]*appsv1.ComponentDefinition{}
 	for _, target := range upgradeSpec.Components {
-		if upgradeTargetHasInstanceVersions(opsRes.Cluster, target.ComponentName) {
+		if len(target.Instances) > 0 || upgradeTargetHasInstanceVersions(opsRes.Cluster, target.ComponentName) {
 			continue
 		}
 		spec := getComponentSpecOrShardingTemplate(opsRes.Cluster, target.ComponentName)
@@ -184,10 +199,14 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 func (u upgradeOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.Upgrade.Components)
 	compOpsHelper.saveLastConfigurations(opsRes, func(compSpec appsv1.ClusterComponentSpec, comOps ComponentOpsInterface) opsv1alpha1.LastComponentConfiguration {
-		return opsv1alpha1.LastComponentConfiguration{
+		last := opsv1alpha1.LastComponentConfiguration{
 			ComponentDefinitionName: compSpec.ComponentDef,
 			ServiceVersion:          compSpec.ServiceVersion,
 		}
+		if len(comOps.(opsv1alpha1.UpgradeComponent).Instances) > 0 {
+			last.Instances = compSpec.DeepCopy().Instances
+		}
+		return last
 	})
 	return nil
 }
@@ -227,7 +246,7 @@ func (u upgradeOpsHandler) getUpgradeComponentSpecs(reqCtx intctrlutil.RequestCt
 	cli client.Client, opsRes *OpsResource) (map[string]*appsv1.ClusterComponentSpec, bool, error) {
 	specs := map[string]*appsv1.ClusterComponentSpec{}
 	for _, target := range opsRes.OpsRequest.Spec.Upgrade.Components {
-		if !upgradeTargetHasInstanceVersions(opsRes.Cluster, target.ComponentName) {
+		if len(target.Instances) == 0 && !upgradeTargetHasInstanceVersions(opsRes.Cluster, target.ComponentName) {
 			continue
 		}
 		found := false

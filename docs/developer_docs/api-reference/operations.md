@@ -4693,7 +4693,7 @@ use the latest available version in ComponentVersion.</p>
 <p>Specifies upgrades for existing named instance templates. Each target applies to all replicas of that template.
 For a component, targets refer to spec.componentSpecs[].instances.
 For a sharding, targets refer to spec.shardings[].template.instances.
-Targets do not select overrides in spec.shardings[].shardTemplates[].instances.</p>
+Sharding targets require all shards to inherit the common instance template list.</p>
 </td>
 </tr>
 </tbody>

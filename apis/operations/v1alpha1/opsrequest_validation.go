@@ -230,6 +230,26 @@ func (r *OpsRequest) validateUpgrade(ctx context.Context, k8sClient client.Clien
 				}
 			}
 		}
+		if len(v.Instances) == 0 {
+			continue
+		}
+		var instanceNames []string
+		for _, instance := range v.Instances {
+			instanceNames = append(instanceNames, instance.Name)
+		}
+		if err := r.checkInstanceTemplate(cluster, v.ComponentOps, instanceNames); err != nil {
+			return err
+		}
+		for _, sharding := range cluster.Spec.Shardings {
+			if sharding.Name != v.ComponentName {
+				continue
+			}
+			for _, template := range sharding.ShardTemplates {
+				if template.Instances != nil {
+					return fmt.Errorf("instance template upgrade is not supported for sharding %q with independent instances in shard template %q", sharding.Name, template.Name)
+				}
+			}
+		}
 	}
 	return nil
 }

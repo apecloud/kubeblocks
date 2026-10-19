@@ -21,6 +21,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 func TestSetStatusAndMessage(t *testing.T) {
@@ -209,7 +211,10 @@ func TestValidateUpgradeInstanceTemplateServiceVersion(t *testing.T) {
 					},
 				}},
 			}}}}
-			err := request.ValidateOps(context.Background(), nil, nil)
+			cluster := &appsv1.Cluster{Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{
+				Name: "pg", Instances: []appsv1.InstanceTemplate{{Name: "stable"}, {Name: "canary"}},
+			}}}}
+			err := request.ValidateOps(context.Background(), nil, cluster)
 			if tc.wantError == "" {
 				if err != nil {
 					t.Fatal(err)
@@ -217,6 +222,45 @@ func TestValidateUpgradeInstanceTemplateServiceVersion(t *testing.T) {
 				return
 			}
 			if err == nil || !strings.Contains(err.Error(), tc.wantError) {
+				t.Fatalf("error = %v, want %q", err, tc.wantError)
+			}
+		})
+	}
+}
+
+func TestValidateUpgradeInstanceTemplateTargets(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		component string
+		instance  string
+		overrides []appsv1.ShardTemplate
+		wantError string
+	}{
+		{name: "component", component: "pg", instance: "canary"},
+		{name: "sharding", component: "shards", instance: "canary"},
+		{name: "inherited instances", component: "shards", instance: "canary", overrides: []appsv1.ShardTemplate{{Name: "zone-a", CompDef: strPtr("pg-new")}}},
+		{name: "missing template", component: "pg", instance: "missing", wantError: "missing"},
+		{name: "missing owner", component: "missing", instance: "canary", wantError: "not found"},
+		{name: "independent instances", component: "shards", instance: "canary", overrides: []appsv1.ShardTemplate{{Name: "zone-a", Instances: []appsv1.InstanceTemplate{{Name: "canary"}}}}, wantError: `shard template "zone-a" overriding instances`},
+		{name: "empty independent instances", component: "shards", instance: "canary", overrides: []appsv1.ShardTemplate{{Name: "zone-a", Instances: []appsv1.InstanceTemplate{}}}, wantError: `shard template "zone-a" overriding instances`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			component := appsv1.ClusterComponentSpec{Name: "pg", Instances: []appsv1.InstanceTemplate{{Name: "canary"}}}
+			cluster := &appsv1.Cluster{Spec: appsv1.ClusterSpec{
+				ComponentSpecs: []appsv1.ClusterComponentSpec{component},
+				Shardings:      []appsv1.ClusterSharding{{Name: "shards", Template: component, ShardTemplates: tc.overrides}},
+			}}
+			request := &OpsRequest{Spec: OpsRequestSpec{Type: UpgradeType, SpecificOpsRequest: SpecificOpsRequest{Upgrade: &Upgrade{
+				Components: []UpgradeComponent{{ComponentOps: ComponentOps{ComponentName: tc.component},
+					Instances: []UpgradeInstanceTemplate{{Name: tc.instance, ComponentDefinitionName: strPtr("pg-new")}},
+				}},
+			}}}}
+			err := request.ValidateOps(context.Background(), nil, cluster)
+			if tc.wantError == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else if err == nil || !strings.Contains(err.Error(), tc.wantError) {
 				t.Fatalf("error = %v, want %q", err, tc.wantError)
 			}
 		})

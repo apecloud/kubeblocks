@@ -359,6 +359,7 @@ type UpgradeComponent struct {
 	// For a component, targets refer to spec.componentSpecs[].instances.
 	// For a sharding, targets refer to spec.shardings[].template.instances.
 	// Targets do not select overrides in spec.shardings[].shardTemplates[].instances.
+	// Sharding targets require all shards to inherit the common instance template list.
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map

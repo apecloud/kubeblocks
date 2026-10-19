@@ -65,6 +65,21 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		if upgradeComp.ServiceVersion != nil {
 			compSpec.ServiceVersion = *upgradeComp.ServiceVersion
 		}
+		for _, upgradeInstance := range upgradeComp.Instances {
+			for i := range compSpec.Instances {
+				instance := &compSpec.Instances[i]
+				if instance.Name != upgradeInstance.Name {
+					continue
+				}
+				if upgradeInstance.ComponentDefinitionName != nil {
+					instance.CompDef = *upgradeInstance.ComponentDefinitionName
+				}
+				if upgradeInstance.ServiceVersion != nil {
+					instance.ServiceVersion = *upgradeInstance.ServiceVersion
+				}
+				break
+			}
+		}
 		return nil
 	}); err != nil {
 		return err
@@ -116,6 +131,27 @@ func (u upgradeOpsHandler) targetsUnchanged(opsRes *OpsResource) bool {
 		if serviceVersion != "" && compSpec.ServiceVersion != serviceVersion {
 			return false
 		}
+		for _, upgradeInstance := range upgrade.Instances {
+			found := false
+			for _, instance := range compSpec.Instances {
+				if instance.Name != upgradeInstance.Name {
+					continue
+				}
+				found = true
+				componentDef := ptr.Deref(upgradeInstance.ComponentDefinitionName, "")
+				if componentDef != "" && instance.CompDef != componentDef {
+					return false
+				}
+				serviceVersion := ptr.Deref(upgradeInstance.ServiceVersion, "")
+				if serviceVersion != "" && instance.ServiceVersion != serviceVersion {
+					return false
+				}
+				break
+			}
+			if !found {
+				return false
+			}
+		}
 	}
 	return true
 }
@@ -124,10 +160,14 @@ func (u upgradeOpsHandler) targetsUnchanged(opsRes *OpsResource) bool {
 func (u upgradeOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.Upgrade.Components)
 	compOpsHelper.saveLastConfigurations(opsRes, func(compSpec appsv1.ClusterComponentSpec, comOps ComponentOpsInterface) opsv1alpha1.LastComponentConfiguration {
-		return opsv1alpha1.LastComponentConfiguration{
+		lastConfiguration := opsv1alpha1.LastComponentConfiguration{
 			ComponentDefinitionName: compSpec.ComponentDef,
 			ServiceVersion:          compSpec.ServiceVersion,
 		}
+		if len(comOps.(opsv1alpha1.UpgradeComponent).Instances) > 0 {
+			lastConfiguration.InstanceTemplates = compSpec.DeepCopy().Instances
+		}
+		return lastConfiguration
 	})
 	return nil
 }

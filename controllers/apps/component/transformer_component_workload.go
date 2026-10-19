@@ -20,15 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	"bytes"
-	"compress/gzip"
 	"context"
-	"encoding/base64"
-	"encoding/json"
-	"fmt"
-	"io"
 	"reflect"
-	"slices"
 	"strings"
 	"time"
 
@@ -109,255 +102,12 @@ func (t *componentWorkloadTransformer) reconcileWorkload(ctx context.Context, cl
 		protoITS.Spec.Template.Spec.InitContainers[i].Image = intctrlutil.ReplaceImageRegistry(container.Image)
 	}
 
-	if err := reconcileInstanceTemplateImages(synthesizedComp, runningITS, protoITS); err != nil {
-		return err
-	}
-
 	t.buildInstanceSetPlacementAnnotation(comp, protoITS)
 
 	if err := t.reconcileReplicasStatus(ctx, cli, synthesizedComp, runningITS, protoITS); err != nil {
 		return err
 	}
 
-	return nil
-}
-
-const (
-	instanceTemplateImageSelectionsAnnotation = "apps.kubeblocks.io/instance-template-image-selections"
-	instanceTemplateImageSelectionsVersion    = "v1:"
-)
-
-type instanceTemplateImageSelection struct {
-	CompDef         string   `json:"c"`
-	ServiceVersion  string   `json:"v"`
-	RuntimeDefaults []string `json:"d,omitempty"`
-}
-
-type instanceTemplateImageSelectionState struct {
-	Selections []instanceTemplateImageSelection `json:"s,omitempty"`
-	Templates  []uint32                         `json:"t,omitempty"`
-}
-
-func readInstanceTemplateImageSelections(its *workloads.InstanceSet) (map[string]instanceTemplateImageSelection, bool, error) {
-	selections := map[string]instanceTemplateImageSelection{}
-	if its == nil {
-		return selections, false, nil
-	}
-	value, marked := its.Annotations[instanceTemplateImageSelectionsAnnotation]
-	if !marked {
-		return selections, false, nil
-	}
-	if !strings.HasPrefix(value, instanceTemplateImageSelectionsVersion) {
-		return nil, true, fmt.Errorf("read instance template image selections: unsupported encoding")
-	}
-	encoded := strings.NewReader(strings.TrimPrefix(value, instanceTemplateImageSelectionsVersion))
-	compressed, err := gzip.NewReader(base64.NewDecoder(base64.StdEncoding, encoded))
-	if err != nil {
-		return nil, true, fmt.Errorf("read instance template image selections: %w", err)
-	}
-	defer compressed.Close()
-	var state *instanceTemplateImageSelectionState
-	decoder := json.NewDecoder(compressed)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&state); err != nil {
-		return nil, true, fmt.Errorf("read instance template image selections: %w", err)
-	}
-	if state == nil {
-		return nil, true, fmt.Errorf("read instance template image selections: null state")
-	}
-	if err := decoder.Decode(&struct{}{}); err != io.EOF {
-		return nil, true, fmt.Errorf("read instance template image selections: trailing data")
-	}
-	if len(state.Selections) == 0 && len(state.Templates) == 0 {
-		return selections, true, nil
-	}
-	if len(state.Templates) != len(its.Spec.Instances) {
-		return nil, true, fmt.Errorf("read instance template image selections: template alignment mismatch")
-	}
-	for _, selection := range state.Selections {
-		if selection.CompDef == "" || selection.ServiceVersion == "" {
-			return nil, true, fmt.Errorf("read instance template image selections: incomplete selection")
-		}
-	}
-	for i, id := range state.Templates {
-		if int64(id) > int64(len(state.Selections)) {
-			return nil, true, fmt.Errorf("read instance template image selections: invalid profile ID %d", id)
-		}
-		if id > 0 {
-			selections[its.Spec.Instances[i].Name] = state.Selections[id-1]
-		}
-	}
-	return selections, true, nil
-}
-
-func writeInstanceTemplateImageSelections(its *workloads.InstanceSet, selections map[string]instanceTemplateImageSelection) error {
-	state := instanceTemplateImageSelectionState{}
-	if len(selections) > 0 {
-		state.Templates = make([]uint32, len(its.Spec.Instances))
-		profiles := map[string]uint32{}
-		for i, tpl := range its.Spec.Instances {
-			selection, selected := selections[tpl.Name]
-			if !selected {
-				continue
-			}
-			profile, err := json.Marshal(selection)
-			if err != nil {
-				return err
-			}
-			id, exists := profiles[string(profile)]
-			if !exists {
-				state.Selections = append(state.Selections, selection)
-				id = uint32(len(state.Selections))
-				profiles[string(profile)] = id
-			}
-			state.Templates[i] = id
-		}
-	}
-	var buffer bytes.Buffer
-	compressed := gzip.NewWriter(&buffer)
-	if err := json.NewEncoder(compressed).Encode(state); err != nil {
-		return err
-	}
-	if err := compressed.Close(); err != nil {
-		return err
-	}
-	if its.Annotations == nil {
-		its.Annotations = make(map[string]string)
-	}
-	its.Annotations[instanceTemplateImageSelectionsAnnotation] = instanceTemplateImageSelectionsVersion + base64.StdEncoding.EncodeToString(buffer.Bytes())
-	return nil
-}
-
-func reconcileInstanceTemplateImages(synth *component.SynthesizedComponent, old, desired *workloads.InstanceSet) error {
-	previous, marked, err := readInstanceTemplateImageSelections(old)
-	if err != nil {
-		return err
-	}
-	selections := map[string]instanceTemplateImageSelection{}
-	for _, selected := range synth.Instances {
-		if len(selected.ServiceVersion) == 0 {
-			continue
-		}
-		selection := instanceTemplateImageSelection{CompDef: selected.CompDef, ServiceVersion: selected.ServiceVersion,
-			RuntimeDefaults: slices.Clone(synth.InstanceImageDefaults[selected.Name])}
-		slices.Sort(selection.RuntimeDefaults)
-		selections[selected.Name] = selection
-		if old == nil {
-			continue
-		}
-		var oldTemplate *workloads.InstanceTemplate
-		for i := range old.Spec.Instances {
-			if old.Spec.Instances[i].Name == selected.Name {
-				oldTemplate = &old.Spec.Instances[i]
-				break
-			}
-		}
-		if oldTemplate == nil {
-			continue
-		}
-		prior, known := previous[selected.Name]
-		same := known && prior.CompDef == selection.CompDef && prior.ServiceVersion == selection.ServiceVersion
-		// Released workloads have no per-template identity. Only missing overrides on
-		// a selection equal to the persisted parent can safely inherit its old images.
-		unrecordedParentSelection := !marked && selection.CompDef == old.Annotations[constant.AppComponentLabelKey] &&
-			selection.ServiceVersion == old.Annotations[constant.KBAppServiceVersionKey]
-		for i := range desired.Spec.Instances {
-			tpl := &desired.Spec.Instances[i]
-			if tpl.Name != selected.Name {
-				continue
-			}
-			for _, name := range selection.RuntimeDefaults {
-				if _, exists := tpl.Images[name]; !exists {
-					continue
-				}
-				oldImage, overridden := oldTemplate.Images[name]
-				if !(same && slices.Contains(prior.RuntimeDefaults, name)) && !(unrecordedParentSelection && !overridden) {
-					continue
-				}
-				if !overridden {
-					for _, containers := range [][]corev1.Container{old.Spec.Template.Spec.InitContainers, old.Spec.Template.Spec.Containers} {
-						for _, container := range containers {
-							if container.Name == name {
-								oldImage = container.Image
-							}
-						}
-					}
-				}
-				if len(oldImage) > 0 {
-					tpl.Images[name] = oldImage
-				}
-			}
-		}
-	}
-	if len(desired.Spec.Instances) == 0 && !marked && (old == nil || len(old.Spec.Instances) == 0) {
-		return nil
-	}
-	return writeInstanceTemplateImageSelections(desired, selections)
-}
-
-func instanceTemplateImagePublicationPending(old, desired *workloads.InstanceSet) (bool, error) {
-	previous, marked, err := readInstanceTemplateImageSelections(old)
-	if err != nil {
-		return false, err
-	}
-	current, _, err := readInstanceTemplateImageSelections(desired)
-	if err != nil {
-		return false, err
-	}
-	desired = desired.DeepCopy()
-	checkNRollbackProtoImages(old, desired)
-	names := sets.New[string]()
-	for name := range previous {
-		names.Insert(name)
-	}
-	for name := range current {
-		names.Insert(name)
-	}
-	for name := range names {
-		prior, wasSelected := previous[name]
-		selected, isSelected := current[name]
-		if isSelected && !wasSelected && !marked && selected.CompDef == old.Annotations[constant.AppComponentLabelKey] &&
-			selected.ServiceVersion == old.Annotations[constant.KBAppServiceVersionKey] {
-			prior, wasSelected = selected, true
-		}
-		imageNames := sets.New[string]()
-		for _, its := range []*workloads.InstanceSet{old, desired} {
-			for _, tpl := range its.Spec.Instances {
-				if tpl.Name == name {
-					for imageName := range tpl.Images {
-						imageNames.Insert(imageName)
-					}
-				}
-			}
-		}
-		if wasSelected != isSelected || prior.CompDef != selected.CompDef || prior.ServiceVersion != selected.ServiceVersion ||
-			!reflect.DeepEqual(effectiveInstanceTemplateImages(old, name, imageNames), effectiveInstanceTemplateImages(desired, name, imageNames)) {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-func effectiveInstanceTemplateImages(its *workloads.InstanceSet, name string, imageNames sets.Set[string]) map[string]string {
-	for _, tpl := range its.Spec.Instances {
-		if tpl.Name != name {
-			continue
-		}
-		images := map[string]string{}
-		for _, containers := range [][]corev1.Container{its.Spec.Template.Spec.InitContainers, its.Spec.Template.Spec.Containers} {
-			for _, container := range containers {
-				if !imageNames.Has(container.Name) {
-					continue
-				}
-				image := container.Image
-				if override, ok := tpl.Images[container.Name]; ok {
-					image = override
-				}
-				images[container.Name] = image
-			}
-		}
-		return images
-	}
 	return nil
 }
 
@@ -412,15 +162,7 @@ func (t *componentWorkloadTransformer) reconcileReplicasStatus(ctx context.Conte
 
 func (t *componentWorkloadTransformer) handleUpdate(transCtx *componentTransformContext, cli model.GraphClient, dag *graph.DAG,
 	synthesizedComp *component.SynthesizedComponent, comp *appsv1.Component, runningITS, protoITS *workloads.InstanceSet) error {
-	publicationPending := false
-	if !isCompStopped(synthesizedComp) && ptr.Deref(runningITS.Spec.Stop, false) {
-		var err error
-		publicationPending, err = instanceTemplateImagePublicationPending(runningITS, protoITS)
-		if err != nil {
-			return err
-		}
-	}
-	start, stop := t.handleWorkloadStartNStop(transCtx, synthesizedComp, runningITS, &protoITS, publicationPending)
+	start, stop := t.handleWorkloadStartNStop(transCtx, synthesizedComp, runningITS, &protoITS)
 	if !(start || stop) {
 		// postpone the update of the workload until the component is back to running.
 		if err := t.handleWorkloadUpdate(transCtx, dag, synthesizedComp, comp, runningITS, protoITS); err != nil {
@@ -446,16 +188,14 @@ func (t *componentWorkloadTransformer) handleUpdate(transCtx *componentTransform
 }
 
 func (t *componentWorkloadTransformer) handleWorkloadStartNStop(transCtx *componentTransformContext, synthesizedComp *component.SynthesizedComponent,
-	runningITS *workloads.InstanceSet, protoITS **workloads.InstanceSet, publicationPending bool) (bool, bool) {
+	runningITS *workloads.InstanceSet, protoITS **workloads.InstanceSet) (bool, bool) {
 	var (
 		stop  = isCompStopped(synthesizedComp)
 		start = !stop && ptr.Deref(runningITS.Spec.Stop, false)
 	)
 	if start || stop {
 		runningITSCopy := runningITS.DeepCopy() // don't modify the runningITS except for the stop flag
-		if !(start && publicationPending) {
-			runningITSCopy.Annotations[constant.KubeBlocksGenerationKey] = (*protoITS).Annotations[constant.KubeBlocksGenerationKey]
-		}
+		runningITSCopy.Annotations[constant.KubeBlocksGenerationKey] = (*protoITS).Annotations[constant.KubeBlocksGenerationKey]
 		*protoITS = runningITSCopy
 	}
 	if stop && checkPostProvisionDone(transCtx) {

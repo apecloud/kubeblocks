@@ -108,17 +108,9 @@ func UpdateCompDefinitionImages4ServiceVersion(ctx context.Context, cli client.R
 // Without a ComponentVersion, action containers inherit the parent synthesized runtime.
 func ResolveInstanceTemplateImages4ServiceVersion(ctx context.Context, cli client.Reader,
 	compDef *appsv1.ComponentDefinition, serviceVersion string) (map[string]string, error) {
-	images, _, err := ResolveInstanceTemplateImagesAndDefaults4ServiceVersion(ctx, cli, compDef, serviceVersion)
-	return images, err
-}
-
-// ResolveInstanceTemplateImagesAndDefaults4ServiceVersion also identifies runtime/init images
-// taken from the selected definition, before registry mapping. Actions are never defaults.
-func ResolveInstanceTemplateImagesAndDefaults4ServiceVersion(ctx context.Context, cli client.Reader,
-	compDef *appsv1.ComponentDefinition, serviceVersion string) (map[string]string, []string, error) {
 	compVersions, err := CompatibleCompVersions4Definition(ctx, cli, compDef)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	return resolveImagesWithCompVersions4Template(compDef, compVersions, serviceVersion)
 }
@@ -182,19 +174,18 @@ func resolveImagesWithCompVersions(compDef *appsv1.ComponentDefinition,
 }
 
 func resolveImagesWithCompVersions4Template(compDef *appsv1.ComponentDefinition,
-	compVersions []*appsv1.ComponentVersion, serviceVersion string) (map[string]string, []string, error) {
+	compVersions []*appsv1.ComponentVersion, serviceVersion string) (map[string]string, error) {
 	var apps map[string]appNameVersionImage
 	if len(compVersions) > 0 {
 		appsInDef := convertImagesFromCompDefinition(compDef)
 		appsInVer, err := findMatchedImagesFromCompVersions(compVersions, serviceVersion)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		apps = checkNMergeImages(serviceVersion, appsInDef, appsInVer)
 	}
 
 	images := make(map[string]string)
-	defaults := make([]string, 0)
 	var err error
 
 	if err = func() error {
@@ -213,9 +204,6 @@ func resolveImagesWithCompVersions4Template(compDef *appsv1.ComponentDefinition,
 			}
 			if len(image) > 0 {
 				images[c.Name] = intctrlutil.ReplaceImageRegistry(image)
-				if len(c.Name) > 0 && (len(compVersions) == 0 || image == c.Image) {
-					defaults = append(defaults, c.Name)
-				}
 			}
 			return nil
 		}
@@ -231,11 +219,11 @@ func resolveImagesWithCompVersions4Template(compDef *appsv1.ComponentDefinition,
 		}
 		return nil
 	}(); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	if len(compVersions) == 0 {
-		return images, defaults, nil
+		return images, nil
 	}
 
 	if err = func() error {
@@ -268,10 +256,10 @@ func resolveImagesWithCompVersions4Template(compDef *appsv1.ComponentDefinition,
 		}
 		return nil
 	}(); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return images, defaults, nil
+	return images, nil
 }
 
 func convertImagesFromCompDefinition(compDef *appsv1.ComponentDefinition) map[string]appNameVersionImage {

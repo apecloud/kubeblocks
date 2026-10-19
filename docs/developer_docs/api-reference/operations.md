@@ -4734,6 +4734,79 @@ And ServiceVersion in ClusterComponentSpec is optional, when no version is speci
 use the latest available version in ComponentVersion.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>instances</code><br/>
+<em>
+<a href="#operations.kubeblocks.io/v1alpha1.UpgradeInstanceTemplate">
+[]UpgradeInstanceTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies upgrades for existing named instance templates. Each target applies to all replicas of that template.
+For a component, targets refer to spec.componentSpecs[].instances.
+For a sharding, targets refer to spec.shardings[].template.instances.
+Targets do not select overrides in spec.shardings[].shardTemplates[].instances.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="operations.kubeblocks.io/v1alpha1.UpgradeInstanceTemplate">UpgradeInstanceTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#operations.kubeblocks.io/v1alpha1.UpgradeComponent">UpgradeComponent</a>)
+</p>
+<div>
+<p>UpgradeInstanceTemplate defines version changes for an existing named instance template.
+An omitted field preserves its stored value; an explicit empty string clears it.
+When both values are empty, the template inherits the component&rsquo;s runtime.
+Otherwise, the Cluster controller resolves and backfills a compatible definition and version pair.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies an instance template name, not a Pod name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>componentDefinitionName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the ComponentDefinition name for the instance template, using an exact match.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the service version for the instance template, using semantic version syntax.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="operations.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling

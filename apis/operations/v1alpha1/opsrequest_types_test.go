@@ -18,6 +18,8 @@ package v1alpha1
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -175,4 +177,91 @@ func TestValidateUpgradeServiceVersion(t *testing.T) {
 
 func strPtr(s string) *string {
 	return &s
+}
+
+func TestValidateUpgradeInstanceTemplateServiceVersion(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		version       *string
+		parentVersion *string
+		wantError     string
+	}{
+		{name: "omitted service version skips validation"},
+		{name: "empty service version skips validation", version: strPtr("")},
+		{name: "release", version: strPtr("17.5.0")},
+		{name: "prerelease", version: strPtr("17.5.0-alpha.1")},
+		{name: "build metadata", version: strPtr("17.5.0+build123")},
+		{name: "v prefix", version: strPtr("v17.5.0")},
+		{name: "missing patch", version: strPtr("17.5"), wantError: `instance template "canary" serviceVersion "17.5"`},
+		{name: "random text", version: strPtr("not-a-version"), wantError: `instance template "canary" serviceVersion "not-a-version"`},
+		{name: "parent and template versions", version: strPtr("18.0.0"), parentVersion: strPtr("17.5.0")},
+		{name: "valid parent invalid template", version: strPtr("18.0"), parentVersion: strPtr("17.5.0"), wantError: `instance template "canary"`},
+		{name: "invalid parent valid template", version: strPtr("18.0.0"), parentVersion: strPtr("17.5"), wantError: `serviceVersion "17.5"`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			request := &OpsRequest{Spec: OpsRequestSpec{Type: UpgradeType, SpecificOpsRequest: SpecificOpsRequest{Upgrade: &Upgrade{
+				Components: []UpgradeComponent{{
+					ComponentOps:   ComponentOps{ComponentName: "pg"},
+					ServiceVersion: tc.parentVersion,
+					Instances: []UpgradeInstanceTemplate{
+						{Name: "stable", ServiceVersion: strPtr("17.5.0")},
+						{Name: "canary", ComponentDefinitionName: strPtr("pg-new"), ServiceVersion: tc.version},
+					},
+				}},
+			}}}}
+			err := request.ValidateOps(context.Background(), nil, nil)
+			if tc.wantError == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tc.wantError) {
+				t.Fatalf("error = %v, want %q", err, tc.wantError)
+			}
+		})
+	}
+}
+
+func TestUpgradeInstanceTemplateVersionPointers(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		json string
+	}{
+		{name: "component definition only", json: `{"name":"canary","componentDefinitionName":"pg-new"}`},
+		{name: "service version only", json: `{"name":"canary","serviceVersion":"18.0.0"}`},
+		{name: "clear component definition", json: `{"name":"canary","componentDefinitionName":""}`},
+		{name: "clear service version", json: `{"name":"canary","serviceVersion":""}`},
+		{name: "clear both", json: `{"name":"canary","componentDefinitionName":"","serviceVersion":""}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var instance UpgradeInstanceTemplate
+			if err := json.Unmarshal([]byte(tc.json), &instance); err != nil {
+				t.Fatal(err)
+			}
+			encoded, err := json.Marshal(instance)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(encoded) != tc.json {
+				t.Fatalf("encoded instance = %s, want %s", encoded, tc.json)
+			}
+			upgrade := &UpgradeComponent{Instances: []UpgradeInstanceTemplate{instance}}
+			copied := upgrade.DeepCopy()
+			copied.Instances[0].Name = "changed"
+			if copied.Instances[0].ComponentDefinitionName != nil {
+				*copied.Instances[0].ComponentDefinitionName = "changed"
+			}
+			if copied.Instances[0].ServiceVersion != nil {
+				*copied.Instances[0].ServiceVersion = "changed"
+			}
+			encoded, err = json.Marshal(upgrade.Instances[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(encoded) != tc.json {
+				t.Fatalf("deep copy changed original instance to %s, want %s", encoded, tc.json)
+			}
+		})
+	}
 }

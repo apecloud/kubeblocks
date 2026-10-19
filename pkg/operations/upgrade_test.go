@@ -58,10 +58,11 @@ import (
 func TestUpgradeInstanceTemplates(t *testing.T) {
 	for _, sharding := range []bool{false, true} {
 		for _, tc := range []struct {
-			name                string
-			definition, version *string
-			parent, supersede   bool
-			wantDef, wantVer    string
+			name                   string
+			definition, version    *string
+			parent, supersede      bool
+			wantDef, wantVer       string
+			replaceDef, replaceVer string
 		}{
 			{name: "definition only", definition: pointer.String("pg-new"), wantDef: "pg-new", wantVer: "18.0.0"},
 			{name: "version only", version: pointer.String("19.0.0"), wantDef: "pg-canary", wantVer: "19.0.0"},
@@ -70,6 +71,9 @@ func TestUpgradeInstanceTemplates(t *testing.T) {
 			{name: "clear definition", definition: pointer.String(""), wantVer: "18.0.0"},
 			{name: "clear version", version: pointer.String(""), wantDef: "pg-canary"},
 			{name: "clear both", definition: pointer.String(""), version: pointer.String("")},
+			{name: "clear both replaced definition", definition: pointer.String(""), version: pointer.String(""), replaceDef: "pg-new"},
+			{name: "clear both replaced version", definition: pointer.String(""), version: pointer.String(""), replaceVer: "19.0.0"},
+			{name: "clear both replaced pair", definition: pointer.String(""), version: pointer.String(""), replaceDef: "pg-new", replaceVer: "19.0.0"},
 			{name: "supersede same-owner template upgrade", definition: pointer.String("pg-new"), supersede: true, wantDef: "pg-new", wantVer: "18.0.0"},
 		} {
 			owner := "component/"
@@ -218,6 +222,10 @@ func TestUpgradeInstanceTemplates(t *testing.T) {
 				if canary.ServiceVersion == "" && canary.CompDef != "" {
 					canary.ServiceVersion = "21.0.0"
 				}
+				if tc.replaceDef != "" || tc.replaceVer != "" {
+					canary.CompDef, canary.ServiceVersion = tc.replaceDef, tc.replaceVer
+					res.Cluster.Generation++
+				}
 				if err := cli.Update(ctx, res.Cluster); err != nil {
 					t.Fatal(err)
 				}
@@ -232,10 +240,17 @@ func TestUpgradeInstanceTemplates(t *testing.T) {
 				if err := cli.Status().Update(ctx, res.Cluster); err != nil {
 					t.Fatal(err)
 				}
+				reload()
 				if _, err := GetOpsManager().Reconcile(reqCtx, cli, res); err != nil {
 					t.Fatal(err)
 				}
 				reload()
+				if tc.replaceDef != "" || tc.replaceVer != "" {
+					if res.OpsRequest.Status.Phase != opsv1alpha1.OpsAbortedPhase || res.OpsRequest.Status.CompletionTimestamp.IsZero() {
+						t.Fatalf("phase = %s, completion = %s, want Aborted with completion timestamp for replaced inherited target", res.OpsRequest.Status.Phase, res.OpsRequest.Status.CompletionTimestamp)
+					}
+					return
+				}
 				if res.OpsRequest.Status.Phase != opsv1alpha1.OpsSucceedPhase || res.OpsRequest.Status.Progress != "3/3" {
 					t.Fatalf("phase = %s, progress = %s, want Succeed 3/3", res.OpsRequest.Status.Phase, res.OpsRequest.Status.Progress)
 				}
@@ -311,19 +326,26 @@ func TestUpgradeInstanceTemplateTargetsUnchanged(t *testing.T) {
 	for _, tc := range []struct {
 		name                string
 		definition, version *string
-		missing             bool
+		missing, inherited  bool
 		want                bool
 	}{
 		{name: "exact pair", definition: pointer.String("pg-canary"), version: pointer.String("18.0.0"), want: true},
 		{name: "definition only", definition: pointer.String("pg-canary"), want: true},
 		{name: "version only", version: pointer.String("18.0.0"), want: true},
-		{name: "owner resolved empty pair", definition: pointer.String(""), version: pointer.String(""), want: true},
+		{name: "inherited pair", definition: pointer.String(""), version: pointer.String(""), inherited: true, want: true},
+		{name: "replaced inherited pair", definition: pointer.String(""), version: pointer.String("")},
+		{name: "owner resolved cleared definition", definition: pointer.String(""), want: true},
+		{name: "owner resolved cleared version", version: pointer.String(""), want: true},
+		{name: "omitted fields", want: true},
 		{name: "replaced definition", definition: pointer.String("pg-new")},
 		{name: "replaced version", version: pointer.String("19.0.0")},
 		{name: "removed template", definition: pointer.String("pg-canary"), missing: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			component := appsv1.ClusterComponentSpec{Name: "pg", Instances: []appsv1.InstanceTemplate{{Name: "canary", CompDef: "pg-canary", ServiceVersion: "18.0.0"}, {Name: "unrelated"}}}
+			if tc.inherited {
+				component.Instances[0].CompDef, component.Instances[0].ServiceVersion = "", ""
+			}
 			if tc.missing {
 				component.Instances = component.Instances[1:]
 			}

@@ -119,7 +119,7 @@ var _ = Describe("Component Version", func() {
 			}
 
 			By("using the KB tools image when no action image is configured")
-			images, err := resolveImagesWithCompVersions4Template(newCompDef(), []*appsv1.ComponentVersion{
+			images, _, err := resolveImagesWithCompVersions4Template(newCompDef(), []*appsv1.ComponentVersion{
 				newCompVersion(map[string]string{appName: "app:2.0.0"}),
 			}, serviceVersion)
 			Expect(err).ShouldNot(HaveOccurred())
@@ -377,6 +377,14 @@ func TestInstanceTemplateResolvedImages(t *testing.T) {
 				wantImages[kbagent.ContainerName4Worker] = actionImage
 			}
 			g.Expect(images).Should(Equal(wantImages))
+			resolved, defaults, err := ResolveInstanceTemplateImagesAndDefaults4ServiceVersion(context.Background(), cli, def, tc.serviceVersion)
+			g.Expect(err).Should(Succeed())
+			g.Expect(resolved).Should(Equal(images))
+			if tc.withVersion && tc.serviceVersion == "2.0.0" {
+				g.Expect(defaults).Should(BeEmpty())
+			} else {
+				g.Expect(defaults).Should(ConsistOf(runtimeName, initName))
+			}
 			g.Expect(def).Should(Equal(before))
 			g.Expect(parent).Should(Equal(parentBefore))
 			if !tc.withVersion {
@@ -501,4 +509,28 @@ func TestInstanceTemplateInheritedActionRuntime(t *testing.T) {
 			g.Expect(synth.PodSpec).Should(Equal(parentPod))
 		})
 	}
+}
+
+func TestInstanceTemplateDefaultsBeforeRegistryMapping(t *testing.T) {
+	g := NewWithT(t)
+	oldRegistries, oldTools := viperx.Get(constant.CfgRegistries), viperx.GetString(constant.KBToolsImage)
+	t.Cleanup(func() {
+		viperx.Set(constant.CfgRegistries, oldRegistries)
+		g.Expect(intctrlutil.LoadRegistryConfig()).Should(Succeed())
+		viperx.Set(constant.KBToolsImage, oldTools)
+	})
+	viperx.Set(constant.CfgRegistries, map[string]any{"registryConfig": []map[string]any{
+		{"from": "source-a.example", "to": "mirror.example", "namespaceMapping": map[string]string{"team-a": "private"}},
+		{"from": "source-b.example", "to": "mirror.example", "namespaceMapping": map[string]string{"team-b": "private"}},
+	}})
+	g.Expect(intctrlutil.LoadRegistryConfig()).Should(Succeed())
+	def := testapps.NewComponentDefinitionFactory("template-default-provenance").SetServiceVersion("1.0.0").SetRuntime(&corev1.Container{Name: "db", Image: "source-a.example/team-a/db:1"}).GetObject()
+	ver := &appsv1.ComponentVersion{ObjectMeta: metav1.ObjectMeta{Name: "releases", Labels: map[string]string{def.Name: def.Name}}, Spec: appsv1.ComponentVersionSpec{Releases: []appsv1.ComponentVersionRelease{{Name: "r1", ServiceVersion: "1.0.0", Images: map[string]string{"db": "source-b.example/team-b/db:1"}}}}, Status: appsv1.ComponentVersionStatus{Phase: appsv1.AvailablePhase}}
+	scheme := runtime.NewScheme()
+	g.Expect(appsv1.AddToScheme(scheme)).Should(Succeed())
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(ver).Build()
+	images, defaults, err := ResolveInstanceTemplateImagesAndDefaults4ServiceVersion(context.Background(), cli, def, "1.0.0")
+	g.Expect(err).Should(Succeed())
+	g.Expect(images["db"]).Should(Equal(intctrlutil.ReplaceImageRegistry(def.Spec.Runtime.Containers[0].Image)))
+	g.Expect(defaults).Should(BeEmpty())
 }

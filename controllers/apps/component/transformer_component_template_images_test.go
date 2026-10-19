@@ -318,7 +318,11 @@ func TestStartDefersTemplatePublicationGeneration(t *testing.T) {
 		running = result
 	}
 	reconcile()
-	running.Spec.Stop = ptr.To(true)
+	stopped := running.DeepCopy()
+	if err := (&componentWorkloadTransformer{}).stopWorkload(trans.SynthesizeComponent, running, stopped); err != nil {
+		t.Fatal(err)
+	}
+	running = stopped
 	if err := cli.Update(ctx, running); err != nil {
 		t.Fatal(err)
 	}
@@ -327,7 +331,7 @@ func TestStartDefersTemplatePublicationGeneration(t *testing.T) {
 	comp.Spec.Instances[0].CompDef = next.Name
 	comp.Spec.Instances[0].ServiceVersion = next.Spec.ServiceVersion
 	reconcile()
-	if ptr.Deref(running.Spec.Stop, false) {
+	if isWorkloadStopped(running) {
 		t.Fatal("Start did not clear stop")
 	}
 	if got := running.Spec.Instances[0].Images["db"]; got != "docker.io/library/db:1" {

@@ -61,6 +61,7 @@ func TestUpgradeInstanceTemplates(t *testing.T) {
 			name                   string
 			definition, version    *string
 			parent, supersede      bool
+			inherited              bool
 			wantDef, wantVer       string
 			replaceDef, replaceVer string
 		}{
@@ -71,6 +72,12 @@ func TestUpgradeInstanceTemplates(t *testing.T) {
 			{name: "clear definition", definition: pointer.String(""), wantVer: "18.0.0"},
 			{name: "clear version", version: pointer.String(""), wantDef: "pg-canary"},
 			{name: "clear both", definition: pointer.String(""), version: pointer.String("")},
+			{name: "single definition clear inherited", inherited: true, definition: pointer.String("")},
+			{name: "single version clear inherited", inherited: true, version: pointer.String("")},
+			{name: "single definition clear inherited replaced definition", inherited: true, definition: pointer.String(""), replaceDef: "pg-new"},
+			{name: "single definition clear inherited replaced version", inherited: true, definition: pointer.String(""), replaceVer: "19.0.0"},
+			{name: "single version clear inherited replaced definition", inherited: true, version: pointer.String(""), replaceDef: "pg-new"},
+			{name: "single version clear inherited replaced version", inherited: true, version: pointer.String(""), replaceVer: "19.0.0"},
 			{name: "clear both replaced definition", definition: pointer.String(""), version: pointer.String(""), replaceDef: "pg-new"},
 			{name: "clear both replaced version", definition: pointer.String(""), version: pointer.String(""), replaceVer: "19.0.0"},
 			{name: "clear both replaced pair", definition: pointer.String(""), version: pointer.String(""), replaceDef: "pg-new", replaceVer: "19.0.0"},
@@ -101,6 +108,9 @@ func TestUpgradeInstanceTemplates(t *testing.T) {
 							}}}},
 						{Name: "sibling", CompDef: "pg-sibling", ServiceVersion: "16.0.0", Replicas: pointer.Int32(1)},
 					}}
+				if tc.inherited {
+					component.Instances[1].CompDef, component.Instances[1].ServiceVersion = "", ""
+				}
 				cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", Generation: 1},
 					Spec:   appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{component}},
 					Status: appsv1.ClusterStatus{Phase: appsv1.RunningClusterPhase}}

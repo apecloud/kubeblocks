@@ -22,6 +22,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -235,6 +236,16 @@ func buildLargeTemplateWorkload(t *testing.T, profile string) *workloads.Instanc
 		t.Fatalf("workloads=%d", len(objs))
 	}
 	its := objs[0].(*workloads.InstanceSet)
+	selections, marked, err := readInstanceTemplateImageSelections(its)
+	if err != nil || !marked || len(selections) != int(replicas) {
+		t.Fatalf("selection history lost records: count=%d marked=%v err=%v", len(selections), marked, err)
+	}
+	for _, tpl := range spec.Instances {
+		selection := selections[tpl.Name]
+		if selection.CompDef != tpl.CompDef || selection.ServiceVersion != tpl.ServiceVersion || len(selection.RuntimeDefaults) != 2 {
+			t.Fatalf("selection history changed for %s: %#v", tpl.Name, selection)
+		}
+	}
 	return its
 }
 
@@ -289,9 +300,21 @@ func TestTemplateImageSelectionAnnotationAPI(t *testing.T) {
 			its := buildLargeTemplateWorkload(t, profile)
 			its.Namespace = ns.Name
 			its.Name = profile
-			err := cli.Create(context.Background(), its)
+			want, _, err := readInstanceTemplateImageSelections(its)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = cli.Create(context.Background(), its)
 			if err != nil {
 				t.Fatalf("API rejected generated workload: %v", err)
+			}
+			stored := &workloads.InstanceSet{}
+			if err := cli.Get(context.Background(), client.ObjectKeyFromObject(its), stored); err != nil {
+				t.Fatal(err)
+			}
+			got, marked, err := readInstanceTemplateImageSelections(stored)
+			if err != nil || !marked || !reflect.DeepEqual(got, want) {
+				t.Fatalf("API persistence changed selection history: records=%d want=%d marked=%v err=%v", len(got), len(want), marked, err)
 			}
 		})
 	}
@@ -403,7 +426,6 @@ func TestStartDefersTemplatePublicationGeneration(t *testing.T) {
 		}
 	}
 	updateStatus(1, appsv1.StartingComponentPhase)
-	// A fresh normal owner pass must publish the target, including its image provenance.
 	reconcile()
 	if got := running.Spec.Instances[0].Images["db"]; got != "docker.io/library/db:2" {
 		t.Fatalf("normal reconcile did not publish target: %s", got)
@@ -428,7 +450,6 @@ func TestTemplateImageSelectionReorderAndRemoval(t *testing.T) {
 	if desired.Spec.Instances[0].Images["db"] != "exact-b" || desired.Spec.Instances[2].Images["db"] != "exact-a" {
 		t.Fatalf("reorder crossed image ownership: %#v", desired.Spec.Instances)
 	}
-	// Persisted alignment must decode by the names in this newly published order.
 	selections, marked, err := readInstanceTemplateImageSelections(desired)
 	if err != nil || !marked || selections["a"].ServiceVersion != "1.0.0" || selections["b"].ServiceVersion != "2.0.0" {
 		t.Fatalf("reordered selections: %#v, marked=%v, err=%v", selections, marked, err)
@@ -543,7 +564,6 @@ func TestReadTemplateImageSelectionBoundary(t *testing.T) {
 	}
 }
 
-// Encode intentionally malformed JSON states to exercise the private decoder boundary.
 func encodeTemplateImageSelectionTestState(t *testing.T, value string) string {
 	t.Helper()
 	var buffer bytes.Buffer

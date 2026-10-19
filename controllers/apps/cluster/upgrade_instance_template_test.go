@@ -102,14 +102,12 @@ func testUpgradeSingleClearSnapshotNormalizationRace(t *testing.T, sharding bool
 		}
 		reload(ops)
 	}
-	// Produce a partial pair through the first real Upgrade entry and Action.
 	do(first)
 	do(first)
 	tpl := spec().Instances[0]
 	if tpl.CompDef != "" || tpl.ServiceVersion != "2.0.0" {
 		t.Fatalf("first Action pair = %#v", tpl)
 	}
-	// Second Pending entry saves the partial pair and transitions to Creating.
 	do(second)
 	if second.Status.Phase != opsv1alpha1.OpsCreatingPhase {
 		t.Fatalf("second phase = %s", second.Status.Phase)
@@ -128,7 +126,6 @@ func testUpgradeSingleClearSnapshotNormalizationRace(t *testing.T, sharding bool
 		}
 		reload(second)
 	}
-	// The existing Cluster owner fills the omitted definition before second Action.
 	normalize()
 	t.Logf("pair before second Action = %#v", spec().Instances[0])
 	do(second)

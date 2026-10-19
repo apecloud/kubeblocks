@@ -118,7 +118,6 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	if err := cli.Update(reqCtx.Ctx, opsRes.Cluster); err != nil {
 		return err
 	}
-	// The controller also patches status after Action errors; publish only an applied checkpoint.
 	if checkpoint != nil {
 		for _, extra := range opsRes.OpsRequest.Status.Extras {
 			if _, ok := extra[upgradeInstanceTemplateInheritanceKey]; ok {

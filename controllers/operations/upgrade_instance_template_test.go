@@ -142,7 +142,6 @@ func TestUpgradeInstanceTemplateActionPersistence(t *testing.T) {
 				if got := spec(after.Cluster).Instances[0]; got.CompDef != "database" || got.ServiceVersion != wantVersion {
 					t.Fatalf("Cluster after failure=%#v", got)
 				}
-				// Owner backfill may run before a restarted controller retries Creating.
 				spec(after.Cluster).Instances[0].ServiceVersion = "2.0.0"
 				if err := base.Update(ctx, after.Cluster); err != nil {
 					t.Fatal(err)

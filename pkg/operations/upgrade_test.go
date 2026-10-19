@@ -20,24 +20,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"context"
 	"strconv"
+	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/factory"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("Upgrade OpsRequest", func() {
@@ -686,3 +700,197 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		// TODO: add case with ClusterDefinition and topology
 	})
 })
+
+func TestUpgradeTemplateInitProgress(t *testing.T) {
+	for _, tc := range []struct {
+		name                                                            string
+		clear, sharding, sidecar, legacy, rewrite, ownerError, deferred bool
+	}{
+		{name: "init-only version"},
+		{name: "clear both fields", clear: true},
+		{name: "shard clear both fields", clear: true, sharding: true},
+		{name: "restartable init", sidecar: true},
+		{name: "admission registry rewrite", rewrite: true},
+		{name: "legacy direct template", legacy: true},
+		{name: "owner error", ownerError: true},
+		{name: "deferred tools init", deferred: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewWithT(t)
+			ctx := context.Background()
+			scheme := runtime.NewScheme()
+			for _, add := range []func(*runtime.Scheme) error{corev1.AddToScheme, appsv1.AddToScheme, opsv1alpha1.AddToScheme, workloads.AddToScheme} {
+				g.Expect(add(scheme)).To(Succeed())
+			}
+			def := &appsv1.ComponentDefinition{ObjectMeta: metav1.ObjectMeta{Name: "db"}, Spec: appsv1.ComponentDefinitionSpec{
+				ServiceVersion: "1.0.0", Runtime: corev1.PodSpec{
+					Containers:     []corev1.Container{{Name: "db", Image: "db:1"}},
+					InitContainers: []corev1.Container{{Name: "setup", Image: "setup:1"}},
+				},
+			}}
+			if tc.sidecar {
+				def.Spec.Runtime.InitContainers[0].RestartPolicy = ptr.To(corev1.ContainerRestartPolicyAlways)
+			}
+			version := &appsv1.ComponentVersion{ObjectMeta: metav1.ObjectMeta{Name: "db-version", Generation: 1, Labels: map[string]string{"db": "db"}},
+				Spec: appsv1.ComponentVersionSpec{
+					CompatibilityRules: []appsv1.ComponentVersionCompatibilityRule{{CompDefs: []string{"db"}, Releases: []string{"v2"}}},
+					Releases:           []appsv1.ComponentVersionRelease{{Name: "v2", ServiceVersion: "2.0.0", Images: map[string]string{"db": "db:1", "setup": "setup:2"}}},
+				}, Status: appsv1.ComponentVersionStatus{ObservedGeneration: 1, Phase: appsv1.AvailablePhase},
+			}
+			componentName, targetName := "db", "db"
+			if tc.sharding {
+				componentName, targetName = "sharding-shard-0", "sharding"
+			}
+			cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", UID: "cluster", Generation: 2},
+				Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: componentName, ComponentDef: "db", ServiceVersion: "1.0.0", Replicas: 1,
+					Instances: []appsv1.InstanceTemplate{{Name: "canary", Replicas: pointer.Int32(1), CompDef: "db", ServiceVersion: "1.0.0"}},
+				}}}, Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{componentName: {Phase: appsv1.RunningComponentPhase}}},
+			}
+			if tc.clear || tc.legacy {
+				cluster.Spec.ComponentSpecs[0].Instances[0].ServiceVersion = "2.0.0"
+			}
+			if tc.sharding {
+				cluster.Spec.Shardings = []appsv1.ClusterSharding{{Name: targetName, Shards: 1, Template: cluster.Spec.ComponentSpecs[0]}}
+				cluster.Spec.ComponentSpecs = nil
+				cluster.Status.Shardings = map[string]appsv1.ClusterComponentStatus{targetName: {Phase: appsv1.RunningComponentPhase}}
+			}
+			target := opsv1alpha1.UpgradeComponent{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: targetName},
+				Instances: []opsv1alpha1.UpgradeInstanceTemplate{{Name: "canary", ServiceVersion: pointer.String("2.0.0")}}}
+			if tc.clear {
+				target.Instances[0].ComponentDefinitionName, target.Instances[0].ServiceVersion = pointer.String(""), pointer.String("")
+			}
+			if tc.legacy {
+				target.Instances = nil
+			}
+			ops := &opsv1alpha1.OpsRequest{ObjectMeta: metav1.ObjectMeta{Name: "upgrade", Namespace: "default"},
+				Spec:   opsv1alpha1.OpsRequestSpec{ClusterName: cluster.Name, Type: opsv1alpha1.UpgradeType, SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{Upgrade: &opsv1alpha1.Upgrade{Components: []opsv1alpha1.UpgradeComponent{target}}}},
+				Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsRunningPhase, StartTimestamp: metav1.Now()},
+			}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(ops).WithObjects(cluster, ops, def, version).Build()
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			handler := GetOpsManager().OpsMap[opsv1alpha1.UpgradeType].OpsHandler
+			res := &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(20)}
+			g.Expect(handler.Action(reqCtx, cli, res)).To(Succeed())
+			compSpec := getComponentSpecOrShardingTemplate(cluster, targetName)
+			if tc.clear {
+				g.Expect(compSpec.Instances[0].CompDef).To(BeEmpty())
+				g.Expect(compSpec.Instances[0].ServiceVersion).To(BeEmpty())
+			}
+			publishedSpec := compSpec.DeepCopy()
+			publishedSpec.Name = componentName
+			comp, err := component.BuildComponent(cluster, publishedSpec, nil, nil)
+			g.Expect(err).NotTo(HaveOccurred())
+			comp.Generation = 2
+			if tc.sharding {
+				comp.Labels[constant.KBAppShardingNameLabelKey] = targetName
+				comp.Labels[constant.KBAppClusterUIDKey] = string(cluster.UID)
+			}
+			g.Expect(cli.Create(ctx, comp)).To(Succeed())
+			images := map[string]map[string]string{}
+			if !tc.clear {
+				images["canary"], err = component.ResolveInstanceTemplateImages4ServiceVersion(ctx, cli, def, "2.0.0")
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(images["canary"]["setup"]).To(HaveSuffix("setup:2"))
+			}
+			synth := &component.SynthesizedComponent{Namespace: cluster.Namespace, ClusterName: cluster.Name, Name: componentName,
+				CompDefName: "db", ServiceVersion: "1.0.0", Generation: "2", Replicas: 1,
+				PodSpec: def.Spec.Runtime.DeepCopy(), Instances: compSpec.Instances, InstanceImages: images}
+			if tc.deferred {
+				oldTools := viper.GetString(constant.KBToolsImage)
+				t.Cleanup(func() { viper.Set(constant.KBToolsImage, oldTools) })
+				viper.Set(constant.KBToolsImage, "mirror.local/apecloud/kubeblocks-tools:1.1.0")
+				synth.PodSpec.InitContainers = []corev1.Container{{Name: kbagent.InitContainerName,
+					Image: "mirror.local/apecloud/kubeblocks-tools:1.1.0", Command: kbagent.InitCommand()}}
+				synth.PodSpec.Containers = append(synth.PodSpec.Containers, corev1.Container{
+					Name: "kbagent", Image: "custom-action:1.0", Command: []string{kbagent.SharedBinaryPath}})
+			}
+			its, err := factory.BuildInstanceSet(synth, def)
+			g.Expect(err).NotTo(HaveOccurred())
+			its.Generation = 2
+			buildPod := func(owner *workloads.InstanceSet) *corev1.Pod {
+				tree := kubebuilderx.NewObjectTree()
+				tree.SetRoot(owner)
+				for _, reconciler := range []kubebuilderx.Reconciler{instanceset.NewFixMetaReconciler(), instanceset.NewRevisionUpdateReconciler(), instanceset.NewAssistantObjectReconciler(), instanceset.NewReplicasAlignmentReconciler()} {
+					_, err := reconciler.Reconcile(tree)
+					g.Expect(err).NotTo(HaveOccurred())
+				}
+				pods := tree.List(&corev1.Pod{})
+				g.Expect(pods).To(HaveLen(1))
+				return pods[0].(*corev1.Pod).DeepCopy()
+			}
+			desiredPod := buildPod(its)
+			pod := desiredPod.DeepCopy()
+			oldInit := "setup:1"
+			if tc.clear {
+				oldInit = "setup:2"
+			}
+			if tc.deferred {
+				oldInit = "docker.io/apecloud/kubeblocks-tools:1.0.0"
+				pod.Spec.InitContainers[0].Command = kbagent.LegacyInitCommand()
+				pod.Spec.Containers[0].Image = "db:0"
+			}
+			pod.Spec.InitContainers[0].Image = oldInit
+			pod.CreationTimestamp = metav1.NewTime(time.Now().Add(-time.Hour))
+			pod.Status = corev1.PodStatus{Phase: corev1.PodRunning,
+				Conditions:            []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: pod.CreationTimestamp}},
+				ContainerStatuses:     []corev1.ContainerStatus{{Name: "db", Image: "db:1", Ready: true}},
+				InitContainerStatuses: []corev1.ContainerStatus{{Name: "setup", Image: oldInit, State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 0}}}},
+			}
+			if tc.deferred {
+				pod.Status.ContainerStatuses[0].Image = "db:0"
+			}
+			g.Expect(cli.Create(ctx, its)).To(Succeed())
+			g.Expect(cli.Create(ctx, pod)).To(Succeed())
+			reconcile := func() (opsv1alpha1.OpsPhase, time.Duration, error) {
+				freshOps, freshCluster := &opsv1alpha1.OpsRequest{}, &appsv1.Cluster{}
+				g.Expect(cli.Get(ctx, client.ObjectKeyFromObject(ops), freshOps)).To(Succeed())
+				g.Expect(cli.Get(ctx, client.ObjectKeyFromObject(cluster), freshCluster)).To(Succeed())
+				res = &OpsResource{Cluster: freshCluster, OpsRequest: freshOps, Recorder: record.NewFakeRecorder(20)}
+				return GetOpsManager().OpsMap[opsv1alpha1.UpgradeType].OpsHandler.ReconcileAction(reqCtx, cli, res)
+			}
+			if tc.ownerError {
+				// Inject an invalid persisted revision encoding at the public owner boundary.
+				its.Status.UpdateRevisions = map[string]string{"zstd": "invalid!"}
+				g.Expect(cli.Update(ctx, its)).To(Succeed())
+				phase, _, err := reconcile()
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(phase).To(Equal(opsv1alpha1.OpsRunningPhase))
+				buildPod(its)
+				g.Expect(cli.Update(ctx, its)).To(Succeed())
+			}
+			for i := 0; i < 2; i++ {
+				phase, _, err := reconcile()
+				g.Expect(err).NotTo(HaveOccurred())
+				if tc.legacy {
+					g.Expect(phase).To(Equal(opsv1alpha1.OpsSucceedPhase))
+					return
+				}
+				g.Expect(phase).To(Equal(opsv1alpha1.OpsRunningPhase))
+				g.Expect(res.OpsRequest.Status.Progress).To(Equal("0/1"))
+			}
+			if !tc.deferred {
+				pod.Spec.InitContainers = desiredPod.Spec.InitContainers
+			}
+			pod.Spec.Containers[0].Image = desiredPod.Spec.Containers[0].Image
+			pod.Status.ContainerStatuses[0].Image = desiredPod.Spec.Containers[0].Image
+			if tc.rewrite {
+				pod.Spec.InitContainers[0].Image = "admission.local/rewritten/setup:2"
+				pod.Spec.Containers[0].Image = "admission.local/rewritten/db:1"
+			}
+			if tc.sidecar {
+				pod.Status.InitContainerStatuses[0].State = corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}
+			}
+			status := pod.Status.DeepCopy()
+			g.Expect(cli.Update(ctx, pod)).To(Succeed())
+			pod.Status = *status
+			g.Expect(cli.Status().Update(ctx, pod)).To(Succeed())
+			updated, err := instanceset.IsPodUpdated(its, pod)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(updated).To(BeTrue())
+			phase, _, err := reconcile()
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(phase).To(Equal(opsv1alpha1.OpsSucceedPhase))
+			g.Expect(res.OpsRequest.Status.Progress).To(Equal("1/1"))
+		})
+	}
+}

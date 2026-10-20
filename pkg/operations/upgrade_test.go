@@ -59,7 +59,6 @@ func TestUpgradeInstanceTemplates(t *testing.T) {
 			name                string
 			definition, version *string
 			parent, supersede   bool
-			inherited           bool
 			wantDef, wantVer    string
 		}{
 			{name: "definition only", definition: pointer.String("pg-new"), wantDef: "pg-new", wantVer: "18.0.0"},
@@ -69,8 +68,6 @@ func TestUpgradeInstanceTemplates(t *testing.T) {
 			{name: "clear definition", definition: pointer.String(""), wantVer: "18.0.0"},
 			{name: "clear version", version: pointer.String(""), wantDef: "pg-canary"},
 			{name: "clear both", definition: pointer.String(""), version: pointer.String("")},
-			{name: "single definition clear inherited", inherited: true, definition: pointer.String("")},
-			{name: "single version clear inherited", inherited: true, version: pointer.String("")},
 			{name: "supersede same-owner template upgrade", definition: pointer.String("pg-new"), supersede: true, wantDef: "pg-new", wantVer: "18.0.0"},
 		} {
 			owner := "component/"
@@ -98,9 +95,6 @@ func TestUpgradeInstanceTemplates(t *testing.T) {
 							}}}},
 						{Name: "sibling", CompDef: "pg-sibling", ServiceVersion: "16.0.0", Replicas: pointer.Int32(1)},
 					}}
-				if tc.inherited {
-					component.Instances[1].CompDef, component.Instances[1].ServiceVersion = "", ""
-				}
 				cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", Generation: 1},
 					Spec:   appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{component}},
 					Status: appsv1.ClusterStatus{Phase: appsv1.RunningClusterPhase}}

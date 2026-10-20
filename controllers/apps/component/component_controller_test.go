@@ -2674,9 +2674,9 @@ var _ = Describe("Component Controller", func() {
 						g.Expect(append(pod.Containers, pod.InitContainers...)).Should(ContainElement(container))
 					}
 				}
-				g.Expect(its.Spec.Instances[0].Images).Should(Equal(map[string]string{
-					testapps.DefaultMySQLContainerName: compDefObj.Spec.Runtime.Containers[0].Image, "prepare": "example.com/prepare:1",
-				}))
+				g.Expect(pod.Containers).Should(ContainElement(And(HaveField("Name", testapps.DefaultMySQLContainerName), HaveField("Image", compDefObj.Spec.Runtime.Containers[0].Image))))
+				g.Expect(pod.InitContainers).Should(ContainElement(And(HaveField("Name", "prepare"), HaveField("Image", "example.com/prepare:1"))))
+				g.Expect(its.Spec.Instances[0].Images).Should(BeEmpty())
 			})).Should(Succeed())
 		},
 			Entry("Pod API", false),

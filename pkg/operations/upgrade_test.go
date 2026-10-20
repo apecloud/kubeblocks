@@ -57,6 +57,7 @@ func TestUpgradeInstanceTemplates(t *testing.T) {
 	for _, sharding := range []bool{false, true} {
 		for _, tc := range []struct {
 			name                string
+			overwrite           string
 			definition, version *string
 			parent, supersede   bool
 			wantDef, wantVer    string
@@ -64,6 +65,8 @@ func TestUpgradeInstanceTemplates(t *testing.T) {
 			{name: "definition only", definition: pointer.String("pg-new"), wantDef: "pg-new", wantVer: "18.0.0"},
 			{name: "version only", version: pointer.String("19.0.0"), wantDef: "pg-canary", wantVer: "19.0.0"},
 			{name: "both", definition: pointer.String("pg-new"), version: pointer.String("19.0.0"), wantDef: "pg-new", wantVer: "19.0.0"},
+			{name: "overwritten definition", definition: pointer.String("pg-new"), overwrite: "definition", wantDef: "pg-new", wantVer: "18.0.0"},
+			{name: "overwritten version", version: pointer.String("19.0.0"), overwrite: "version", wantDef: "pg-canary", wantVer: "19.0.0"},
 			{name: "mixed parent", definition: pointer.String("pg-new"), parent: true, wantDef: "pg-new", wantVer: "18.0.0"},
 			{name: "clear definition", definition: pointer.String(""), wantVer: "18.0.0"},
 			{name: "clear version", version: pointer.String(""), wantDef: "pg-canary"},
@@ -216,6 +219,14 @@ func TestUpgradeInstanceTemplates(t *testing.T) {
 				if canary.ServiceVersion == "" && canary.CompDef != "" {
 					canary.ServiceVersion = "21.0.0"
 				}
+				if tc.overwrite != "" {
+					if tc.overwrite == "definition" {
+						canary.CompDef = "pg-replaced"
+					} else {
+						canary.ServiceVersion = "20.0.0"
+					}
+					res.Cluster.Generation++
+				}
 				if err := cli.Update(ctx, res.Cluster); err != nil {
 					t.Fatal(err)
 				}
@@ -235,6 +246,12 @@ func TestUpgradeInstanceTemplates(t *testing.T) {
 					t.Fatal(err)
 				}
 				reload()
+				if tc.overwrite != "" {
+					if res.OpsRequest.Status.Phase != opsv1alpha1.OpsAbortedPhase {
+						t.Fatalf("phase = %s, want Aborted for overwritten template %s", res.OpsRequest.Status.Phase, tc.overwrite)
+					}
+					return
+				}
 				if res.OpsRequest.Status.Phase != opsv1alpha1.OpsSucceedPhase || res.OpsRequest.Status.Progress != "3/3" {
 					t.Fatalf("phase = %s, progress = %s, want Succeed 3/3", res.OpsRequest.Status.Phase, res.OpsRequest.Status.Progress)
 				}
@@ -290,6 +307,43 @@ func TestUpgradeTargetsUnchanged(t *testing.T) {
 	cluster.Spec.ComponentSpecs[0].ServiceVersion = "resolved-latest"
 	if !handler.targetsUnchanged(newOpsResource("mysql", &latest, &latest)) {
 		t.Fatal("non-exact latest target rejected the owner-resolved values")
+	}
+
+	for _, owner := range []string{"mysql", "shard"} {
+		for _, change := range []string{"unchanged", "definition", "version", "missing", "omitted", "empty"} {
+			t.Run(owner+"/template/"+change, func(t *testing.T) {
+				res := newOpsResource(owner, nil, nil)
+				res.Cluster = cluster.DeepCopy()
+				spec := &res.Cluster.Spec.ComponentSpecs[0]
+				if owner == "shard" {
+					spec = &res.Cluster.Spec.Shardings[0].Template
+				}
+				spec.Instances = []appsv1.InstanceTemplate{{Name: "canary", CompDef: explicitCompDef, ServiceVersion: explicitServiceVersion}}
+				upgrade := &res.OpsRequest.Spec.Upgrade.Components[0]
+				upgrade.Instances = []opsv1alpha1.UpgradeInstanceTemplate{{Name: "canary", ComponentDefinitionName: &explicitCompDef, ServiceVersion: &explicitServiceVersion}}
+				want := false
+				switch change {
+				case "unchanged":
+					want = true
+				case "definition":
+					spec.Instances[0].CompDef = "mysql-8.4"
+				case "version":
+					spec.Instances[0].ServiceVersion = "8.4.0"
+				case "missing":
+					spec.Instances = nil
+				case "omitted", "empty":
+					spec.Instances[0].CompDef = "mysql-resolved"
+					upgrade.Instances[0].ComponentDefinitionName = nil
+					if change == "empty" {
+						upgrade.Instances[0].ComponentDefinitionName = &latest
+					}
+					want = true
+				}
+				if got := handler.targetsUnchanged(res); got != want {
+					t.Fatalf("targetsUnchanged = %t, want %t", got, want)
+				}
+			})
+		}
 	}
 
 	opsRes := newOpsResource("mysql", &explicitCompDef, &explicitServiceVersion)

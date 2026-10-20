@@ -31,6 +31,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
@@ -42,6 +43,7 @@ type upgradeOpsHandler struct{}
 
 type upgradeExpectedImages struct {
 	definition           *appsv1.ComponentDefinition
+	workload             *workloads.InstanceSet
 	containersByTemplate map[string][]corev1.Container
 	pendingOwner         bool
 }
@@ -78,6 +80,21 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		if upgradeComp.ServiceVersion != nil {
 			compSpec.ServiceVersion = *upgradeComp.ServiceVersion
 		}
+		for _, target := range upgradeComp.Instances {
+			for i := range compSpec.Instances {
+				instance := &compSpec.Instances[i]
+				if instance.Name != target.Name {
+					continue
+				}
+				if target.ComponentDefinitionName != nil {
+					instance.CompDef = *target.ComponentDefinitionName
+				}
+				if target.ServiceVersion != nil {
+					instance.ServiceVersion = *target.ServiceVersion
+				}
+				break
+			}
+		}
 		return nil
 	}); err != nil {
 		return err
@@ -110,7 +127,7 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	compOpsHelper = newComponentOpsHelper(upgradeSpec.Components)
 	legacyDefinitions := map[string]*appsv1.ComponentDefinition{}
 	for _, target := range upgradeSpec.Components {
-		if upgradeTargetHasInstanceVersions(opsRes.Cluster, target.ComponentName) {
+		if len(target.Instances) > 0 || upgradeTargetHasInstanceVersions(opsRes.Cluster, target.ComponentName) {
 			continue
 		}
 		spec := getComponentSpecOrShardingTemplate(opsRes.Cluster, target.ComponentName)
@@ -145,13 +162,21 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		ops *opsv1alpha1.OpsRequest,
 		pod *corev1.Pod,
 		pgRes *progressResource) bool {
-		target := pgRes.compOps.(opsv1alpha1.UpgradeComponent).GetComponentName()
+		request := pgRes.compOps.(opsv1alpha1.UpgradeComponent)
+		target := request.GetComponentName()
 		if def, ok := legacyDefinitions[target]; ok {
 			return u.podImageApplied(pod, def.Spec.Runtime.Containers)
 		}
 		expected, ok := containersMap[pgRes.fullComponentName]
 		if !ok || expected.pendingOwner {
 			return false
+		}
+		if len(request.Instances) > 0 {
+			status := expected.workload.FindInstanceStatus(pod.Name)
+			if expected.workload.Status.ObservedGeneration != expected.workload.Generation ||
+				status == nil || !status.UpToDate {
+				return false
+			}
 		}
 		templateName, labeled := instancetemplate.TemplateNameFromLabels(pod.Labels)
 		if !labeled {
@@ -184,10 +209,14 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 func (u upgradeOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.Upgrade.Components)
 	compOpsHelper.saveLastConfigurations(opsRes, func(compSpec appsv1.ClusterComponentSpec, comOps ComponentOpsInterface) opsv1alpha1.LastComponentConfiguration {
-		return opsv1alpha1.LastComponentConfiguration{
+		last := opsv1alpha1.LastComponentConfiguration{
 			ComponentDefinitionName: compSpec.ComponentDef,
 			ServiceVersion:          compSpec.ServiceVersion,
 		}
+		if len(comOps.(opsv1alpha1.UpgradeComponent).Instances) > 0 {
+			last.Instances = compSpec.DeepCopy().Instances
+		}
+		return last
 	})
 	return nil
 }
@@ -227,7 +256,7 @@ func (u upgradeOpsHandler) getUpgradeComponentSpecs(reqCtx intctrlutil.RequestCt
 	cli client.Client, opsRes *OpsResource) (map[string]*appsv1.ClusterComponentSpec, bool, error) {
 	specs := map[string]*appsv1.ClusterComponentSpec{}
 	for _, target := range opsRes.OpsRequest.Spec.Upgrade.Components {
-		if !upgradeTargetHasInstanceVersions(opsRes.Cluster, target.ComponentName) {
+		if len(target.Instances) == 0 && !upgradeTargetHasInstanceVersions(opsRes.Cluster, target.ComponentName) {
 			continue
 		}
 		found := false
@@ -309,7 +338,7 @@ func (u upgradeOpsHandler) getExpectedContainersMap(reqCtx intctrlutil.RequestCt
 			}
 			templates[template.Name] = containers
 		}
-		containersMap[name] = upgradeExpectedImages{definition: compDef, containersByTemplate: templates}
+		containersMap[name] = upgradeExpectedImages{definition: compDef, workload: its, containersByTemplate: templates}
 	}
 	return containersMap, nil
 }

@@ -18,6 +18,9 @@ package v1alpha1
 
 import (
 	"context"
+	"encoding/json"
+	"reflect"
+	"strings"
 	"testing"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -222,4 +225,175 @@ func TestValidateUpgradeServiceVersion(t *testing.T) {
 
 func strPtr(s string) *string {
 	return &s
+}
+
+func TestValidateUpgradeInstanceServiceVersion(t *testing.T) {
+	tests := []struct {
+		name    string
+		version *string
+		wantErr bool
+	}{
+		{name: "omitted version"},
+		{name: "empty version", version: ptr.To("")},
+		{name: "three parts", version: ptr.To("17.5.0")},
+		{name: "v prefix", version: ptr.To("v17.5.0")},
+		{name: "prerelease", version: ptr.To("17.5.0-alpha.1")},
+		{name: "build metadata", version: ptr.To("17.5.0+build123")},
+		{name: "missing patch", version: ptr.To("17.5"), wantErr: true},
+		{name: "random text", version: ptr.To("not-a-version"), wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ops := &OpsRequest{Spec: OpsRequestSpec{Type: UpgradeType, SpecificOpsRequest: SpecificOpsRequest{
+				Upgrade: &Upgrade{Components: []UpgradeComponent{{
+					ComponentOps: ComponentOps{ComponentName: "pg"},
+					Instances: []UpgradeInstanceTemplate{{Name: "canary", ComponentDefinitionName: ptr.To("postgresql-17"),
+						ServiceVersion: tt.version}},
+				}}},
+			}}}
+			before := ops.DeepCopy()
+			cluster := &appsv1.Cluster{Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{
+				Name: "pg", Instances: []appsv1.InstanceTemplate{{Name: "canary"}},
+			}}}}
+			err := ops.ValidateOps(context.Background(), nil, cluster)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("ValidateOps() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr && (!strings.Contains(err.Error(), "canary") || !strings.Contains(err.Error(), *tt.version)) {
+				t.Errorf("validation error does not identify the template and version: %v", err)
+			}
+			if !reflect.DeepEqual(ops, before) {
+				t.Error("validation changed the request")
+			}
+		})
+	}
+}
+
+func TestValidateUpgradeMixedTargets(t *testing.T) {
+	tests := []struct {
+		name       string
+		components []UpgradeComponent
+		wantErr    bool
+	}{
+		{
+			name: "multiple templates with invalid later version",
+			components: []UpgradeComponent{{ComponentOps: ComponentOps{ComponentName: "pg"}, Instances: []UpgradeInstanceTemplate{
+				{Name: "stable", ServiceVersion: ptr.To("17.4.0")},
+				{Name: "canary", ServiceVersion: ptr.To("17.5")},
+			}}},
+			wantErr: true,
+		},
+		{
+			name: "parent and template upgrades across components",
+			components: []UpgradeComponent{
+				{ComponentOps: ComponentOps{ComponentName: "pg"}, ServiceVersion: ptr.To("17.5.0"), Instances: []UpgradeInstanceTemplate{
+					{Name: "stable", ServiceVersion: ptr.To("")},
+					{Name: "canary", ServiceVersion: ptr.To("17.6.0")},
+				}},
+				{ComponentOps: ComponentOps{ComponentName: "redis"}, Instances: []UpgradeInstanceTemplate{
+					{Name: "canary", ServiceVersion: ptr.To("7.2.0")},
+				}},
+			},
+		},
+		{
+			name: "invalid template on later component",
+			components: []UpgradeComponent{
+				{ComponentOps: ComponentOps{ComponentName: "pg"}, ServiceVersion: ptr.To("17.5.0")},
+				{ComponentOps: ComponentOps{ComponentName: "redis"}, Instances: []UpgradeInstanceTemplate{
+					{Name: "canary", ServiceVersion: ptr.To("7.2")},
+				}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid parent with valid template",
+			components: []UpgradeComponent{{ComponentOps: ComponentOps{ComponentName: "pg"}, ServiceVersion: ptr.To("17.5"),
+				Instances: []UpgradeInstanceTemplate{{Name: "canary", ServiceVersion: ptr.To("17.6.0")}}}},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ops := &OpsRequest{Spec: OpsRequestSpec{Type: UpgradeType, SpecificOpsRequest: SpecificOpsRequest{
+				Upgrade: &Upgrade{Components: tt.components},
+			}}}
+			cluster := &appsv1.Cluster{Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{
+				{Name: "pg", Instances: []appsv1.InstanceTemplate{{Name: "stable"}, {Name: "canary"}}},
+				{Name: "redis", Instances: []appsv1.InstanceTemplate{{Name: "canary"}}},
+			}}}
+			if err := ops.ValidateOps(context.Background(), nil, cluster); (err != nil) != tt.wantErr {
+				t.Errorf("ValidateOps() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestUpgradeInstanceTemplateJSONPreservesOverrides(t *testing.T) {
+	for _, target := range []UpgradeInstanceTemplate{
+		{Name: "canary", ComponentDefinitionName: ptr.To("postgresql-17")},
+		{Name: "canary", ServiceVersion: ptr.To("17.5.0")},
+		{Name: "canary", ComponentDefinitionName: ptr.To(""), ServiceVersion: ptr.To("")},
+	} {
+		data, err := json.Marshal(target)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var decoded UpgradeInstanceTemplate
+		if err := json.Unmarshal(data, &decoded); err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(decoded, target) {
+			t.Errorf("JSON round trip changed override presence: got %#v, want %#v", decoded, target)
+		}
+	}
+}
+
+func TestValidateUpgradeInstanceTargets(t *testing.T) {
+	for _, tc := range []struct {
+		name, owner, template, wantError                 string
+		shard, independent, emptyIndependent, parentOnly bool
+	}{
+		{name: "component", owner: "db", template: "canary"},
+		{name: "missing component template", owner: "db", template: "missing", wantError: "missing"},
+		{name: "missing owner", owner: "missing", template: "canary", wantError: "canary"},
+		{name: "sharding", owner: "shards", template: "canary", shard: true},
+		{name: "missing sharding template", owner: "shards", template: "missing", shard: true, wantError: "missing"},
+		{name: "independent instances", owner: "shards", template: "canary", shard: true, independent: true, wantError: "special"},
+		{name: "empty independent instances", owner: "shards", template: "canary", shard: true, emptyIndependent: true, wantError: "special"},
+		{name: "old parent request", owner: "shards", shard: true, independent: true, parentOnly: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			spec := appsv1.ClusterComponentSpec{Name: "db", Instances: []appsv1.InstanceTemplate{{Name: "canary"}}}
+			cluster := &appsv1.Cluster{Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{spec}}}
+			if tc.shard {
+				cluster.Spec.ComponentSpecs = nil
+				cluster.Spec.Shardings = []appsv1.ClusterSharding{{Name: "shards", Shards: 1, Template: spec,
+					ShardTemplates: []appsv1.ShardTemplate{{Name: "special", Replicas: ptr.To(int32(2)), ServiceVersion: ptr.To("2.0.0")}},
+				}}
+				if tc.independent {
+					cluster.Spec.Shardings[0].ShardTemplates[0].Instances = []appsv1.InstanceTemplate{{Name: "canary"}}
+				}
+				if tc.emptyIndependent {
+					cluster.Spec.Shardings[0].ShardTemplates[0].Instances = []appsv1.InstanceTemplate{}
+				}
+			}
+			target := UpgradeComponent{ComponentOps: ComponentOps{ComponentName: tc.owner}}
+			if tc.parentOnly {
+				target.ServiceVersion = ptr.To("1.0.0")
+			} else {
+				target.Instances = []UpgradeInstanceTemplate{{Name: tc.template, ComponentDefinitionName: ptr.To("db-v2")}}
+			}
+			ops := &OpsRequest{Spec: OpsRequestSpec{Type: UpgradeType, SpecificOpsRequest: SpecificOpsRequest{
+				Upgrade: &Upgrade{Components: []UpgradeComponent{target}},
+			}}}
+			err := ops.ValidateOps(context.Background(), nil, cluster)
+			if tc.wantError == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else if err == nil || !strings.Contains(err.Error(), tc.wantError) {
+				t.Fatalf("error = %v, want %q", err, tc.wantError)
+			}
+		})
+	}
 }

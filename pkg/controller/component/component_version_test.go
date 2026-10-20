@@ -121,7 +121,7 @@ var _ = Describe("Component Version", func() {
 			By("using the KB tools image when no action image is configured")
 			images, err := resolveImagesWithCompVersions4Template(newCompDef(), []*appsv1.ComponentVersion{
 				newCompVersion(map[string]string{appName: "app:2.0.0"}),
-			}, serviceVersion, nil)
+			}, serviceVersion)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(viperx.GetString(constant.KBToolsImage)).Should(Equal(toolsImage))
 			Expect(images).Should(HaveKeyWithValue(kbagent.ContainerName, toolsImage))

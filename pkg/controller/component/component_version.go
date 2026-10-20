@@ -104,8 +104,8 @@ func UpdateCompDefinitionImages4ServiceVersion(ctx context.Context, cli client.R
 	return resolveImagesWithCompVersions(compDef, compVersions, serviceVersion)
 }
 
-// ResolveInstanceTemplateImages4ServiceVersion returns runtime images and ComponentVersion action image overrides.
-// Defaults matching parentRuntime inherit its images; nil returns all runtime images.
+// ResolveInstanceTemplateImages4ServiceVersion returns template image overrides relative to parentRuntime.
+// Runtime defaults matching parentRuntime are inherited; nil returns all runtime images.
 // Without a ComponentVersion, action containers inherit the parent synthesized runtime.
 func ResolveInstanceTemplateImages4ServiceVersion(ctx context.Context, cli client.Reader,
 	compDef *appsv1.ComponentDefinition, serviceVersion string, parentRuntime *corev1.PodSpec) (map[string]string, error) {
@@ -113,7 +113,36 @@ func ResolveInstanceTemplateImages4ServiceVersion(ctx context.Context, cli clien
 	if err != nil {
 		return nil, err
 	}
-	return resolveImagesWithCompVersions4Template(compDef, compVersions, serviceVersion, parentRuntime)
+	images, err := resolveImagesWithCompVersions4Template(compDef, compVersions, serviceVersion)
+	if err != nil || parentRuntime == nil {
+		return images, err
+	}
+	var apps map[string]appNameVersionImage
+	if len(compVersions) > 0 {
+		appsInVer, err := findMatchedImagesFromCompVersions(compVersions, serviceVersion)
+		if err != nil {
+			return nil, err
+		}
+		apps = checkNMergeImages(serviceVersion, convertImagesFromCompDefinition(compDef), appsInVer)
+	}
+	inheritDefaults := func(containers, parentContainers []corev1.Container) {
+		for _, c := range containers {
+			rawImage := c.Image
+			if len(compVersions) > 0 {
+				rawImage = apps[c.Name].image
+			}
+			if rawImage == "" || rawImage != c.Image {
+				continue
+			}
+			_, parent := intctrlutil.GetContainerByName(parentContainers, c.Name)
+			if parent != nil && images[c.Name] == intctrlutil.ReplaceImageRegistry(parent.Image) {
+				delete(images, c.Name)
+			}
+		}
+	}
+	inheritDefaults(compDef.Spec.Runtime.InitContainers, parentRuntime.InitContainers)
+	inheritDefaults(compDef.Spec.Runtime.Containers, parentRuntime.Containers)
+	return images, nil
 }
 
 func resolveImagesWithCompVersions(compDef *appsv1.ComponentDefinition,
@@ -175,7 +204,7 @@ func resolveImagesWithCompVersions(compDef *appsv1.ComponentDefinition,
 }
 
 func resolveImagesWithCompVersions4Template(compDef *appsv1.ComponentDefinition,
-	compVersions []*appsv1.ComponentVersion, serviceVersion string, parentRuntime *corev1.PodSpec) (map[string]string, error) {
+	compVersions []*appsv1.ComponentVersion, serviceVersion string) (map[string]string, error) {
 	var apps map[string]appNameVersionImage
 	if len(compVersions) > 0 {
 		appsInDef := convertImagesFromCompDefinition(compDef)
@@ -190,7 +219,7 @@ func resolveImagesWithCompVersions4Template(compDef *appsv1.ComponentDefinition,
 	var err error
 
 	if err = func() error {
-		checkNAddImage := func(c corev1.Container, parentContainers []corev1.Container) error {
+		checkNAddImage := func(c corev1.Container) error {
 			image := c.Image
 			if len(compVersions) > 0 {
 				app, ok := apps[c.Name]
@@ -204,28 +233,17 @@ func resolveImagesWithCompVersions4Template(compDef *appsv1.ComponentDefinition,
 				}
 			}
 			if len(image) > 0 {
-				mappedImage := intctrlutil.ReplaceImageRegistry(image)
-				if image == c.Image {
-					_, parent := intctrlutil.GetContainerByName(parentContainers, c.Name)
-					if parent != nil && mappedImage == intctrlutil.ReplaceImageRegistry(parent.Image) {
-						return nil
-					}
-				}
-				images[c.Name] = mappedImage
+				images[c.Name] = intctrlutil.ReplaceImageRegistry(image)
 			}
 			return nil
 		}
-		var parentInitContainers, parentContainers []corev1.Container
-		if parentRuntime != nil {
-			parentInitContainers, parentContainers = parentRuntime.InitContainers, parentRuntime.Containers
-		}
 		for _, c := range compDef.Spec.Runtime.InitContainers {
-			if err := checkNAddImage(c, parentInitContainers); err != nil {
+			if err := checkNAddImage(c); err != nil {
 				return err
 			}
 		}
 		for _, c := range compDef.Spec.Runtime.Containers {
-			if err := checkNAddImage(c, parentContainers); err != nil {
+			if err := checkNAddImage(c); err != nil {
 				return err
 			}
 		}

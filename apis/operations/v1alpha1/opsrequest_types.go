@@ -382,7 +382,7 @@ type UpgradeInstanceTemplate struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// Specifies the ComponentDefinition name for the instance template, using an exact match.
+	// Specifies the ComponentDefinition name for the instance template.
 	// +kubebuilder:validation:MaxLength=64
 	// +optional
 	ComponentDefinitionName *string `json:"componentDefinitionName,omitempty"`

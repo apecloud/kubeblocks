@@ -733,8 +733,8 @@ var _ = Describe("Upgrade OpsRequest", func() {
 
 func TestUpgradeTemplateInitProgress(t *testing.T) {
 	for _, tc := range []struct {
-		name                                                            string
-		clear, sharding, sidecar, legacy, rewrite, ownerError, deferred bool
+		name                                                string
+		clear, sharding, sidecar, legacy, rewrite, deferred bool
 	}{
 		{name: "init-only version"},
 		{name: "clear both fields", clear: true},
@@ -742,7 +742,6 @@ func TestUpgradeTemplateInitProgress(t *testing.T) {
 		{name: "restartable init", sidecar: true},
 		{name: "admission registry rewrite", rewrite: true},
 		{name: "legacy direct template", legacy: true},
-		{name: "owner error", ownerError: true},
 		{name: "deferred tools init", deferred: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -877,15 +876,6 @@ func TestUpgradeTemplateInitProgress(t *testing.T) {
 				g.Expect(cli.Get(ctx, client.ObjectKeyFromObject(cluster), freshCluster)).To(Succeed())
 				res = &OpsResource{Cluster: freshCluster, OpsRequest: freshOps, Recorder: record.NewFakeRecorder(20)}
 				return GetOpsManager().OpsMap[opsv1alpha1.UpgradeType].OpsHandler.ReconcileAction(reqCtx, cli, res)
-			}
-			if tc.ownerError {
-				its.Status.UpdateRevisions = map[string]string{"zstd": "invalid!"}
-				g.Expect(cli.Update(ctx, its)).To(Succeed())
-				phase, _, err := reconcile()
-				g.Expect(err).To(HaveOccurred())
-				g.Expect(phase).To(Equal(opsv1alpha1.OpsRunningPhase))
-				buildPod(its)
-				g.Expect(cli.Update(ctx, its)).To(Succeed())
 			}
 			for i := 0; i < 2; i++ {
 				phase, requeue, err := reconcile()

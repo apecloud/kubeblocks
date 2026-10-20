@@ -4726,7 +4726,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the ComponentDefinition name for the instance template, using an exact match.</p>
+<p>Specifies the ComponentDefinition name for the instance template.</p>
 </td>
 </tr>
 <tr>

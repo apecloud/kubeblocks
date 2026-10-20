@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
-	"encoding/json"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,10 +32,6 @@ import (
 )
 
 type upgradeOpsHandler struct{}
-
-const upgradeInstanceTemplateInheritanceKey = "upgrade-instance-template-inheritance/v1"
-
-type upgradeInstanceTemplateInheritance map[string]map[string]bool
 
 var _ OpsHandler = upgradeOpsHandler{}
 
@@ -62,7 +57,6 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	var compOpsHelper componentOpsHelper
 	upgradeSpec := opsRes.OpsRequest.Spec.Upgrade
 	compOpsHelper = newComponentOpsHelper(upgradeSpec.Components)
-	inheritance := make(upgradeInstanceTemplateInheritance)
 	if err := compOpsHelper.updateClusterComponentsAndShardings(opsRes.Cluster, func(compSpec *appsv1.ClusterComponentSpec, obj ComponentOpsInterface) error {
 		upgradeComp := obj.(opsv1alpha1.UpgradeComponent)
 		if u.needUpdateCompDef(upgradeComp, opsRes.Cluster) {
@@ -70,9 +64,6 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		}
 		if upgradeComp.ServiceVersion != nil {
 			compSpec.ServiceVersion = *upgradeComp.ServiceVersion
-		}
-		if len(upgradeComp.Instances) > 0 {
-			inheritance[upgradeComp.ComponentName] = make(map[string]bool)
 		}
 		for _, upgradeInstance := range upgradeComp.Instances {
 			for i := range compSpec.Instances {
@@ -86,7 +77,6 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 				if upgradeInstance.ServiceVersion != nil {
 					instance.ServiceVersion = *upgradeInstance.ServiceVersion
 				}
-				inheritance[upgradeComp.ComponentName][instance.Name] = instance.CompDef == "" && instance.ServiceVersion == ""
 				break
 			}
 		}
@@ -107,27 +97,7 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		}); err != nil {
 		return err
 	}
-	var checkpoint []byte
-	if len(inheritance) > 0 {
-		var err error
-		checkpoint, err = json.Marshal(inheritance)
-		if err != nil {
-			return err
-		}
-	}
-	if err := cli.Update(reqCtx.Ctx, opsRes.Cluster); err != nil {
-		return err
-	}
-	if checkpoint != nil {
-		for _, extra := range opsRes.OpsRequest.Status.Extras {
-			if _, ok := extra[upgradeInstanceTemplateInheritanceKey]; ok {
-				extra[upgradeInstanceTemplateInheritanceKey] = string(checkpoint)
-				return nil
-			}
-		}
-		opsRes.OpsRequest.Status.Extras = append(opsRes.OpsRequest.Status.Extras, map[string]string{upgradeInstanceTemplateInheritanceKey: string(checkpoint)})
-	}
-	return nil
+	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }
 
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
@@ -148,15 +118,6 @@ func (u upgradeOpsHandler) targetsUnchanged(opsRes *OpsResource) bool {
 	if opsRes == nil || opsRes.Cluster == nil || opsRes.OpsRequest == nil || opsRes.OpsRequest.Spec.Upgrade == nil {
 		return false
 	}
-	var inheritance upgradeInstanceTemplateInheritance
-	for _, extra := range opsRes.OpsRequest.Status.Extras {
-		if checkpoint, ok := extra[upgradeInstanceTemplateInheritanceKey]; ok {
-			if err := json.Unmarshal([]byte(checkpoint), &inheritance); err != nil {
-				return false
-			}
-			break
-		}
-	}
 	for _, upgrade := range opsRes.OpsRequest.Spec.Upgrade.Components {
 		compSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, upgrade.ComponentName)
 		if compSpec == nil {
@@ -169,31 +130,6 @@ func (u upgradeOpsHandler) targetsUnchanged(opsRes *OpsResource) bool {
 		serviceVersion := ptr.Deref(upgrade.ServiceVersion, "")
 		if serviceVersion != "" && compSpec.ServiceVersion != serviceVersion {
 			return false
-		}
-		for _, upgradeInstance := range upgrade.Instances {
-			found := false
-			for _, instance := range compSpec.Instances {
-				if instance.Name != upgradeInstance.Name {
-					continue
-				}
-				found = true
-				componentDef := ptr.Deref(upgradeInstance.ComponentDefinitionName, "")
-				serviceVersion := ptr.Deref(upgradeInstance.ServiceVersion, "")
-				inherited := inheritance[upgrade.ComponentName][upgradeInstance.Name]
-				if inherited && (instance.CompDef != "" || instance.ServiceVersion != "") {
-					return false
-				}
-				if componentDef != "" && instance.CompDef != componentDef {
-					return false
-				}
-				if serviceVersion != "" && instance.ServiceVersion != serviceVersion {
-					return false
-				}
-				break
-			}
-			if !found {
-				return false
-			}
 		}
 	}
 	return true

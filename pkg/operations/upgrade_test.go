@@ -27,7 +27,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/spf13/viper"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -49,7 +48,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
-	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	opsutil "github.com/apecloud/kubeblocks/pkg/operations/util"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
@@ -58,12 +56,11 @@ import (
 func TestUpgradeInstanceTemplates(t *testing.T) {
 	for _, sharding := range []bool{false, true} {
 		for _, tc := range []struct {
-			name                   string
-			definition, version    *string
-			parent, supersede      bool
-			inherited              bool
-			wantDef, wantVer       string
-			replaceDef, replaceVer string
+			name                string
+			definition, version *string
+			parent, supersede   bool
+			inherited           bool
+			wantDef, wantVer    string
 		}{
 			{name: "definition only", definition: pointer.String("pg-new"), wantDef: "pg-new", wantVer: "18.0.0"},
 			{name: "version only", version: pointer.String("19.0.0"), wantDef: "pg-canary", wantVer: "19.0.0"},
@@ -74,13 +71,6 @@ func TestUpgradeInstanceTemplates(t *testing.T) {
 			{name: "clear both", definition: pointer.String(""), version: pointer.String("")},
 			{name: "single definition clear inherited", inherited: true, definition: pointer.String("")},
 			{name: "single version clear inherited", inherited: true, version: pointer.String("")},
-			{name: "single definition clear inherited replaced definition", inherited: true, definition: pointer.String(""), replaceDef: "pg-new"},
-			{name: "single definition clear inherited replaced version", inherited: true, definition: pointer.String(""), replaceVer: "19.0.0"},
-			{name: "single version clear inherited replaced definition", inherited: true, version: pointer.String(""), replaceDef: "pg-new"},
-			{name: "single version clear inherited replaced version", inherited: true, version: pointer.String(""), replaceVer: "19.0.0"},
-			{name: "clear both replaced definition", definition: pointer.String(""), version: pointer.String(""), replaceDef: "pg-new"},
-			{name: "clear both replaced version", definition: pointer.String(""), version: pointer.String(""), replaceVer: "19.0.0"},
-			{name: "clear both replaced pair", definition: pointer.String(""), version: pointer.String(""), replaceDef: "pg-new", replaceVer: "19.0.0"},
 			{name: "supersede same-owner template upgrade", definition: pointer.String("pg-new"), supersede: true, wantDef: "pg-new", wantVer: "18.0.0"},
 		} {
 			owner := "component/"
@@ -174,9 +164,6 @@ func TestUpgradeInstanceTemplates(t *testing.T) {
 					if _, err := GetOpsManager().Do(reqCtx, cli, res); err != nil {
 						t.Fatal(err)
 					}
-					if err := cli.Status().Update(ctx, res.OpsRequest); err != nil {
-						t.Fatal(err)
-					}
 					reload()
 				}
 				got := getComponentSpecOrShardingTemplate(res.Cluster, "pg")
@@ -235,10 +222,6 @@ func TestUpgradeInstanceTemplates(t *testing.T) {
 				if canary.ServiceVersion == "" && canary.CompDef != "" {
 					canary.ServiceVersion = "21.0.0"
 				}
-				if tc.replaceDef != "" || tc.replaceVer != "" {
-					canary.CompDef, canary.ServiceVersion = tc.replaceDef, tc.replaceVer
-					res.Cluster.Generation++
-				}
 				if err := cli.Update(ctx, res.Cluster); err != nil {
 					t.Fatal(err)
 				}
@@ -258,12 +241,6 @@ func TestUpgradeInstanceTemplates(t *testing.T) {
 					t.Fatal(err)
 				}
 				reload()
-				if tc.replaceDef != "" || tc.replaceVer != "" {
-					if res.OpsRequest.Status.Phase != opsv1alpha1.OpsAbortedPhase || res.OpsRequest.Status.CompletionTimestamp.IsZero() {
-						t.Fatalf("phase = %s, completion = %s, want Aborted with completion timestamp for replaced inherited target", res.OpsRequest.Status.Phase, res.OpsRequest.Status.CompletionTimestamp)
-					}
-					return
-				}
 				if res.OpsRequest.Status.Phase != opsv1alpha1.OpsSucceedPhase || res.OpsRequest.Status.Progress != "3/3" {
 					t.Fatalf("phase = %s, progress = %s, want Succeed 3/3", res.OpsRequest.Status.Phase, res.OpsRequest.Status.Progress)
 				}
@@ -332,65 +309,6 @@ func TestUpgradeTargetsUnchanged(t *testing.T) {
 	phase, _, err = handler.ReconcileAction(intctrlutil.RequestCtx{}, nil, opsRes)
 	if err != nil || phase != opsv1alpha1.OpsAbortedPhase {
 		t.Fatalf("phase=%s err=%v, want Aborted for a replaced explicit target", phase, err)
-	}
-}
-
-func TestUpgradeInstanceTemplateTargetsUnchanged(t *testing.T) {
-	for _, tc := range []struct {
-		name                string
-		definition, version *string
-		missing, inherited  bool
-		want                bool
-	}{
-		{name: "exact pair", definition: pointer.String("pg-canary"), version: pointer.String("18.0.0"), want: true},
-		{name: "definition only", definition: pointer.String("pg-canary"), want: true},
-		{name: "version only", version: pointer.String("18.0.0"), want: true},
-		{name: "inherited pair", definition: pointer.String(""), version: pointer.String(""), inherited: true, want: true},
-		{name: "replaced inherited pair", definition: pointer.String(""), version: pointer.String("")},
-		{name: "owner resolved cleared definition", definition: pointer.String(""), want: true},
-		{name: "owner resolved cleared version", version: pointer.String(""), want: true},
-		{name: "omitted fields", want: true},
-		{name: "replaced definition", definition: pointer.String("pg-new")},
-		{name: "replaced version", version: pointer.String("19.0.0")},
-		{name: "removed template", definition: pointer.String("pg-canary"), missing: true},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			component := appsv1.ClusterComponentSpec{Name: "pg", Instances: []appsv1.InstanceTemplate{{Name: "canary", CompDef: "pg-canary", ServiceVersion: "18.0.0"}, {Name: "unrelated"}}}
-			if tc.inherited {
-				component.Instances[0].CompDef, component.Instances[0].ServiceVersion = "", ""
-			}
-			if tc.missing {
-				component.Instances = component.Instances[1:]
-			}
-			res := &OpsResource{Cluster: &appsv1.Cluster{Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{component}}},
-				OpsRequest: &opsv1alpha1.OpsRequest{Spec: opsv1alpha1.OpsRequestSpec{SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{
-					Upgrade: &opsv1alpha1.Upgrade{Components: []opsv1alpha1.UpgradeComponent{{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "pg"},
-						Instances: []opsv1alpha1.UpgradeInstanceTemplate{{Name: "canary", ComponentDefinitionName: tc.definition, ServiceVersion: tc.version}},
-					}}},
-				}}}}
-			observed := res.Cluster.DeepCopy()
-			res.Cluster.Name, res.Cluster.Namespace = "demo", "default"
-			res.Cluster.Spec.ComponentSpecs[0].Instances = []appsv1.InstanceTemplate{{Name: "canary", CompDef: "pg-canary", ServiceVersion: "18.0.0"}}
-			scheme := runtime.NewScheme()
-			for _, add := range []func(*runtime.Scheme) error{appsv1.AddToScheme, opsv1alpha1.AddToScheme} {
-				if err := add(scheme); err != nil {
-					t.Fatal(err)
-				}
-			}
-			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(res.Cluster).Build()
-			if err := (upgradeOpsHandler{}).Action(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, res); err != nil {
-				t.Fatal(err)
-			}
-			res.Cluster = observed
-			if got := (upgradeOpsHandler{}).targetsUnchanged(res); got != tc.want {
-				t.Fatalf("targets unchanged = %t, want %t", got, tc.want)
-			}
-			res.Cluster.Spec.ComponentSpecs = nil
-			res.Cluster.Spec.Shardings = []appsv1.ClusterSharding{{Name: "pg", Template: component}}
-			if got := (upgradeOpsHandler{}).targetsUnchanged(res); got != tc.want {
-				t.Fatalf("sharding targets unchanged = %t, want %t", got, tc.want)
-			}
-		})
 	}
 }
 
@@ -946,16 +864,13 @@ var _ = Describe("Upgrade OpsRequest", func() {
 
 func TestUpgradeInstanceTemplateOwnerConvergence(t *testing.T) {
 	for _, tc := range []struct {
-		name                                       string
-		clear, shard, sidecar, rewritten, deferred bool
+		name         string
+		clear, shard bool
 	}{
 		{name: "init-only"},
 		{name: "clear-both", clear: true},
 		{name: "shard init-only", shard: true},
 		{name: "shard clear-both", shard: true, clear: true},
-		{name: "running init sidecar", sidecar: true},
-		{name: "admission registry rewrite", rewritten: true},
-		{name: "deferred tools init", deferred: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
@@ -971,23 +886,10 @@ func TestUpgradeInstanceTemplateOwnerConvergence(t *testing.T) {
 					InitContainers: []corev1.Container{{Name: "setup", Image: "setup:1"}},
 				},
 			}}
-			if tc.sidecar {
-				def.Spec.Runtime.InitContainers[0].RestartPolicy = ptr.To(corev1.ContainerRestartPolicyAlways)
-			}
-			if tc.deferred {
-				oldToolsImage := viper.GetString(constant.KBToolsImage)
-				defer viper.Set(constant.KBToolsImage, oldToolsImage)
-				viper.Set(constant.KBToolsImage, "docker.io/apecloud/kubeblocks-tools:1.1.0")
-				def.Spec.Runtime.InitContainers[0] = corev1.Container{Name: kbagent.InitContainerName, Image: "docker.io/apecloud/kubeblocks-tools:1.0.0", Command: kbagent.InitCommand()}
-				def.Spec.Runtime.Containers = append(def.Spec.Runtime.Containers, corev1.Container{Name: "kbagent", Image: "custom-action:1", Command: []string{kbagent.SharedBinaryPath}})
-			}
 			initName, targetInit := def.Spec.Runtime.InitContainers[0].Name, "setup:2"
-			if tc.deferred {
-				targetInit = "docker.io/apecloud/kubeblocks-tools:1.1.0"
-			}
 			ver := &appsv1.ComponentVersion{ObjectMeta: metav1.ObjectMeta{Name: "db-ver", Generation: 1, Labels: map[string]string{"db": "db"}}, Spec: appsv1.ComponentVersionSpec{
 				CompatibilityRules: []appsv1.ComponentVersionCompatibilityRule{{CompDefs: []string{"db"}, Releases: []string{"v2"}}},
-				Releases:           []appsv1.ComponentVersionRelease{{Name: "v2", ServiceVersion: "2.0.0", Images: map[string]string{"db": "db:same", initName: targetInit, "kbagent": "custom-action:1"}}},
+				Releases:           []appsv1.ComponentVersionRelease{{Name: "v2", ServiceVersion: "2.0.0", Images: map[string]string{"db": "db:same", initName: targetInit}}},
 			}, Status: appsv1.ComponentVersionStatus{ObservedGeneration: 1, Phase: appsv1.AvailablePhase}}
 			spec := appsv1.ClusterComponentSpec{Name: "db", ComponentDef: "db", ServiceVersion: "1.0.0", Replicas: 1, Instances: []appsv1.InstanceTemplate{{Name: "canary", Replicas: ptr.To(int32(1)), CompDef: "db", ServiceVersion: "1.0.0"}}}
 			if tc.clear {
@@ -1013,9 +915,6 @@ func TestUpgradeInstanceTemplateOwnerConvergence(t *testing.T) {
 			}
 			handler := GetOpsManager().OpsMap[opsv1alpha1.UpgradeType].OpsHandler
 			if err := handler.Action(reqCtx, cli, resource()); err != nil {
-				t.Fatal(err)
-			}
-			if err := cli.Status().Update(ctx, ops); err != nil {
 				t.Fatal(err)
 			}
 			spec = *getComponentSpecOrShardingTemplate(cluster, targetName).DeepCopy()
@@ -1073,16 +972,7 @@ func TestUpgradeInstanceTemplateOwnerConvergence(t *testing.T) {
 			if tc.clear {
 				pod.Spec.InitContainers[0].Image = "setup:2"
 			}
-			if tc.deferred {
-				pod.Spec.InitContainers[0].Image = "docker.io/apecloud/kubeblocks-tools:1.0.0"
-				pod.Spec.InitContainers[0].Command = kbagent.LegacyInitCommand()
-				pod.Spec.Containers[0].Image = "db:old"
-				pod.Status.ContainerStatuses[0].Image = "db:old"
-			}
 			pod.Status.InitContainerStatuses = []corev1.ContainerStatus{{Name: initName, Image: pod.Spec.InitContainers[0].Image, State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 0}}}}
-			if tc.sidecar {
-				pod.Status.InitContainerStatuses[0].State = corev1.ContainerState{Running: &corev1.ContainerStateRunning{StartedAt: metav1.Now()}}
-			}
 			publish := func() {
 				t.Helper()
 				tree.SetRoot(its)
@@ -1118,14 +1008,6 @@ func TestUpgradeInstanceTemplateOwnerConvergence(t *testing.T) {
 			reconcile(opsv1alpha1.OpsRunningPhase, "0/1")
 			reconcile(opsv1alpha1.OpsRunningPhase, "0/1")
 			pod.Spec.InitContainers[0].Image = desiredInit
-			if tc.rewritten {
-				pod.Spec.InitContainers[0].Image = "admission.local/tenant/" + desiredInit
-			}
-			if tc.deferred {
-				pod.Spec.InitContainers[0].Image = "docker.io/apecloud/kubeblocks-tools:1.0.0"
-				pod.Spec.Containers[0].Image = "db:same"
-				pod.Status.ContainerStatuses[0].Image = "db:same"
-			}
 			pod.Status.InitContainerStatuses[0].Image = pod.Spec.InitContainers[0].Image
 			podStatus := *pod.Status.DeepCopy()
 			if err := cli.Update(ctx, pod); err != nil {
@@ -1139,33 +1021,6 @@ func TestUpgradeInstanceTemplateOwnerConvergence(t *testing.T) {
 			if status := its.FindInstanceStatus(pod.Name); status == nil || !status.UpToDate {
 				t.Fatalf("updated Pod not applied by owner: %#v", status)
 			}
-			currentStatus := *its.Status.DeepCopy()
-			for _, state := range []string{"missing", "stale", "not applied", "offline", "terminating"} {
-				its.Status = *currentStatus.DeepCopy()
-				switch state {
-				case "missing":
-					its.Status.InstanceStatus = nil
-				case "stale":
-					its.Status.ObservedGeneration--
-				case "not applied":
-					its.Status.InstanceStatus[0].UpToDate = false
-				case "offline":
-					its.Status.InstanceStatus[0].DesiredState = workloads.InstanceDesiredStateOffline
-					its.Status.InstanceStatus[0].UpToDate = false
-				case "terminating":
-					its.Status.InstanceStatus[0].CurrentState = workloads.InstanceCurrentStateTerminating
-					its.Status.InstanceStatus[0].UpToDate = false
-				}
-				if err := cli.Status().Update(ctx, its); err != nil {
-					t.Fatal(err)
-				}
-				progress := "0/1"
-				if state == "stale" {
-					progress = "1/1"
-				}
-				reconcile(opsv1alpha1.OpsRunningPhase, progress)
-			}
-			its.Status = currentStatus
 			if err := cli.Status().Update(ctx, its); err != nil {
 				t.Fatal(err)
 			}

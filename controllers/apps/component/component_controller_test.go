@@ -2564,7 +2564,7 @@ var _ = Describe("Component Controller", func() {
 				f.GetObject().Spec.EnableInstanceAPI = ptr.To(enableInstanceAPI)
 			})
 			expectedRetry := ""
-			checkImages := func(selected bool) {
+			checkImages := func() {
 				Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, its *workloads.InstanceSet) {
 					g.Expect(its.Spec.EnableInstanceAPI).Should(Equal(ptr.To(enableInstanceAPI)))
 					g.Expect(its.Spec.Instances).Should(HaveLen(1))
@@ -2583,26 +2583,22 @@ var _ = Describe("Component Controller", func() {
 							g.Expect(append(pod.Containers, pod.InitContainers...)).Should(ContainElement(container))
 						}
 					}
-					if selected {
-						g.Expect(its.Spec.Instances[0].Images).Should(Equal(map[string]string{
-							testapps.DefaultMySQLContainerName: intctrlutil.ReplaceImageRegistry(compDefObj.Spec.Runtime.Containers[0].Image), "prepare": intctrlutil.ReplaceImageRegistry(initImage),
-						}))
-					} else {
-						g.Expect(its.Spec.Instances[0].Images).Should(BeEmpty())
-					}
+					g.Expect(pod.Containers).Should(ContainElement(And(HaveField("Name", testapps.DefaultMySQLContainerName), HaveField("Image", intctrlutil.ReplaceImageRegistry(compDefObj.Spec.Runtime.Containers[0].Image)))))
+					g.Expect(pod.InitContainers).Should(ContainElement(And(HaveField("Name", "prepare"), HaveField("Image", intctrlutil.ReplaceImageRegistry(initImage)))))
+					g.Expect(its.Spec.Instances[0].Images).Should(BeEmpty())
 				})).Should(Succeed())
 			}
-			checkImages(true)
+			checkImages()
 			expectedRetry = "true"
 			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
 				comp.Spec.Instances[0].Annotations = map[string]string{"retry-template-images": expectedRetry}
 			})()).Should(Succeed())
-			checkImages(true)
+			checkImages()
 			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
 				comp.Spec.Instances[0].CompDef = ""
 				comp.Spec.Instances[0].ServiceVersion = ""
 			})()).Should(Succeed())
-			checkImages(false)
+			checkImages()
 		},
 			Entry("Pod API", false, false),
 			Entry("Instance API", true, false),

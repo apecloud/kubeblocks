@@ -1108,7 +1108,7 @@ func TestUpgradeInstanceTemplateOwnerConvergence(t *testing.T) {
 			}
 			images := map[string]map[string]string{}
 			if !tc.clear && !tc.legacy {
-				images["canary"], err = component.ResolveInstanceTemplateImages4ServiceVersion(ctx, cli, def, "2.0.0")
+				images["canary"], err = component.ResolveInstanceTemplateImages4ServiceVersion(ctx, cli, def, "2.0.0", nil)
 				if err != nil {
 					t.Fatal(err)
 				}

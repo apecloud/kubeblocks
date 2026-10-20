@@ -104,15 +104,45 @@ func UpdateCompDefinitionImages4ServiceVersion(ctx context.Context, cli client.R
 	return resolveImagesWithCompVersions(compDef, compVersions, serviceVersion)
 }
 
-// ResolveInstanceTemplateImages4ServiceVersion returns runtime images and ComponentVersion action image overrides.
+// ResolveInstanceTemplateImages4ServiceVersion returns template image overrides relative to parent.
+// Runtime defaults matching parent are inherited; nil returns all runtime images.
 // Without a ComponentVersion, action containers inherit the parent synthesized runtime.
 func ResolveInstanceTemplateImages4ServiceVersion(ctx context.Context, cli client.Reader,
-	compDef *appsv1.ComponentDefinition, serviceVersion string) (map[string]string, error) {
+	compDef *appsv1.ComponentDefinition, serviceVersion string, parent *corev1.PodSpec) (map[string]string, error) {
 	compVersions, err := CompatibleCompVersions4Definition(ctx, cli, compDef)
 	if err != nil {
 		return nil, err
 	}
-	return resolveImagesWithCompVersions4Template(compDef, compVersions, serviceVersion)
+	images, err := resolveImagesWithCompVersions4Template(compDef, compVersions, serviceVersion)
+	if err != nil || parent == nil {
+		return images, err
+	}
+	var apps map[string]appNameVersionImage
+	if len(compVersions) > 0 {
+		appsInVer, err := findMatchedImagesFromCompVersions(compVersions, serviceVersion)
+		if err != nil {
+			return nil, err
+		}
+		apps = checkNMergeImages(serviceVersion, convertImagesFromCompDefinition(compDef), appsInVer)
+	}
+	inheritDefaults := func(containers, parentContainers []corev1.Container) {
+		for _, c := range containers {
+			rawImage := c.Image
+			if len(compVersions) > 0 {
+				rawImage = apps[c.Name].image
+			}
+			if rawImage == "" || rawImage != c.Image {
+				continue
+			}
+			_, parentContainer := intctrlutil.GetContainerByName(parentContainers, c.Name)
+			if parentContainer != nil && images[c.Name] == intctrlutil.ReplaceImageRegistry(parentContainer.Image) {
+				delete(images, c.Name)
+			}
+		}
+	}
+	inheritDefaults(compDef.Spec.Runtime.InitContainers, parent.InitContainers)
+	inheritDefaults(compDef.Spec.Runtime.Containers, parent.Containers)
+	return images, nil
 }
 
 func resolveImagesWithCompVersions(compDef *appsv1.ComponentDefinition,

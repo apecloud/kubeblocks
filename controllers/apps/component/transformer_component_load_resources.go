@@ -80,7 +80,7 @@ func (t *componentLoadResourcesTransformer) transformForNativeComponent(transCtx
 			if err != nil {
 				return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 			}
-			images, err := component.ResolveInstanceTemplateImages4ServiceVersion(ctx, cli, compDef, tpl.ServiceVersion)
+			images, err := component.ResolveInstanceTemplateImages4ServiceVersion(ctx, cli, compDef, tpl.ServiceVersion, synthesizedComp.PodSpec)
 			if err != nil {
 				return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 			}

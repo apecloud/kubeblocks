@@ -31,12 +31,19 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type upgradeOpsHandler struct{}
+
+type upgradeExpectedImages struct {
+	containers map[string][]corev1.Container
+	workload   *workloads.InstanceSet
+}
 
 var _ OpsHandler = upgradeOpsHandler{}
 
@@ -69,6 +76,21 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		}
 		if upgradeComp.ServiceVersion != nil {
 			compSpec.ServiceVersion = *upgradeComp.ServiceVersion
+		}
+		for _, target := range upgradeComp.Instances {
+			for i := range compSpec.Instances {
+				instance := &compSpec.Instances[i]
+				if instance.Name != target.Name {
+					continue
+				}
+				if target.ComponentDefinitionName != nil {
+					instance.CompDef = *target.ComponentDefinitionName
+				}
+				if target.ServiceVersion != nil {
+					instance.ServiceVersion = *target.ServiceVersion
+				}
+				break
+			}
 		}
 		return nil
 	}); err != nil {
@@ -104,15 +126,30 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		return opsRes.OpsRequest.Status.Phase, 0, err
 	}
 	ownerPending := false
-	ownerContainers := map[string]map[string][]corev1.Container{}
+	ownerContainers := map[string]*upgradeExpectedImages{}
+	var ownerError error
 	podApplyCompOps := func(
 		ops *opsv1alpha1.OpsRequest,
 		pod *corev1.Pod,
 		pgRes *progressResource) bool {
 		upgradeComponent := pgRes.compOps.(opsv1alpha1.UpgradeComponent)
-		templates, owner := ownerContainers[pgRes.fullComponentName]
-		if !owner {
-			templates = containersMap[upgradeComponent.GetComponentName()]
+		templates := containersMap[upgradeComponent.GetComponentName()]
+		if owner, ok := ownerContainers[pgRes.fullComponentName]; ok {
+			if owner == nil {
+				return false
+			}
+			templates = owner.containers
+			if len(upgradeComponent.Instances) > 0 {
+				updated, err := instanceset.IsPodUpdated(owner.workload, pod)
+				if err != nil {
+					ownerError = err
+					return false
+				}
+				if !updated {
+					ownerPending = true
+					return false
+				}
+			}
 		}
 		if templates == nil {
 			return false
@@ -129,7 +166,7 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		opsRes *OpsResource,
 		pgRes *progressResource,
 		compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
-		if hasInstanceTemplateServiceVersion(pgRes.clusterComponent) {
+		if len(pgRes.compOps.(opsv1alpha1.UpgradeComponent).Instances) > 0 || hasInstanceTemplateServiceVersion(pgRes.clusterComponent) {
 			templates, err := u.getOwnedExpectedContainers(reqCtx, cli, opsRes.Cluster, pgRes.fullComponentName)
 			if err != nil {
 				return 0, 0, err
@@ -137,7 +174,11 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 			ownerContainers[pgRes.fullComponentName] = templates
 			ownerPending = ownerPending || templates == nil
 		}
-		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, podApplyCompOps)
+		expected, completed, err := handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, podApplyCompOps)
+		if err == nil {
+			err = ownerError
+		}
+		return expected, completed, err
 	}
 	phase, requeue, err := compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "upgrade", handleUpgradeProgress)
 	if ownerPending && phase == opsv1alpha1.OpsRunningPhase && err == nil && requeue == 0 {
@@ -150,10 +191,14 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 func (u upgradeOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.Upgrade.Components)
 	compOpsHelper.saveLastConfigurations(opsRes, func(compSpec appsv1.ClusterComponentSpec, comOps ComponentOpsInterface) opsv1alpha1.LastComponentConfiguration {
-		return opsv1alpha1.LastComponentConfiguration{
+		lastConfig := opsv1alpha1.LastComponentConfiguration{
 			ComponentDefinitionName: compSpec.ComponentDef,
 			ServiceVersion:          compSpec.ServiceVersion,
 		}
+		if len(comOps.(opsv1alpha1.UpgradeComponent).Instances) > 0 {
+			lastConfig.Instances = compSpec.DeepCopy().Instances
+		}
+		return lastConfig
 	})
 	return nil
 }
@@ -168,7 +213,7 @@ func (u upgradeOpsHandler) getExpectedContainersMap(reqCtx intctrlutil.RequestCt
 			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`"can not found the component "%s" in the cluster "%s"`,
 				v.ComponentName, opsRes.Cluster.Name))
 		}
-		if hasInstanceTemplateServiceVersion(compSpec) {
+		if len(v.Instances) > 0 || hasInstanceTemplateServiceVersion(compSpec) {
 			continue
 		}
 		compDef, err := component.GetCompDefByName(reqCtx.Ctx, cli, compSpec.ComponentDef)
@@ -195,7 +240,7 @@ func hasInstanceTemplateServiceVersion(spec *appsv1.ClusterComponentSpec) bool {
 }
 
 func (u upgradeOpsHandler) getOwnedExpectedContainers(reqCtx intctrlutil.RequestCtx, cli client.Client,
-	cluster *appsv1.Cluster, compName string) (map[string][]corev1.Container, error) {
+	cluster *appsv1.Cluster, compName string) (*upgradeExpectedImages, error) {
 	comp := &appsv1.Component{}
 	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: cluster.Namespace,
 		Name: constant.GenerateClusterComponentName(cluster.Name, compName)}, comp); err != nil {
@@ -225,7 +270,7 @@ func (u upgradeOpsHandler) getOwnedExpectedContainers(reqCtx intctrlutil.Request
 		}
 		templates[template.Name] = containers
 	}
-	return templates, nil
+	return &upgradeExpectedImages{containers: templates, workload: its}, nil
 }
 
 // podImageApplied checks if the pod has applied the new image.

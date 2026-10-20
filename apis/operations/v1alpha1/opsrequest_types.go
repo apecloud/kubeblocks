@@ -336,7 +336,7 @@ type Upgrade struct {
 	Components []UpgradeComponent `json:"components,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 }
 
-// +kubebuilder:validation:XValidation:rule="has(self.componentDefinitionName) || has(self.serviceVersion)",message="at least one componentDefinitionName or serviceVersion"
+// +kubebuilder:validation:XValidation:rule="has(self.componentDefinitionName) || has(self.serviceVersion) || (has(self.instances) && size(self.instances) > 0)",message="at least one componentDefinitionName, serviceVersion or instance template upgrade"
 
 type UpgradeComponent struct {
 	// Specifies the name of the Component.
@@ -351,6 +351,43 @@ type UpgradeComponent struct {
 	// Referring to the ServiceVersion defined by the ComponentDefinition and ComponentVersion.
 	// And ServiceVersion in ClusterComponentSpec is optional, when no version is specified,
 	// use the latest available version in ComponentVersion.
+	// +kubebuilder:validation:MaxLength=32
+	// +optional
+	ServiceVersion *string `json:"serviceVersion,omitempty"`
+
+	// Specifies upgrades for existing named instance templates. Each target applies to all replicas of that template.
+	// For a component, targets refer to spec.componentSpecs[].instances.
+	// For a sharding, targets refer to spec.shardings[].template.instances.
+	// Sharding targets require all shards to inherit the common instance template list.
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	Instances []UpgradeInstanceTemplate `json:"instances,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+}
+
+// +kubebuilder:validation:XValidation:rule="has(self.componentDefinitionName) || has(self.serviceVersion)",message="at least one componentDefinitionName or serviceVersion"
+
+// UpgradeInstanceTemplate defines version changes for an existing named instance template.
+// An omitted field preserves its stored value; an explicit empty string clears it.
+// When both values are empty, the template inherits the component's runtime.
+// Otherwise, the Cluster controller resolves and backfills a compatible definition and version pair.
+type UpgradeInstanceTemplate struct {
+	// Specifies an instance template name, not a Pod name.
+	// For a component, it refers to spec.componentSpecs[].instances[].name.
+	// For a sharding, it refers to spec.shardings[].template.instances[].name.
+	// +kubebuilder:validation:MaxLength=54
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Specifies the ComponentDefinition name for the instance template.
+	// +kubebuilder:validation:MaxLength=64
+	// +optional
+	ComponentDefinitionName *string `json:"componentDefinitionName,omitempty"`
+
+	// Specifies the service version for the instance template, using semantic version syntax.
 	// +kubebuilder:validation:MaxLength=32
 	// +optional
 	ServiceVersion *string `json:"serviceVersion,omitempty"`

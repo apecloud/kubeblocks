@@ -20,23 +20,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"context"
 	"strconv"
+	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	k8sappsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/factory"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("Upgrade OpsRequest", func() {
@@ -238,8 +254,143 @@ var _ = Describe("Upgrade OpsRequest", func() {
 	}
 
 	Context("Test OpsRequest", func() {
-		DescribeTable("completes an upgrade with an instance template service version", func(templateVersion, templateRelease string, sharding bool) {
+		DescribeTable("updates only selected instance template version fields", func(sharding, parent bool, compDef, version *string) {
 			compDef1, compDef2, opsRes := initOpsResWithComponentDef(true)
+			if compDef != nil && *compDef != "" {
+				compDef = &compDef2.Name
+			}
+			targetName := defaultCompName
+			if sharding {
+				targetName = "sharding"
+			}
+			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(cluster *appsv1.Cluster) {
+				cluster.Spec.ComponentSpecs[0].Instances = []appsv1.InstanceTemplate{
+					{Name: "canary", CompDef: compDef1.Name, ServiceVersion: "1.0.0", Replicas: pointer.Int32(1),
+						Ordinals: appsv1.Ordinals{Discrete: []int32{7}}, Labels: map[string]string{"role": "canary"},
+						Annotations:      map[string]string{"annotation": "preserved"},
+						SchedulingPolicy: &appsv1.SchedulingPolicy{NodeSelector: map[string]string{"zone": "a"}},
+						Resources:        &corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("100m")}},
+						Env:              []corev1.EnvVar{{Name: "PRESERVED", Value: "yes"}},
+						VolumeClaimTemplates: []appsv1.ClusterComponentVolumeClaimTemplate{{Name: "data", Spec: appsv1.PersistentVolumeClaimSpec{
+							AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+							Resources:   corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}},
+						}}}},
+					{Name: "stable", Replicas: pointer.Int32(1)},
+					{Name: "untouched", CompDef: compDef1.Name, ServiceVersion: "1.0.0", Replicas: pointer.Int32(1)},
+				}
+				if sharding {
+					cluster.Spec.Shardings = []appsv1.ClusterSharding{{Name: targetName, Shards: 2, Template: *cluster.Spec.ComponentSpecs[0].DeepCopy()}}
+				}
+			})).Should(Succeed())
+			before := opsRes.Cluster.DeepCopy()
+			expected := getComponentSpecOrShardingTemplate(before, targetName).DeepCopy()
+			upgrade := opsv1alpha1.UpgradeComponent{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: targetName},
+				Instances: []opsv1alpha1.UpgradeInstanceTemplate{
+					{Name: "canary", ComponentDefinitionName: compDef, ServiceVersion: version},
+					{Name: "stable", ServiceVersion: pointer.String("2.0.0")},
+				}}
+			if compDef != nil {
+				expected.Instances[0].CompDef = *compDef
+			}
+			if version != nil {
+				expected.Instances[0].ServiceVersion = *version
+			}
+			expected.Instances[1].ServiceVersion = "2.0.0"
+			if parent {
+				upgrade.ComponentDefinitionName, upgrade.ServiceVersion = &compDef2.Name, pointer.String(serviceVer2)
+				expected.ComponentDef, expected.ServiceVersion = compDef2.Name, serviceVer2
+			}
+			opsRes.OpsRequest = createUpgradeOpsRequest(opsRes.Cluster, opsv1alpha1.Upgrade{Components: []opsv1alpha1.UpgradeComponent{upgrade}})
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			persisted := &appsv1.Cluster{}
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.Cluster), persisted)).Should(Succeed())
+			Expect(getComponentSpecOrShardingTemplate(persisted, targetName)).Should(Equal(expected))
+			if sharding {
+				Expect(persisted.Spec.ComponentSpecs).Should(Equal(before.Spec.ComponentSpecs))
+				Expect(persisted.Spec.Shardings[0].Shards).Should(Equal(before.Spec.Shardings[0].Shards))
+			}
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			Expect(opsRes.OpsRequest.Status.LastConfiguration.Components[targetName].Instances).
+				Should(Equal(getComponentSpecOrShardingTemplate(before, targetName).Instances))
+			By("repeating the registered action from persisted state")
+			opsRes.Cluster = persisted
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(persisted), persisted)).Should(Succeed())
+			Expect(getComponentSpecOrShardingTemplate(persisted, targetName)).Should(Equal(expected))
+			Expect(opsRes.OpsRequest.Status.LastConfiguration.Components[targetName].Instances).
+				Should(Equal(getComponentSpecOrShardingTemplate(before, targetName).Instances))
+		},
+			Entry("component definition only", false, false, pointer.String("new-template-def"), nil),
+			Entry("component version only", false, false, nil, pointer.String("2.0.0")),
+			Entry("component both fields with parent upgrade", false, true, pointer.String("new-template-def"), pointer.String("2.0.0")),
+			Entry("component clears definition without parent exception", false, false, pointer.String(""), nil),
+			Entry("component clears version", false, false, nil, pointer.String("")),
+			Entry("component resets both fields", false, false, pointer.String(""), pointer.String("")),
+			Entry("sharding definition only", true, false, pointer.String("new-template-def"), nil),
+			Entry("sharding version only", true, false, nil, pointer.String("2.0.0")),
+			Entry("sharding both fields with parent upgrade", true, true, pointer.String("new-template-def"), pointer.String("2.0.0")),
+			Entry("sharding resets both fields", true, false, pointer.String(""), pointer.String("")),
+		)
+
+		DescribeTable("revalidates instance template targets before applying a queued upgrade", func(sharding bool) {
+			_, compDef2, opsRes := initOpsResWithComponentDef(true)
+			targetName := defaultCompName
+			if sharding {
+				targetName = "sharding"
+			}
+			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(cluster *appsv1.Cluster) {
+				cluster.Spec.ComponentSpecs[0].Instances = []appsv1.InstanceTemplate{{Name: "canary", Replicas: pointer.Int32(1)}}
+				if sharding {
+					cluster.Spec.Shardings = []appsv1.ClusterSharding{{Name: targetName, Shards: 1, Template: *cluster.Spec.ComponentSpecs[0].DeepCopy()}}
+				}
+			})).Should(Succeed())
+			opsRes.OpsRequest = createUpgradeOpsRequest(opsRes.Cluster, opsv1alpha1.Upgrade{Components: []opsv1alpha1.UpgradeComponent{{
+				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: targetName}, ComponentDefinitionName: &compDef2.Name,
+				Instances: []opsv1alpha1.UpgradeInstanceTemplate{{Name: "canary", ServiceVersion: pointer.String("2.0.0")}},
+			}}})
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			By("removing the target before the next pre-action turn")
+			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(cluster *appsv1.Cluster) {
+				if sharding {
+					cluster.Spec.Shardings[0].Template.Instances = nil
+				} else {
+					cluster.Spec.ComponentSpecs[0].Instances = nil
+				}
+			})).Should(Succeed())
+			before := getComponentSpecOrShardingTemplate(opsRes.Cluster, targetName).DeepCopy()
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.Cluster), opsRes.Cluster)).Should(Succeed())
+			Expect(getComponentSpecOrShardingTemplate(opsRes.Cluster, targetName)).Should(Equal(before))
+		}, Entry("component", false), Entry("sharding", true))
+
+		DescribeTable("completes an upgrade with an instance template service version", func(templateVersion, templateRelease string, sharding bool, targets []opsv1alpha1.UpgradeInstanceTemplate) {
+			compDef1, compDef2, opsRes := initOpsResWithComponentDef(true)
+			upgrade := opsv1alpha1.UpgradeComponent{
+				ComponentDefinitionName: &compDef2.Name, ServiceVersion: pointer.String(serviceVer2), Instances: targets,
+			}
+			ownerCompDef, ownerVersion, baseRelease := compDef2.Name, serviceVer2, release3
+			if len(targets) > 0 {
+				upgrade.ComponentDefinitionName, upgrade.ServiceVersion = nil, nil
+				ownerCompDef, ownerVersion, baseRelease = compDef1.Name, serviceVer0, release0
+				for i := range upgrade.Instances {
+					if definition := upgrade.Instances[i].ComponentDefinitionName; definition != nil && *definition != "" {
+						upgrade.Instances[i].ComponentDefinitionName = &compDef2.Name
+					}
+				}
+			}
 			DeferCleanup(func() {
 				selector := client.MatchingLabels{constant.AppInstanceLabelKey: clusterName}
 				testapps.ClearResources(&testCtx, generics.InstanceSetSignature, client.InNamespace(testCtx.DefaultNamespace), selector)
@@ -261,17 +412,13 @@ var _ = Describe("Upgrade OpsRequest", func() {
 					}}
 				}
 			})).Should(Succeed())
-			opsRes.OpsRequest = createUpgradeOpsRequest(opsRes.Cluster, opsv1alpha1.Upgrade{
-				Components: []opsv1alpha1.UpgradeComponent{{
-					ComponentOps:            opsv1alpha1.ComponentOps{ComponentName: targetName},
-					ComponentDefinitionName: &compDef2.Name, ServiceVersion: pointer.String(serviceVer2),
-				}},
-			})
+			upgrade.ComponentOps = opsv1alpha1.ComponentOps{ComponentName: targetName}
+			opsRes.OpsRequest = createUpgradeOpsRequest(opsRes.Cluster, opsv1alpha1.Upgrade{Components: []opsv1alpha1.UpgradeComponent{upgrade}})
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			makeUpgradeOpsIsRunning(reqCtx, opsRes)
 			mockComponentIsOperating(opsRes.Cluster, appsv1.RunningComponentPhase, defaultCompName)
 			if sharding {
-				testapps.NewComponentFactory(testCtx.DefaultNamespace, clusterName+"-"+componentName, compDef2.Name).
+				testapps.NewComponentFactory(testCtx.DefaultNamespace, clusterName+"-"+componentName, ownerCompDef).
 					AddLabels(constant.AppInstanceLabelKey, clusterName).
 					AddLabels(constant.KBAppClusterUIDKey, string(opsRes.Cluster.UID)).
 					AddLabels(constant.KBAppShardingNameLabelKey, targetName).
@@ -286,7 +433,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			comp := &appsv1.Component{}
 			compKey := client.ObjectKey{Namespace: testCtx.DefaultNamespace, Name: clusterName + "-" + componentName}
 			if err := k8sClient.Get(ctx, compKey, comp); err != nil {
-				comp = testapps.NewComponentFactory(testCtx.DefaultNamespace, compKey.Name, compDef2.Name).
+				comp = testapps.NewComponentFactory(testCtx.DefaultNamespace, compKey.Name, ownerCompDef).
 					AddLabels(constant.AppInstanceLabelKey, clusterName).
 					AddLabels(constant.KBAppComponentLabelKey, componentName).SetReplicas(3).Create(&testCtx).Get()
 			}
@@ -297,22 +444,24 @@ var _ = Describe("Upgrade OpsRequest", func() {
 				Expect(phase).Should(Equal(opsv1alpha1.OpsRunningPhase))
 				Expect(requeue).Should(BeNumerically(">", 0))
 			}
-			for _, name := range []string{
-				clusterName + "-" + componentName + "-0",
-				clusterName + "-" + componentName + "-1",
-				clusterName + "-" + componentName + "-pinned-0",
-			} {
-				image := testapps.AppImage(testapps.AppName, release3)
-				if name == clusterName+"-"+componentName+"-pinned-0" {
-					image = testapps.AppImage(testapps.AppName, release0)
+			if len(upgrade.Instances) == 0 {
+				for _, name := range []string{
+					clusterName + "-" + componentName + "-0",
+					clusterName + "-" + componentName + "-1",
+					clusterName + "-" + componentName + "-pinned-0",
+				} {
+					image := testapps.AppImage(testapps.AppName, baseRelease)
+					if name == clusterName+"-"+componentName+"-pinned-0" {
+						image = testapps.AppImage(testapps.AppName, release0)
+					}
+					pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterName, componentName, name, "")
+					Expect(testapps.ChangeObj(&testCtx, pod, func(pod *corev1.Pod) {
+						pod.Spec.Containers[0].Image = image
+					})).Should(Succeed())
+					Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
+						pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: testapps.DefaultMySQLContainerName, Image: image}}
+					})).Should(Succeed())
 				}
-				pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterName, componentName, name, "")
-				Expect(testapps.ChangeObj(&testCtx, pod, func(pod *corev1.Pod) {
-					pod.Spec.Containers[0].Image = image
-				})).Should(Succeed())
-				Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
-					pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: testapps.DefaultMySQLContainerName, Image: image}}
-				})).Should(Succeed())
 			}
 			By("waiting for the Component to consume the Cluster generation")
 			Expect(testapps.ChangeObj(&testCtx, comp, func(comp *appsv1.Component) {
@@ -321,16 +470,19 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			assertPending()
 			Expect(testapps.ChangeObj(&testCtx, comp, func(comp *appsv1.Component) {
 				comp.Annotations[constant.KubeBlocksGenerationKey] = strconv.FormatInt(opsRes.Cluster.Generation, 10)
-				comp.Spec.ServiceVersion = serviceVer2
+				comp.Spec.ServiceVersion = ownerVersion
 			})).Should(Succeed())
 			By("waiting for the owned workload to exist")
 			assertPending()
 			its := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace, comp.Name, clusterName, componentName).
 				SetReplicas(3).AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName,
-				Image: testapps.AppImage(testapps.AppName, release3)}).Create(&testCtx).Get()
+				Image: testapps.AppImage(testapps.AppName, baseRelease)}).Create(&testCtx).Get()
 			By("waiting for the workload to consume the Component generation")
 			Expect(testapps.ChangeObj(&testCtx, its, func(its *workloads.InstanceSet) {
 				its.Annotations = map[string]string{constant.KubeBlocksGenerationKey: strconv.FormatInt(comp.Generation-1, 10)}
+				if len(upgrade.Instances) > 0 {
+					its.Spec.PodManagementPolicy = k8sappsv1.ParallelPodManagement
+				}
 				its.Spec.Instances = []workloads.InstanceTemplate{{Name: "pinned", Replicas: pointer.Int32(1),
 					Images: map[string]string{testapps.DefaultMySQLContainerName: testapps.AppImage(testapps.AppName, release0)}}}
 			})).Should(Succeed())
@@ -339,7 +491,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			Expect(testapps.ChangeObj(&testCtx, its, func(its *workloads.InstanceSet) {
 				its.Annotations[constant.KubeBlocksGenerationKey] = strconv.FormatInt(comp.Generation, 10)
 				its.Annotations[constant.AppComponentLabelKey] = comp.Spec.CompDef
-				its.Annotations[constant.KBAppServiceVersionKey] = serviceVer0
+				its.Annotations[constant.KBAppServiceVersionKey] = "not-the-owner-version"
 			})).Should(Succeed())
 			assertPending()
 			Expect(testapps.ChangeObj(&testCtx, its, func(its *workloads.InstanceSet) {
@@ -347,6 +499,30 @@ var _ = Describe("Upgrade OpsRequest", func() {
 				its.Annotations[constant.KBAppServiceVersionKey] = comp.Spec.ServiceVersion
 				its.Spec.Instances[0].Images[testapps.DefaultMySQLContainerName] = ownerImage
 			})).Should(Succeed())
+			if len(upgrade.Instances) > 0 {
+				tree := kubebuilderx.NewObjectTree()
+				tree.SetRoot(its)
+				for _, reconciler := range []kubebuilderx.Reconciler{instanceset.NewRevisionUpdateReconciler(), instanceset.NewReplicasAlignmentReconciler()} {
+					_, err := reconciler.Reconcile(tree)
+					Expect(err).ShouldNot(HaveOccurred())
+				}
+				Expect(k8sClient.Status().Update(ctx, its)).Should(Succeed())
+				pods := tree.List(&corev1.Pod{})
+				Expect(pods).Should(HaveLen(3))
+				for _, object := range pods {
+					pod := object.(*corev1.Pod)
+
+					if pod.Name == clusterName+"-"+componentName+"-pinned-0" {
+						pod.Spec.Containers[0].Image = testapps.AppImage(testapps.AppName, release0)
+					}
+					Expect(k8sClient.Create(ctx, pod)).Should(Succeed())
+					Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
+						pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}
+						pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: pod.Spec.Containers[0].Name, Image: pod.Spec.Containers[0].Image}}
+					})).Should(Succeed())
+				}
+			}
+
 			By("waiting while the template Pod still has the old spec and status images")
 			phase, _, err := (upgradeOpsHandler{}).ReconcileAction(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
@@ -373,9 +549,21 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			Expect(phase).Should(Equal(opsv1alpha1.OpsSucceedPhase))
 			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("3/3"))
 		},
-			Entry("keeps the explicitly pinned version", serviceVer1, release4, false),
-			Entry("uses published owner images even when version parsing produces no overrides", serviceVer0, release3, false),
-			Entry("uses the actual shard component name for template ownership", serviceVer1, release4, true),
+			Entry("keeps the explicitly pinned version", serviceVer1, release4, false, nil),
+			Entry("uses published owner images even when version parsing produces no overrides", serviceVer0, release3, false, nil),
+			Entry("uses the actual shard component name for template ownership", serviceVer1, release4, true, nil),
+			Entry("waits for owner images after a definition-only template change", "", release4, false,
+				[]opsv1alpha1.UpgradeInstanceTemplate{{Name: "pinned", ComponentDefinitionName: pointer.String("resolved-template-def")}}),
+			Entry("waits for owner images after resetting both template fields", serviceVer1, release3, false,
+				[]opsv1alpha1.UpgradeInstanceTemplate{{Name: "pinned", ComponentDefinitionName: pointer.String(""), ServiceVersion: pointer.String("")}}),
+			Entry("waits for owner images after a shard template definition-only change", "", release4, true,
+				[]opsv1alpha1.UpgradeInstanceTemplate{{Name: "pinned", ComponentDefinitionName: pointer.String("resolved-template-def")}}),
+			Entry("waits for owner images after resetting both shard template fields", serviceVer1, release3, true,
+				[]opsv1alpha1.UpgradeInstanceTemplate{{Name: "pinned", ComponentDefinitionName: pointer.String(""), ServiceVersion: pointer.String("")}}),
+			Entry("waits for owner images after a version-only template change", "", release4, false,
+				[]opsv1alpha1.UpgradeInstanceTemplate{{Name: "pinned", ServiceVersion: pointer.String("2.0.0")}}),
+			Entry("waits for owner images after changing both shard template fields", serviceVer1, release4, true,
+				[]opsv1alpha1.UpgradeInstanceTemplate{{Name: "pinned", ComponentDefinitionName: pointer.String("resolved-template-def"), ServiceVersion: pointer.String("2.0.0")}}),
 		)
 
 		It("Test upgrade OpsRequest with ComponentDef and no ComponentVersion", func() {
@@ -542,3 +730,187 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		// TODO: add case with ClusterDefinition and topology
 	})
 })
+
+func TestUpgradeTemplateInitProgress(t *testing.T) {
+	for _, tc := range []struct {
+		name                                                string
+		clear, sharding, sidecar, legacy, rewrite, deferred bool
+	}{
+		{name: "init-only version"},
+		{name: "clear both fields", clear: true},
+		{name: "shard clear both fields", clear: true, sharding: true},
+		{name: "restartable init", sidecar: true},
+		{name: "admission registry rewrite", rewrite: true},
+		{name: "legacy direct template", legacy: true},
+		{name: "deferred tools init", deferred: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewWithT(t)
+			ctx := context.Background()
+			scheme := runtime.NewScheme()
+			for _, add := range []func(*runtime.Scheme) error{corev1.AddToScheme, appsv1.AddToScheme, opsv1alpha1.AddToScheme, workloads.AddToScheme} {
+				g.Expect(add(scheme)).To(Succeed())
+			}
+			def := &appsv1.ComponentDefinition{ObjectMeta: metav1.ObjectMeta{Name: "db"}, Spec: appsv1.ComponentDefinitionSpec{
+				ServiceVersion: "1.0.0", Runtime: corev1.PodSpec{
+					Containers:     []corev1.Container{{Name: "db", Image: "db:1"}},
+					InitContainers: []corev1.Container{{Name: "setup", Image: "setup:1"}},
+				},
+			}}
+			if tc.sidecar {
+				def.Spec.Runtime.InitContainers[0].RestartPolicy = ptr.To(corev1.ContainerRestartPolicyAlways)
+			}
+			version := &appsv1.ComponentVersion{ObjectMeta: metav1.ObjectMeta{Name: "db-version", Generation: 1, Labels: map[string]string{"db": "db"}},
+				Spec: appsv1.ComponentVersionSpec{
+					CompatibilityRules: []appsv1.ComponentVersionCompatibilityRule{{CompDefs: []string{"db"}, Releases: []string{"v2"}}},
+					Releases:           []appsv1.ComponentVersionRelease{{Name: "v2", ServiceVersion: "2.0.0", Images: map[string]string{"db": "db:1", "setup": "setup:2"}}},
+				}, Status: appsv1.ComponentVersionStatus{ObservedGeneration: 1, Phase: appsv1.AvailablePhase},
+			}
+			componentName, targetName := "db", "db"
+			if tc.sharding {
+				componentName, targetName = "sharding-shard-0", "sharding"
+			}
+			cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", UID: "cluster", Generation: 2},
+				Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: componentName, ComponentDef: "db", ServiceVersion: "1.0.0", Replicas: 1,
+					Instances: []appsv1.InstanceTemplate{{Name: "canary", Replicas: pointer.Int32(1), CompDef: "db", ServiceVersion: "1.0.0"}},
+				}}}, Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{componentName: {Phase: appsv1.RunningComponentPhase}}},
+			}
+			if tc.clear || tc.legacy {
+				cluster.Spec.ComponentSpecs[0].Instances[0].ServiceVersion = "2.0.0"
+			}
+			if tc.sharding {
+				cluster.Spec.Shardings = []appsv1.ClusterSharding{{Name: targetName, Shards: 1, Template: cluster.Spec.ComponentSpecs[0]}}
+				cluster.Spec.ComponentSpecs = nil
+				cluster.Status.Shardings = map[string]appsv1.ClusterComponentStatus{targetName: {Phase: appsv1.RunningComponentPhase}}
+			}
+			target := opsv1alpha1.UpgradeComponent{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: targetName},
+				Instances: []opsv1alpha1.UpgradeInstanceTemplate{{Name: "canary", ServiceVersion: pointer.String("2.0.0")}}}
+			if tc.clear {
+				target.Instances[0].ComponentDefinitionName, target.Instances[0].ServiceVersion = pointer.String(""), pointer.String("")
+			}
+			if tc.legacy {
+				target.Instances = nil
+			}
+			ops := &opsv1alpha1.OpsRequest{ObjectMeta: metav1.ObjectMeta{Name: "upgrade", Namespace: "default"},
+				Spec:   opsv1alpha1.OpsRequestSpec{ClusterName: cluster.Name, Type: opsv1alpha1.UpgradeType, SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{Upgrade: &opsv1alpha1.Upgrade{Components: []opsv1alpha1.UpgradeComponent{target}}}},
+				Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsRunningPhase, StartTimestamp: metav1.Now()},
+			}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(ops).WithObjects(cluster, ops, def, version).Build()
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			handler := GetOpsManager().OpsMap[opsv1alpha1.UpgradeType].OpsHandler
+			res := &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(20)}
+			g.Expect(handler.Action(reqCtx, cli, res)).To(Succeed())
+			compSpec := getComponentSpecOrShardingTemplate(cluster, targetName)
+			if tc.clear {
+				g.Expect(compSpec.Instances[0].CompDef).To(BeEmpty())
+				g.Expect(compSpec.Instances[0].ServiceVersion).To(BeEmpty())
+			}
+			publishedSpec := compSpec.DeepCopy()
+			publishedSpec.Name = componentName
+			comp, err := component.BuildComponent(cluster, publishedSpec, nil, nil)
+			g.Expect(err).NotTo(HaveOccurred())
+			comp.Generation = 2
+			if tc.sharding {
+				comp.Labels[constant.KBAppShardingNameLabelKey] = targetName
+				comp.Labels[constant.KBAppClusterUIDKey] = string(cluster.UID)
+			}
+			g.Expect(cli.Create(ctx, comp)).To(Succeed())
+			images := map[string]map[string]string{}
+			if !tc.clear {
+				images["canary"], err = component.ResolveInstanceTemplateImages4ServiceVersion(ctx, cli, def, "2.0.0")
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(images["canary"]["setup"]).To(HaveSuffix("setup:2"))
+			}
+			synth := &component.SynthesizedComponent{Namespace: cluster.Namespace, ClusterName: cluster.Name, Name: componentName,
+				CompDefName: "db", ServiceVersion: "1.0.0", Generation: "2", Replicas: 1,
+				PodSpec: def.Spec.Runtime.DeepCopy(), Instances: compSpec.Instances, InstanceImages: images}
+			if tc.deferred {
+				oldTools := viper.GetString(constant.KBToolsImage)
+				t.Cleanup(func() { viper.Set(constant.KBToolsImage, oldTools) })
+				viper.Set(constant.KBToolsImage, "mirror.local/apecloud/kubeblocks-tools:1.1.0")
+				synth.PodSpec.InitContainers = []corev1.Container{{Name: kbagent.InitContainerName,
+					Image: "mirror.local/apecloud/kubeblocks-tools:1.1.0", Command: kbagent.InitCommand()}}
+				synth.PodSpec.Containers = append(synth.PodSpec.Containers, corev1.Container{
+					Name: "kbagent", Image: "custom-action:1.0", Command: []string{kbagent.SharedBinaryPath}})
+			}
+			its, err := factory.BuildInstanceSet(synth, def)
+			g.Expect(err).NotTo(HaveOccurred())
+			its.Generation = 2
+			buildPod := func(owner *workloads.InstanceSet) *corev1.Pod {
+				tree := kubebuilderx.NewObjectTree()
+				tree.SetRoot(owner)
+				for _, reconciler := range []kubebuilderx.Reconciler{instanceset.NewFixMetaReconciler(), instanceset.NewRevisionUpdateReconciler(), instanceset.NewAssistantObjectReconciler(), instanceset.NewReplicasAlignmentReconciler()} {
+					_, err := reconciler.Reconcile(tree)
+					g.Expect(err).NotTo(HaveOccurred())
+				}
+				pods := tree.List(&corev1.Pod{})
+				g.Expect(pods).To(HaveLen(1))
+				return pods[0].(*corev1.Pod).DeepCopy()
+			}
+			desiredPod := buildPod(its)
+			pod := desiredPod.DeepCopy()
+			oldInit := "setup:1"
+			if tc.clear {
+				oldInit = "setup:2"
+			}
+			if tc.deferred {
+				oldInit = "docker.io/apecloud/kubeblocks-tools:1.0.0"
+				pod.Spec.InitContainers[0].Command = kbagent.LegacyInitCommand()
+				pod.Spec.Containers[0].Image = "db:0"
+			}
+			pod.Spec.InitContainers[0].Image = oldInit
+			pod.CreationTimestamp = metav1.NewTime(time.Now().Add(-time.Hour))
+			pod.Status = corev1.PodStatus{Phase: corev1.PodRunning,
+				Conditions:            []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: pod.CreationTimestamp}},
+				ContainerStatuses:     []corev1.ContainerStatus{{Name: "db", Image: "db:1", Ready: true}},
+				InitContainerStatuses: []corev1.ContainerStatus{{Name: "setup", Image: oldInit, State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 0}}}},
+			}
+			if tc.deferred {
+				pod.Status.ContainerStatuses[0].Image = "db:0"
+			}
+			g.Expect(cli.Create(ctx, its)).To(Succeed())
+			g.Expect(cli.Create(ctx, pod)).To(Succeed())
+			reconcile := func() (opsv1alpha1.OpsPhase, time.Duration, error) {
+				freshOps, freshCluster := &opsv1alpha1.OpsRequest{}, &appsv1.Cluster{}
+				g.Expect(cli.Get(ctx, client.ObjectKeyFromObject(ops), freshOps)).To(Succeed())
+				g.Expect(cli.Get(ctx, client.ObjectKeyFromObject(cluster), freshCluster)).To(Succeed())
+				res = &OpsResource{Cluster: freshCluster, OpsRequest: freshOps, Recorder: record.NewFakeRecorder(20)}
+				return GetOpsManager().OpsMap[opsv1alpha1.UpgradeType].OpsHandler.ReconcileAction(reqCtx, cli, res)
+			}
+			for i := 0; i < 2; i++ {
+				phase, requeue, err := reconcile()
+				g.Expect(err).NotTo(HaveOccurred())
+				if tc.legacy {
+					g.Expect(phase).To(Equal(opsv1alpha1.OpsSucceedPhase))
+					return
+				}
+				g.Expect(phase).To(Equal(opsv1alpha1.OpsRunningPhase))
+				g.Expect(res.OpsRequest.Status.Progress).To(Equal("0/1"))
+				g.Expect(requeue).To(BeNumerically(">", 0))
+			}
+			if !tc.deferred {
+				pod.Spec.InitContainers = desiredPod.Spec.InitContainers
+			}
+			pod.Spec.Containers[0].Image = desiredPod.Spec.Containers[0].Image
+			pod.Status.ContainerStatuses[0].Image = desiredPod.Spec.Containers[0].Image
+			if tc.rewrite {
+				pod.Spec.InitContainers[0].Image = "admission.local/rewritten/setup:2"
+				pod.Spec.Containers[0].Image = "admission.local/rewritten/db:1"
+			}
+			if tc.sidecar {
+				pod.Status.InitContainerStatuses[0].State = corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}
+			}
+			status := pod.Status.DeepCopy()
+			g.Expect(cli.Update(ctx, pod)).To(Succeed())
+			pod.Status = *status
+			g.Expect(cli.Status().Update(ctx, pod)).To(Succeed())
+			updated, err := instanceset.IsPodUpdated(its, pod)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(updated).To(BeTrue())
+			phase, _, err := reconcile()
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(phase).To(Equal(opsv1alpha1.OpsSucceedPhase))
+			g.Expect(res.OpsRequest.Status.Progress).To(Equal("1/1"))
+		})
+	}
+}

@@ -26,6 +26,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -151,6 +153,67 @@ var _ = Describe("Component Workload Operations Test", func() {
 
 		graphCli = model.NewGraphClient(reader)
 		dag = newDAG(graphCli, comp)
+	})
+
+	Context("Start generation", func() {
+		It("publishes the desired generation only after the deferred workload update", func() {
+			comp.Generation = 2
+			comp.Status.Phase = appsv1.StartingComponentPhase
+			compDef := &appsv1.ComponentDefinition{}
+			synthesizeComp.CompDefName = "db"
+			synthesizeComp.ServiceVersion = "1.0.0"
+			synthesizeComp.Generation = "1"
+			synthesizeComp.Replicas = 1
+			synthesizeComp.PodSpec = &corev1.PodSpec{
+				Containers: []corev1.Container{{Name: "db", Image: "db:1"}},
+			}
+			synthesizeComp.LifecycleActions.ComponentLifecycleActions = &appsv1.ComponentLifecycleActions{}
+			synthesizeComp.Instances = []appsv1.InstanceTemplate{{Name: "canary", Replicas: ptr.To(int32(1)), ServiceVersion: "1.0.0"}}
+			synthesizeComp.InstanceImages = map[string]map[string]string{"canary": {"db": "db:1"}}
+			stopped, err := component.BuildInstanceSet(synthesizeComp, compDef)
+			Expect(err).ShouldNot(HaveOccurred())
+			stopped.Spec.Stop = ptr.To(true)
+			cli := fake.NewClientBuilder().WithScheme(k8sClient.Scheme()).WithObjects(stopped).Build()
+
+			synthesizeComp.Generation = "2"
+			synthesizeComp.Instances[0].ServiceVersion = "2.0.0"
+			synthesizeComp.InstanceImages["canary"]["db"] = "db:2"
+			publish := func() *workloads.InstanceSet {
+				current := &workloads.InstanceSet{}
+				Expect(cli.Get(ctx, client.ObjectKeyFromObject(stopped), current)).Should(Succeed())
+				graphCli := model.NewGraphClient(cli)
+				dag := newDAG(graphCli, comp)
+				transCtx := &componentTransformContext{
+					Context:             ctx,
+					Client:              graphCli,
+					Logger:              logger,
+					EventRecorder:       clusterRecorder,
+					Component:           comp,
+					ComponentOrig:       comp.DeepCopy(),
+					CompDef:             compDef,
+					SynthesizeComponent: synthesizeComp,
+					RunningWorkload:     current,
+				}
+				Expect((&componentWorkloadTransformer{Client: cli}).Transform(transCtx, dag)).Should(Succeed())
+				Expect(graphCli.IsAction(dag, current, model.ActionUpdatePtr())).Should(BeTrue())
+				updated := graphCli.FindMatchedVertex(dag, current).(*model.ObjectVertex).Obj.(*workloads.InstanceSet)
+				Expect(cli.Update(ctx, updated)).Should(Succeed())
+				persisted := &workloads.InstanceSet{}
+				Expect(cli.Get(ctx, client.ObjectKeyFromObject(current), persisted)).Should(Succeed())
+				return persisted
+			}
+
+			started := publish()
+			Expect(started.Spec.Stop).Should(BeNil())
+			Expect(started.Spec.Instances[0].Images["db"]).Should(Equal("db:1"))
+			Expect(started.Annotations[constant.KubeBlocksGenerationKey]).Should(Equal("1"))
+
+			updated := publish()
+			Expect(comp.Status.Phase).Should(Equal(appsv1.StartingComponentPhase))
+			Expect(updated.Spec.Stop).Should(BeNil())
+			Expect(updated.Spec.Instances[0].Images["db"]).Should(Equal("db:2"))
+			Expect(updated.Annotations[constant.KubeBlocksGenerationKey]).Should(Equal("2"))
+		})
 	})
 
 	Context("Data Replication Operations", func() {

@@ -2069,6 +2069,10 @@ var _ = Describe("Component Controller", func() {
 				g.Expect(*its.Spec.Replicas).Should(BeEquivalentTo(0))
 			})).Should(Succeed())
 
+			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
+				g.Expect(comp.Status.ObservedGeneration).Should(Equal(comp.Generation))
+			})).Should(Succeed())
+
 			By("scale the component from zero to one")
 			changeCompReplicas(compKey, 1)
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {

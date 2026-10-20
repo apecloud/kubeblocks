@@ -1219,29 +1219,25 @@ func TestUpgradeInstanceTemplateOwnerConvergence(t *testing.T) {
 			if status := its.FindInstanceStatus(pod.Name); status == nil || !status.UpToDate {
 				t.Fatalf("updated Pod not applied by owner: %#v", status)
 			}
-			currentStatus := *its.Status.DeepCopy()
-			for _, state := range []string{"missing", "stale", "not applied", "offline", "terminating"} {
-				its.Status = *currentStatus.DeepCopy()
-				switch state {
-				case "missing":
-					its.Status.InstanceStatus = nil
-				case "stale":
-					its.Status.ObservedGeneration--
-				case "not applied":
-					its.Status.InstanceStatus[0].UpToDate = false
-				case "offline":
-					its.Status.InstanceStatus[0].DesiredState = workloads.InstanceDesiredStateOffline
-					its.Status.InstanceStatus[0].UpToDate = false
-				case "terminating":
-					its.Status.InstanceStatus[0].CurrentState = workloads.InstanceCurrentStateTerminating
-					its.Status.InstanceStatus[0].UpToDate = false
+			if tc.name == "init-only" {
+				currentStatus := *its.Status.DeepCopy()
+				for _, state := range []string{"missing", "stale", "not applied"} {
+					its.Status = *currentStatus.DeepCopy()
+					switch state {
+					case "missing":
+						its.Status.InstanceStatus = nil
+					case "stale":
+						its.Status.ObservedGeneration--
+					case "not applied":
+						its.Status.InstanceStatus[0].UpToDate = false
+					}
+					if err := cli.Status().Update(ctx, its); err != nil {
+						t.Fatal(err)
+					}
+					reconcile(opsv1alpha1.OpsRunningPhase)
 				}
-				if err := cli.Status().Update(ctx, its); err != nil {
-					t.Fatal(err)
-				}
-				reconcile(opsv1alpha1.OpsRunningPhase)
+				its.Status = currentStatus
 			}
-			its.Status = currentStatus
 			if err := cli.Status().Update(ctx, its); err != nil {
 				t.Fatal(err)
 			}

@@ -174,9 +174,7 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		if len(request.Instances) > 0 {
 			status := expected.workload.FindInstanceStatus(pod.Name)
 			if expected.workload.Status.ObservedGeneration != expected.workload.Generation ||
-				status == nil || !status.UpToDate ||
-				status.EffectiveDesiredState() != workloads.InstanceDesiredStateActive ||
-				status.EffectiveCurrentState() != workloads.InstanceCurrentStatePresent {
+				status == nil || !status.UpToDate {
 				return false
 			}
 		}

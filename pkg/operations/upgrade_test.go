@@ -21,17 +21,21 @@ package operations
 
 import (
 	"context"
+	"reflect"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -39,11 +43,222 @@ import (
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	opsutil "github.com/apecloud/kubeblocks/pkg/operations/util"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
+
+func TestUpgradeInstanceTemplates(t *testing.T) {
+	for _, sharding := range []bool{false, true} {
+		for _, tc := range []struct {
+			name                string
+			overwrite           string
+			definition, version *string
+			parent, supersede   bool
+			wantDef, wantVer    string
+		}{
+			{name: "definition only", definition: pointer.String("pg-new"), wantDef: "pg-new", wantVer: "18.0.0"},
+			{name: "version only", version: pointer.String("19.0.0"), wantDef: "pg-canary", wantVer: "19.0.0"},
+			{name: "both", definition: pointer.String("pg-new"), version: pointer.String("19.0.0"), wantDef: "pg-new", wantVer: "19.0.0"},
+			{name: "overwritten definition", definition: pointer.String("pg-new"), overwrite: "definition", wantDef: "pg-new", wantVer: "18.0.0"},
+			{name: "overwritten version", version: pointer.String("19.0.0"), overwrite: "version", wantDef: "pg-canary", wantVer: "19.0.0"},
+			{name: "mixed parent", definition: pointer.String("pg-new"), parent: true, wantDef: "pg-new", wantVer: "18.0.0"},
+			{name: "clear definition", definition: pointer.String(""), wantVer: "18.0.0"},
+			{name: "clear version", version: pointer.String(""), wantDef: "pg-canary"},
+			{name: "clear both", definition: pointer.String(""), version: pointer.String("")},
+			{name: "supersede same-owner template upgrade", definition: pointer.String("pg-new"), supersede: true, wantDef: "pg-new", wantVer: "18.0.0"},
+		} {
+			owner := "component/"
+			if sharding {
+				owner = "sharding/"
+			}
+			t.Run(owner+tc.name, func(t *testing.T) {
+				ctx := context.Background()
+				reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+				scheme := runtime.NewScheme()
+				for _, add := range []func(*runtime.Scheme) error{appsv1.AddToScheme, opsv1alpha1.AddToScheme, workloads.AddToScheme} {
+					if err := add(scheme); err != nil {
+						t.Fatal(err)
+					}
+				}
+				component := appsv1.ClusterComponentSpec{Name: "pg", ComponentDef: "pg-old", ServiceVersion: "17.0.0", Replicas: 3,
+					Instances: []appsv1.InstanceTemplate{
+						{Name: "stable", CompDef: "pg-stable", ServiceVersion: "17.0.0", Replicas: pointer.Int32(1)},
+						{Name: "canary", CompDef: "pg-canary", ServiceVersion: "18.0.0", Replicas: pointer.Int32(1), Canary: pointer.Bool(true),
+							Ordinals: appsv1.Ordinals{Discrete: []int32{2}}, Labels: map[string]string{"test": "keep"}, Annotations: map[string]string{"test": "keep"},
+							Resources:        &corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")}},
+							SchedulingPolicy: &appsv1.SchedulingPolicy{NodeSelector: map[string]string{"zone": "a"}},
+							VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{Name: "data", Spec: corev1.PersistentVolumeClaimSpec{
+								Resources: corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}},
+							}}}},
+						{Name: "sibling", CompDef: "pg-sibling", ServiceVersion: "16.0.0", Replicas: pointer.Int32(1)},
+					}}
+				cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", Generation: 1},
+					Spec:   appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{component}},
+					Status: appsv1.ClusterStatus{Phase: appsv1.RunningClusterPhase}}
+				fullComponentName := "pg"
+				if sharding {
+					cluster.Spec.ComponentSpecs = nil
+					cluster.Spec.Shardings = []appsv1.ClusterSharding{{Name: "pg", Shards: 1, Template: component,
+						ShardTemplates: []appsv1.ShardTemplate{{Name: "zone-a", Shards: pointer.Int32(1)}}}}
+					fullComponentName = "pg-a"
+				}
+				upgrade := opsv1alpha1.UpgradeComponent{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "pg"},
+					Instances: []opsv1alpha1.UpgradeInstanceTemplate{
+						{Name: "canary", ComponentDefinitionName: tc.definition, ServiceVersion: tc.version},
+						{Name: "stable", ServiceVersion: pointer.String("19.0.0")},
+					}}
+				want := component.DeepCopy()
+				want.Instances[0].ServiceVersion = "19.0.0"
+				want.Instances[1].CompDef, want.Instances[1].ServiceVersion = tc.wantDef, tc.wantVer
+				if tc.parent {
+					upgrade.ComponentDefinitionName, upgrade.ServiceVersion = pointer.String("pg-parent"), pointer.String("20.0.0")
+					want.ComponentDef, want.ServiceVersion = "pg-parent", "20.0.0"
+				}
+				ops := &opsv1alpha1.OpsRequest{ObjectMeta: metav1.ObjectMeta{Name: "upgrade", Namespace: "default"},
+					Spec: opsv1alpha1.OpsRequestSpec{ClusterName: cluster.Name, Type: opsv1alpha1.UpgradeType, Force: tc.supersede,
+						SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{Upgrade: &opsv1alpha1.Upgrade{Components: []opsv1alpha1.UpgradeComponent{upgrade}}}},
+					Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsPendingPhase}}
+				cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(ops, cluster).WithObjects(cluster, ops).Build()
+				res := &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(50)}
+				previous := &opsv1alpha1.OpsRequest{}
+				if tc.supersede {
+					previous = ops.DeepCopy()
+					previous.Name, previous.ResourceVersion = "earlier-upgrade", ""
+					previous.Spec.Force = false
+					previous.Spec.Upgrade.Components[0].Instances = []opsv1alpha1.UpgradeInstanceTemplate{{Name: "sibling", ServiceVersion: pointer.String("17.0.0")}}
+					previous.Status.Phase = opsv1alpha1.OpsRunningPhase
+					if err := cli.Create(ctx, previous); err != nil {
+						t.Fatal(err)
+					}
+					if err := opsutil.UpdateClusterOpsAnnotations(ctx, cli, cluster, []opsv1alpha1.OpsRecorder{{Name: previous.Name, Type: opsv1alpha1.UpgradeType}}); err != nil {
+						t.Fatal(err)
+					}
+				}
+				reload := func() {
+					t.Helper()
+					res.Cluster, res.OpsRequest, res.Runtimes = &appsv1.Cluster{}, &opsv1alpha1.OpsRequest{}, nil
+					if err := cli.Get(ctx, client.ObjectKeyFromObject(cluster), res.Cluster); err != nil {
+						t.Fatal(err)
+					}
+					if err := cli.Get(ctx, client.ObjectKeyFromObject(ops), res.OpsRequest); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if _, err := GetOpsManager().Do(reqCtx, cli, res); err != nil {
+					t.Fatal(err)
+				}
+				reload()
+				if res.OpsRequest.Status.Phase != opsv1alpha1.OpsCreatingPhase {
+					t.Fatalf("phase = %s, want Creating", res.OpsRequest.Status.Phase)
+				}
+				for i := 0; i < 2; i++ {
+					if _, err := GetOpsManager().Do(reqCtx, cli, res); err != nil {
+						t.Fatal(err)
+					}
+					reload()
+				}
+				got := getComponentSpecOrShardingTemplate(res.Cluster, "pg")
+				if !reflect.DeepEqual(got, want) {
+					t.Fatalf("component = %#v, want %#v", got, want)
+				}
+				last := res.OpsRequest.Status.LastConfiguration.Components["pg"]
+				if !reflect.DeepEqual(last.InstanceTemplates, component.Instances) || last.ComponentDefinitionName != component.ComponentDef || last.ServiceVersion != component.ServiceVersion {
+					t.Fatalf("last configuration = %#v, want original component", last)
+				}
+				if tc.supersede {
+					if err := cli.Get(ctx, client.ObjectKeyFromObject(previous), previous); err != nil {
+						t.Fatal(err)
+					}
+					if previous.Status.Phase != opsv1alpha1.OpsAbortedPhase || previous.Status.CompletionTimestamp.IsZero() {
+						t.Fatal("earlier Upgrade on another template of the same owner was not aborted")
+					}
+				}
+				if sharding {
+					comp := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{Name: "demo-" + fullComponentName, Namespace: "default",
+						Labels: constant.GetCompLabels("demo", fullComponentName, map[string]string{constant.KBAppShardingNameLabelKey: "pg"})}}
+					if err := cli.Create(ctx, comp); err != nil {
+						t.Fatal(err)
+					}
+				}
+				its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "demo-" + fullComponentName, Namespace: "default"}, Spec: workloads.InstanceSetSpec{Replicas: pointer.Int32(3)}}
+				for _, name := range []string{"stable-0", "canary-2", "sibling-0"} {
+					its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{PodName: its.Name + "-" + name,
+						DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent,
+						UpToDate: true, Ready: true, Available: true})
+				}
+				if err := cli.Create(ctx, its); err != nil {
+					t.Fatal(err)
+				}
+				res.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+				res.OpsRequest.Status.ClusterGeneration = res.Cluster.Generation
+				if err := cli.Status().Update(ctx, res.OpsRequest); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := GetOpsManager().Reconcile(reqCtx, cli, res); err != nil {
+					t.Fatal(err)
+				}
+				reload()
+				if res.OpsRequest.Status.Phase != opsv1alpha1.OpsRunningPhase {
+					t.Fatal("upgrade completed before the owner published current status")
+				}
+				var canary *appsv1.InstanceTemplate
+				if sharding {
+					canary = &res.Cluster.Spec.Shardings[0].Template.Instances[1]
+				} else {
+					canary = &res.Cluster.Spec.ComponentSpecs[0].Instances[1]
+				}
+				if canary.CompDef == "" && canary.ServiceVersion != "" {
+					canary.CompDef = "pg-resolved"
+				}
+				if canary.ServiceVersion == "" && canary.CompDef != "" {
+					canary.ServiceVersion = "21.0.0"
+				}
+				if tc.overwrite != "" {
+					if tc.overwrite == "definition" {
+						canary.CompDef = "pg-replaced"
+					} else {
+						canary.ServiceVersion = "20.0.0"
+					}
+					res.Cluster.Generation++
+				}
+				if err := cli.Update(ctx, res.Cluster); err != nil {
+					t.Fatal(err)
+				}
+				status := appsv1.ClusterComponentStatus{Phase: appsv1.RunningComponentPhase, ObservedGeneration: res.Cluster.Generation, UpToDate: true}
+				if sharding {
+					res.Cluster.Status.Shardings = map[string]appsv1.ClusterShardingStatus{"pg": {
+						Phase: status.Phase, ObservedGeneration: status.ObservedGeneration, UpToDate: status.UpToDate,
+					}}
+				} else {
+					res.Cluster.Status.Components = map[string]appsv1.ClusterComponentStatus{"pg": status}
+				}
+				if err := cli.Status().Update(ctx, res.Cluster); err != nil {
+					t.Fatal(err)
+				}
+				reload()
+				if _, err := GetOpsManager().Reconcile(reqCtx, cli, res); err != nil {
+					t.Fatal(err)
+				}
+				reload()
+				if tc.overwrite != "" {
+					if res.OpsRequest.Status.Phase != opsv1alpha1.OpsAbortedPhase {
+						t.Fatalf("phase = %s, want Aborted for overwritten template %s", res.OpsRequest.Status.Phase, tc.overwrite)
+					}
+					return
+				}
+				if res.OpsRequest.Status.Phase != opsv1alpha1.OpsSucceedPhase || res.OpsRequest.Status.Progress != "3/3" {
+					t.Fatalf("phase = %s, progress = %s, want Succeed 3/3", res.OpsRequest.Status.Phase, res.OpsRequest.Status.Progress)
+				}
+			})
+		}
+	}
+}
 
 func TestUpgradeTargetsUnchanged(t *testing.T) {
 	explicitCompDef := "mysql-8.0"
@@ -94,6 +309,43 @@ func TestUpgradeTargetsUnchanged(t *testing.T) {
 		t.Fatal("non-exact latest target rejected the owner-resolved values")
 	}
 
+	for _, owner := range []string{"mysql", "shard"} {
+		for _, change := range []string{"unchanged", "definition", "version", "missing", "omitted", "empty"} {
+			t.Run(owner+"/template/"+change, func(t *testing.T) {
+				res := newOpsResource(owner, nil, nil)
+				res.Cluster = cluster.DeepCopy()
+				spec := &res.Cluster.Spec.ComponentSpecs[0]
+				if owner == "shard" {
+					spec = &res.Cluster.Spec.Shardings[0].Template
+				}
+				spec.Instances = []appsv1.InstanceTemplate{{Name: "canary", CompDef: explicitCompDef, ServiceVersion: explicitServiceVersion}}
+				upgrade := &res.OpsRequest.Spec.Upgrade.Components[0]
+				upgrade.Instances = []opsv1alpha1.UpgradeInstanceTemplate{{Name: "canary", ComponentDefinitionName: &explicitCompDef, ServiceVersion: &explicitServiceVersion}}
+				want := false
+				switch change {
+				case "unchanged":
+					want = true
+				case "definition":
+					spec.Instances[0].CompDef = "mysql-8.4"
+				case "version":
+					spec.Instances[0].ServiceVersion = "8.4.0"
+				case "missing":
+					spec.Instances = nil
+				case "omitted", "empty":
+					spec.Instances[0].CompDef = "mysql-resolved"
+					upgrade.Instances[0].ComponentDefinitionName = nil
+					if change == "empty" {
+						upgrade.Instances[0].ComponentDefinitionName = &latest
+					}
+					want = true
+				}
+				if got := handler.targetsUnchanged(res); got != want {
+					t.Fatalf("targetsUnchanged = %t, want %t", got, want)
+				}
+			})
+		}
+	}
+
 	opsRes := newOpsResource("mysql", &explicitCompDef, &explicitServiceVersion)
 	opsRes.Cluster.Generation = 7
 	opsRes.OpsRequest.Status.ClusterGeneration = 8
@@ -105,6 +357,91 @@ func TestUpgradeTargetsUnchanged(t *testing.T) {
 	phase, _, err = handler.ReconcileAction(intctrlutil.RequestCtx{}, nil, opsRes)
 	if err != nil || phase != opsv1alpha1.OpsAbortedPhase {
 		t.Fatalf("phase=%s err=%v, want Aborted for a replaced explicit target", phase, err)
+	}
+}
+
+func TestUpgradeInstanceTemplateSnapshotDoesNotAliasCluster(t *testing.T) {
+	res := &OpsResource{Cluster: &appsv1.Cluster{Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "pg",
+		Instances: []appsv1.InstanceTemplate{{Name: "canary", CompDef: "pg-old", Labels: map[string]string{"test": "keep"}}},
+	}}}}, OpsRequest: &opsv1alpha1.OpsRequest{Spec: opsv1alpha1.OpsRequestSpec{SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{
+		Upgrade: &opsv1alpha1.Upgrade{Components: []opsv1alpha1.UpgradeComponent{{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "pg"},
+			Instances: []opsv1alpha1.UpgradeInstanceTemplate{{Name: "canary", ComponentDefinitionName: pointer.String("pg-new")}},
+		}}},
+	}}}}
+	if err := (upgradeOpsHandler{}).SaveLastConfiguration(intctrlutil.RequestCtx{}, nil, res); err != nil {
+		t.Fatal(err)
+	}
+	res.Cluster.Spec.ComponentSpecs[0].Instances[0].CompDef = "pg-new"
+	res.Cluster.Spec.ComponentSpecs[0].Instances[0].Labels["test"] = "changed"
+	last := res.OpsRequest.Status.LastConfiguration.Components["pg"].InstanceTemplates[0]
+	if last.CompDef != "pg-old" || last.Labels["test"] != "keep" {
+		t.Fatalf("snapshot changed with Cluster = %#v", last)
+	}
+}
+
+func TestUpgradeRevalidatesInstanceTemplatesBeforeAction(t *testing.T) {
+	for _, change := range []string{"remove template", "remove component", "override shard instances"} {
+		t.Run(change, func(t *testing.T) {
+			ctx := context.Background()
+			scheme := runtime.NewScheme()
+			for _, add := range []func(*runtime.Scheme) error{appsv1.AddToScheme, opsv1alpha1.AddToScheme} {
+				if err := add(scheme); err != nil {
+					t.Fatal(err)
+				}
+			}
+			component := appsv1.ClusterComponentSpec{Name: "pg", ComponentDef: "pg-old", Instances: []appsv1.InstanceTemplate{{Name: "canary", CompDef: "pg-old"}}}
+			cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
+				Spec:   appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{component}},
+				Status: appsv1.ClusterStatus{Phase: appsv1.RunningClusterPhase}}
+			if change == "override shard instances" {
+				cluster.Spec.ComponentSpecs = nil
+				cluster.Spec.Shardings = []appsv1.ClusterSharding{{Name: "pg", Shards: 1, Template: component}}
+			}
+			ops := &opsv1alpha1.OpsRequest{ObjectMeta: metav1.ObjectMeta{Name: "upgrade", Namespace: "default"},
+				Spec: opsv1alpha1.OpsRequestSpec{ClusterName: "demo", Type: opsv1alpha1.UpgradeType,
+					SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{Upgrade: &opsv1alpha1.Upgrade{Components: []opsv1alpha1.UpgradeComponent{{
+						ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "pg"}, Instances: []opsv1alpha1.UpgradeInstanceTemplate{{Name: "canary", ComponentDefinitionName: pointer.String("pg-new")}},
+					}}}}}, Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsPendingPhase}}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(ops).WithObjects(cluster, ops).Build()
+			res := &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(20)}
+			if _, err := GetOpsManager().Do(intctrlutil.RequestCtx{Ctx: ctx}, cli, res); err != nil {
+				t.Fatal(err)
+			}
+			if res.OpsRequest.Status.Phase != opsv1alpha1.OpsCreatingPhase {
+				t.Fatalf("phase = %s, want Creating", res.OpsRequest.Status.Phase)
+			}
+			switch change {
+			case "remove template":
+				cluster.Spec.ComponentSpecs[0].Instances = nil
+			case "remove component":
+				cluster.Spec.ComponentSpecs = nil
+			case "override shard instances":
+				cluster.Spec.Shardings[0].ShardTemplates = []appsv1.ShardTemplate{{Name: "independent", Instances: []appsv1.InstanceTemplate{{Name: "canary"}}}}
+			}
+			if err := cli.Update(ctx, cluster); err != nil {
+				t.Fatal(err)
+			}
+			want := cluster.Spec.DeepCopy()
+			res = &OpsResource{Cluster: &appsv1.Cluster{}, OpsRequest: &opsv1alpha1.OpsRequest{}, Recorder: record.NewFakeRecorder(20)}
+			if err := cli.Get(ctx, client.ObjectKeyFromObject(cluster), res.Cluster); err != nil {
+				t.Fatal(err)
+			}
+			if err := cli.Get(ctx, client.ObjectKeyFromObject(ops), res.OpsRequest); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := GetOpsManager().Do(intctrlutil.RequestCtx{Ctx: ctx}, cli, res); err != nil {
+				t.Fatal(err)
+			}
+			if err := cli.Get(ctx, client.ObjectKeyFromObject(ops), ops); err != nil {
+				t.Fatal(err)
+			}
+			if err := cli.Get(ctx, client.ObjectKeyFromObject(cluster), cluster); err != nil {
+				t.Fatal(err)
+			}
+			if ops.Status.Phase != opsv1alpha1.OpsFailedPhase || !reflect.DeepEqual(&cluster.Spec, want) {
+				t.Fatalf("phase = %s, Cluster spec changed = %t", ops.Status.Phase, !reflect.DeepEqual(&cluster.Spec, want))
+			}
+		})
 	}
 }
 
@@ -572,3 +909,183 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		// TODO: add case with ClusterDefinition and topology
 	})
 })
+
+func TestUpgradeInstanceTemplateOwnerConvergence(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		clear, shard bool
+	}{
+		{name: "init-only"},
+		{name: "clear-both", clear: true},
+		{name: "shard init-only", shard: true},
+		{name: "shard clear-both", shard: true, clear: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			scheme := runtime.NewScheme()
+			for _, add := range []func(*runtime.Scheme) error{corev1.AddToScheme, appsv1.AddToScheme, opsv1alpha1.AddToScheme, workloads.AddToScheme} {
+				if err := add(scheme); err != nil {
+					t.Fatal(err)
+				}
+			}
+			def := &appsv1.ComponentDefinition{ObjectMeta: metav1.ObjectMeta{Name: "db"}, Spec: appsv1.ComponentDefinitionSpec{
+				ServiceVersion: "1.0.0", Runtime: corev1.PodSpec{
+					Containers:     []corev1.Container{{Name: "db", Image: "db:same"}},
+					InitContainers: []corev1.Container{{Name: "setup", Image: "setup:1"}},
+				},
+			}}
+			initName, targetInit := def.Spec.Runtime.InitContainers[0].Name, "setup:2"
+			ver := &appsv1.ComponentVersion{ObjectMeta: metav1.ObjectMeta{Name: "db-ver", Generation: 1, Labels: map[string]string{"db": "db"}}, Spec: appsv1.ComponentVersionSpec{
+				CompatibilityRules: []appsv1.ComponentVersionCompatibilityRule{{CompDefs: []string{"db"}, Releases: []string{"v2"}}},
+				Releases:           []appsv1.ComponentVersionRelease{{Name: "v2", ServiceVersion: "2.0.0", Images: map[string]string{"db": "db:same", initName: targetInit}}},
+			}, Status: appsv1.ComponentVersionStatus{ObservedGeneration: 1, Phase: appsv1.AvailablePhase}}
+			spec := appsv1.ClusterComponentSpec{Name: "db", ComponentDef: "db", ServiceVersion: "1.0.0", Replicas: 1, Instances: []appsv1.InstanceTemplate{{Name: "canary", Replicas: ptr.To(int32(1)), CompDef: "db", ServiceVersion: "1.0.0"}}}
+			if tc.clear {
+				spec.Instances[0].ServiceVersion = "2.0.0"
+			}
+			cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", Generation: 2}, Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{spec}}, Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{"db": {Phase: appsv1.RunningComponentPhase, ObservedGeneration: 1, UpToDate: false}}}}
+			targetName, componentName := "db", "db"
+			if tc.shard {
+				targetName, componentName = "shards", "shards-abc"
+				cluster.Spec.ComponentSpecs = nil
+				cluster.Spec.Shardings = []appsv1.ClusterSharding{{Name: targetName, Shards: 1, Template: spec}}
+				cluster.Status.Shardings = map[string]appsv1.ClusterShardingStatus{targetName: {Phase: appsv1.RunningComponentPhase, ObservedGeneration: 1, UpToDate: false}}
+			}
+			target := opsv1alpha1.UpgradeInstanceTemplate{Name: "canary", ServiceVersion: ptr.To("2.0.0")}
+			if tc.clear {
+				target.ComponentDefinitionName, target.ServiceVersion = ptr.To(""), ptr.To("")
+			}
+			ops := &opsv1alpha1.OpsRequest{ObjectMeta: metav1.ObjectMeta{Name: "upgrade", Namespace: "default"}, Spec: opsv1alpha1.OpsRequestSpec{ClusterName: cluster.Name, Type: opsv1alpha1.UpgradeType, SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{Upgrade: &opsv1alpha1.Upgrade{Components: []opsv1alpha1.UpgradeComponent{{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: targetName}, Instances: []opsv1alpha1.UpgradeInstanceTemplate{target}}}}}}, Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsRunningPhase, StartTimestamp: metav1.Now(), ClusterGeneration: 2}}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(ops, cluster, &workloads.InstanceSet{}, &corev1.Pod{}).WithObjects(def, ver, cluster, ops).Build()
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			resource := func() *OpsResource {
+				return &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(100)}
+			}
+			handler := GetOpsManager().OpsMap[opsv1alpha1.UpgradeType].OpsHandler
+			if err := handler.Action(reqCtx, cli, resource()); err != nil {
+				t.Fatal(err)
+			}
+			spec = *getComponentSpecOrShardingTemplate(cluster, targetName).DeepCopy()
+			if tc.clear && (spec.Instances[0].CompDef != "" || spec.Instances[0].ServiceVersion != "") {
+				t.Fatalf("Action did not clear overrides: %#v", spec.Instances[0])
+			}
+			spec.Name = componentName
+			comp, err := component.BuildComponent(cluster, &spec, nil, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			comp.Generation = 2
+			if tc.shard {
+				comp.Labels[constant.KBAppShardingNameLabelKey] = targetName
+			}
+			if err := cli.Create(ctx, comp); err != nil {
+				t.Fatal(err)
+			}
+			images := map[string]map[string]string{}
+			if !tc.clear {
+				images["canary"], err = component.ResolveInstanceTemplateImages4ServiceVersion(ctx, cli, def, "2.0.0", nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !intctrlutil.EqualContainerImageInSpec(images["canary"][initName], targetInit) {
+					t.Fatalf("resolved init image=%#v", images)
+				}
+			}
+			synth := &component.SynthesizedComponent{Namespace: cluster.Namespace, ClusterName: cluster.Name, Name: componentName, CompDefName: "db", ServiceVersion: "1.0.0", Generation: "2", Replicas: 1, PodSpec: def.Spec.Runtime.DeepCopy(), Instances: spec.Instances, InstanceImages: images}
+			its, err := component.BuildInstanceSet(synth, def)
+			if err != nil {
+				t.Fatal(err)
+			}
+			its.Generation = 2
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			for _, reconciler := range []kubebuilderx.Reconciler{instanceset.NewRevisionUpdateReconciler(), instanceset.NewReplicasAlignmentReconciler(cli)} {
+				if _, err := reconciler.Reconcile(tree); err != nil {
+					t.Fatal(err)
+				}
+			}
+			pods := tree.List(&corev1.Pod{})
+			if len(pods) != 1 {
+				t.Fatalf("built %d Pods", len(pods))
+			}
+			pod := pods[0].(*corev1.Pod)
+			desiredInit := pod.Spec.InitContainers[0].Image
+			pod.CreationTimestamp = metav1.NewTime(time.Now().Add(-time.Hour))
+			pod.UID = "existing-pod"
+			pod.Status = corev1.PodStatus{Phase: corev1.PodRunning, Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: pod.CreationTimestamp}}}
+			for _, container := range pod.Spec.Containers {
+				pod.Status.ContainerStatuses = append(pod.Status.ContainerStatuses, corev1.ContainerStatus{Name: container.Name, Image: container.Image, ImageID: "containerd://sha256:1234", Ready: true})
+			}
+			pod.Spec.InitContainers[0].Image = "setup:1"
+			if tc.clear {
+				pod.Spec.InitContainers[0].Image = "setup:2"
+			}
+			pod.Status.InitContainerStatuses = []corev1.ContainerStatus{{Name: initName, Image: pod.Spec.InitContainers[0].Image, State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 0}}}}
+			publish := func() {
+				t.Helper()
+				tree.SetRoot(its)
+				if err := tree.Update(pod); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := instanceset.NewStatusReconciler().Reconcile(tree); err != nil {
+					t.Fatal(err)
+				}
+			}
+			publish()
+			if status := its.FindInstanceStatus(pod.Name); status == nil || status.UpToDate {
+				t.Fatalf("old init unexpectedly applied: %#v", status)
+			}
+			for _, object := range []client.Object{its, pod} {
+				if err := cli.Create(ctx, object); err != nil {
+					t.Fatal(err)
+				}
+			}
+			reconcile := func(want opsv1alpha1.OpsPhase, progress string) {
+				t.Helper()
+				if err := cli.Get(ctx, client.ObjectKeyFromObject(cluster), cluster); err != nil {
+					t.Fatal(err)
+				}
+				if err := cli.Get(ctx, client.ObjectKeyFromObject(ops), ops); err != nil {
+					t.Fatal(err)
+				}
+				phase, requeue, err := GetOpsManager().OpsMap[opsv1alpha1.UpgradeType].OpsHandler.ReconcileAction(reqCtx, cli, resource())
+				if err != nil || phase != want || ops.Status.Progress != progress {
+					t.Fatalf("phase=%s progress=%s requeue=%s err=%v, want %s %s", phase, ops.Status.Progress, requeue, err, want, progress)
+				}
+			}
+			reconcile(opsv1alpha1.OpsRunningPhase, "0/1")
+			reconcile(opsv1alpha1.OpsRunningPhase, "0/1")
+			pod.Spec.InitContainers[0].Image = desiredInit
+			pod.Status.InitContainerStatuses[0].Image = pod.Spec.InitContainers[0].Image
+			podStatus := *pod.Status.DeepCopy()
+			if err := cli.Update(ctx, pod); err != nil {
+				t.Fatal(err)
+			}
+			pod.Status = podStatus
+			if err := cli.Status().Update(ctx, pod); err != nil {
+				t.Fatal(err)
+			}
+			publish()
+			if status := its.FindInstanceStatus(pod.Name); status == nil || !status.UpToDate {
+				t.Fatalf("updated Pod not applied by owner: %#v", status)
+			}
+			if err := cli.Status().Update(ctx, its); err != nil {
+				t.Fatal(err)
+			}
+			reconcile(opsv1alpha1.OpsRunningPhase, "1/1")
+			if tc.shard {
+				status := cluster.Status.Shardings[targetName]
+				status.ObservedGeneration, status.UpToDate = cluster.Generation, true
+				cluster.Status.Shardings[targetName] = status
+			} else {
+				status := cluster.Status.Components[targetName]
+				status.ObservedGeneration, status.UpToDate = cluster.Generation, true
+				cluster.Status.Components[targetName] = status
+			}
+			if err := cli.Status().Update(ctx, cluster); err != nil {
+				t.Fatal(err)
+			}
+			reconcile(opsv1alpha1.OpsSucceedPhase, "1/1")
+		})
+	}
+}

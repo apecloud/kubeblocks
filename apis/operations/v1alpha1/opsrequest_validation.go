@@ -221,6 +221,33 @@ func (r *OpsRequest) validateUpgrade(ctx context.Context, k8sClient client.Clien
 			}
 		}
 	}
+	for _, v := range r.Spec.Upgrade.Components {
+		if len(v.Instances) == 0 {
+			continue
+		}
+		var instanceNames []string
+		for _, instance := range v.Instances {
+			instanceNames = append(instanceNames, instance.Name)
+			if instance.ServiceVersion != nil && *instance.ServiceVersion != "" {
+				if _, err := version.ParseSemantic(*instance.ServiceVersion); err != nil {
+					return invalidValueError(v.ComponentName, fmt.Sprintf("instance template %q serviceVersion \"%s\" is not a valid semantic version: %s", instance.Name, *instance.ServiceVersion, err.Error()))
+				}
+			}
+		}
+		if err := r.checkInstanceTemplate(cluster, v.ComponentOps, instanceNames); err != nil {
+			return err
+		}
+		for _, sharding := range cluster.Spec.Shardings {
+			if sharding.Name != v.ComponentName {
+				continue
+			}
+			for _, template := range sharding.ShardTemplates {
+				if template.Instances != nil {
+					return invalidValueError(v.ComponentName, fmt.Sprintf("instance template upgrades are not supported for sharding with shard template %q overriding instances", template.Name))
+				}
+			}
+		}
+	}
 	return nil
 }
 

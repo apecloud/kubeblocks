@@ -34,6 +34,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -103,16 +104,45 @@ func UpdateCompDefinitionImages4ServiceVersion(ctx context.Context, cli client.R
 	return resolveImagesWithCompVersions(compDef, compVersions, serviceVersion)
 }
 
+// ResolveInstanceTemplateImages4ServiceVersion returns template image overrides relative to parent.
+// Runtime defaults matching parent are inherited; nil returns all runtime images.
+// Without a ComponentVersion, action containers inherit the parent synthesized runtime.
 func ResolveInstanceTemplateImages4ServiceVersion(ctx context.Context, cli client.Reader,
-	compDef *appsv1.ComponentDefinition, serviceVersion string) (map[string]string, error) {
+	compDef *appsv1.ComponentDefinition, serviceVersion string, parent *corev1.PodSpec) (map[string]string, error) {
 	compVersions, err := CompatibleCompVersions4Definition(ctx, cli, compDef)
 	if err != nil {
 		return nil, err
 	}
-	if len(compVersions) == 0 {
-		return nil, nil
+	images, err := resolveImagesWithCompVersions4Template(compDef, compVersions, serviceVersion)
+	if err != nil || parent == nil {
+		return images, err
 	}
-	return resolveImagesWithCompVersions4Template(compDef, compVersions, serviceVersion)
+	var apps map[string]appNameVersionImage
+	if len(compVersions) > 0 {
+		appsInVer, err := findMatchedImagesFromCompVersions(compVersions, serviceVersion)
+		if err != nil {
+			return nil, err
+		}
+		apps = checkNMergeImages(serviceVersion, convertImagesFromCompDefinition(compDef), appsInVer)
+	}
+	inheritDefaults := func(containers, parentContainers []corev1.Container) {
+		for _, c := range containers {
+			rawImage := c.Image
+			if len(compVersions) > 0 {
+				rawImage = apps[c.Name].image
+			}
+			if rawImage == "" || rawImage != c.Image {
+				continue
+			}
+			_, parentContainer := intctrlutil.GetContainerByName(parentContainers, c.Name)
+			if parentContainer != nil && images[c.Name] == intctrlutil.ReplaceImageRegistry(parentContainer.Image) {
+				delete(images, c.Name)
+			}
+		}
+	}
+	inheritDefaults(compDef.Spec.Runtime.InitContainers, parent.InitContainers)
+	inheritDefaults(compDef.Spec.Runtime.Containers, parent.Containers)
+	return images, nil
 }
 
 func resolveImagesWithCompVersions(compDef *appsv1.ComponentDefinition,
@@ -175,44 +205,55 @@ func resolveImagesWithCompVersions(compDef *appsv1.ComponentDefinition,
 
 func resolveImagesWithCompVersions4Template(compDef *appsv1.ComponentDefinition,
 	compVersions []*appsv1.ComponentVersion, serviceVersion string) (map[string]string, error) {
-	appsInDef := convertImagesFromCompDefinition(compDef)
-	appsInVer, err := findMatchedImagesFromCompVersions(compVersions, serviceVersion)
-	if err != nil {
-		return nil, err
+	var apps map[string]appNameVersionImage
+	if len(compVersions) > 0 {
+		appsInDef := convertImagesFromCompDefinition(compDef)
+		appsInVer, err := findMatchedImagesFromCompVersions(compVersions, serviceVersion)
+		if err != nil {
+			return nil, err
+		}
+		apps = checkNMergeImages(serviceVersion, appsInDef, appsInVer)
 	}
 
 	images := make(map[string]string)
-	apps := checkNMergeImages(serviceVersion, appsInDef, appsInVer)
+	var err error
 
 	if err = func() error {
-		checkNUpdateImage := func(name, image string) error {
-			var err error
-			app, ok := apps[name]
-			switch {
-			case ok && app.err == nil:
-				if len(image) == 0 || image != app.image {
-					images[name] = app.image
+		checkNAddImage := func(c corev1.Container) error {
+			image := c.Image
+			if len(compVersions) > 0 {
+				app, ok := apps[c.Name]
+				switch {
+				case !ok:
+					return fmt.Errorf("no matched image found for container %s", c.Name)
+				case app.err != nil:
+					return app.err
+				default:
+					image = app.image
 				}
-			case ok:
-				err = app.err
-			default:
-				err = fmt.Errorf("no matched image found for container %s", name)
 			}
-			return err
+			if len(image) > 0 {
+				images[c.Name] = intctrlutil.ReplaceImageRegistry(image)
+			}
+			return nil
 		}
 		for _, c := range compDef.Spec.Runtime.InitContainers {
-			if err := checkNUpdateImage(c.Name, c.Image); err != nil {
+			if err := checkNAddImage(c); err != nil {
 				return err
 			}
 		}
 		for _, c := range compDef.Spec.Runtime.Containers {
-			if err := checkNUpdateImage(c.Name, c.Image); err != nil {
+			if err := checkNAddImage(c); err != nil {
 				return err
 			}
 		}
 		return nil
 	}(); err != nil {
 		return nil, err
+	}
+
+	if len(compVersions) == 0 {
+		return images, nil
 	}
 
 	if err = func() error {
@@ -224,11 +265,14 @@ func resolveImagesWithCompVersions4Template(compDef *appsv1.ComponentDefinition,
 					if app.err != nil {
 						return app.err
 					}
+					if len(app.image) == 0 {
+						continue
+					}
 					if image, ok := images[kbagent.ContainerName]; !ok || len(image) == 0 {
-						images[kbagent.ContainerName] = app.image
+						images[kbagent.ContainerName] = intctrlutil.ReplaceImageRegistry(app.image)
 					}
 					if image, ok := images[kbagent.ContainerName4Worker]; !ok || len(image) == 0 {
-						images[kbagent.ContainerName4Worker] = app.image
+						images[kbagent.ContainerName4Worker] = intctrlutil.ReplaceImageRegistry(app.image)
 					}
 				}
 			}

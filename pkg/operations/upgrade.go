@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"slices"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -130,6 +131,23 @@ func (u upgradeOpsHandler) targetsUnchanged(opsRes *OpsResource) bool {
 		serviceVersion := ptr.Deref(upgrade.ServiceVersion, "")
 		if serviceVersion != "" && compSpec.ServiceVersion != serviceVersion {
 			return false
+		}
+		for _, upgradeInstance := range upgrade.Instances {
+			index := slices.IndexFunc(compSpec.Instances, func(instance appsv1.InstanceTemplate) bool {
+				return instance.Name == upgradeInstance.Name
+			})
+			if index < 0 {
+				return false
+			}
+			instance := compSpec.Instances[index]
+			componentDef := ptr.Deref(upgradeInstance.ComponentDefinitionName, "")
+			if componentDef != "" && instance.CompDef != componentDef {
+				return false
+			}
+			serviceVersion := ptr.Deref(upgradeInstance.ServiceVersion, "")
+			if serviceVersion != "" && instance.ServiceVersion != serviceVersion {
+				return false
+			}
 		}
 	}
 	return true

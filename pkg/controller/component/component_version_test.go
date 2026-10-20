@@ -254,7 +254,7 @@ var _ = Describe("instance template image resolution", func() {
 		}}}
 		before := def.DeepCopy()
 		By("returning definition defaults when no compatible ComponentVersion exists")
-		images, err := ResolveInstanceTemplateImages4ServiceVersion(ctx, testCtx.Cli, def, "2.0.0")
+		images, err := ResolveInstanceTemplateImages4ServiceVersion(ctx, testCtx.Cli, def, "2.0.0", nil)
 		Expect(err).Should(Succeed())
 		Expect(images).Should(Equal(map[string]string{"db": "docker.io/library/db:1", "setup": "docker.io/library/setup:1"}))
 		images, err = resolveImagesWithCompVersions4Template(def, []*appsv1.ComponentVersion{ver}, "2.0.0")
@@ -288,12 +288,19 @@ func TestInstanceTemplateResolvedImages(t *testing.T) {
 		versionActionImage string
 		wantAction         string
 		registry           bool
+		withParent         bool
+		inheritDefaults    bool
+		mappedCollision    bool
 	}{
 		{name: "definition defaults without ComponentVersion", serviceVersion: "1.0.0", actionImage: "docker.io/apecloud/action:1"},
 		{name: "definition defaults with registry replacement", registry: true, serviceVersion: "1.0.0", actionImage: "docker.io/apecloud/action:1"},
 		{name: "release images equal definition defaults", withVersion: true, serviceVersion: "1.0.0", actionImage: "docker.io/apecloud/action:1", wantAction: "docker.io/apecloud/action:1"},
 		{name: "release overrides runtime and action images", withVersion: true, serviceVersion: "2.0.0", versionActionImage: "docker.io/apecloud/action:2", wantAction: "docker.io/apecloud/action:2"},
 		{name: "no version keeps semantic version bypass and action inheritance", serviceVersion: "legacy-version"},
+		{name: "matching parent defaults without ComponentVersion", serviceVersion: "1.0.0", withParent: true, inheritDefaults: true},
+		{name: "matching parent defaults with ComponentVersion", withVersion: true, serviceVersion: "1.0.0", wantAction: "tools:default", withParent: true, inheritDefaults: true},
+		{name: "different defaults remain explicit", withVersion: true, serviceVersion: "1.0.0", wantAction: "tools:default", withParent: true},
+		{name: "nondefault override maps to parent image", withVersion: true, serviceVersion: "2.0.0", registry: true, wantAction: "tools:default", withParent: true, mappedCollision: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			g := NewWithT(t)
@@ -342,14 +349,28 @@ func TestInstanceTemplateResolvedImages(t *testing.T) {
 			before := def.DeepCopy()
 			parent := def.DeepCopy()
 			g.Expect(UpdateCompDefinitionImages4ServiceVersion(context.Background(), cli, parent, "2.0.0")).Should(Succeed())
+			if tc.inheritDefaults {
+				parent.Spec.Runtime = *def.Spec.Runtime.DeepCopy()
+			}
+			if tc.mappedCollision {
+				parent.Spec.Runtime.Containers[0].Image = "other.invalid/apecloud/db:2"
+				parent.Spec.Runtime.InitContainers[0].Image = "other.invalid/apecloud/prepare:2"
+			}
 			parentBefore := parent.DeepCopy()
-			images, err := ResolveInstanceTemplateImages4ServiceVersion(context.Background(), cli, def, tc.serviceVersion)
+			var parentRuntime *corev1.PodSpec
+			if tc.withParent {
+				parentRuntime = &parent.Spec.Runtime
+			}
+			images, err := ResolveInstanceTemplateImages4ServiceVersion(context.Background(), cli, def, tc.serviceVersion, parentRuntime)
 			g.Expect(err).Should(Succeed())
 			suffix := "1"
 			if tc.serviceVersion == "2.0.0" {
 				suffix = "2"
 			}
 			want := map[string]string{"db": prefix + "db:" + suffix, "prepare": prefix + "prepare:" + suffix}
+			if tc.inheritDefaults {
+				want = map[string]string{}
+			}
 			if tc.withVersion {
 				actionImage := strings.Replace(tc.wantAction, "docker.io/apecloud/", prefix, 1)
 				want[kbagent.ContainerName] = actionImage
@@ -384,7 +405,7 @@ func TestInstanceTemplateRuntimeActionNameCollision(t *testing.T) {
 				def.Spec.LifecycleActions = &appsv1.ComponentLifecycleActions{MemberJoin: &appsv1.Action{
 					Exec: &appsv1.ExecAction{Image: actionImage, Command: []string{"true"}},
 				}}
-				images, err := ResolveInstanceTemplateImages4ServiceVersion(context.Background(), cli, def, "1.0.0")
+				images, err := ResolveInstanceTemplateImages4ServiceVersion(context.Background(), cli, def, "1.0.0", nil)
 				g.Expect(err).Should(Succeed())
 				want := map[string]string{container.Name: container.Image}
 				if initContainer {

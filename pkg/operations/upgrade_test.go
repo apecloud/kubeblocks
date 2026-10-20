@@ -817,7 +817,7 @@ func TestUpgradeTemplateInitProgress(t *testing.T) {
 			g.Expect(cli.Create(ctx, comp)).To(Succeed())
 			images := map[string]map[string]string{}
 			if !tc.clear {
-				images["canary"], err = component.ResolveInstanceTemplateImages4ServiceVersion(ctx, cli, def, "2.0.0")
+				images["canary"], err = component.ResolveInstanceTemplateImages4ServiceVersion(ctx, cli, def, "2.0.0", nil)
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(images["canary"]["setup"]).To(HaveSuffix("setup:2"))
 			}

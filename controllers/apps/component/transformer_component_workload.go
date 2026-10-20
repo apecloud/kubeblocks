@@ -188,6 +188,9 @@ func (t *componentWorkloadTransformer) handleWorkloadStartNStop(transCtx *compon
 	)
 	if start || stop {
 		runningITSCopy := runningITS.DeepCopy()
+		// While stopped, normal updates stay deferred, so acknowledge the generation here.
+		// Start only clears Stop here; defer its generation until the normal update publishes
+		// the requested workload, so old readiness cannot complete pending operations.
 		if stop {
 			runningITSCopy.Annotations[constant.KubeBlocksGenerationKey] = (*protoITS).Annotations[constant.KubeBlocksGenerationKey]
 		}

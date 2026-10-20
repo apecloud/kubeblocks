@@ -378,7 +378,9 @@ func TestValidateUpgradeInstanceTargets(t *testing.T) {
 				}
 			}
 			target := UpgradeComponent{ComponentOps: ComponentOps{ComponentName: tc.owner}}
-			if !tc.parentOnly {
+			if tc.parentOnly {
+				target.ServiceVersion = ptr.To("1.0.0")
+			} else {
 				target.Instances = []UpgradeInstanceTemplate{{Name: tc.template, ComponentDefinitionName: ptr.To("db-v2")}}
 			}
 			ops := &OpsRequest{Spec: OpsRequestSpec{Type: UpgradeType, SpecificOpsRequest: SpecificOpsRequest{

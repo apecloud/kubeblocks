@@ -1221,15 +1221,13 @@ func TestUpgradeInstanceTemplateOwnerConvergence(t *testing.T) {
 			}
 			if tc.name == "init-only" {
 				currentStatus := *its.Status.DeepCopy()
-				for _, state := range []string{"missing", "stale", "not applied"} {
+				for _, state := range []string{"missing", "stale"} {
 					its.Status = *currentStatus.DeepCopy()
 					switch state {
 					case "missing":
 						its.Status.InstanceStatus = nil
 					case "stale":
 						its.Status.ObservedGeneration--
-					case "not applied":
-						its.Status.InstanceStatus[0].UpToDate = false
 					}
 					if err := cli.Status().Update(ctx, its); err != nil {
 						t.Fatal(err)

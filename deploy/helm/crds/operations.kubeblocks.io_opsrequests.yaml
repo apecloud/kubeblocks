@@ -3122,7 +3122,7 @@ spec:
                             properties:
                               componentDefinitionName:
                                 description: Specifies the ComponentDefinition name
-                                  for the instance template, using an exact match.
+                                  for the instance template.
                                 maxLength: 64
                                 type: string
                               name:

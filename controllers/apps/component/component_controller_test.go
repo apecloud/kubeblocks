@@ -2189,6 +2189,59 @@ var _ = Describe("Component Controller", func() {
 			})).Should(Succeed())
 		})
 
+		DescribeTable("preserves selected template images after registry reload", func(withVersion bool) {
+			oldRegistryConfig := viper.Get(constant.CfgRegistries)
+			oldToolsImage := viper.GetString(constant.KBToolsImage)
+			DeferCleanup(func() {
+				viper.Set(constant.CfgRegistries, oldRegistryConfig)
+				Expect(intctrlutil.LoadRegistryConfig()).Should(Succeed())
+				viper.Set(constant.KBToolsImage, oldToolsImage)
+			})
+			viper.Set(constant.CfgRegistries, map[string]any{"defaultRegistry": "old.example"})
+			Expect(intctrlutil.LoadRegistryConfig()).Should(Succeed())
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compDefObj), func(def *kbappsv1.ComponentDefinition) {
+				def.Spec.Runtime.Containers[0].Image = "docker.io/apecloud/mysql:8.0.30"
+				def.Spec.Runtime.InitContainers = []corev1.Container{{Name: "prepare", Image: "docker.io/apecloud/prepare:8.0.30"}}
+				def.Spec.SystemAccounts = nil
+				def.Spec.LifecycleActions = nil
+			})()).Should(Succeed())
+			if withVersion {
+				Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compVerObj), func(ver *kbappsv1.ComponentVersion) {
+					ver.Spec.Releases = []kbappsv1.ComponentVersionRelease{{Name: "baseline", ServiceVersion: compDefObj.Spec.ServiceVersion, Images: map[string]string{testapps.DefaultMySQLContainerName: "docker.io/apecloud/mysql:8.0.30", "prepare": "docker.io/apecloud/prepare:8.0.30"}}}
+					ver.Spec.CompatibilityRules[0].Releases = []string{"baseline"}
+				})()).Should(Succeed())
+			} else {
+				Expect(testCtx.Cli.Delete(testCtx.Ctx, compVerObj)).Should(Succeed())
+				Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(compVerObj), &kbappsv1.ComponentVersion{}, false)).Should(Succeed())
+			}
+			createCompObj(defaultCompName, compDefObj.Name, func(f *testapps.MockComponentFactory) {
+				f.SetServiceVersion(compDefObj.Spec.ServiceVersion).AddInstances(kbappsv1.InstanceTemplate{Name: "canary", Replicas: ptr.To(int32(1)), CompDef: compDefObj.Name, ServiceVersion: compDefObj.Spec.ServiceVersion})
+			})
+			check := func(annotation string) {
+				Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, its *workloads.InstanceSet) {
+					g.Expect(its.Spec.Template.Spec.Containers[0].Image).Should(Equal("old.example/apecloud/mysql:8.0.30"))
+					g.Expect(its.Spec.Instances).Should(HaveLen(1))
+					if annotation != "" {
+						g.Expect(its.Spec.Instances[0].Annotations).Should(HaveKeyWithValue("reconcile", annotation))
+					}
+					ext, err := instancetemplate.BuildInstanceSetExt(its, nil)
+					g.Expect(err).Should(Succeed())
+					templates := instancetemplate.BuildInstanceTemplateExt(ext)
+					g.Expect(templates).Should(HaveLen(1))
+					g.Expect(templates[0].Spec.Containers).Should(ContainElement(And(HaveField("Name", testapps.DefaultMySQLContainerName), HaveField("Image", "old.example/apecloud/mysql:8.0.30"))))
+					g.Expect(templates[0].Spec.InitContainers).Should(ContainElement(And(HaveField("Name", "prepare"), HaveField("Image", "old.example/apecloud/prepare:8.0.30"))))
+				})).Should(Succeed())
+			}
+			check("")
+
+			viper.Set(constant.CfgRegistries, map[string]any{"defaultRegistry": "new.example"})
+			Expect(intctrlutil.LoadRegistryConfig()).Should(Succeed())
+			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+				comp.Spec.Instances[0].Annotations = map[string]string{"reconcile": "after-registry-reload"}
+			})()).Should(Succeed())
+			check("after-registry-reload")
+		}, Entry("without ComponentVersion", false), Entry("ComponentVersion equal to defaults", true))
+
 		DescribeTable("publishes selected template defaults and restores inheritance", func(standalone, withVersion bool) {
 			const targetVersion = "8.0.30"
 			const parentVersion = "8.0.31"

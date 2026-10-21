@@ -20603,6 +20603,48 @@ An empty value from an older object is treated as Present because those entries 
 </tr>
 <tr>
 <td>
+<code>provisioned</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provisioned records that a Present or Terminating runtime has been observed for this instance.
+Once true, it stays true while the status entry is retained. It does not indicate current presence,
+readiness, or completion of provisioning work.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dataLoaded</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>DataLoaded records the tracked data-loading result. nil means no result is tracked,
+false means loading is incomplete, and true means completion has been recorded.
+Runtime health and restore conditions do not determine this value.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberJoined</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>MemberJoined records the tracked membership result. nil means no result is tracked and does not prove absence,
+false records not joined, and true records joined. A successful leave can record false.
+Runtime health and role do not determine this value.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>currentRevision</code><br/>
 <em>
 string
@@ -20737,6 +20779,48 @@ bool
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<code>provisioned</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provisioned records that a Present or Terminating runtime has been observed for this instance.
+Once true, it stays true while the status entry is retained. It does not indicate current presence,
+readiness, or completion of provisioning work.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dataLoaded</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>DataLoaded records the tracked data-loading result. nil means no result is tracked,
+false means loading is incomplete, and true means completion has been recorded.
+Runtime health and restore conditions do not determine this value.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberJoined</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>MemberJoined records the tracked membership result. nil means no result is tracked and does not prove absence,
+false records not joined, and true records joined. A successful leave can record false.
+Runtime health and role do not determine this value.</p>
+</td>
+</tr>
 <tr>
 <td>
 <code>observedGeneration</code><br/>
@@ -21138,6 +21222,7 @@ indicated by UpdateRevisions.</p>
 (<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSpec">InstanceSpec</a>)
 </p>
 <div>
+<p>LifecycleActions defines actions for customizing the behavior of a workload.</p>
 </div>
 <table>
 <thead>
@@ -21184,7 +21269,67 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the procedure that update replicas with new configuration.</p>
+<p>Defines the procedure to update a replica with new configuration.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberJoin</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure to add a new replica to the replication group.
+This action is initiated after a replica Pod becomes ready.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberLeave</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure to remove a replica from the replication group.
+The operator waits for successful completion before releasing the replica and cleaning up its resources.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dataDump</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure for exporting the data from a replica.
+The output must be a valid data dump streamed to stdout.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dataLoad</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure for importing data into a replica.
+Data is received through stdin. The action must be idempotent to allow retries from the beginning.</p>
 </td>
 </tr>
 </tbody>

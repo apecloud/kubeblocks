@@ -20638,9 +20638,9 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>MemberJoined records the tracked membership result. nil means no result is tracked and does not prove absence,
-false records not joined, and true records joined. A successful leave can record false.
-Runtime health and role do not determine this value.</p>
+<p>MemberJoined records whether the configured membership step is satisfied. nil means no result is tracked
+and does not prove absence, false means not joined, and true means joined, including initial instances
+that need no join action. A successful leave records false. Runtime health and role do not complete a pending join.</p>
 </td>
 </tr>
 <tr>
@@ -20816,9 +20816,9 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>MemberJoined records the tracked membership result. nil means no result is tracked and does not prove absence,
-false records not joined, and true records joined. A successful leave can record false.
-Runtime health and role do not determine this value.</p>
+<p>MemberJoined records whether the configured membership step is satisfied. nil means no result is tracked
+and does not prove absence, false means not joined, and true means joined, including initial instances
+that need no join action. A successful leave records false. Runtime health and role do not complete a pending join.</p>
 </td>
 </tr>
 <tr>

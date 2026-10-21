@@ -76,7 +76,11 @@ func (t *componentVarsTransformer) Transform(ctx graph.TransformContext, dag *gr
 
 	// pass all direct value env vars through CM
 	envVars2, envData := buildEnvVarsNData(envVars)
-	setTemplateNEnvVars(synthesizedComp, templateVars, envVars2)
+	exporter, selected, err := exporterEnvSelection(transCtx.CompDef, envVars)
+	if err != nil {
+		return err
+	}
+	setTemplateNEnvVars(synthesizedComp, templateVars, envVars2, exporter, selected)
 
 	if err := createOrUpdateEnvConfigMap(transCtx, dag, envData, nil); err != nil {
 		return err
@@ -101,13 +105,13 @@ func buildEnvVarsNData(vars []corev1.EnvVar) ([]corev1.EnvVar, map[string]string
 	return envVars, envData
 }
 
-func setTemplateNEnvVars(synthesizedComp *component.SynthesizedComponent, templateVars map[string]any, envVars []corev1.EnvVar) {
+func setTemplateNEnvVars(synthesizedComp *component.SynthesizedComponent, templateVars map[string]any, envVars []corev1.EnvVar, exporter string, selected []corev1.EnvVar) {
 	envSource := envConfigMapSource(synthesizedComp.ClusterName, synthesizedComp.Name)
 	synthesizedComp.TemplateVars = templateVars
 	synthesizedComp.EnvVars = envVars
 	synthesizedComp.EnvFromSources = []corev1.EnvFromSource{envSource}
 
-	component.InjectEnvVars(synthesizedComp, envVars, []corev1.EnvFromSource{envSource})
+	injectSelectedExporterEnv(synthesizedComp, envVars, []corev1.EnvFromSource{envSource}, exporter, selected)
 }
 
 func envConfigMapSource(clusterName, compName string) corev1.EnvFromSource {

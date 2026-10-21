@@ -60,30 +60,6 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 	for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
 		resources.Insert(obj.GetLabels()[constant.KBAppPodNameLabelKey])
 	}
-	if workloadlifecycle.HasData(its) {
-		templates, err := desiredInstanceTemplates(its, tree)
-		if err != nil {
-			return kubebuilderx.Continue, err
-		}
-		for name, template := range templates {
-			pod, err := buildInstancePodByTemplate(name, template, its, "")
-			if err != nil {
-				return lifecycleWait(tree, its, err)
-			}
-			pvcName, err := workloadlifecycle.DataPVCName(its, pod)
-			if err != nil {
-				return lifecycleWait(tree, its, err)
-			}
-			pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: pvcName, Namespace: its.Namespace}}
-			obj, err := tree.Get(pvc)
-			if err != nil {
-				return kubebuilderx.Continue, err
-			}
-			if obj != nil {
-				resources.Insert(name)
-			}
-		}
-	}
 	registered := workloadlifecycle.Register(its, assignments, names, resources)
 	desired := sets.New[string]()
 	for _, a := range assignments {
@@ -96,48 +72,15 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 			status.Provisioned = true
 		}
 	}
-	for i := range its.Status.InstanceStatus {
-		status := &its.Status.InstanceStatus[i]
-		if !workloadlifecycle.HasData(its) || !desired.Has(status.PodName) {
-			continue
-		}
-		pod := findLifecyclePod(pods, status.PodName)
-		if pod == nil {
-			ext, err := instancetemplate.BuildInstanceSetExt(its, tree)
-			if err != nil {
+	for _, pod := range pods {
+		status := workloadlifecycle.Status(its, pod.Name)
+		if workloadlifecycle.HasData(its) && desired.Has(pod.Name) {
+			if _, err := workloadlifecycle.ObserveData(status, pod); err != nil {
 				return kubebuilderx.Continue, err
 			}
-			nb, err := instancetemplate.NewPodNameBuilder(ext, nil)
-			if err != nil {
-				return kubebuilderx.Continue, err
-			}
-			templates, err := nb.BuildInstanceName2TemplateMap()
-			if err != nil {
-				return kubebuilderx.Continue, err
-			}
-			if template := templates[status.PodName]; template != nil {
-				pod, err = buildInstancePodByTemplate(status.PodName, template, its, "")
-				if err != nil {
-					return lifecycleWait(tree, its, err)
-				}
-			}
 		}
-		if pod == nil {
-			continue
-		}
-		pvcName, err := workloadlifecycle.DataPVCName(its, pod)
-		if err != nil {
-			return lifecycleWait(tree, its, err)
-		}
-		obj, err := tree.Get(&corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pvcName}})
-		if err != nil {
-			return kubebuilderx.Continue, err
-		}
-		if obj == nil {
-			continue
-		}
-		workloadlifecycle.ObserveData(status, obj.(*corev1.PersistentVolumeClaim))
 	}
+
 	if registered || workloadlifecycle.CriticalStatusChanged(previous, its.Status.InstanceStatus) {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
@@ -206,15 +149,6 @@ func reconcileMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, 
 	return kubebuilderx.RetryAfter(time.Second), nil
 }
 
-func findLifecyclePod(pods []*corev1.Pod, name string) *corev1.Pod {
-	for _, pod := range pods {
-		if pod.Name == name {
-			return pod
-		}
-	}
-	return nil
-}
-
 func lifecycleWait(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, err error) (kubebuilderx.Result, error) {
 	meta.SetStatusCondition(&its.Status.Conditions, metav1.Condition{Type: "InstanceLifecycle", Status: metav1.ConditionFalse, ObservedGeneration: its.Generation, Reason: "Waiting", Message: err.Error()})
 	if tree.EventRecorder != nil {
@@ -228,26 +162,15 @@ func lifecycleCreatePod(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSe
 	if status == nil || status.DataLoaded == nil || !workloadlifecycle.HasData(its) {
 		return nil
 	}
-	pvcName, err := workloadlifecycle.DataPVCName(its, pod)
-	if err != nil {
-		return err
-	}
-	obj, err := tree.Get(&corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pvcName}})
-	if err != nil {
-		return err
-	}
-	// An unread PVC retains the previous result and startup check. A newly observed empty PVC regenerates the task.
 	complete := ptr.Deref(status.DataLoaded, false)
-	if obj != nil {
-		complete = obj.GetAnnotations()["workloads.kubeblocks.io/data-loaded"] == "true"
-	}
+	var err error
 	var source *corev1.Pod
 	if !complete {
 		var pods []*corev1.Pod
 		for _, obj := range tree.List(&corev1.Pod{}) {
 			pods = append(pods, obj.(*corev1.Pod))
 		}
-		source, err = workloadlifecycle.SourcePod(its, pods, pod.Name)
+		source, err = workloadlifecycle.SourcePod(its, pods, pod.Name, &pod.Spec)
 		if err != nil {
 			return err
 		}

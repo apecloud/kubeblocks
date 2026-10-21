@@ -1456,15 +1456,15 @@ func newDataLifecycleITS(replicas int32) *workloads.InstanceSet {
 		Spec: workloads.InstanceSetSpec{
 			Replicas: ptr.To(replicas), Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "data-lifecycle"}},
 			Template: corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "data-lifecycle"}}, Spec: corev1.PodSpec{
-				ServiceAccountName: "data-loader", Containers: []corev1.Container{{Name: "db", Image: "database", VolumeMounts: []corev1.VolumeMount{{Name: "data", MountPath: "/data"}}}},
+				ServiceAccountName: "data-loader", Containers: []corev1.Container{{Name: "db", Image: "database", VolumeMounts: []corev1.VolumeMount{{Name: "data", MountPath: "/data"}}}, {Name: kbagent.ContainerName, Image: "tools", Ports: []corev1.ContainerPort{{Name: kbagent.DefaultHTTPPortName, ContainerPort: 3501}, {Name: kbagent.DefaultStreamingPortName, ContainerPort: 3502}}}},
+				InitContainers: []corev1.Container{{Name: kbagent.ContainerName4Worker, Image: "tools", Command: []string{kbagent.BinaryPath}, Args: []string{"--server=false"}, VolumeMounts: []corev1.VolumeMount{{Name: "data", MountPath: "/data"}}}},
 			}},
 			VolumeClaimTemplates: []corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "data"}, Spec: corev1.PersistentVolumeClaimSpec{
 				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}, Resources: corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}},
 			}}},
 			LifecycleActions: &workloads.LifecycleActions{
 				DataDump: &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"dump"}}},
-				DataLoad: &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"load"}}}, DataVolume: "data",
-				Worker: &corev1.Container{Name: "worker-context", Image: "tools", VolumeMounts: []corev1.VolumeMount{{Name: "data", MountPath: "/data"}}},
+				DataLoad: &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"load"}}},
 			},
 		},
 	}
@@ -1538,7 +1538,7 @@ func TestInstanceSetLifecycleRegistrationPrecedesRuntimeCreation(t *testing.T) {
 	}
 	for _, c := range pods[0].Spec.InitContainers {
 		for _, env := range c.Env {
-			if env.Name == "KB_AGENT_TASK" || env.Name == "KB_AGENT_DATA_LOAD_RESULT" {
+			if env.Name == "KB_AGENT_TASK" {
 				t.Fatalf("bootstrap Pod unexpectedly requires a data task: %+v", c)
 			}
 		}
@@ -1630,27 +1630,18 @@ func TestInstanceSetLifecycleRecoversDataResultAcrossStatusFailureAndPodRecreati
 	}
 	assertTask := func(pod *corev1.Pod, wantTask bool) {
 		t.Helper()
-		var task, guard bool
+		var task bool
 		for _, c := range pod.Spec.InitContainers {
 			for _, env := range c.Env {
 				task = task || env.Name == "KB_AGENT_TASK"
-				guard = guard || env.Name == "KB_AGENT_DATA_LOAD_RESULT"
 			}
 		}
-		if task != wantTask || !guard {
-			t.Fatalf("target task=%v guard=%v, want task=%v: %+v", task, guard, wantTask, pod.Spec.InitContainers)
+		if task != wantTask {
+			t.Fatalf("target task=%v, want task=%v: %+v", task, wantTask, pod.Spec.InitContainers)
 		}
 	}
 	assertTask(target, true)
-	pvcKey := client.ObjectKey{Namespace: its.Namespace, Name: "data-data-lifecycle-1"}
-	pvc := &corev1.PersistentVolumeClaim{}
-	if err := cli.Get(ctx, pvcKey, pvc); err != nil {
-		t.Fatal(err)
-	}
-	pvc.Annotations = map[string]string{kbaproto.DataLoadedAnnotationKey: "true"}
-	if err := cli.Update(ctx, pvc); err != nil {
-		t.Fatal(err)
-	}
+	markDataWorkerComplete(t, cli, client.ObjectKey{Namespace: its.Namespace, Name: "data-lifecycle-1"})
 	rejectCompletion = true
 	stored, result, err := reconcileLifecycleITS(t, cli, key)
 	if err != nil || !result.Requeue || ptr.Deref(stored.FindInstanceStatus(targetKey.Name).DataLoaded, false) {
@@ -1663,9 +1654,9 @@ func TestInstanceSetLifecycleRecoversDataResultAcrossStatusFailureAndPodRecreati
 	rejectCompletion = false
 	its = step()
 	if !ptr.Deref(its.FindInstanceStatus(targetKey.Name).DataLoaded, false) {
-		t.Fatal("fresh reconciler did not recover result from actual PVC")
+		t.Fatal("fresh reconciler did not recover worker result")
 	}
-	// Simulate runtime loss after successful loading; the retained PVC is the durable result.
+	// Recreate the runtime after the instance result has been committed.
 	target.Finalizers = nil
 	if err := cli.Update(ctx, target); err != nil {
 		t.Fatal(err)
@@ -1687,31 +1678,6 @@ func TestInstanceSetLifecycleRecoversDataResultAcrossStatusFailureAndPodRecreati
 	if !ptr.Deref(its.FindInstanceStatus(targetKey.Name).DataLoaded, false) {
 		t.Fatal("runtime reconstruction lost completed data result")
 	}
-	// A replacement PVC with the same name must not inherit the old completion.
-	pvc.Finalizers = nil
-	if err := cli.Update(ctx, pvc); err != nil {
-		t.Fatal(err)
-	}
-	if err := cli.Delete(ctx, pvc); err != nil {
-		t.Fatal(err)
-	}
-	pvc.ResourceVersion = ""
-	pvc.UID = ""
-	pvc.Annotations = nil
-	if err := cli.Create(ctx, pvc); err != nil {
-		t.Fatal(err)
-	}
-	its = step()
-	if ptr.Deref(its.FindInstanceStatus(targetKey.Name).DataLoaded, false) {
-		t.Fatal("replacement data PVC inherited historical result")
-	}
-	for i := 0; i < 4; i++ {
-		step()
-	}
-	if err := cli.Get(ctx, targetKey, target); err != nil {
-		t.Fatal(err)
-	}
-	assertTask(target, true)
 }
 
 func TestInstanceSetLifecycleMemberActionsRespectStatusFailureAndLatestSpec(t *testing.T) {
@@ -1838,10 +1804,11 @@ func TestInstanceSetLifecycleMemberOnlyExecutesGeneratedAgentActions(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	its.Spec.Template.Spec.Containers = append(its.Spec.Template.Spec.Containers, corev1.Container{
+	its.Spec.Template.Spec.InitContainers = nil
+	its.Spec.Template.Spec.Containers[1] = corev1.Container{
 		Name: kbagent.ContainerName, Image: "tools", Env: existingEnv,
 		Ports: []corev1.ContainerPort{{Name: kbagent.DefaultHTTPPortName, ContainerPort: int32(port)}},
-	})
+	}
 	cli := newLifecycleEntryClient(t, its, interceptor.Funcs{})
 	key := client.ObjectKeyFromObject(its)
 	step := func() {
@@ -2191,7 +2158,7 @@ func TestInstanceSetLifecycleReexpandRetainedDataRestoresResultAndJoins(t *testi
 		if err := cli.Get(ctx, client.ObjectKey{Namespace: its.Namespace, Name: name}, pod); err != nil {
 			t.Fatal(err)
 		}
-		pod.Status = corev1.PodStatus{Phase: corev1.PodRunning, PodIP: "10.0.0.1", Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: metav1.Now()}}}
+		pod.Status = corev1.PodStatus{InitContainerStatuses: pod.Status.InitContainerStatuses, Phase: corev1.PodRunning, PodIP: "10.0.0.1", Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: metav1.Now()}}}
 		if err := cli.Status().Update(ctx, pod); err != nil {
 			t.Fatal(err)
 		}
@@ -2214,10 +2181,7 @@ func TestInstanceSetLifecycleReexpandRetainedDataRestoresResultAndJoins(t *testi
 	if err := cli.Get(ctx, pvcKey, pvc); err != nil {
 		t.Fatal(err)
 	}
-	pvc.Annotations = map[string]string{kbaproto.DataLoadedAnnotationKey: "true"}
-	if err := cli.Update(ctx, pvc); err != nil {
-		t.Fatal(err)
-	}
+	markDataWorkerComplete(t, cli, client.ObjectKey{Namespace: its.Namespace, Name: "data-lifecycle-1"})
 	ready("data-lifecycle-1")
 	for i := 0; i < 3; i++ {
 		step()
@@ -2233,8 +2197,9 @@ func TestInstanceSetLifecycleReexpandRetainedDataRestoresResultAndJoins(t *testi
 	for i := 0; i < 5; i++ {
 		step()
 	}
-	if leaves != 1 || its.FindInstanceStatus("data-lifecycle-1") != nil {
-		t.Fatalf("retained shrink did not release identity: leaves=%d status=%+v", leaves, its.Status.InstanceStatus)
+	retained := its.FindInstanceStatus("data-lifecycle-1")
+	if leaves != 1 || retained == nil || retained.DesiredState != workloads.InstanceDesiredStateReleased || !ptr.Deref(retained.DataLoaded, false) || ptr.Deref(retained.MemberJoined, true) {
+		t.Fatalf("retained shrink lost the instance result: leaves=%d status=%+v", leaves, its.Status.InstanceStatus)
 	}
 	if err := cli.Get(ctx, pvcKey, pvc); err != nil {
 		t.Fatal("retained data PVC was deleted", err)

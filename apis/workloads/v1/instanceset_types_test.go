@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"os"
 	"reflect"
-	"slices"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -55,11 +54,6 @@ func TestLifecycleActionsAPIRoundTrip(t *testing.T) {
 		TemplateVars: map[string]string{"DATA_PATH": "/data/payload"},
 		MemberJoin:   action("join"), MemberLeave: action("leave"),
 		DataDump: action("cat /data/payload"), DataLoad: action("cat > /data/payload"),
-		DataVolume: "data",
-		Worker: &corev1.Container{Name: "loader", Image: "tools:current", Command: []string{"/bin/kbagent"},
-			Env:             []corev1.EnvVar{{Name: "WORKER_ENV", Value: "original"}},
-			VolumeMounts:    []corev1.VolumeMount{{Name: "data", MountPath: "/data"}},
-			SecurityContext: &corev1.SecurityContext{RunAsUser: ptr.To(int64(65532))}},
 	}
 	for _, withActions := range []bool{false, true} {
 		for _, result := range []*bool{nil, ptr.To(false), ptr.To(true)} {
@@ -85,7 +79,7 @@ func TestLifecycleActionsAPIRoundTrip(t *testing.T) {
 			if result == nil && (bytes.Contains(data, []byte(`"dataLoaded"`)) || bytes.Contains(data, []byte(`"memberJoined"`))) {
 				t.Fatal("unknown result serialized as tracked")
 			}
-			instance := &Instance{Spec: InstanceSpec{LifecycleActions: object.Spec.LifecycleActions}}
+			instance := &Instance{Spec: InstanceSpec{LifecycleActions: object.Spec.LifecycleActions}, Status: InstanceStatus2{Provisioned: true, DataLoaded: result, MemberJoined: result}}
 			instanceData, err := runtime.Encode(codec, instance)
 			if err != nil {
 				t.Fatal(err)
@@ -95,7 +89,7 @@ func TestLifecycleActionsAPIRoundTrip(t *testing.T) {
 				t.Fatal(err)
 			}
 			gotInstance, ok := decoded.(*Instance)
-			if !ok || !reflect.DeepEqual(gotInstance.Spec, instance.Spec) {
+			if !ok || !reflect.DeepEqual(gotInstance.Spec, instance.Spec) || !reflect.DeepEqual(gotInstance.Status, instance.Status) {
 				t.Fatalf("Instance lifecycle fields lost for actions=%v: %#v", withActions, gotInstance)
 			}
 		}
@@ -106,10 +100,7 @@ func TestLifecycleActionsAPIRoundTrip(t *testing.T) {
 	copy.MemberLeave.Exec.Env[0].Value = "changed"
 	copy.DataDump.Exec.Command[0] = "changed"
 	copy.DataLoad.Exec.Env[0].Value = "changed"
-	copy.Worker.Env[0].Value = "changed"
-	copy.Worker.VolumeMounts[0].MountPath = "changed"
-	*copy.Worker.SecurityContext.RunAsUser = 1
-	if actions.TemplateVars["DATA_PATH"] != "/data/payload" || actions.MemberJoin.Exec.Command[0] != "/bin/sh" || actions.MemberLeave.Exec.Env[0].Value != "original" || actions.DataDump.Exec.Command[0] != "/bin/sh" || actions.DataLoad.Exec.Env[0].Value != "original" || actions.Worker.Env[0].Value != "original" || actions.Worker.VolumeMounts[0].MountPath != "/data" || *actions.Worker.SecurityContext.RunAsUser != 65532 {
+	if actions.TemplateVars["DATA_PATH"] != "/data/payload" || actions.MemberJoin.Exec.Command[0] != "/bin/sh" || actions.MemberLeave.Exec.Env[0].Value != "original" || actions.DataDump.Exec.Command[0] != "/bin/sh" || actions.DataLoad.Exec.Env[0].Value != "original" {
 		t.Fatal("deepcopy aliases lifecycle inputs")
 	}
 }
@@ -143,13 +134,10 @@ func TestLifecycleActionsGeneratedSchemas(t *testing.T) {
 	if !reflect.DeepEqual(instanceLifecycle, lifecycle) {
 		t.Fatal("Instance and InstanceSet lifecycle schemas differ")
 	}
-	for _, name := range []string{"memberJoin", "memberLeave", "dataDump", "dataLoad", "dataVolume", "worker"} {
+	for _, name := range []string{"memberJoin", "memberLeave", "dataDump", "dataLoad"} {
 		if _, ok := lifecycle.Properties[name]; !ok {
 			t.Fatalf("missing lifecycle schema: %s", name)
 		}
-	}
-	if !slices.Contains(lifecycle.Properties["worker"].Required, "name") {
-		t.Fatal("worker name is not required")
 	}
 	var internal apiextensions.JSONSchemaProps
 	if err := apiextensionsv1.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(schema, &internal, nil); err != nil {
@@ -165,9 +153,8 @@ func TestLifecycleActionsGeneratedSchemas(t *testing.T) {
 		Template: corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "data-copy"}},
 			Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "database", Image: "database:v1"}}}},
 		LifecycleActions: &LifecycleActions{
-			DataDump:   &Action{Exec: &apps.ExecAction{Command: []string{"dump"}}},
-			DataLoad:   &Action{Exec: &apps.ExecAction{Command: []string{"load"}}},
-			DataVolume: "data", Worker: &corev1.Container{Name: "worker", Image: "agent:v1"},
+			DataDump: &Action{Exec: &apps.ExecAction{Command: []string{"dump"}}},
+			DataLoad: &Action{Exec: &apps.ExecAction{Command: []string{"load"}}},
 		},
 	}}
 	data, err := json.Marshal(its)
@@ -180,9 +167,5 @@ func TestLifecycleActionsGeneratedSchemas(t *testing.T) {
 	}
 	if errs := apiextvalidation.ValidateCustomResource(field.NewPath(""), object, validator); len(errs) > 0 {
 		t.Fatalf("lifecycle inputs violate CRD: %v", errs)
-	}
-	delete(object["spec"].(map[string]interface{})["lifecycleActions"].(map[string]interface{})["worker"].(map[string]interface{}), "name")
-	if errs := apiextvalidation.ValidateCustomResource(field.NewPath(""), object, validator); len(errs) == 0 {
-		t.Fatal("schema accepted worker without name")
 	}
 }

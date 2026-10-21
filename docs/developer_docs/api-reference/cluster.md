@@ -20583,7 +20583,7 @@ InstanceDesiredState
 <em>(Optional)</em>
 <p>DesiredState describes whether the instance should be running (Active), is retained without running (Offline),
 or is no longer allocated and is kept while its runtime is observed, owned resources require cleanup,
-data loading is incomplete on an existing data PVC, membership is joined,
+a registered data-loading requirement is incomplete, membership is joined,
 or provisioned bootstrap membership still needs a configured Leave (Released).
 An empty value from an older object is treated as Active.</p>
 </td>
@@ -20781,6 +20781,43 @@ bool
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<code>provisioned</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provisioned records whether a Present or Terminating runtime has been observed for this instance.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dataLoaded</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>DataLoaded records the data-loading result. nil means no loading requirement is tracked.
+A committed true result survives Stop and Pod recreation.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberJoined</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>MemberJoined records the member join or leave result maintained by InstanceSet alignment.</p>
+</td>
+</tr>
 <tr>
 <td>
 <code>observedGeneration</code><br/>
@@ -21290,35 +21327,6 @@ Action
 <em>(Optional)</em>
 <p>Defines the procedure for importing data into a replica.
 Data is received through stdin. The action must be idempotent to allow retries from the beginning.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>dataVolume</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>DataVolume names the Pod volume that contains the persistent loaded data.
-It must resolve to a PVC; the controller never guesses from mount order.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>worker</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#container-v1-core">
-Kubernetes core/v1.Container
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Worker supplies the agent image, execution environment, mounts, and security context.
-Its command defaults to /bin/kbagent. The Pod template must specify a ServiceAccount
-authorized to get and update the data PVC and provide Kubernetes API credentials.</p>
 </td>
 </tr>
 </tbody>

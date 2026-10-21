@@ -507,15 +507,14 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 
 	for _, pod := range lifecyclePods(tree) {
 		resources = append(resources, instancestatus.ResourceObservation{InstanceName: pod.Name})
-		if previous := instanceLifecycleStatus(its, pod.Name); previous != nil {
-			previous.Provisioned = true
+	}
+	if tree.Context != nil {
+		if retained, ok := tree.Context.Value(retainedResourcesKey{}).(sets.Set[string]); ok {
+			for name := range retained {
+				resources = append(resources, instancestatus.ResourceObservation{InstanceName: name})
+			}
 		}
 	}
-	pendingResources, err := pendingDataResourceObservations(tree, its)
-	if err != nil {
-		return err
-	}
-	resources = append(resources, pendingResources...)
 	requireLeave := its.Spec.LifecycleActions != nil && its.Spec.LifecycleActions.MemberLeave != nil
 	statuses, err := instancestatus.Build(instancestatus.Input{
 		RequireMemberLeave: requireLeave,

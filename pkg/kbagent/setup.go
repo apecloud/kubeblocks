@@ -20,11 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package kbagent
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
-	"slices"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -48,11 +46,10 @@ const (
 	DefaultHTTPPort      = 3501
 	DefaultStreamingPort = 3502
 
-	actionEnvName         = "KB_AGENT_ACTION"
-	probeEnvName          = "KB_AGENT_PROBE"
-	streamingEnvName      = "KB_AGENT_STREAMING"
-	taskEnvName           = "KB_AGENT_TASK"
-	dataLoadResultEnvName = "KB_AGENT_DATA_LOAD_RESULT"
+	actionEnvName    = "KB_AGENT_ACTION"
+	probeEnvName     = "KB_AGENT_PROBE"
+	streamingEnvName = "KB_AGENT_STREAMING"
+	taskEnvName      = "KB_AGENT_TASK"
 )
 
 func BuildEnv4Server(actions []proto.Action, probes []proto.Probe, streaming []string) ([]corev1.EnvVar, error) {
@@ -91,21 +88,6 @@ func BuildEnv4Worker(tasks []proto.Task) (*corev1.EnvVar, error) {
 		Name:  taskEnvName,
 		Value: dt,
 	}, nil
-}
-
-// BuildEnv4DataLoadResult keeps the startup check independent of one-time tasks.
-func BuildEnv4DataLoadResult(result *proto.DataLoadResult) (*corev1.EnvVar, error) {
-	if result == nil {
-		return nil, nil
-	}
-	if result.Namespace == "" || result.PVCName == "" {
-		return nil, fmt.Errorf("data load result namespace and PVC name are required")
-	}
-	data, err := json.Marshal(result)
-	if err != nil {
-		return nil, err
-	}
-	return &corev1.EnvVar{Name: dataLoadResultEnvName, Value: string(data)}, nil
 }
 
 func UpdateEnv4Worker(envVars map[string]string, f func(proto.Task) *proto.Task) (*corev1.EnvVar, error) {
@@ -241,24 +223,8 @@ func runAsServer(logger logr.Logger, config server.Config, services []service.Se
 }
 
 func runAsWorker(logger logr.Logger, services []service.Service, envVars map[string]string) error {
-	var result *proto.DataLoadResult
-	var completed bool
-	if data := envVars[dataLoadResultEnvName]; len(data) > 0 {
-		result = &proto.DataLoadResult{}
-		if err := json.Unmarshal([]byte(data), result); err != nil {
-			return err
-		}
-		loaded, err := service.DataLoadCompleted(context.Background(), result)
-		if err != nil {
-			return err
-		}
-		completed = loaded
-	}
 	dt, ok := envVars[taskEnvName]
 	if !ok || len(dt) == 0 {
-		if result != nil && !completed {
-			return fmt.Errorf("data PVC %s/%s has no completed data load and no loading task", result.Namespace, result.PVCName)
-		}
 		return nil // has no task
 	}
 
@@ -268,23 +234,6 @@ func runAsWorker(logger logr.Logger, services []service.Service, envVars map[str
 	if err != nil {
 		return err
 	}
-	if completed {
-		tasks = slices.DeleteFunc(tasks, func(task proto.Task) bool {
-			return task.NewReplica != nil && task.NewReplica.DataLoadResult != nil &&
-				*task.NewReplica.DataLoadResult == *result
-		})
-		if len(tasks) == 0 {
-			return nil
-		}
-	}
-	if result != nil && !completed && !slices.ContainsFunc(tasks, func(task proto.Task) bool {
-		return task.NewReplica != nil && task.NewReplica.DataLoadResult != nil &&
-			*task.NewReplica.DataLoadResult == *result &&
-			slices.Contains(strings.Split(task.Replicas, ","), util.PodName())
-	}) {
-		return fmt.Errorf("data PVC %s/%s has no completed data load and no matching loading task", result.Namespace, result.PVCName)
-	}
-
 	if err := service.RunTasks(logger, actionService(services), tasks); err != nil {
 		return errors.Wrap(err, "failed to run as worker")
 	}

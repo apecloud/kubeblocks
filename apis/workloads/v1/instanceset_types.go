@@ -553,17 +553,6 @@ type LifecycleActions struct {
 	//
 	// +optional
 	DataLoad *Action `json:"dataLoad,omitempty"`
-
-	// DataVolume names the Pod volume that contains the persistent loaded data.
-	// It must resolve to a PVC; the controller never guesses from mount order.
-	// +optional
-	DataVolume string `json:"dataVolume,omitempty"`
-
-	// Worker supplies the agent image, execution environment, mounts, and security context.
-	// Its command defaults to /bin/kbagent. The Pod template must specify a ServiceAccount
-	// authorized to get and update the data PVC and provide Kubernetes API credentials.
-	// +optional
-	Worker *corev1.Container `json:"worker,omitempty"`
 }
 
 type ConfigTemplate struct {
@@ -619,7 +608,7 @@ type InstanceStatus struct {
 
 	// DesiredState describes whether the instance should be running (Active), is retained without running (Offline),
 	// or is no longer allocated and is kept while its runtime is observed, owned resources require cleanup,
-	// data loading is incomplete on an existing data PVC, membership is joined,
+	// a registered data-loading requirement is incomplete, membership is joined,
 	// or provisioned bootstrap membership still needs a configured Leave (Released).
 	// An empty value from an older object is treated as Active.
 	//

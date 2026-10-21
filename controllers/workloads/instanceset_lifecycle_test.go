@@ -34,14 +34,16 @@ import (
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	apps "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
-	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
 type lifecycleEntry struct {
@@ -137,7 +139,7 @@ func (f *lifecycleEntry) setReady(t *testing.T, name string, ready bool) {
 	if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: name}, pod); err != nil {
 		t.Fatal(err)
 	}
-	pod.Status = corev1.PodStatus{Phase: corev1.PodRunning, PodIP: "10.0.0.1", Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionFalse, LastTransitionTime: metav1.Now()}}}
+	pod.Status = corev1.PodStatus{InitContainerStatuses: pod.Status.InitContainerStatuses, Phase: corev1.PodRunning, PodIP: "10.0.0.1", Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionFalse, LastTransitionTime: metav1.Now()}}}
 	if ready {
 		pod.Status.Conditions[0].Status = corev1.ConditionTrue
 	}
@@ -172,26 +174,7 @@ func (f *lifecycleEntry) bootstrap(t *testing.T, replicas int) {
 
 func (f *lifecycleEntry) markDataLoaded(t *testing.T, name string) {
 	t.Helper()
-	ctx := context.Background()
-	pod := &corev1.Pod{}
-	if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: name}, pod); err != nil {
-		t.Fatal(err)
-	}
-	pvcName, err := workloadlifecycle.DataPVCName(f.its, pod)
-	if err != nil {
-		t.Fatal(err)
-	}
-	pvc := &corev1.PersistentVolumeClaim{}
-	if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: pvcName}, pvc); err != nil {
-		t.Fatal(err)
-	}
-	if pvc.Annotations == nil {
-		pvc.Annotations = map[string]string{}
-	}
-	pvc.Annotations[proto.DataLoadedAnnotationKey] = "true"
-	if err := f.cli.Update(ctx, pvc); err != nil {
-		t.Fatal(err)
-	}
+	markDataWorkerComplete(t, f.cli, client.ObjectKey{Namespace: f.its.Namespace, Name: name})
 }
 
 func TestInstanceSetLifecycleReplacementWaitsForJoin(t *testing.T) {
@@ -571,7 +554,11 @@ func TestInstanceSetLifecycleAllocationSwitchSeparatesCreationAndMemberResult(t 
 			}
 			f.step(t)
 			old = f.its.FindInstanceStatus(f.its.Name + "-1")
-			if len(agent.calls) != 3 || old == nil || old.MemberJoined == nil || *old.MemberJoined || len(lifecycleEntryPods(t, f.cli)) != 3 {
+			wantCalls := 3
+			if instanceAPI {
+				wantCalls = 2
+			}
+			if len(agent.calls) != wantCalls || old == nil || old.MemberJoined == nil || *old.MemberJoined || len(lifecycleEntryPods(t, f.cli)) != 3 {
 				t.Fatalf("member result retry did not commit alone: calls=%v status=%#v", agent.calls, f.its.Status.InstanceStatus)
 			}
 		})
@@ -729,7 +716,7 @@ func TestInstanceSetLifecycleKeepsReplacementDataSourceUntilLoadCompletes(t *tes
 				if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: sourceName}, &corev1.Pod{}); err != nil || len(agent.calls) != 0 {
 					t.Fatalf("data source retired before loading completed: %v calls=%v", err, agent.calls)
 				}
-				name, err := workloadlifecycle.DataPVCName(f.its, target)
+				name, err := lifecycleTestDataPVCName(f.its, target)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -740,7 +727,7 @@ func TestInstanceSetLifecycleKeepsReplacementDataSourceUntilLoadCompletes(t *tes
 				if pvc.Annotations == nil {
 					pvc.Annotations = map[string]string{}
 				}
-				pvc.Annotations[proto.DataLoadedAnnotationKey] = "true"
+				f.markDataLoaded(t, targetName)
 				if err := f.cli.Update(ctx, pvc); err != nil {
 					t.Fatal(err)
 				}
@@ -873,7 +860,7 @@ func TestInstanceSetLifecycleRegistersExpansionWhileStopped(t *testing.T) {
 					if task, err := workloadlifecycle.GeneratedTask(&target.Spec); err != nil || task == "" || len(agent.calls) != 0 {
 						t.Fatalf("resume bypassed loading before Join: task=%s calls=%v err=%v", task, agent.calls, err)
 					}
-					name, err := workloadlifecycle.DataPVCName(f.its, target)
+					name, err := lifecycleTestDataPVCName(f.its, target)
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -884,7 +871,7 @@ func TestInstanceSetLifecycleRegistersExpansionWhileStopped(t *testing.T) {
 					if pvc.Annotations == nil {
 						pvc.Annotations = map[string]string{}
 					}
-					pvc.Annotations[proto.DataLoadedAnnotationKey] = "true"
+					f.markDataLoaded(t, targetName)
 					if err := f.cli.Update(ctx, pvc); err != nil {
 						t.Fatal(err)
 					}
@@ -983,7 +970,7 @@ func TestInstanceSetLifecycleRetainedPendingDataRecovery(t *testing.T) {
 				if status := f.its.FindInstanceStatus(target.Name); status == nil || status.DataLoaded == nil || *status.DataLoaded {
 					t.Fatalf("initial expansion did not record pending data: %#v", status)
 				}
-				pvcName, err := workloadlifecycle.DataPVCName(f.its, target)
+				pvcName, err := lifecycleTestDataPVCName(f.its, target)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -1006,7 +993,7 @@ func TestInstanceSetLifecycleRetainedPendingDataRecovery(t *testing.T) {
 				if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: pvcName}, pvc); err != nil {
 					t.Fatal("cancellation did not retain the incomplete data PVC", err)
 				}
-				if pvc.Annotations[proto.DataLoadedAnnotationKey] == "true" || len(agent.calls) != 0 {
+				if len(agent.calls) != 0 {
 					t.Fatalf("cancellation invented data or membership completion: pvc=%#v calls=%v", pvc.Annotations, agent.calls)
 				}
 				if status := f.its.FindInstanceStatus(targetKey.Name); status == nil || status.DesiredState != workloads.InstanceDesiredStateReleased || status.DataLoaded == nil || *status.DataLoaded {
@@ -1043,9 +1030,9 @@ func TestInstanceSetLifecycleRetainedPendingDataRecovery(t *testing.T) {
 				if err := f.cli.Get(ctx, targetKey, target); err != nil {
 					t.Fatal(err)
 				}
-				guard, task := its2TaskInput(&workloads.Instance{Spec: workloads.InstanceSpec{Template: corev1.PodTemplateSpec{Spec: target.Spec}}})
-				if guard == "" || task == "" || len(agent.calls) != 0 {
-					t.Fatalf("re-expansion did not restore the task and startup guard before joining: guard=%s task=%s calls=%v", guard, task, agent.calls)
+				task := its2TaskInput(&workloads.Instance{Spec: workloads.InstanceSpec{Template: corev1.PodTemplateSpec{Spec: target.Spec}}})
+				if task == "" || len(agent.calls) != 0 {
+					t.Fatalf("re-expansion did not restore the task before joining: task=%s calls=%v", task, agent.calls)
 				}
 				f.markDataLoaded(t, target.Name)
 				for round := 0; round < 8; round++ {
@@ -1289,147 +1276,181 @@ func TestInstanceSetLifecycleStopScaleThenResume(t *testing.T) {
 	}
 }
 
-func TestInstanceSetLifecycleFreshPVCRecoveryWithMinReadySeconds(t *testing.T) {
-	for _, scenario := range []struct {
-		name        string
-		instanceAPI bool
-		onDelete    bool
-	}{
-		{name: "ITS"},
-		{name: "ITS2", instanceAPI: true},
-		{name: "ITS2OnDelete", instanceAPI: true, onDelete: true},
-	} {
-		t.Run(scenario.name, func(t *testing.T) {
+func markDataWorkerComplete(t *testing.T, cli client.Client, key client.ObjectKey) {
+	t.Helper()
+	pod := &corev1.Pod{}
+	if err := cli.Get(context.Background(), key, pod); err != nil {
+		t.Fatal(err)
+	}
+	task, err := workloadlifecycle.GeneratedTask(&pod.Spec)
+	if err != nil || task == "" {
+		t.Fatalf("worker completion requires a data task: %q %v", task, err)
+	}
+	pod.Status.InitContainerStatuses = []corev1.ContainerStatus{{Name: kbagent.ContainerName4Worker, State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 0}}}}
+	if err := cli.Status().Update(context.Background(), pod); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestInstanceSetLifecycleDataResultRetryAndCleanup(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		t.Run(fmt.Sprintf("instanceAPI=%t", instanceAPI), func(t *testing.T) {
 			ctx := context.Background()
-			f := newDataLifecycleEntry(t, scenario.instanceAPI, 1, appsv1.ParallelPodManagement)
-			f.its.Spec.MinReadySeconds = 1
-			if scenario.onDelete {
-				f.its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{Type: apps.OnDeleteStrategyType}
-			}
-			if err := f.cli.Update(ctx, f.its); err != nil {
-				t.Fatal(err)
-			}
-			setAvailable := func(name string) {
-				t.Helper()
-				f.setReady(t, name, true)
-				pod := &corev1.Pod{}
-				if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: name}, pod); err != nil {
-					t.Fatal(err)
-				}
-				pod.Status.Conditions[0].LastTransitionTime = metav1.NewTime(time.Now().Add(-time.Minute))
-				if err := f.cli.Status().Update(ctx, pod); err != nil {
-					t.Fatal(err)
-				}
-			}
-			for round := 0; round < 4; round++ {
-				f.stepWithChildren(t)
-			}
-			setAvailable(f.its.Name + "-0")
-			for round := 0; round < 4; round++ {
-				f.stepWithChildren(t)
-			}
-			if source := f.its.FindInstanceStatus(f.its.Name + "-0"); source == nil || !source.Available {
-				t.Fatalf("source never satisfied MinReadySeconds: %#v", source)
-			}
-			agent := &its2LifecycleAgent{}
-			kbacli.SetMockClient(agent, nil)
-			defer kbacli.UnsetMockClient()
+			f := newDataLifecycleEntry(t, instanceAPI, 1, appsv1.ParallelPodManagement)
+			f.bootstrap(t, 1)
 			f.its.Spec.Replicas = ptr.To[int32](2)
 			f.its.Generation++
 			if err := f.cli.Update(ctx, f.its); err != nil {
 				t.Fatal(err)
 			}
-			for round := 0; round < 12; round++ {
+			key := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-1"}
+			for i := 0; i < 12; i++ {
 				f.stepWithChildren(t)
-			}
-			targetKey := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-1"}
-			target := &corev1.Pod{}
-			if err := f.cli.Get(ctx, targetKey, target); err != nil {
-				t.Fatal(err)
-			}
-			if task, err := workloadlifecycle.GeneratedTask(&target.Spec); err != nil || task == "" {
-				t.Fatalf("initial expansion has no data task: %q %v", task, err)
-			}
-			f.markDataLoaded(t, target.Name)
-			for round := 0; round < 8; round++ {
-				f.stepWithChildren(t)
-			}
-			if status := f.its.FindInstanceStatus(target.Name); status == nil || !ptr.Deref(status.DataLoaded, false) {
-				t.Fatalf("initial data result was not committed: %#v", status)
-			}
-			if scenario.instanceAPI {
-				inst := its2LifecycleInstance(t, f.cli, target.Name)
-				guard, task := its2TaskInput(inst)
-				if guard == "" || task != "" || inst.Spec.MinReadySeconds != 1 || (scenario.onDelete && ptr.Deref(inst.Spec.InstanceUpdateStrategyType, "") != apps.OnDeleteStrategyType) {
-					t.Fatalf("Instance did not receive cleanup and recovery settings: %#v", inst.Spec)
+				if err := f.cli.Get(ctx, key, &corev1.Pod{}); err == nil {
+					break
 				}
 			}
-			pvcName, err := workloadlifecycle.DataPVCName(f.its, target)
-			if err != nil {
+			pod := &corev1.Pod{}
+			if err := f.cli.Get(ctx, key, pod); err != nil {
 				t.Fatal(err)
 			}
-			pvcKey := client.ObjectKey{Namespace: f.its.Namespace, Name: pvcName}
-			pvc := &corev1.PersistentVolumeClaim{}
-			if err := f.cli.Get(ctx, pvcKey, pvc); err != nil {
+			before, err := workloadlifecycle.GeneratedTask(&pod.Spec)
+			if err != nil || before == "" {
+				t.Fatalf("missing pending task: %s %v", before, err)
+			}
+			f.its.Spec.MinReadySeconds = 5
+			if err := f.cli.Update(ctx, f.its); err != nil {
 				t.Fatal(err)
 			}
-			target.Finalizers = nil
-			if err := f.cli.Update(ctx, target); err != nil {
+			source := &corev1.Pod{}
+			if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-0"}, source); err != nil {
 				t.Fatal(err)
 			}
-			if err := f.cli.Delete(ctx, target); err != nil {
+			for i := range source.Status.Conditions {
+				source.Status.Conditions[i].LastTransitionTime = metav1.NewTime(time.Now().Add(-time.Minute))
+			}
+			if err := f.cli.Status().Update(ctx, source); err != nil {
 				t.Fatal(err)
 			}
-			pvc.Finalizers = nil
-			if err := f.cli.Update(ctx, pvc); err != nil {
+			// A failed attempt remains pending; a later successful attempt can be retried safely.
+			pod.Status.InitContainerStatuses = []corev1.ContainerStatus{{Name: kbagent.ContainerName4Worker, State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 1}}}}
+			if err := f.cli.Status().Update(ctx, pod); err != nil {
 				t.Fatal(err)
 			}
-			if err := f.cli.Delete(ctx, pvc); err != nil {
-				t.Fatal(err)
+			f.stepWithChildren(t)
+			if ptr.Deref(f.its.FindInstanceStatus(key.Name).DataLoaded, false) {
+				t.Fatal("failed worker completed loading")
 			}
-			if scenario.instanceAPI {
-				leaf := &InstanceReconciler{Client: f.cli, Scheme: f.cli.Scheme(), Recorder: record.NewFakeRecorder(100)}
-				if _, err := leaf.Reconcile(ctx, ctrl.Request{NamespacedName: targetKey}); err != nil {
-					t.Fatal(err)
+			markDataWorkerComplete(t, f.cli, key)
+			faulty := &its2LifecycleClient{Client: f.cli, rejectDataResult: true}
+			f.cli = faulty
+			for i := 0; i < 3; i++ {
+				f.stepWithChildren(t)
+			}
+			if faulty.dataResultFailures == 0 || ptr.Deref(f.its.FindInstanceStatus(key.Name).DataLoaded, false) {
+				t.Fatal("completion failure was not exercised")
+			}
+			if instanceAPI {
+				inst := its2LifecycleInstance(t, f.cli, key.Name)
+				if ptr.Deref(inst.Status.DataLoaded, false) || its2TaskInput(inst) == "" {
+					t.Fatal("failed status write cleaned Instance task")
 				}
-			} else {
-				f.step(t)
 			}
-			if err := f.cli.Get(ctx, targetKey, target); err != nil {
+			if err := f.cli.Get(ctx, key, pod); err != nil {
 				t.Fatal(err)
 			}
-			guard, task := its2TaskInput(&workloads.Instance{Spec: workloads.InstanceSpec{Template: corev1.PodTemplateSpec{Spec: target.Spec}}})
-			if guard == "" || task != "" {
-				t.Fatalf("recreated Pod did not start from the completed guard-only template: guard=%s task=%s", guard, task)
+			if task, err := workloadlifecycle.GeneratedTask(&pod.Spec); err != nil || task != before {
+				t.Fatalf("pending task changed: %s %v", task, err)
 			}
-			if err := f.cli.Get(ctx, pvcKey, pvc); err != nil || pvc.Annotations[proto.DataLoadedAnnotationKey] == "true" {
-				t.Fatalf("controller did not recreate an unmarked PVC: pvc=%#v err=%v", pvc.Annotations, err)
-			}
-			target.Status = corev1.PodStatus{Phase: corev1.PodPending}
-			if err := f.cli.Status().Update(ctx, target); err != nil {
-				t.Fatal(err)
-			}
-			for round := 0; round < 16; round++ {
+			faulty.rejectDataResult = false
+			for i := 0; i < 8; i++ {
 				f.stepWithChildren(t)
 			}
-			if status := f.its.FindInstanceStatus(target.Name); status == nil || status.DataLoaded == nil || *status.DataLoaded {
-				t.Fatalf("fresh PVC did not require a new data result: %#v", status)
+			if !ptr.Deref(f.its.FindInstanceStatus(key.Name).DataLoaded, false) {
+				t.Fatal("successful worker result not recovered")
 			}
-			if err := f.cli.Get(ctx, targetKey, target); err != nil {
+			if f.its.FindInstanceStatus(key.Name).Ready {
+				t.Fatal("fixture did not exercise completion before Pod readiness")
+			}
+			pod.Finalizers = nil
+			if err := f.cli.Update(ctx, pod); err != nil {
 				t.Fatal(err)
 			}
-			guard, task = its2TaskInput(&workloads.Instance{Spec: workloads.InstanceSpec{Template: corev1.PodTemplateSpec{Spec: target.Spec}}})
-			if guard == "" || task == "" {
-				t.Fatalf("MinReadySeconds blocked replacement of the guard-only Pending Pod: guard=%s task=%s", guard, task)
+			if err := f.cli.Delete(ctx, pod); err != nil {
+				t.Fatal(err)
 			}
-			f.markDataLoaded(t, target.Name)
-			setAvailable(target.Name)
-			for round := 0; round < 12; round++ {
+			for i := 0; i < 8; i++ {
 				f.stepWithChildren(t)
 			}
-			if status := f.its.FindInstanceStatus(target.Name); status == nil || !ptr.Deref(status.DataLoaded, false) || !ptr.Deref(status.MemberJoined, false) || !status.Available || len(agent.calls) != 1 || agent.calls[0] != "memberJoin" {
-				t.Fatalf("fresh PVC recovery did not complete: status=%#v calls=%v", status, agent.calls)
+			if err := f.cli.Get(ctx, key, pod); err != nil {
+				t.Fatal(err)
+			}
+			if task, err := workloadlifecycle.GeneratedTask(&pod.Spec); err != nil || task != "" {
+				t.Fatalf("completed instance regenerated loading: %s %v", task, err)
 			}
 		})
 	}
+}
+
+func TestITS2MembershipResultRetriesInstanceStatusConflict(t *testing.T) {
+	ctx := context.Background()
+	reject := true
+	failures := 0
+	storage := fake.NewClientBuilder().WithScheme(model.GetScheme()).
+		WithStatusSubresource(&workloads.InstanceSet{}, &workloads.Instance{}, &corev1.Pod{}).
+		WithInterceptorFuncs(interceptor.Funcs{SubResourceUpdate: func(ctx context.Context, cli client.Client, sub string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+			if inst, ok := obj.(*workloads.Instance); ok && sub == "status" && ptr.Deref(inst.Status.MemberJoined, false) && reject {
+				failures++
+				return apierrors.NewConflict(workloads.Resource("instances"), inst.Name, fmt.Errorf("injected member status conflict"))
+			}
+			return cli.SubResource(sub).Update(ctx, obj, opts...)
+		}}).Build()
+	its, cli, _ := its2LifecycleFixture(t, 1, false, storage)
+	f := &lifecycleEntry{cli: cli, its: its, instanceAPI: true}
+	f.bootstrap(t, 1)
+	agent := &its2LifecycleAgent{}
+	kbacli.SetMockClient(agent, nil)
+	defer kbacli.UnsetMockClient()
+	f.its.Spec.Replicas = ptr.To[int32](2)
+	f.its.Generation++
+	if err := cli.Update(ctx, f.its); err != nil {
+		t.Fatal(err)
+	}
+	key := client.ObjectKey{Namespace: its.Namespace, Name: "lifecycle-1"}
+	for i := 0; i < 12; i++ {
+		f.stepWithChildren(t)
+		if err := cli.Get(ctx, key, &corev1.Pod{}); err == nil {
+			break
+		}
+	}
+	f.setReady(t, key.Name, true)
+	for i := 0; i < 3; i++ {
+		f.stepWithChildren(t)
+	}
+	if failures == 0 || ptr.Deref(its2LifecycleInstance(t, cli, key.Name).Status.MemberJoined, false) || ptr.Deref(f.its.FindInstanceStatus(key.Name).MemberJoined, false) {
+		t.Fatal("failed child status commit leaked membership success")
+	}
+	reject = false
+	for i := 0; i < 6; i++ {
+		f.stepWithChildren(t)
+	}
+	if !ptr.Deref(its2LifecycleInstance(t, cli, key.Name).Status.MemberJoined, false) || !ptr.Deref(f.its.FindInstanceStatus(key.Name).MemberJoined, false) {
+		t.Fatal("membership did not recover through Instance status")
+	}
+	calls := len(agent.calls)
+	for i := 0; i < 3; i++ {
+		f.stepWithChildren(t)
+	}
+	if len(agent.calls) != calls {
+		t.Fatal("committed membership was called again")
+	}
+}
+
+func lifecycleTestDataPVCName(_ *workloads.InstanceSet, pod *corev1.Pod) (string, error) {
+	for _, volume := range pod.Spec.Volumes {
+		if volume.Name == "data" && volume.PersistentVolumeClaim != nil {
+			return volume.PersistentVolumeClaim.ClaimName, nil
+		}
+	}
+	return "", fmt.Errorf("fixture has no data PVC")
 }

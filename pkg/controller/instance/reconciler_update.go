@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instance
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -38,8 +37,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	"github.com/apecloud/kubeblocks/pkg/kbagent"
-	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
 type updateReconciler struct{}
@@ -87,7 +84,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (result kube
 		if !isPodPending(pod) {
 			continue
 		}
-		regenerate, err := needsDataTaskPodReplacement(tree, inst, pod)
+		regenerate, err := needsDataTaskPodReplacement(inst, pod)
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
@@ -301,9 +298,11 @@ func buildBlockedCondition(inst *workloads.Instance, message string) *metav1.Con
 	}
 }
 
-// A guard-only Pod cannot receive regenerated init inputs in place. Replace it only
-// after observing an unmarked data PVC and a current generated task for that PVC.
-func needsDataTaskPodReplacement(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod) (bool, error) {
+// A pending Pod cannot receive changed init task inputs in place.
+func needsDataTaskPodReplacement(inst *workloads.Instance, pod *corev1.Pod) (bool, error) {
+	if ptr.Deref(inst.Status.DataLoaded, false) {
+		return false, nil
+	}
 	desired, err := buildInstancePod(inst, "")
 	if err != nil {
 		return false, err
@@ -316,30 +315,5 @@ func needsDataTaskPodReplacement(tree *kubebuilderx.ObjectTree, inst *workloads.
 	if err != nil {
 		return false, err
 	}
-	if currentTask == "" || currentTask == oldTask {
-		return false, nil
-	}
-	guard := ""
-	for _, worker := range desired.Spec.InitContainers {
-		if worker.Name != kbagent.ContainerName4Worker {
-			continue
-		}
-		for _, env := range worker.Env {
-			if env.Name == "KB_AGENT_DATA_LOAD_RESULT" {
-				guard = env.Value
-			}
-		}
-	}
-	if guard == "" {
-		return false, nil
-	}
-	var result proto.DataLoadResult
-	if err := json.Unmarshal([]byte(guard), &result); err != nil {
-		return false, err
-	}
-	pvc, err := readDataResultPVC(tree, &result)
-	if err != nil || pvc == nil {
-		return false, err
-	}
-	return pvc.Annotations[proto.DataLoadedAnnotationKey] != "true", nil
+	return currentTask != "" && currentTask != oldTask, nil
 }

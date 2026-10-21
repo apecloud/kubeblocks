@@ -38,13 +38,12 @@ import (
 
 func TestCompletedDataRefreshPreservesUnrelatedTaskAndRevisions(t *testing.T) {
 	action := &apps.Action{Exec: &apps.ExecAction{Command: []string{"true"}}}
-	its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "worker", Namespace: "default"}, Spec: workloads.InstanceSetSpec{LifecycleActions: &workloads.LifecycleActions{DataDump: action, DataLoad: action, DataVolume: "data", Worker: &corev1.Container{Name: "worker", Image: "agent:v1"}}}, Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{PodName: "worker-0", DataLoaded: ptr.To(true)}}}}
-	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "worker-0", Namespace: "default"}, Spec: corev1.PodSpec{ServiceAccountName: "worker", Containers: []corev1.Container{{Name: "db", Image: "db:v1"}}, Volumes: []corev1.Volume{{Name: "data", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "target-data"}}}}}}
+	its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "worker", Namespace: "default"}, Spec: workloads.InstanceSetSpec{LifecycleActions: &workloads.LifecycleActions{DataDump: action, DataLoad: action}}, Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{PodName: "worker-0", DataLoaded: ptr.To(true)}}}}
+	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "worker-0", Namespace: "default"}, Spec: corev1.PodSpec{ServiceAccountName: "worker", Containers: []corev1.Container{{Name: "db", Image: "db:v1"}, {Name: kbagent.ContainerName, Image: "agent:v1"}}, InitContainers: []corev1.Container{{Name: kbagent.ContainerName4Worker, Image: "agent:v1"}}, Volumes: []corev1.Volume{{Name: "data", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "target-data"}}}}}}
 	if err := workloadlifecycle.ConfigurePod(its, pod, nil, true, true); err != nil {
 		t.Fatal(err)
 	}
-	result := &proto.DataLoadResult{Namespace: pod.Namespace, PVCName: "target-data"}
-	tasks, err := kbagent.BuildEnv4Worker([]proto.Task{{UID: "generated", NewReplica: &proto.NewReplicaTask{Remote: "source", DataLoadResult: result}}, {UID: "unrelated", NewReplica: &proto.NewReplicaTask{DataLoadResult: &proto.DataLoadResult{Namespace: pod.Namespace, PVCName: "other-data"}}}})
+	tasks, err := kbagent.BuildEnv4Worker([]proto.Task{{Instance: "worker", Task: "newReplica", UID: pod.Name, Replicas: pod.Name, NewReplica: &proto.NewReplicaTask{Remote: "source", Replicas: pod.Name}}, {UID: "unrelated", NewReplica: &proto.NewReplicaTask{}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,9 +56,6 @@ func TestCompletedDataRefreshPreservesUnrelatedTaskAndRevisions(t *testing.T) {
 	}
 	tree := kubebuilderx.NewObjectTree()
 	tree.SetRoot(its)
-	if err := tree.Add(&corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: result.PVCName, Namespace: result.Namespace, Annotations: map[string]string{proto.DataLoadedAnnotationKey: "true"}}}); err != nil {
-		t.Fatal(err)
-	}
 	if err := refreshInstanceData(tree, its, inst); err != nil {
 		t.Fatal(err)
 	}

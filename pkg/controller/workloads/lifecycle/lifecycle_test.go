@@ -45,10 +45,10 @@ func testAction(command string) *apps.Action {
 	return &apps.Action{Exec: &apps.ExecAction{Command: []string{"/bin/sh", "-c", command}}}
 }
 func dataWorkload() *workloads.InstanceSet {
-	return &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "runtime", Generation: 1}, Spec: workloads.InstanceSetSpec{LifecycleActions: &workloads.LifecycleActions{MemberJoin: testAction("true"), MemberLeave: testAction("true"), DataDump: testAction("printf data"), DataLoad: testAction("cat > /data/value"), DataVolume: "data", Worker: &corev1.Container{Name: "worker-context", Image: "tools", VolumeMounts: []corev1.VolumeMount{{Name: "data", MountPath: "/data"}}}}}}
+	return &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "runtime", Generation: 1}, Spec: workloads.InstanceSetSpec{LifecycleActions: &workloads.LifecycleActions{MemberJoin: testAction("true"), MemberLeave: testAction("true"), DataDump: testAction("printf data"), DataLoad: testAction("cat > /data/value")}}}
 }
 func dataPod() *corev1.Pod {
-	return &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "demo-1", Namespace: "runtime"}, Spec: corev1.PodSpec{ServiceAccountName: "loader", Containers: []corev1.Container{{Name: "db", Image: "db"}}, Volumes: []corev1.Volume{{Name: "data", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "data-demo-1"}}}}}}
+	return &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "demo-1", Namespace: "runtime"}, Spec: corev1.PodSpec{ServiceAccountName: "loader", Containers: []corev1.Container{{Name: "db", Image: "db"}, {Name: kbagent.ContainerName, Image: "tools"}}, InitContainers: []corev1.Container{{Name: kbagent.ContainerName4Worker, Image: "tools", Args: []string{"--server=false"}, VolumeMounts: []corev1.VolumeMount{{Name: "data", MountPath: "/data"}}}}, Volumes: []corev1.Volume{{Name: "data", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "data-demo-1"}}}}}}
 }
 func envValue(c corev1.Container, name string) string {
 	for _, env := range c.Env {
@@ -99,14 +99,14 @@ func TestConfigurePodKeepsBootstrapIndependentAndBuildsTrackedTask(t *testing.T)
 		t.Fatal(err)
 	}
 	worker := pod.Spec.InitContainers[0]
-	if envValue(worker, resultEnv) != "" || envValue(worker, taskEnv) != "" {
+	if envValue(worker, taskEnv) != "" {
 		t.Fatal("bootstrap requires a load result")
 	}
 	var actions []proto.Action
 	if err := json.Unmarshal([]byte(envValue(pod.Spec.Containers[1], "KB_AGENT_ACTION")), &actions); err != nil {
 		t.Fatal(err)
 	}
-	if len(actions) != 4 || !strings.Contains(envValue(pod.Spec.Containers[1], "KB_AGENT_STREAMING"), "dataDump") {
+	if len(actions) != 3 || !strings.Contains(envValue(pod.Spec.Containers[1], "KB_AGENT_STREAMING"), "dataDump") {
 		t.Fatal("source streaming actions not registered")
 	}
 	source := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Namespace: "runtime"}, Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: kbagent.ContainerName, Ports: []corev1.ContainerPort{{Name: kbagent.DefaultStreamingPortName, ContainerPort: 3502}}}}}, Status: corev1.PodStatus{PodIP: "10.0.0.2"}}
@@ -119,7 +119,7 @@ func TestConfigurePodKeepsBootstrapIndependentAndBuildsTrackedTask(t *testing.T)
 		t.Fatal(err)
 	}
 	task := tasks[0]
-	if task.NotifyAtFinish || task.ReportPeriodSeconds != 0 || task.NewReplica.DataLoadResult.Namespace != "runtime" || task.NewReplica.DataLoadResult.PVCName != "data-demo-1" || task.NewReplica.Remote != "10.0.0.2" {
+	if task.NotifyAtFinish || task.ReportPeriodSeconds != 0 || task.NewReplica.Remote != "10.0.0.2" {
 		t.Fatalf("wrong new task %+v", task)
 	}
 	before := pod.Spec.DeepCopy()
@@ -127,8 +127,8 @@ func TestConfigurePodKeepsBootstrapIndependentAndBuildsTrackedTask(t *testing.T)
 	if err := ConfigurePod(its, pod, nil, true, true); err != nil {
 		t.Fatal(err)
 	}
-	if envValue(pod.Spec.InitContainers[0], taskEnv) != "" || envValue(pod.Spec.InitContainers[0], resultEnv) == "" {
-		t.Fatal("cleanup removed startup guard or left task")
+	if envValue(pod.Spec.InitContainers[0], taskEnv) != "" {
+		t.Fatal("cleanup left data task")
 	}
 	after := pod.Spec.DeepCopy()
 	FilterTransient(after)
@@ -144,10 +144,10 @@ func TestMemberOnlyMergesActionsAndPreservesServerConfiguration(t *testing.T) {
 	its := dataWorkload()
 	its.Spec.LifecycleActions.DataDump = nil
 	its.Spec.LifecycleActions.DataLoad = nil
-	its.Spec.LifecycleActions.Worker = nil
 	pod := dataPod()
 	existing, _ := json.Marshal([]proto.Action{{Name: "reconfigure", Exec: &proto.ExecAction{Commands: []string{"old"}}}})
-	pod.Spec.Containers = append(pod.Spec.Containers, corev1.Container{Name: kbagent.ContainerName, Image: "tools", Env: []corev1.EnvVar{{Name: "KB_AGENT_ACTION", Value: string(existing)}, {Name: "KB_AGENT_PROBE", Value: "existing-probe"}, {Name: "BUSINESS", Value: "keep"}}})
+	pod.Spec.InitContainers = nil
+	pod.Spec.Containers[1] = corev1.Container{Name: kbagent.ContainerName, Image: "tools", Env: []corev1.EnvVar{{Name: "KB_AGENT_ACTION", Value: string(existing)}, {Name: "KB_AGENT_PROBE", Value: "existing-probe"}, {Name: "BUSINESS", Value: "keep"}}}
 	if err := ConfigurePod(its, pod, nil, false, false); err != nil {
 		t.Fatal(err)
 	}
@@ -195,7 +195,8 @@ func TestValidatedExecutionPreservesActionSelection(t *testing.T) {
 			for _, pod := range pods {
 				pod.Labels = map[string]string{constant.RoleLabelKey: "replica"}
 				pod.Status.PodIP = "10.0.0.1"
-				pod.Spec.Containers = append(pod.Spec.Containers, corev1.Container{Name: kbagent.ContainerName, Ports: []corev1.ContainerPort{{Name: kbagent.DefaultHTTPPortName, ContainerPort: 3501}}})
+				pod.Spec.InitContainers = nil
+				pod.Spec.Containers[1] = corev1.Container{Name: kbagent.ContainerName, Ports: []corev1.ContainerPort{{Name: kbagent.DefaultHTTPPortName, ContainerPort: 3501}}}
 			}
 			opts, err := ValidateExecution(tc.action, pods[0], pods)
 			if err != nil {
@@ -246,42 +247,59 @@ func TestValidatedExecutionWaitsWithoutExecutors(t *testing.T) {
 }
 
 func TestCleanupPreservesExplicitTasksAndActualConfiguration(t *testing.T) {
-	task, _ := kbagent.BuildEnv4Worker([]proto.Task{{Task: "explicit", UID: "retained"}, {Task: "newReplica", NewReplica: &proto.NewReplicaTask{DataLoadResult: &proto.DataLoadResult{Namespace: "runtime", PVCName: "data"}}}})
-	guard, _ := kbagent.BuildEnv4DataLoadResult(&proto.DataLoadResult{Namespace: "runtime", PVCName: "data"})
-	spec := &corev1.PodSpec{InitContainers: []corev1.Container{{Name: kbagent.ContainerName4Worker, Image: "tools", Env: []corev1.EnvVar{*task, *guard}}}}
-	changed, err := CleanTask(spec)
-	if err != nil || !changed {
-		t.Fatalf("cleanup: %v %v", changed, err)
+	pod := dataPod()
+	env, _ := kbagent.BuildEnv4Worker([]proto.Task{{Task: "explicit", UID: "retained"}, {Instance: "demo", Task: "newReplica", UID: pod.Name, Replicas: pod.Name, NewReplica: &proto.NewReplicaTask{Replicas: pod.Name}}})
+	pod.Spec.InitContainers[0].Env = []corev1.EnvVar{*env, {Name: "USER", Value: "keep"}}
+	before := pod.Spec.DeepCopy()
+	if changed, err := CleanTask(&pod.Spec, pod.Name); err != nil || !changed {
+		t.Fatalf("cleanup=%v, %v", changed, err)
 	}
 	var tasks []proto.Task
-	if err := json.Unmarshal([]byte(envValue(spec.InitContainers[0], taskEnv)), &tasks); err != nil || len(tasks) != 1 || tasks[0].UID != "retained" {
-		t.Fatal("explicit task discarded")
+	if err := json.Unmarshal([]byte(envValue(pod.Spec.InitContainers[0], taskEnv)), &tasks); err != nil || len(tasks) != 1 || tasks[0].UID != "retained" {
+		t.Fatalf("remaining tasks=%v, %v", tasks, err)
 	}
-	changed, err = CleanTask(spec)
-	if err != nil || changed {
-		t.Fatal("cleanup is not idempotent")
-	}
-	original := spec.DeepCopy()
-	FilterTransient(spec)
-	if envValue(spec.InitContainers[0], taskEnv) == "" || spec.InitContainers[0].Image != original.InitContainers[0].Image {
-		t.Fatal("revision removed explicit configuration")
+	FilterTransient(before)
+	if !reflect.DeepEqual(before, &pod.Spec) {
+		t.Fatal("cleanup changed persistent configuration")
 	}
 }
 
-func TestDataObservationDistinguishesUnavailableAndReplacementPVC(t *testing.T) {
-	status := &workloads.InstanceStatus{DataLoaded: ptr.To(true)}
-	if ObserveData(status, nil) || !*status.DataLoaded {
-		t.Fatal("observation failure cleared result")
-	}
-	if !ObserveData(status, &corev1.PersistentVolumeClaim{}) || *status.DataLoaded {
-		t.Fatal("new unmarked data inherited old result")
-	}
-	if !ObserveData(status, &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{proto.DataLoadedAnnotationKey: "true"}}}) || !*status.DataLoaded {
-		t.Fatal("actual result not published")
-	}
-	status.DataLoaded = nil
-	if ObserveData(status, &corev1.PersistentVolumeClaim{}) || status.DataLoaded != nil {
-		t.Fatal("bootstrap acquired tracked result")
+func TestDataObservationRequiresMatchingSuccessfulWorker(t *testing.T) {
+	for _, mode := range []string{"no-task", "other-target", "running", "failed", "other-init", "completed"} {
+		t.Run(mode, func(t *testing.T) {
+			pod := dataPod()
+			target := pod.Name
+			if mode == "other-target" {
+				target = "other"
+			}
+			if mode != "no-task" {
+				env, _ := kbagent.BuildEnv4Worker([]proto.Task{{Instance: "demo", Task: "newReplica", UID: target, Replicas: target, NewReplica: &proto.NewReplicaTask{Replicas: target}}})
+				pod.Spec.InitContainers[0].Env = []corev1.EnvVar{*env}
+			}
+			state := corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 0}}
+			worker := kbagent.ContainerName4Worker
+			if mode == "running" {
+				state = corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}
+			}
+			if mode == "failed" {
+				state.Terminated.ExitCode = 1
+			}
+			if mode == "other-init" {
+				worker = "other"
+			}
+			pod.Status.InitContainerStatuses = []corev1.ContainerStatus{{Name: worker, State: state}}
+			status := &workloads.InstanceStatus{DataLoaded: ptr.To(false)}
+			if _, err := ObserveData(status, pod); err != nil {
+				t.Fatal(err)
+			}
+			if *status.DataLoaded != (mode == "completed") {
+				t.Fatalf("unexpected result=%v", *status.DataLoaded)
+			}
+			status.DataLoaded = ptr.To(true)
+			if _, err := ObserveData(status, pod); err != nil || !*status.DataLoaded {
+				t.Fatal("committed result regressed", err)
+			}
+		})
 	}
 }
 
@@ -312,10 +330,11 @@ func TestValidationRejectsUnownedPreconditionsAndNonblockingActions(t *testing.T
 			its.Spec.LifecycleActions.DataLoad.NonBlocking = true
 		}
 		pod := dataPod()
+		before := pod.DeepCopy()
 		if err := ConfigurePod(its, pod, nil, false, false); err == nil {
 			t.Fatalf("accepted nonblocking %s without a completion contract", name)
 		}
-		if len(pod.Spec.InitContainers) != 0 || len(pod.Spec.Containers) != 1 {
+		if !reflect.DeepEqual(before, pod) {
 			t.Fatalf("invalid %s action changed the Pod", name)
 		}
 	}
@@ -381,21 +400,17 @@ func TestDataSourceRetirementUsesMembershipResult(t *testing.T) {
 	}
 }
 
-func TestTaskCleanupMatchesExactRuntimeDataResult(t *testing.T) {
-	own := &proto.DataLoadResult{Namespace: "one", PVCName: "data"}
-	other := &proto.DataLoadResult{Namespace: "two", PVCName: "data"}
-	env, err := kbagent.BuildEnv4Worker([]proto.Task{{UID: "own", NewReplica: &proto.NewReplicaTask{DataLoadResult: own}}, {UID: "other", NewReplica: &proto.NewReplicaTask{DataLoadResult: other}}})
-	if err != nil {
-		t.Fatal(err)
-	}
+func TestTaskCleanupPreservesOtherInstances(t *testing.T) {
+	own := proto.Task{Instance: "demo", Task: "newReplica", UID: "demo-1", Replicas: "demo-1", NewReplica: &proto.NewReplicaTask{Replicas: "demo-1"}}
+	other := proto.Task{Instance: "demo", Task: "newReplica", UID: "demo-2", Replicas: "demo-2", NewReplica: &proto.NewReplicaTask{Replicas: "demo-2"}}
+	env, _ := kbagent.BuildEnv4Worker([]proto.Task{own, other})
 	cm := &corev1.ConfigMap{Data: map[string]string{taskEnv: env.Value}}
-	changed, err := CleanTaskConfigMap(cm, own)
-	if err != nil || !changed {
-		t.Fatalf("cleanup %v %v", changed, err)
+	if changed, err := CleanTaskConfigMap(cm, "demo-1"); err != nil || !changed {
+		t.Fatalf("cleanup=%v,%v", changed, err)
 	}
 	var tasks []proto.Task
-	if err := json.Unmarshal([]byte(cm.Data[taskEnv]), &tasks); err != nil || len(tasks) != 1 || tasks[0].UID != "other" {
-		t.Fatalf("cleanup removed another runtime's task: %+v %v", tasks, err)
+	if err := json.Unmarshal([]byte(cm.Data[taskEnv]), &tasks); err != nil || len(tasks) != 1 || tasks[0].UID != "demo-2" {
+		t.Fatalf("tasks=%v,%v", tasks, err)
 	}
 }
 

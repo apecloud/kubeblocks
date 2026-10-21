@@ -152,6 +152,19 @@ type InstanceSpec struct {
 
 // InstanceStatus2 defines the observed state of Instance
 type InstanceStatus2 struct {
+	// Provisioned records whether a Present or Terminating runtime has been observed for this instance.
+	// +optional
+	Provisioned bool `json:"provisioned,omitempty"`
+
+	// DataLoaded records the data-loading result. nil means no loading requirement is tracked.
+	// A committed true result survives Stop and Pod recreation.
+	// +optional
+	DataLoaded *bool `json:"dataLoaded,omitempty"`
+
+	// MemberJoined records the member join or leave result maintained by InstanceSet alignment.
+	// +optional
+	MemberJoined *bool `json:"memberJoined,omitempty"`
+
 	// observedGeneration is the most recent generation observed for this Instance. It corresponds to the
 	// Instance's generation, which is updated on mutation by the API Server.
 	//

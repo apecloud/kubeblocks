@@ -27,6 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -276,16 +277,12 @@ func ordinalConfigMap(name string) *corev1.ConfigMap {
 }
 
 func TestAssistantRebuildClearsOnlyCompletedInstanceDataTask(t *testing.T) {
-	result := &proto.DataLoadResult{Namespace: testNamespace, PVCName: "data-target"}
-	guard, err := kbagent.BuildEnv4DataLoadResult(result)
-	if err != nil {
-		t.Fatal(err)
-	}
 	tasks := []proto.Task{
-		{UID: "completed", NewReplica: &proto.NewReplicaTask{DataLoadResult: result}},
-		{UID: "other-instance", NewReplica: &proto.NewReplicaTask{DataLoadResult: &proto.DataLoadResult{Namespace: testNamespace, PVCName: "data-other"}}},
+		{Instance: "cluster-component", Task: "newReplica", UID: "cluster-component-0", Replicas: "cluster-component-0", NewReplica: &proto.NewReplicaTask{Replicas: "cluster-component-0"}},
+		{Instance: "cluster-component", Task: "newReplica", UID: "other-instance", Replicas: "other-instance", NewReplica: &proto.NewReplicaTask{Replicas: "other-instance"}},
 		{UID: "legacy", NewReplica: &proto.NewReplicaTask{}},
 	}
+
 	taskEnv, err := kbagent.BuildEnv4Worker(tasks)
 	if err != nil {
 		t.Fatal(err)
@@ -293,11 +290,8 @@ func TestAssistantRebuildClearsOnlyCompletedInstanceDataTask(t *testing.T) {
 	assistant := sharedConfigMapAssistantObject("cluster-component-env", "v1")
 	assistant.ConfigMap.Data[taskEnv.Name] = taskEnv.Value
 	inst := newTestInstance("cluster-component-0", assistant)
-	inst.Spec.Template.Spec.InitContainers = []corev1.Container{{Name: kbagent.ContainerName4Worker, Env: []corev1.EnvVar{*guard}}}
+	inst.Status.DataLoaded = ptr.To(true)
 	tree := newTestTree(inst)
-	if err := tree.Add(&corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: result.PVCName, Namespace: result.Namespace, Annotations: map[string]string{proto.DataLoadedAnnotationKey: "true"}}}); err != nil {
-		t.Fatal(err)
-	}
 	if _, err := NewAssistantObjectReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)
 	}

@@ -37,46 +37,40 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
-	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 )
 
 func TestTreeLoaderReadsLifecycleRuntimeFromInstancePlacement(t *testing.T) {
 	action := &apps.Action{Exec: &apps.ExecAction{Command: []string{"true"}}}
-	its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "placed", Namespace: "default", UID: "its", Annotations: map[string]string{constant.KBAppMultiClusterPlacementKey: "worker-a,worker-b"}}, Spec: workloads.InstanceSetSpec{Replicas: ptr.To[int32](2), Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{ServiceAccountName: "worker", Containers: []corev1.Container{{Name: "db", Image: "db:v1"}}, Volumes: []corev1.Volume{{Name: "data", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "target-data"}}}}}}, LifecycleActions: &workloads.LifecycleActions{DataDump: action, DataLoad: action, DataVolume: "data", Worker: &corev1.Container{Name: "worker", Image: "agent:v1"}}}, Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{PodName: "placed-0", DataLoaded: ptr.To(false)}}}}
+	its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "placed", Namespace: "default", UID: "its", Annotations: map[string]string{constant.KBAppMultiClusterPlacementKey: "worker-a,worker-b"}}, Spec: workloads.InstanceSetSpec{Replicas: ptr.To[int32](2), Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{ServiceAccountName: "worker", Containers: []corev1.Container{{Name: "db", Image: "db:v1"}, {Name: kbagent.ContainerName, Image: "agent:v1"}}, InitContainers: []corev1.Container{{Name: kbagent.ContainerName4Worker, Image: "agent:v1"}}, Volumes: []corev1.Volume{{Name: "data", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "target-data"}}}}}}, LifecycleActions: &workloads.LifecycleActions{DataDump: action, DataLoad: action}}, Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{PodName: "placed-0", DataLoaded: ptr.To(false)}}}}
 	inst := &workloads.Instance{ObjectMeta: metav1.ObjectMeta{Name: "placed-0", Namespace: "default", Labels: getMatchLabels(its.Name), Annotations: map[string]string{constant.KBAppMultiClusterPlacementKey: "worker-b"}}, Spec: workloads.InstanceSpec{InstanceSetName: its.Name, Template: its.Spec.Template}}
 	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: inst.Name, Namespace: inst.Namespace}, Spec: inst.Spec.Template.Spec, Status: corev1.PodStatus{PodIP: "10.1.0.2"}}
-	pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "target-data", Namespace: "default"}}
-	wrongPVC := pvc.DeepCopy()
-	wrongPVC.Annotations = map[string]string{proto.DataLoadedAnnotationKey: "true"}
+	inst.Status.DataLoaded = ptr.To(false)
 	instA := inst.DeepCopy()
 	instA.Name = "placed-1"
+	instA.Status.DataLoaded = ptr.To(true)
 	instA.Annotations[constant.KBAppMultiClusterPlacementKey] = "worker-a"
 	podA := pod.DeepCopy()
 	podA.Name = instA.Name
 	podA.Status.PodIP = "10.1.0.1"
-	control := fake.NewClientBuilder().WithScheme(model.GetScheme()).WithObjects(its, wrongPVC).Build()
-	workerA := fake.NewClientBuilder().WithScheme(model.GetScheme()).WithObjects(instA, podA, wrongPVC).Build()
-	workerB := fake.NewClientBuilder().WithScheme(model.GetScheme()).WithObjects(inst, pod, pvc).Build()
+	control := fake.NewClientBuilder().WithScheme(model.GetScheme()).WithObjects(its).Build()
+	workerA := fake.NewClientBuilder().WithScheme(model.GetScheme()).WithObjects(instA, podA).Build()
+	workerB := fake.NewClientBuilder().WithScheme(model.GetScheme()).WithObjects(inst, pod).Build()
 	cli := multicluster.NewClient(control, map[string]client.Client{"worker-a": workerA, "worker-b": workerB})
 	tree, err := NewTreeLoader().Load(context.Background(), cli, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(its)}, record.NewFakeRecorder(10), logr.Discard())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(tree.List(&corev1.PersistentVolumeClaim{})) != 0 {
-		t.Fatal("parent tree stores placement-ambiguous PVC resources")
+	if len(tree.List(&workloads.Instance{})) != 2 {
+		t.Fatal("instances were not read from both placements")
 	}
-	for _, tc := range []struct {
-		pod       *corev1.Pod
-		completed bool
-	}{{pod, false}, {podA, true}} {
-		observed, err := dataPVC(tree, its, tc.pod)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if observed == nil || (observed.Annotations[proto.DataLoadedAnnotationKey] == "true") != tc.completed {
-			t.Fatalf("wrong PVC result for %s: %#v", tc.pod.Name, observed)
+	for _, object := range tree.List(&workloads.Instance{}) {
+		observed := object.(*workloads.Instance)
+		if observed.Status.DataLoaded == nil || *observed.Status.DataLoaded != (observed.Name == instA.Name) {
+			t.Fatalf("wrong Instance result: %+v", observed.Status)
 		}
 	}
+
 	loaded, opts, err := tree.GetWithOption(pod)
 	if err != nil {
 		t.Fatal(err)

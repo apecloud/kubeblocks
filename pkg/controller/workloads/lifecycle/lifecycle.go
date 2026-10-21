@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"slices"
 	"sort"
-	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -43,7 +42,6 @@ import (
 )
 
 const taskEnv = "KB_AGENT_TASK"
-const resultEnv = "KB_AGENT_DATA_LOAD_RESULT"
 
 func Enabled(its *workloads.InstanceSet) bool {
 	a := its.Spec.LifecycleActions
@@ -86,8 +84,8 @@ func Validate(its *workloads.InstanceSet) error {
 			return fmt.Errorf("workload-owned lifecycle actions must use blocking execution")
 		}
 	}
-	if HasData(its) && (a.DataDump == nil || a.DataLoad == nil || a.Worker == nil || a.Worker.Image == "" || a.DataVolume == "") {
-		return fmt.Errorf("data copying requires dataDump, dataLoad, dataVolume and a worker image")
+	if HasData(its) && (a.DataDump == nil || a.DataLoad == nil) {
+		return fmt.Errorf("data copying requires dataDump and dataLoad")
 	}
 	return nil
 }
@@ -144,29 +142,52 @@ func NeedsLeave(its *workloads.InstanceSet, status *workloads.InstanceStatus) bo
 	return ptr.Deref(status.MemberJoined, false) || (status.MemberJoined == nil && status.Provisioned)
 }
 
-func DataPVCName(its *workloads.InstanceSet, pod *corev1.Pod) (string, error) {
-	for _, volume := range pod.Spec.Volumes {
-		if volume.Name == its.Spec.LifecycleActions.DataVolume && volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName != "" {
-			return volume.PersistentVolumeClaim.ClaimName, nil
+// DataTask returns the workload-owned data task matching this instance.
+func DataTask(spec *corev1.PodSpec, name string) (*proto.Task, error) {
+	for _, worker := range spec.InitContainers {
+		if worker.Name != kbagent.ContainerName4Worker {
+			continue
+		}
+		var tasks []proto.Task
+		if value := envValueForTask(worker.Env); value != "" {
+			if err := json.Unmarshal([]byte(value), &tasks); err != nil {
+				return nil, err
+			}
+		}
+		for _, task := range tasks {
+			if generatedDataTask(task, name) {
+				return &task, nil
+			}
 		}
 	}
-	return "", fmt.Errorf("instance %s data volume %q must reference a PVC", pod.Name, its.Spec.LifecycleActions.DataVolume)
+	return nil, nil
 }
 
-// ObserveData only changes a result after an actual data PVC was observed.
-func ObserveData(status *workloads.InstanceStatus, pvc *corev1.PersistentVolumeClaim) bool {
-	if status == nil || pvc == nil {
-		return false
+// ObserveData retains committed results and requires a matching task and successful worker termination.
+func ObserveData(status *workloads.InstanceStatus, pod *corev1.Pod) (bool, error) {
+	if status == nil || pod == nil || ptr.Deref(status.DataLoaded, false) {
+		return false, nil
 	}
-	complete := pvc.Annotations[proto.DataLoadedAnnotationKey] == "true"
-	if status.DataLoaded == nil && !complete {
-		return false
+	task, err := DataTask(&pod.Spec, pod.Name)
+	if err != nil || task == nil {
+		return false, err
 	}
-	if status.DataLoaded != nil && *status.DataLoaded == complete {
-		return false
+	complete := slices.ContainsFunc(pod.Status.InitContainerStatuses, func(s corev1.ContainerStatus) bool {
+		return s.Name == kbagent.ContainerName4Worker && s.State.Terminated != nil && s.State.Terminated.ExitCode == 0
+	})
+	if complete {
+		status.DataLoaded = ptr.To(true)
+		return true, nil
 	}
-	status.DataLoaded = ptr.To(complete)
-	return true
+	if status.DataLoaded == nil {
+		status.DataLoaded = ptr.To(false)
+		return true, nil
+	}
+	return false, nil
+}
+
+func generatedDataTask(task proto.Task, name string) bool {
+	return task.Instance != "" && task.Task == "newReplica" && task.NewReplica != nil && task.UID != "" && task.UID == task.Replicas && task.NewReplica.Replicas == task.Replicas && (name == "" || task.Replicas == name)
 }
 
 // SortDataSourcesFirst places pending data targets after other instances, preserving order within each group.
@@ -185,7 +206,7 @@ func SortDataSourcesFirst(its *workloads.InstanceSet, names []string) {
 	})
 }
 
-func SourcePod(its *workloads.InstanceSet, pods []*corev1.Pod, target string) (*corev1.Pod, error) {
+func SourcePod(its *workloads.InstanceSet, pods []*corev1.Pod, target string, current ...*corev1.PodSpec) (*corev1.Pod, error) {
 	candidates := slices.Clone(pods)
 	slices.SortFunc(candidates, func(a, b *corev1.Pod) int { return strings.Compare(a.Name, b.Name) })
 	available := make([]*corev1.Pod, 0, len(candidates))
@@ -212,16 +233,31 @@ func SourcePod(its *workloads.InstanceSet, pods []*corev1.Pod, target string) (*
 		if selector == "" && action.Exec != nil {
 			selector = action.Exec.TargetPodSelector
 		}
-		if selector == "" || selector == apps.AnyReplica {
-			return available[0], nil
+		if selector != "" && selector != apps.AnyReplica {
+			selected, err := publiclifecycle.SelectTargetPods(available, available[0], action)
+			if err != nil {
+				return nil, err
+			}
+			available = selected
 		}
-		selected, err := publiclifecycle.SelectTargetPods(available, available[0], action)
+	}
+	if len(current) > 0 {
+		task, err := DataTask(current[0], target)
 		if err != nil {
 			return nil, err
 		}
-		if len(selected) > 0 {
-			return selected[0], nil
+		if task != nil {
+			for _, pod := range available {
+				port, _ := intctrlutil.GetPortByName(*pod, kbagent.ContainerName, kbagent.DefaultStreamingPortName)
+				if pod.Status.PodIP == task.NewReplica.Remote && port == task.NewReplica.Port {
+					return pod, nil
+				}
+			}
 		}
+	}
+
+	if len(available) > 0 {
+		return available[0], nil
 	}
 	return nil, fmt.Errorf("instance %s is waiting for an available data source", target)
 }
@@ -231,7 +267,7 @@ func NewLifecycle(its *workloads.InstanceSet, pod *corev1.Pod, pods []*corev1.Po
 	return publiclifecycle.New(its.Namespace, its.Labels[constant.AppInstanceLabelKey], its.Labels[constant.KBAppComponentLabelKey], &apps.ComponentLifecycleActions{Switchover: a.Switchover, Reconfigure: a.Reconfigure, MemberJoin: a.MemberJoin, MemberLeave: a.MemberLeave}, a.TemplateVars, pod, pods)
 }
 
-// ConfigurePod adds persistent action configuration and, for expansion only, a data-result guard.
+// ConfigurePod configures actions and tasks in the agent runtime supplied by the caller.
 func ConfigurePod(its *workloads.InstanceSet, pod *corev1.Pod, source *corev1.Pod, trackData, completed bool) error {
 	if !Enabled(its) {
 		return nil
@@ -241,113 +277,55 @@ func ConfigurePod(its *workloads.InstanceSet, pod *corev1.Pod, source *corev1.Po
 	}
 	a := its.Spec.LifecycleActions
 	serverIndex := slices.IndexFunc(pod.Spec.Containers, func(c corev1.Container) bool { return c.Name == kbagent.ContainerName })
-	var server *corev1.Container
-	if serverIndex >= 0 {
-		server = &pod.Spec.Containers[serverIndex]
-	} else {
-		if a.Worker == nil {
-			return fmt.Errorf("membership actions require a configured kbagent server container or worker")
-		}
-		c := *a.Worker.DeepCopy()
-		c.Name = kbagent.ContainerName
-		if len(c.Command) == 0 {
-			c.Command = []string{kbagent.BinaryPath}
-		}
-		c.Args = append(c.Args, "--port", strconv.Itoa(kbagent.DefaultHTTPPort), "--streaming-port", strconv.Itoa(kbagent.DefaultStreamingPort))
-		c.Ports = append(c.Ports, corev1.ContainerPort{Name: kbagent.DefaultHTTPPortName, ContainerPort: kbagent.DefaultHTTPPort}, corev1.ContainerPort{Name: kbagent.DefaultStreamingPortName, ContainerPort: kbagent.DefaultStreamingPort})
-		pod.Spec.Containers = append(pod.Spec.Containers, c)
-		server = &pod.Spec.Containers[len(pod.Spec.Containers)-1]
+	if serverIndex < 0 {
+		return fmt.Errorf("instance %s requires a prepared kbagent server container", pod.Name)
 	}
-	if err := applyExecContext(server, pod, a); err != nil {
-		return err
-	}
-	if err := mergeActions(server, a); err != nil {
+	server := &pod.Spec.Containers[serverIndex]
+	serverActions := *a
+	serverActions.DataLoad = nil
+	if err := mergeActions(server, &serverActions); err != nil {
 		return err
 	}
 	if !HasData(its) {
 		return nil
 	}
-	if trackData && (pod.Spec.ServiceAccountName == "" || (pod.Spec.AutomountServiceAccountToken != nil && !*pod.Spec.AutomountServiceAccountToken)) {
-		return fmt.Errorf("instance %s data worker requires an explicit authorized serviceAccountName and API credentials", pod.Name)
-	}
 	index := slices.IndexFunc(pod.Spec.InitContainers, func(c corev1.Container) bool { return c.Name == kbagent.ContainerName4Worker })
-	var worker corev1.Container
-	worker = *a.Worker.DeepCopy()
-	worker.Name = kbagent.ContainerName4Worker
-	if index >= 0 {
-		for _, env := range pod.Spec.InitContainers[index].Env {
-			if !slices.ContainsFunc(worker.Env, func(e corev1.EnvVar) bool { return e.Name == env.Name }) {
-				worker.Env = append(worker.Env, env)
-			}
-		}
-	}
-	if err := applyExecContext(&worker, pod, a); err != nil {
-		return err
-	}
-	if len(worker.Command) == 0 {
-		worker.Command = []string{kbagent.BinaryPath}
-	}
-	worker.Args = append(worker.Args, "--server=false")
-	if err := mergeActions(&worker, a); err != nil {
-		return err
-	}
-	setEnv(&worker, corev1.EnvVar{Name: "KB_AGENT_DATA_VOLUME", Value: a.DataVolume})
-	if !trackData {
-		if index < 0 {
-			pod.Spec.InitContainers = append(pod.Spec.InitContainers, worker)
-		} else {
-			pod.Spec.InitContainers[index] = worker
-		}
-		return nil
-	}
-	pvcName, err := DataPVCName(its, pod)
-	if err != nil {
-		return err
-	}
-	result := &proto.DataLoadResult{Namespace: pod.Namespace, PVCName: pvcName}
-	guard, err := kbagent.BuildEnv4DataLoadResult(result)
-	if err != nil {
-		return err
-	}
-	setEnv(&worker, *guard)
-	if completed {
-		spec := corev1.PodSpec{InitContainers: []corev1.Container{worker}}
-		if _, err := CleanTask(&spec); err != nil {
-			return err
-		}
-		worker = spec.InitContainers[0]
-	} else {
-		if source == nil {
-			return fmt.Errorf("instance %s is waiting for an available data source", pod.Name)
-		}
-		port, err := intctrlutil.GetPortByName(*source, kbagent.ContainerName, kbagent.DefaultStreamingPortName)
-		if err != nil {
-			return err
-		}
-		host := source.Status.PodIP
-		if host == "" {
-			return fmt.Errorf("source instance %s has no observed runtime address", source.Name)
-		}
-		task := proto.Task{Instance: its.Name, Task: "newReplica", UID: pod.Name, Replicas: pod.Name, NewReplica: &proto.NewReplicaTask{Remote: host, Port: port, Replicas: pod.Name, Parameters: a.TemplateVars, DataLoadResult: result}}
-		var tasks []proto.Task
-		if existing := envValueForTask(worker.Env); existing != "" {
-			if err := json.Unmarshal([]byte(existing), &tasks); err != nil {
-				return err
-			}
-		}
-		tasks = slices.DeleteFunc(tasks, func(t proto.Task) bool { return t.NewReplica != nil && sameResult(t.NewReplica.DataLoadResult, result) })
-		tasks = append(tasks, task)
-		env, err := kbagent.BuildEnv4Worker(tasks)
-		if err != nil {
-			return err
-		}
-		setEnv(&worker, *env)
-	}
 	if index < 0 {
-		pod.Spec.InitContainers = append(pod.Spec.InitContainers, worker)
-	} else {
-		pod.Spec.InitContainers[index] = worker
+		return fmt.Errorf("instance %s requires a prepared kbagent worker init container", pod.Name)
 	}
+	worker := &pod.Spec.InitContainers[index]
+	workerActions := &workloads.LifecycleActions{DataLoad: a.DataLoad}
+	if err := mergeActions(worker, workerActions); err != nil {
+		return err
+	}
+	if !trackData || completed {
+		_, err := CleanTask(&pod.Spec, pod.Name)
+		return err
+	}
+	if source == nil {
+		return fmt.Errorf("instance %s is waiting for an available data source", pod.Name)
+	}
+	port, err := intctrlutil.GetPortByName(*source, kbagent.ContainerName, kbagent.DefaultStreamingPortName)
+	if err != nil {
+		return err
+	}
+	if source.Status.PodIP == "" {
+		return fmt.Errorf("source instance %s has no observed runtime address", source.Name)
+	}
+	task := proto.Task{Instance: its.Name, Task: "newReplica", UID: pod.Name, Replicas: pod.Name, NewReplica: &proto.NewReplicaTask{Remote: source.Status.PodIP, Port: port, Replicas: pod.Name, Parameters: a.TemplateVars}}
+	var tasks []proto.Task
+	if existing := envValueForTask(worker.Env); existing != "" {
+		if err := json.Unmarshal([]byte(existing), &tasks); err != nil {
+			return err
+		}
+	}
+	tasks = slices.DeleteFunc(tasks, func(t proto.Task) bool { return generatedDataTask(t, pod.Name) })
+	tasks = append(tasks, task)
+	env, err := kbagent.BuildEnv4Worker(tasks)
+	if err != nil {
+		return err
+	}
+	setEnv(worker, *env)
 	return nil
 }
 
@@ -437,27 +415,23 @@ func Action(name string, action *apps.Action) *proto.Action {
 	return a
 }
 
-func CleanTask(spec *corev1.PodSpec) (bool, error) {
+func CleanTask(spec *corev1.PodSpec, names ...string) (bool, error) {
+	name := ""
+	if len(names) > 0 {
+		name = names[0]
+	}
 	changed := false
 	for i := range spec.InitContainers {
-		c := &spec.InitContainers[i]
-		if c.Name != kbagent.ContainerName4Worker || !slices.ContainsFunc(c.Env, func(e corev1.EnvVar) bool { return e.Name == resultEnv }) {
+		worker := &spec.InitContainers[i]
+		if worker.Name != kbagent.ContainerName4Worker {
 			continue
 		}
-		for j := 0; j < len(c.Env); j++ {
-			if c.Env[j].Name != taskEnv {
+		for j := 0; j < len(worker.Env); j++ {
+			if worker.Env[j].Name != taskEnv {
 				continue
 			}
-			cm := &corev1.ConfigMap{Data: map[string]string{taskEnv: c.Env[j].Value}}
-			var result proto.DataLoadResult
-			for _, env := range c.Env {
-				if env.Name == resultEnv {
-					if err := json.Unmarshal([]byte(env.Value), &result); err != nil {
-						return false, err
-					}
-				}
-			}
-			cleaned, err := CleanTaskConfigMap(cm, &result)
+			cm := &corev1.ConfigMap{Data: map[string]string{taskEnv: worker.Env[j].Value}}
+			cleaned, err := CleanTaskConfigMap(cm, name)
 			if err != nil {
 				return false, err
 			}
@@ -466,9 +440,9 @@ func CleanTask(spec *corev1.PodSpec) (bool, error) {
 			}
 			changed = true
 			if value, ok := cm.Data[taskEnv]; ok {
-				c.Env[j].Value = value
+				worker.Env[j].Value = value
 			} else {
-				c.Env = append(c.Env[:j], c.Env[j+1:]...)
+				worker.Env = append(worker.Env[:j], worker.Env[j+1:]...)
 				j--
 			}
 		}
@@ -476,29 +450,8 @@ func CleanTask(spec *corev1.PodSpec) (bool, error) {
 	return changed, nil
 }
 
-// FilterTransient removes generated tasks and normalizes their runtime PVC binding.
-// The data volume, startup-check capability, and agent configuration remain revision inputs.
-func FilterTransient(spec *corev1.PodSpec) {
-	_, _ = CleanTask(spec)
-	for i := range spec.InitContainers {
-		c := &spec.InitContainers[i]
-		if c.Name != kbagent.ContainerName4Worker {
-			continue
-		}
-		volume := ""
-		for _, env := range c.Env {
-			if env.Name == "KB_AGENT_DATA_VOLUME" {
-				volume = env.Value
-			}
-		}
-		if volume == "" {
-			continue
-		}
-		// Both bootstrap and expansion workers share this capability. Only the runtime PVC binding differs.
-		normalized, _ := kbagent.BuildEnv4DataLoadResult(&proto.DataLoadResult{Namespace: "$runtime", PVCName: "$volume:" + volume})
-		setEnv(c, *normalized)
-	}
-}
+// FilterTransient excludes only workload-generated task inputs from revisions.
+func FilterTransient(spec *corev1.PodSpec) { _, _ = CleanTask(spec) }
 
 // ValidateExecution keeps AnyReplica execution on the endpoint validated in this invocation.
 func ValidateExecution(action *apps.Action, target *corev1.Pod, pods []*corev1.Pod) (*publiclifecycle.Options, error) {
@@ -532,7 +485,7 @@ func ValidateExecution(action *apps.Action, target *corev1.Pod, pods []*corev1.P
 }
 
 // CleanTaskConfigMap preserves unrelated tasks and clears only workload-generated data-copy instructions.
-func CleanTaskConfigMap(cm *corev1.ConfigMap, result *proto.DataLoadResult) (bool, error) {
+func CleanTaskConfigMap(cm *corev1.ConfigMap, name string) (bool, error) {
 	value := cm.Data[taskEnv]
 	if value == "" {
 		return false, nil
@@ -543,7 +496,7 @@ func CleanTaskConfigMap(cm *corev1.ConfigMap, result *proto.DataLoadResult) (boo
 	}
 	before := len(tasks)
 	tasks = slices.DeleteFunc(tasks, func(task proto.Task) bool {
-		return task.NewReplica != nil && sameResult(task.NewReplica.DataLoadResult, result)
+		return generatedDataTask(task, name)
 	})
 	if before == len(tasks) {
 		return false, nil
@@ -560,44 +513,6 @@ func CleanTaskConfigMap(cm *corev1.ConfigMap, result *proto.DataLoadResult) (boo
 	return true, nil
 }
 
-// Explicit action container/image references must agree with the supplied worker context.
-func applyExecContext(agent *corev1.Container, pod *corev1.Pod, a *workloads.LifecycleActions) error {
-	for _, action := range []*apps.Action{a.MemberJoin, a.MemberLeave, a.Switchover, a.DataDump, a.DataLoad} {
-		if action == nil || action.Exec == nil {
-			continue
-		}
-		exec := action.Exec
-		if exec.Image != "" && exec.Image != agent.Image {
-			return fmt.Errorf("action image %s does not match agent image %s", exec.Image, agent.Image)
-		}
-		if exec.Container == "" {
-			continue
-		}
-		i := slices.IndexFunc(pod.Spec.Containers, func(c corev1.Container) bool { return c.Name == exec.Container })
-		if i < 0 {
-			return fmt.Errorf("action execution container %s is not present", exec.Container)
-		}
-		context := &pod.Spec.Containers[i]
-		for _, mount := range context.VolumeMounts {
-			if !slices.ContainsFunc(agent.VolumeMounts, func(m corev1.VolumeMount) bool { return m.Name == mount.Name }) {
-				agent.VolumeMounts = append(agent.VolumeMounts, mount)
-			}
-		}
-		for _, env := range context.Env {
-			if !slices.ContainsFunc(agent.Env, func(e corev1.EnvVar) bool { return e.Name == env.Name }) {
-				agent.Env = append(agent.Env, env)
-			}
-		}
-		if agent.SecurityContext == nil && context.SecurityContext != nil {
-			agent.SecurityContext = context.SecurityContext.DeepCopy()
-		}
-		if agent.WorkingDir == "" {
-			agent.WorkingDir = context.WorkingDir
-		}
-	}
-	return nil
-}
-
 func envValueForTask(envs []corev1.EnvVar) string {
 	for _, env := range envs {
 		if env.Name == taskEnv {
@@ -607,43 +522,19 @@ func envValueForTask(envs []corev1.EnvVar) string {
 	return ""
 }
 
-// IsDataWorker distinguishes generated data-copy execution context from ordinary init containers.
+// IsDataWorker identifies the prepared data worker container.
 func IsDataWorker(container *corev1.Container) bool {
-	return container.Name == kbagent.ContainerName4Worker && slices.ContainsFunc(container.Env, func(e corev1.EnvVar) bool { return e.Name == "KB_AGENT_DATA_VOLUME" && e.Value != "" })
+	return container.Name == kbagent.ContainerName4Worker
 }
 
-func sameResult(a, b *proto.DataLoadResult) bool {
-	return a != nil && b != nil && a.Namespace == b.Namespace && a.PVCName == b.PVCName
-}
-
-// GeneratedTask returns just the task bound to this Pod's data-result guard.
+// GeneratedTask returns workload-generated data-copy instructions for update comparison.
 func GeneratedTask(spec *corev1.PodSpec) (string, error) {
-	for _, container := range spec.InitContainers {
-		if container.Name != kbagent.ContainerName4Worker {
-			continue
-		}
-		var result proto.DataLoadResult
-		for _, env := range container.Env {
-			if env.Name == resultEnv {
-				if err := json.Unmarshal([]byte(env.Value), &result); err != nil {
-					return "", err
-				}
-			}
-		}
-		var tasks []proto.Task
-		if value := envValueForTask(container.Env); value != "" {
-			if err := json.Unmarshal([]byte(value), &tasks); err != nil {
-				return "", err
-			}
-		}
-		for _, task := range tasks {
-			if task.NewReplica != nil && sameResult(task.NewReplica.DataLoadResult, &result) {
-				data, err := json.Marshal(task)
-				return string(data), err
-			}
-		}
+	task, err := DataTask(spec, "")
+	if err != nil || task == nil {
+		return "", err
 	}
-	return "", nil
+	data, err := json.Marshal(task)
+	return string(data), err
 }
 
 // CriticalStatusChanged reports facts that must be committed before changing runtime inputs or membership.

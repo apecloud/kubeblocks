@@ -76,6 +76,13 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 	for _, pod := range pods {
 		status := workloadlifecycle.Status(its, pod.Name)
 		if workloadlifecycle.HasData(its) && desired.Has(pod.Name) {
+			task, err := workloadlifecycle.DataTask(&pod.Spec, pod.Name)
+			if err != nil {
+				return kubebuilderx.Continue, err
+			}
+			if status != nil && status.DataLoaded == nil && task == nil {
+				status.DataLoaded = ptr.To(true)
+			}
 			if _, err := workloadlifecycle.ObserveData(status, pod); err != nil {
 				return kubebuilderx.Continue, err
 			}

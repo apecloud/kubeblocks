@@ -88,6 +88,10 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
+	if inst.Status.DataLoaded == nil && task == nil && actual == nil &&
+		inst.Spec.LifecycleActions != nil && inst.Spec.LifecycleActions.DataDump != nil && inst.Spec.LifecycleActions.DataLoad != nil {
+		inst.Status.DataLoaded = ptr.To(true)
+	}
 	if task != nil && reflect.DeepEqual(task, actual) {
 		result := workloads.InstanceStatus{DataLoaded: inst.Status.DataLoaded}
 		if _, err := workloadlifecycle.ObserveData(&result, pod); err != nil {

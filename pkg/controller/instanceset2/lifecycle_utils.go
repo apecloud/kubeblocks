@@ -66,6 +66,9 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 			runtimeNames.Insert(inst.Name)
 		}
 	}
+	if retained, ok := tree.Context.Value(retainedResourcesKey{}).(sets.Set[string]); ok {
+		resourceNames.Insert(retained.UnsortedList()...)
+	}
 	registered := workloadlifecycle.Register(its, assignments, runtimeNames, resourceNames)
 	previous := its.DeepCopy().Status.InstanceStatus
 	for _, inst := range instances {

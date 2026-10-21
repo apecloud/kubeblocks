@@ -159,9 +159,9 @@ type InstanceStatus2 struct {
 	// +optional
 	Provisioned bool `json:"provisioned,omitempty"`
 
-	// DataLoaded records the tracked data-loading result. nil means no result is tracked,
-	// false means loading is incomplete, and true means completion has been recorded.
-	// Runtime health and restore conditions do not determine this value.
+	// DataLoaded records whether the configured data-loading step is satisfied. nil means no result is tracked,
+	// false means the tracked step is incomplete, and true means it is satisfied, including initial instances that need no data copy.
+	// Pending data copies become satisfied only after successful completion; runtime health and restore conditions do not complete them.
 	//
 	// +optional
 	DataLoaded *bool `json:"dataLoaded,omitempty"`

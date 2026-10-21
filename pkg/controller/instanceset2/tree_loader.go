@@ -153,6 +153,9 @@ func loadLifecycleRuntime(ctx context.Context, reader client.Reader, tree *kubeb
 				if err != nil {
 					return err
 				}
+				if *status.TemplateName == instancetemplate.DefaultTemplateName && ext.InstanceTemplates[instancetemplate.DefaultTemplateName] == nil {
+					ext.InstanceTemplates[instancetemplate.DefaultTemplateName] = &workloads.InstanceTemplate{}
+				}
 				for _, template := range instancetemplate.BuildInstanceTemplateExt(ext) {
 					if template.Name != *status.TemplateName {
 						continue

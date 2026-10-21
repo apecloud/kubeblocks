@@ -105,6 +105,8 @@ func buildRevisionIntentHash(intent instanceRevisionIntent) string {
 }
 
 func buildPodTemplateRevisionIntent(template corev1.PodTemplateSpec) podTemplateRevisionIntent {
+	template = *template.DeepCopy()
+	workloadlifecycle.FilterTransient(&template.Spec)
 	return podTemplateRevisionIntent{
 		Labels:      copyStringMap(template.Labels),
 		Annotations: copyStringMap(template.Annotations),
@@ -172,5 +174,5 @@ func revisionLifecycleActions(actions *workloads.LifecycleActions) *workloads.Li
 	if !workloadlifecycle.Enabled(its) {
 		return nil
 	}
-	return &workloads.LifecycleActions{MemberJoin: actions.MemberJoin, MemberLeave: actions.MemberLeave, Switchover: actions.Switchover, Reconfigure: actions.Reconfigure, TemplateVars: actions.TemplateVars}
+	return actions
 }

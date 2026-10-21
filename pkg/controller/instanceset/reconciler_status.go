@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
@@ -552,9 +553,11 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		}
 	}
 	syncObservationPVCStatus(tree, observations)
+	resources := statusResourceObservations(tree, its)
 
 	statuses, err := instancestatus.Build(instancestatus.Input{
 		RequireMemberLeave: its.Spec.LifecycleActions != nil && its.Spec.LifecycleActions.MemberLeave != nil,
+		Resources:          resources,
 		Previous:           its.Status.InstanceStatus,
 		DesiredAssignments: desiredTemplateAssignments,
 		Offline:            offlineNames,
@@ -567,6 +570,27 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	}
 	its.Status.InstanceStatus = statuses
 	return nil
+}
+
+func statusResourceObservations(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) []instancestatus.ResourceObservation {
+	if tree == nil {
+		return nil
+	}
+	var resources []instancestatus.ResourceObservation
+	retain := its.Spec.PersistentVolumeClaimRetentionPolicy != nil &&
+		its.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled == kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType
+	for _, object := range tree.List(&corev1.PersistentVolumeClaim{}) {
+		pvc := object.(*corev1.PersistentVolumeClaim)
+		owner := metav1.GetControllerOf(pvc)
+		name := pvc.Labels[constant.KBAppPodNameLabelKey]
+		tracked := workloadlifecycle.Status(its, name)
+		keepResult := tracked != nil && tracked.DataLoaded != nil
+		if owner == nil || owner.UID != its.UID || name == "" || (retain && pvc.DeletionTimestamp.IsZero() && !keepResult) {
+			continue
+		}
+		resources = append(resources, instancestatus.ResourceObservation{InstanceName: name})
+	}
+	return resources
 }
 
 func observePodRuntime(its *workloads.InstanceSet, pod *corev1.Pod, roles map[string]workloads.ReplicaRole) (instancestatus.Observation, error) {

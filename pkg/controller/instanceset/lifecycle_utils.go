@@ -62,13 +62,26 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 		resources.Insert(obj.GetLabels()[constant.KBAppPodNameLabelKey])
 	}
 	registered := workloadlifecycle.Register(its, assignments, names, resources)
-	// Commit the first observed Pod before cleanup or a member action.
+	desired := sets.New[string]()
+	for _, a := range assignments {
+		desired.Insert(a.InstanceName)
+	}
+	// Read the actual completion fact first and commit it alone before cleanup or a member action.
 	previous := its.DeepCopy().Status.InstanceStatus
 	for _, pod := range pods {
 		if status := workloadlifecycle.Status(its, pod.Name); status != nil {
 			status.Provisioned = true
 		}
 	}
+	for _, pod := range pods {
+		status := workloadlifecycle.Status(its, pod.Name)
+		if workloadlifecycle.HasData(its) && desired.Has(pod.Name) {
+			if _, err := workloadlifecycle.ObserveData(status, pod); err != nil {
+				return kubebuilderx.Continue, err
+			}
+		}
+	}
+
 	if registered || workloadlifecycle.CriticalStatusChanged(previous, its.Status.InstanceStatus) {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
@@ -91,7 +104,7 @@ func reconcileMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, 
 		pods = append(pods, obj.(*corev1.Pod))
 	}
 	leave := !join
-	if join && (!pod.DeletionTimestamp.IsZero() || !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds)) {
+	if join && (!pod.DeletionTimestamp.IsZero() || (workloadlifecycle.HasData(its) && status.DataLoaded != nil && !*status.DataLoaded) || !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds)) {
 		return kubebuilderx.Continue, nil
 	}
 	action := its.Spec.LifecycleActions.MemberJoin
@@ -143,4 +156,24 @@ func lifecycleWait(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, er
 		tree.EventRecorder.Event(its, corev1.EventTypeWarning, "InstanceLifecycle", err.Error())
 	}
 	return kubebuilderx.RetryAfter(2 * time.Second), nil
+}
+
+func lifecycleCreatePod(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod) error {
+	status := workloadlifecycle.Status(its, pod.Name)
+	if status == nil || status.DataLoaded == nil || !workloadlifecycle.HasData(its) {
+		return nil
+	}
+	if *status.DataLoaded {
+		_, err := workloadlifecycle.CleanTask(&pod.Spec, pod.Name)
+		return err
+	}
+	var pods []*corev1.Pod
+	for _, obj := range tree.List(&corev1.Pod{}) {
+		pods = append(pods, obj.(*corev1.Pod))
+	}
+	source, err := workloadlifecycle.SourcePod(its, pods, pod.Name, &pod.Spec)
+	if err != nil {
+		return err
+	}
+	return workloadlifecycle.ConfigureDataTask(its, pod, source)
 }

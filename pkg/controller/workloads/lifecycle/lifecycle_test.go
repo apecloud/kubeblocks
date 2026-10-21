@@ -253,3 +253,143 @@ func TestStandaloneAgentRegistersSwitchover(t *testing.T) {
 		t.Fatal("new switchover accepts a Component dependency")
 	}
 }
+
+func dataWorkload() *workloads.InstanceSet {
+	return &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "runtime", Generation: 1}, Spec: workloads.InstanceSetSpec{LifecycleActions: &workloads.LifecycleActions{MemberJoin: testAction("true"), MemberLeave: testAction("true"), DataDump: testAction("printf data"), DataLoad: testAction("cat > /data/value")}}}
+}
+
+func dataPod() *corev1.Pod {
+	return &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "demo-1", Namespace: "runtime"}, Spec: corev1.PodSpec{ServiceAccountName: "loader", Containers: []corev1.Container{{Name: "db", Image: "db"}, {Name: kbagent.ContainerName, Image: "tools"}}, InitContainers: []corev1.Container{{Name: kbagent.ContainerName4Worker, Image: "tools", Args: []string{"--server=false"}, VolumeMounts: []corev1.VolumeMount{{Name: "data", MountPath: "/data"}}}}, Volumes: []corev1.Volume{{Name: "data", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "data-demo-1"}}}}}}
+}
+
+func TestCleanupPreservesExplicitTasksAndActualConfiguration(t *testing.T) {
+	pod := dataPod()
+	env, _ := kbagent.BuildEnv4Worker([]proto.Task{{Task: "explicit", UID: "retained"}, {Instance: "demo", Task: "newReplica", UID: pod.Name, Replicas: pod.Name, NewReplica: &proto.NewReplicaTask{Replicas: pod.Name}}})
+	pod.Spec.InitContainers[0].Env = []corev1.EnvVar{*env, {Name: "USER", Value: "keep"}}
+	before := pod.Spec.DeepCopy()
+	if changed, err := CleanTask(&pod.Spec, pod.Name); err != nil || !changed {
+		t.Fatalf("cleanup=%v, %v", changed, err)
+	}
+	var tasks []proto.Task
+	if err := json.Unmarshal([]byte(envValue(pod.Spec.InitContainers[0], taskEnv)), &tasks); err != nil || len(tasks) != 1 || tasks[0].UID != "retained" {
+		t.Fatalf("remaining tasks=%v, %v", tasks, err)
+	}
+	FilterTransient(before)
+	if !reflect.DeepEqual(before, &pod.Spec) {
+		t.Fatal("cleanup changed persistent configuration")
+	}
+}
+
+func TestDataObservationRequiresMatchingSuccessfulWorker(t *testing.T) {
+	for _, mode := range []string{"no-task", "other-target", "running", "failed", "other-init", "completed"} {
+		t.Run(mode, func(t *testing.T) {
+			pod := dataPod()
+			target := pod.Name
+			if mode == "other-target" {
+				target = "other"
+			}
+			if mode != "no-task" {
+				env, _ := kbagent.BuildEnv4Worker([]proto.Task{{Instance: "demo", Task: "newReplica", UID: target, Replicas: target, NewReplica: &proto.NewReplicaTask{Replicas: target}}})
+				pod.Spec.InitContainers[0].Env = []corev1.EnvVar{*env}
+			}
+			state := corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 0}}
+			worker := kbagent.ContainerName4Worker
+			if mode == "running" {
+				state = corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}
+			}
+			if mode == "failed" {
+				state.Terminated.ExitCode = 1
+			}
+			if mode == "other-init" {
+				worker = "other"
+			}
+			pod.Status.InitContainerStatuses = []corev1.ContainerStatus{{Name: worker, State: state}}
+			status := &workloads.InstanceStatus{DataLoaded: ptr.To(false)}
+			if _, err := ObserveData(status, pod); err != nil {
+				t.Fatal(err)
+			}
+			if *status.DataLoaded != (mode == "completed") {
+				t.Fatalf("unexpected result=%v", *status.DataLoaded)
+			}
+			status.DataLoaded = ptr.To(true)
+			if _, err := ObserveData(status, pod); err != nil || !*status.DataLoaded {
+				t.Fatal("committed result regressed", err)
+			}
+		})
+	}
+}
+
+func TestDataSourceRetirementUsesMembershipResult(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		status workloads.InstanceStatus
+		usable bool
+	}{
+		{name: "retiring bootstrap", status: workloads.InstanceStatus{DesiredState: workloads.InstanceDesiredStateReleased}, usable: true},
+		{name: "retiring member", status: workloads.InstanceStatus{DesiredState: workloads.InstanceDesiredStateReleased, MemberJoined: ptr.To(true)}, usable: true},
+		{name: "left member", status: workloads.InstanceStatus{DesiredState: workloads.InstanceDesiredStateReleased, MemberJoined: ptr.To(false)}},
+		{name: "offline member", status: workloads.InstanceStatus{DesiredState: workloads.InstanceDesiredStateOffline, MemberJoined: ptr.To(true)}},
+		{name: "loading member", status: workloads.InstanceStatus{DesiredState: workloads.InstanceDesiredStateActive, DataLoaded: ptr.To(false)}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			its := dataWorkload()
+			tc.status.PodName = "demo-0"
+			its.Status.InstanceStatus = []workloads.InstanceStatus{tc.status}
+			pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "demo-0"}, Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: kbagent.ContainerName, Ports: []corev1.ContainerPort{{Name: kbagent.DefaultStreamingPortName, ContainerPort: 3502}}}}}, Status: corev1.PodStatus{Phase: corev1.PodRunning, PodIP: "10.0.0.1", Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}}}
+			source, err := SourcePod(its, []*corev1.Pod{pod}, "demo-1", nil)
+			if tc.usable {
+				if err != nil || source != pod {
+					t.Fatalf("live source was rejected: %v", err)
+				}
+			} else if err == nil || source != nil {
+				t.Fatalf("unusable source was selected: %v %v", source, err)
+			}
+		})
+	}
+}
+
+func TestTaskCleanupPreservesOtherInstances(t *testing.T) {
+	own := proto.Task{Instance: "demo", Task: "newReplica", UID: "demo-1", Replicas: "demo-1", NewReplica: &proto.NewReplicaTask{Replicas: "demo-1"}}
+	other := proto.Task{Instance: "demo", Task: "newReplica", UID: "demo-2", Replicas: "demo-2", NewReplica: &proto.NewReplicaTask{Replicas: "demo-2"}}
+	env, _ := kbagent.BuildEnv4Worker([]proto.Task{own, other})
+	cm := &corev1.ConfigMap{Data: map[string]string{taskEnv: env.Value}}
+	if changed, err := CleanTaskConfigMap(cm, "demo-1"); err != nil || !changed {
+		t.Fatalf("cleanup=%v,%v", changed, err)
+	}
+	var tasks []proto.Task
+	if err := json.Unmarshal([]byte(cm.Data[taskEnv]), &tasks); err != nil || len(tasks) != 1 || tasks[0].UID != "demo-2" {
+		t.Fatalf("tasks=%v,%v", tasks, err)
+	}
+}
+
+func TestDataActionsPreservePreparedWorkerEnvironment(t *testing.T) {
+	its, pod := dataWorkload(), dataPod()
+	identity := corev1.EnvVar{Name: "KB_AGENT_POD_NAME", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"}}}
+	pod.Spec.InitContainers[0].Env = []corev1.EnvVar{identity, {Name: "USER_CONFIG", Value: "keep"}}
+	if err := ConfigurePod(its, pod); err != nil {
+		t.Fatal(err)
+	}
+	worker := &pod.Spec.InitContainers[0]
+	if len(worker.Env) != 4 || !reflect.DeepEqual(worker.Env[0], identity) || envValue(*worker, "USER_CONFIG") != "keep" {
+		t.Fatalf("action merge changed runtime environment: %#v", worker.Env)
+	}
+	if task, err := DataTask(&pod.Spec, pod.Name); err != nil || task != nil {
+		t.Fatal("action configuration generated a task", err)
+	}
+	var actions []proto.Action
+	if err := json.Unmarshal([]byte(envValue(*worker, "KB_AGENT_ACTION")), &actions); err != nil {
+		t.Fatal(err)
+	}
+	if len(actions) != 1 || actions[0].Name != "dataLoad" || envValue(*worker, "KB_AGENT_STREAMING") != "dataLoad" {
+		t.Fatalf("worker actions=%#v", actions)
+	}
+	pod = dataPod()
+	if err := ConfigurePod(its, pod); err != nil {
+		t.Fatal(err)
+	}
+	for _, env := range pod.Spec.InitContainers[0].Env {
+		if env.Name == "KB_AGENT_POD_NAME" {
+			t.Fatal("workload injected missing caller identity environment")
+		}
+	}
+}

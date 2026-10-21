@@ -22,6 +22,7 @@ package instance
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -34,6 +35,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
 func TestStatusReconcilerPublishesInstanceCurrentState(t *testing.T) {
@@ -404,5 +407,56 @@ func TestStatusReconcilerRecordsProvisioningAndPreservesMembership(t *testing.T)
 				t.Fatalf("runtime removal erased historical facts: %#v", inst.Status)
 			}
 		}
+	}
+}
+
+func TestDataResultRequiresAppliedTaskAndCurrentWorkerSuccess(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		actual   bool
+		remote   string
+		worker   corev1.ContainerStatus
+		complete bool
+	}{
+		{name: "missing task", worker: corev1.ContainerStatus{Name: kbagent.ContainerName4Worker, State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 0}}}},
+		{name: "different applied input", actual: true, remote: "old-source", worker: corev1.ContainerStatus{Name: kbagent.ContainerName4Worker, State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 0}}}},
+		{name: "unrelated init", actual: true, remote: "source", worker: corev1.ContainerStatus{Name: "other-init", State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 0}}}},
+		{name: "running worker", actual: true, remote: "source", worker: corev1.ContainerStatus{Name: kbagent.ContainerName4Worker, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}, LastTerminationState: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 0}}}},
+		{name: "failed worker", actual: true, remote: "source", worker: corev1.ContainerStatus{Name: kbagent.ContainerName4Worker, State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 1}}}},
+		{name: "matching success", actual: true, remote: "source", worker: corev1.ContainerStatus{Name: kbagent.ContainerName4Worker, State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 0}}}, complete: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			taskSpec := func(remote string) corev1.PodSpec {
+				env, err := kbagent.BuildEnv4Worker([]proto.Task{{Instance: "demo", Task: "newReplica", UID: "demo-1", Replicas: "demo-1", NewReplica: &proto.NewReplicaTask{Remote: remote, Port: 3502, Replicas: "demo-1"}}})
+				if err != nil {
+					t.Fatal(err)
+				}
+				return corev1.PodSpec{InitContainers: []corev1.Container{{Name: kbagent.ContainerName4Worker, Env: []corev1.EnvVar{*env}}}}
+			}
+			inst := &workloads.Instance{ObjectMeta: metav1.ObjectMeta{Name: "demo-1", Namespace: "default"}, Spec: workloads.InstanceSpec{Template: corev1.PodTemplateSpec{Spec: taskSpec("source")}}}
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(inst)
+			pod := &corev1.Pod{ObjectMeta: inst.ObjectMeta, Status: corev1.PodStatus{Phase: corev1.PodPending, InitContainerStatuses: []corev1.ContainerStatus{tc.worker}}}
+			if tc.actual {
+				pod.Spec = taskSpec(tc.remote)
+			}
+			if err := tree.Add(pod); err != nil {
+				t.Fatal(err)
+			}
+			result, err := NewStatusReconciler().Reconcile(tree)
+			if err != nil || result != kubebuilderx.RetryAfter(time.Second) || inst.Status.DataLoaded == nil || *inst.Status.DataLoaded != tc.complete {
+				t.Fatalf("result=%#v data=%v err=%v", result, inst.Status.DataLoaded, err)
+			}
+			if err := tree.Delete(pod); err != nil {
+				t.Fatal(err)
+			}
+			inst.Spec.Stop = ptr.To(true)
+			if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			if inst.Status.DataLoaded == nil || *inst.Status.DataLoaded != tc.complete {
+				t.Fatal("Stop erased tracked result")
+			}
+		})
 	}
 }

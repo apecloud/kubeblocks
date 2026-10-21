@@ -39,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 func NewTreeLoader() kubebuilderx.TreeLoader {
@@ -106,6 +107,8 @@ func loadCompressedInstanceTemplates(ctx context.Context, reader client.Reader, 
 	return nil
 }
 
+type retainedResourcesKey struct{}
+
 // Runtime resources belong to Instance. They are observations only in the parent tree.
 func loadLifecycleRuntime(ctx context.Context, reader client.Reader, tree *kubebuilderx.ObjectTree) error {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
@@ -138,16 +141,49 @@ func loadLifecycleRuntime(ctx context.Context, reader client.Reader, tree *kubeb
 	for _, status := range its.Status.InstanceStatus {
 		names.Insert(status.PodName)
 	}
+	retained := sets.New[string]()
 	for _, name := range sets.List(names) {
 		inst := instances[name]
 		if inst == nil {
 			inst = desired[name]
 		}
 		if inst == nil {
+			if status := instanceLifecycleStatus(its, name); status != nil && status.TemplateName != nil && status.DataLoaded != nil {
+				ext, err := instancetemplate.BuildInstanceSetExt(its, tree)
+				if err != nil {
+					return err
+				}
+				for _, template := range instancetemplate.BuildInstanceTemplateExt(ext) {
+					if template.Name != *status.TemplateName {
+						continue
+					}
+					inst, err = buildInstanceByTemplate(tree, name, template, its)
+					if err != nil {
+						return err
+					}
+					break
+				}
+			}
+		}
+		if inst == nil {
 			inst = &workloads.Instance{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: its.Namespace}}
 		}
 		_, ordinal := parseParentNameAndOrdinal(name)
 		inst = multicluster.Assign(ctx, inst.DeepCopy(), func() int { return max(0, ordinal) }).(*workloads.Instance)
+		if status := instanceLifecycleStatus(its, name); status != nil && status.DataLoaded != nil {
+			for _, claim := range inst.Spec.VolumeClaimTemplates {
+				pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+					Name: intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{ObjectMeta: claim.ObjectMeta}, its.Name, name), Namespace: its.Namespace, Annotations: inst.Annotations,
+				}}
+				if err := reader.Get(ctx, client.ObjectKeyFromObject(pvc), pvc, multicluster.InDataContext()); err != nil {
+					if !errors.IsNotFound(err) {
+						return err
+					}
+				} else {
+					retained.Insert(name)
+				}
+			}
+		}
 		pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: its.Namespace, Annotations: inst.Annotations}}
 		if err := reader.Get(ctx, client.ObjectKeyFromObject(pod), pod, multicluster.InDataContext()); err != nil {
 			if !errors.IsNotFound(err) {
@@ -158,5 +194,6 @@ func loadLifecycleRuntime(ctx context.Context, reader client.Reader, tree *kubeb
 			return err
 		}
 	}
+	tree.Context = context.WithValue(tree.Context, retainedResourcesKey{}, retained)
 	return nil
 }

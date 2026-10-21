@@ -71,6 +71,9 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 	for _, inst := range instances {
 		if status := instanceLifecycleStatus(its, inst.Name); status != nil {
 			status.Provisioned = status.Provisioned || inst.Status.Provisioned
+			if inst.Status.DataLoaded != nil && (!ptr.Deref(status.DataLoaded, false) || *inst.Status.DataLoaded) {
+				status.DataLoaded = ptr.To(*inst.Status.DataLoaded)
+			}
 			if inst.Status.MemberJoined != nil {
 				status.MemberJoined = ptr.To(*inst.Status.MemberJoined)
 			}
@@ -104,6 +107,9 @@ func reconcileMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, 
 		if current == nil || !current.GetDeletionTimestamp().IsZero() || ptr.Deref(current.(*workloads.Instance).Spec.Stop, false) {
 			return kubebuilderx.Continue, nil
 		}
+	}
+	if join && status.DataLoaded != nil && !*status.DataLoaded {
+		return kubebuilderx.Continue, nil
 	}
 	var pod *corev1.Pod
 	for _, p := range pods {
@@ -196,9 +202,60 @@ func exclusiveRole(its *workloads.InstanceSet, pod *corev1.Pod) bool {
 	return false
 }
 
+func refreshInstanceData(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, inst *workloads.Instance) error {
+	applied := its.DeepCopy()
+	applied.Spec.LifecycleActions = inst.Spec.LifecycleActions
+	return lifecycleCreateInstance(tree, applied, inst)
+}
+
 func configureInstance(its *workloads.InstanceSet, inst *workloads.Instance) error {
 	pod := &corev1.Pod{ObjectMeta: inst.ObjectMeta, Spec: inst.Spec.Template.Spec}
 	if err := workloadlifecycle.ConfigurePod(its, pod); err != nil {
+		return err
+	}
+	if _, err := workloadlifecycle.CleanTask(&pod.Spec, inst.Name); err != nil {
+		return err
+	}
+	inst.Spec.Template.Spec = pod.Spec
+	return nil
+}
+
+func lifecycleCreateInstance(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, inst *workloads.Instance) error {
+	if !workloadlifecycle.HasData(its) {
+		return nil
+	}
+	status := instanceLifecycleStatus(its, inst.Name)
+	completed := status == nil || status.DataLoaded == nil || *status.DataLoaded
+	currentSpec := &inst.Spec.Template.Spec
+	if current, err := tree.Get(inst); err != nil {
+		return err
+	} else if current != nil {
+		child := current.(*workloads.Instance)
+		completed = completed || ptr.Deref(child.Status.DataLoaded, false)
+		currentSpec = &child.Spec.Template.Spec
+	}
+	if completed {
+		if _, err := workloadlifecycle.CleanTask(&inst.Spec.Template.Spec, inst.Name); err != nil {
+			return err
+		}
+		for i := range inst.Spec.InstanceAssistantObjects {
+			if cm := inst.Spec.InstanceAssistantObjects[i].ConfigMap; cm != nil {
+				if _, err := workloadlifecycle.CleanTaskConfigMap(cm, inst.Name); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+	if ptr.Deref(its.Spec.Stop, false) {
+		return nil
+	}
+	pod := &corev1.Pod{ObjectMeta: inst.ObjectMeta, Spec: inst.Spec.Template.Spec}
+	source, err := workloadlifecycle.SourcePod(its, lifecyclePods(tree), inst.Name, currentSpec)
+	if err != nil {
+		return err
+	}
+	if err := workloadlifecycle.ConfigureDataTask(its, pod, source); err != nil {
 		return err
 	}
 	inst.Spec.Template.Spec = pod.Spec

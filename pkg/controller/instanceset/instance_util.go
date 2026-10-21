@@ -426,6 +426,9 @@ func buildInstancePodByTemplate(name string, template *instancetemplate.Instance
 	if err := workloadlifecycle.ConfigurePod(parent, pod); err != nil {
 		return nil, err
 	}
+	if _, err := workloadlifecycle.CleanTask(&pod.Spec, name); err != nil {
+		return nil, err
+	}
 	return pod, nil
 }
 

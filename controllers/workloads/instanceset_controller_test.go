@@ -4418,3 +4418,1114 @@ func TestInstanceSetZeroToOneJoinsMember(t *testing.T) {
 		})
 	}
 }
+
+func newDataLifecycleITS(replicas int32) *workloads.InstanceSet {
+	return &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "data-lifecycle", Namespace: "default", UID: "data-lifecycle", Generation: 1,
+			Finalizers: []string{"instanceset.workloads.kubeblocks.io/finalizer"}},
+		Spec: workloads.InstanceSetSpec{
+			Replicas: ptr.To(replicas), Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "data-lifecycle"}},
+			Template: corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "data-lifecycle"}}, Spec: corev1.PodSpec{
+				ServiceAccountName: "data-loader", Containers: []corev1.Container{{Name: "db", Image: "database", VolumeMounts: []corev1.VolumeMount{{Name: "data", MountPath: "/data"}}}, {Name: kbagent.ContainerName, Image: "tools", Ports: []corev1.ContainerPort{{Name: kbagent.DefaultHTTPPortName, ContainerPort: 3501}, {Name: kbagent.DefaultStreamingPortName, ContainerPort: 3502}}}},
+				InitContainers: []corev1.Container{{Name: kbagent.ContainerName4Worker, Image: "tools", Env: []corev1.EnvVar{{Name: "KB_AGENT_POD_NAME", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.name"}}}}, Command: []string{kbagent.BinaryPath}, Args: []string{"--server=false"}, VolumeMounts: []corev1.VolumeMount{{Name: "data", MountPath: "/data"}}}},
+			}},
+			VolumeClaimTemplates: []corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "data"}, Spec: corev1.PersistentVolumeClaimSpec{
+				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}, Resources: corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}},
+			}}},
+			LifecycleActions: &workloads.LifecycleActions{
+				DataDump: &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"dump"}}},
+				DataLoad: &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"load"}}},
+			},
+		},
+	}
+}
+
+func newDataLifecycleEntry(t *testing.T, instanceAPI bool, replicas int32, policy appsv1.PodManagementPolicyType) *lifecycleEntry {
+	t.Helper()
+	var its *workloads.InstanceSet
+	var cli client.Client
+	if instanceAPI {
+		its, cli, _ = its2DataFixture(t, replicas)
+	} else {
+		its = newDataLifecycleITS(replicas)
+		its.Spec.LifecycleActions.MemberJoin = &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"join"}}}
+		its.Spec.LifecycleActions.MemberLeave = &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"leave"}}}
+		cli = newLifecycleEntryClient(t, its, interceptor.Funcs{})
+	}
+	its.Spec.PodManagementPolicy = policy
+	its.Spec.ParallelPodManagementConcurrency = ptr.To(intstr.FromInt(1))
+	if err := cli.Update(context.Background(), its); err != nil {
+		t.Fatal(err)
+	}
+	return &lifecycleEntry{cli: cli, its: its, instanceAPI: instanceAPI}
+}
+
+func markDataWorkerComplete(t *testing.T, cli client.Client, key client.ObjectKey) {
+	t.Helper()
+	pod := &corev1.Pod{}
+	if err := cli.Get(context.Background(), key, pod); err != nil {
+		t.Fatal(err)
+	}
+	task, err := workloadlifecycle.GeneratedTask(&pod.Spec)
+	if err != nil || task == "" {
+		t.Fatalf("worker completion requires a data task: %q %v", task, err)
+	}
+	pod.Status.InitContainerStatuses = []corev1.ContainerStatus{{Name: kbagent.ContainerName4Worker, State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 0}}}}
+	if err := cli.Status().Update(context.Background(), pod); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func (f *lifecycleEntry) markDataLoaded(t *testing.T, name string) {
+	t.Helper()
+	markDataWorkerComplete(t, f.cli, client.ObjectKey{Namespace: f.its.Namespace, Name: name})
+}
+
+func lifecycleTestDataPVCName(pod *corev1.Pod) (string, error) {
+	for _, volume := range pod.Spec.Volumes {
+		if volume.Name == "data" && volume.PersistentVolumeClaim != nil {
+			return volume.PersistentVolumeClaim.ClaimName, nil
+		}
+	}
+	return "", fmt.Errorf("fixture has no data PVC")
+}
+
+func TestInstanceSetLifecycleZeroToOneWaitsForDataSource(t *testing.T) {
+	its := newDataLifecycleITS(0)
+	cli := newLifecycleEntryClient(t, its, interceptor.Funcs{})
+	key := client.ObjectKeyFromObject(its)
+	stored, _, err := reconcileLifecycleITS(t, cli, key)
+	if err != nil || stored.Status.ObservedGeneration != 1 {
+		t.Fatalf("zero bootstrap was not committed: %+v err=%v", stored.Status, err)
+	}
+	stored.Spec.Replicas = ptr.To[int32](1)
+	stored.Generation++
+	if err := cli.Update(context.Background(), stored); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 4; i++ {
+		var result ctrl.Result
+		stored, result, err = reconcileLifecycleITS(t, cli, key)
+		if err != nil || result.RequeueAfter == 0 {
+			t.Fatalf("waiting expansion has no retry: result=%+v err=%v", result, err)
+		}
+	}
+	status := stored.FindInstanceStatus("data-lifecycle-0")
+	if status == nil || status.DataLoaded == nil || *status.DataLoaded || len(lifecycleEntryPods(t, cli)) != 0 {
+		t.Fatalf("zero-to-one bypassed source requirement: status=%+v pods=%+v", status, lifecycleEntryPods(t, cli))
+	}
+}
+
+func TestInstanceSetLifecycleRecoversDataResultAcrossStatusFailureAndPodRecreation(t *testing.T) {
+	ctx := context.Background()
+	its := newDataLifecycleITS(1)
+	rejectCompletion := false
+	cli := newLifecycleEntryClient(t, its, interceptor.Funcs{SubResourceUpdate: func(ctx context.Context, cli client.Client, subresource string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+		if stored, ok := obj.(*workloads.InstanceSet); ok && subresource == "status" && rejectCompletion {
+			if status := stored.FindInstanceStatus("data-lifecycle-1"); status != nil && ptr.Deref(status.DataLoaded, false) {
+				return apierrors.NewConflict(schema.GroupResource{Group: workloads.GroupVersion.Group, Resource: "instancesets"}, obj.GetName(), fmt.Errorf("injected completion status conflict"))
+			}
+		}
+		return cli.SubResource(subresource).Update(ctx, obj, opts...)
+	}})
+	key := client.ObjectKeyFromObject(its)
+	step := func() *workloads.InstanceSet {
+		t.Helper()
+		stored, _, err := reconcileLifecycleITS(t, cli, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return stored
+	}
+	for i := 0; i < 4; i++ {
+		its = step()
+	}
+	source := &corev1.Pod{}
+	if err := cli.Get(ctx, client.ObjectKey{Namespace: its.Namespace, Name: "data-lifecycle-0"}, source); err != nil {
+		t.Fatal(err)
+	}
+	source.Status.PodIP = "10.0.0.1"
+	source.Status.Phase = corev1.PodRunning
+	source.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: metav1.Now()}}
+	if err := cli.Status().Update(ctx, source); err != nil {
+		t.Fatal(err)
+	}
+	its = step()
+	its.Spec.Replicas = ptr.To[int32](2)
+	its.Generation++
+	if err := cli.Update(ctx, its); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 4; i++ {
+		its = step()
+	}
+	targetKey := client.ObjectKey{Namespace: its.Namespace, Name: "data-lifecycle-1"}
+	target := &corev1.Pod{}
+	if err := cli.Get(ctx, targetKey, target); err != nil {
+		t.Fatal(err)
+	}
+	assertTask := func(pod *corev1.Pod, wantTask bool) {
+		t.Helper()
+		var task bool
+		for _, c := range pod.Spec.InitContainers {
+			for _, env := range c.Env {
+				task = task || env.Name == "KB_AGENT_TASK"
+			}
+		}
+		if task != wantTask {
+			t.Fatalf("target task=%v, want task=%v: %+v", task, wantTask, pod.Spec.InitContainers)
+		}
+	}
+	assertTask(target, true)
+	markDataWorkerComplete(t, cli, client.ObjectKey{Namespace: its.Namespace, Name: "data-lifecycle-1"})
+	rejectCompletion = true
+	stored, result, err := reconcileLifecycleITS(t, cli, key)
+	if err != nil || !result.Requeue || ptr.Deref(stored.FindInstanceStatus(targetKey.Name).DataLoaded, false) {
+		t.Fatalf("completion conflict was not exercised: status=%+v err=%v", stored.Status.InstanceStatus, err)
+	}
+	if err := cli.Get(ctx, targetKey, target); err != nil {
+		t.Fatal(err)
+	}
+	assertTask(target, true)
+	rejectCompletion = false
+	its = step()
+	if !ptr.Deref(its.FindInstanceStatus(targetKey.Name).DataLoaded, false) {
+		t.Fatal("fresh reconciler did not recover worker result")
+	}
+	target.Finalizers = nil
+	if err := cli.Update(ctx, target); err != nil {
+		t.Fatal(err)
+	}
+	if err := cli.Delete(ctx, target); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		its = step()
+	}
+	if err := cli.Get(ctx, targetKey, target); err != nil {
+		t.Fatal(err)
+	}
+	assertTask(target, false)
+	target.Status.Phase = corev1.PodPending
+	if err := cli.Status().Update(ctx, target); err != nil {
+		t.Fatal(err)
+	}
+	if !ptr.Deref(its.FindInstanceStatus(targetKey.Name).DataLoaded, false) {
+		t.Fatal("runtime reconstruction lost completed data result")
+	}
+}
+
+func TestInstanceSetLifecycleRefreshesPendingWorkerAfterDonorAddressChanges(t *testing.T) {
+	ctx := context.Background()
+	its := newDataLifecycleITS(1)
+	its.Spec.DisableDefaultHeadlessService = true
+	cli := newLifecycleEntryClient(t, its, interceptor.Funcs{})
+	key := client.ObjectKeyFromObject(its)
+	step := func() {
+		t.Helper()
+		var err error
+		its, _, err = reconcileLifecycleITS(t, cli, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := 0; i < 4; i++ {
+		step()
+	}
+	source := &corev1.Pod{}
+	sourceKey := client.ObjectKey{Namespace: its.Namespace, Name: "data-lifecycle-0"}
+	if err := cli.Get(ctx, sourceKey, source); err != nil {
+		t.Fatal(err)
+	}
+	source.Status = corev1.PodStatus{PodIP: "10.0.0.1", Phase: corev1.PodRunning, Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: metav1.Now()}}}
+	if err := cli.Status().Update(ctx, source); err != nil {
+		t.Fatal(err)
+	}
+	step()
+	its.Spec.Replicas = ptr.To[int32](2)
+	its.Generation++
+	if err := cli.Update(ctx, its); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 4; i++ {
+		step()
+	}
+	target := &corev1.Pod{}
+	targetKey := client.ObjectKey{Namespace: its.Namespace, Name: "data-lifecycle-1"}
+	if err := cli.Get(ctx, targetKey, target); err != nil {
+		t.Fatal(err)
+	}
+	target.Status.Phase = corev1.PodPending
+	if err := cli.Status().Update(ctx, target); err != nil {
+		t.Fatal(err)
+	}
+	oldTask, err := workloadlifecycle.GeneratedTask(&target.Spec)
+	if err != nil || oldTask == "" {
+		t.Fatalf("missing generated worker %s %v", oldTask, err)
+	}
+	source.Status.PodIP = "10.0.0.99"
+	if err := cli.Status().Update(ctx, source); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		step()
+	}
+	if err := cli.Get(ctx, targetKey, target); err != nil {
+		t.Fatal(err)
+	}
+	current, err := workloadlifecycle.GeneratedTask(&target.Spec)
+	if err != nil || current == oldTask {
+		t.Fatalf("pending worker kept stale donor: %s %v", current, err)
+	}
+	var task kbaproto.Task
+	if err := json.Unmarshal([]byte(current), &task); err != nil {
+		t.Fatal(err)
+	}
+	if task.NewReplica.Remote != "10.0.0.99" {
+		t.Fatalf("pending worker did not use current donor address: %+v", task)
+	}
+	target.Status.Phase = corev1.PodRunning
+	if err := cli.Status().Update(ctx, target); err != nil {
+		t.Fatal(err)
+	}
+	source.Status.PodIP = "10.0.0.100"
+	if err := cli.Status().Update(ctx, source); err != nil {
+		t.Fatal(err)
+	}
+	step()
+	if err := cli.Get(ctx, targetKey, target); err != nil {
+		t.Fatal("running database was deleted for stale completed init instructions", err)
+	}
+}
+
+func TestInstanceSetLifecycleReexpandRetainedDataRestoresResultAndJoins(t *testing.T) {
+	ctx := context.Background()
+	its := newDataLifecycleITS(1)
+	its.Spec.LifecycleActions.MemberJoin = &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"join"}}}
+	its.Spec.LifecycleActions.MemberLeave = &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"leave"}}}
+	its.Spec.PersistentVolumeClaimRetentionPolicy = &workloads.PersistentVolumeClaimRetentionPolicy{WhenScaled: kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType}
+	var joins, leaves int
+	agent := kbacli.NewMockClient(gomock.NewController(t))
+	agent.EXPECT().Action(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, req kbaproto.ActionRequest) (kbaproto.ActionResponse, error) {
+		switch req.Action {
+		case "memberJoin":
+			joins++
+		case "memberLeave":
+			leaves++
+		}
+		return kbaproto.ActionResponse{}, nil
+	}).AnyTimes()
+	kbacli.SetMockClient(agent, nil)
+	t.Cleanup(kbacli.UnsetMockClient)
+	cli := newLifecycleEntryClient(t, its, interceptor.Funcs{})
+	key := client.ObjectKeyFromObject(its)
+	step := func() {
+		t.Helper()
+		var err error
+		its, _, err = reconcileLifecycleITS(t, cli, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	ready := func(name string) {
+		t.Helper()
+		pod := &corev1.Pod{}
+		if err := cli.Get(ctx, client.ObjectKey{Namespace: its.Namespace, Name: name}, pod); err != nil {
+			t.Fatal(err)
+		}
+		pod.Status = corev1.PodStatus{InitContainerStatuses: pod.Status.InitContainerStatuses, Phase: corev1.PodRunning, PodIP: "10.0.0.1", Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: metav1.Now()}}}
+		if err := cli.Status().Update(ctx, pod); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := 0; i < 4; i++ {
+		step()
+	}
+	ready("data-lifecycle-0")
+	step()
+	its.Spec.Replicas = ptr.To[int32](2)
+	its.Generation++
+	if err := cli.Update(ctx, its); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 4; i++ {
+		step()
+	}
+	pvcKey := client.ObjectKey{Namespace: its.Namespace, Name: "data-data-lifecycle-1"}
+	pvc := &corev1.PersistentVolumeClaim{}
+	if err := cli.Get(ctx, pvcKey, pvc); err != nil {
+		t.Fatal(err)
+	}
+	markDataWorkerComplete(t, cli, client.ObjectKey{Namespace: its.Namespace, Name: "data-lifecycle-1"})
+	ready("data-lifecycle-1")
+	for i := 0; i < 3; i++ {
+		step()
+	}
+	if joins != 1 {
+		t.Fatalf("first expansion did not join: %d", joins)
+	}
+	its.Spec.Replicas = ptr.To[int32](1)
+	its.Generation++
+	if err := cli.Update(ctx, its); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 5; i++ {
+		step()
+	}
+	retained := its.FindInstanceStatus("data-lifecycle-1")
+	if leaves != 1 || retained == nil || retained.DesiredState != workloads.InstanceDesiredStateReleased || !ptr.Deref(retained.DataLoaded, false) || ptr.Deref(retained.MemberJoined, true) {
+		t.Fatalf("retained shrink lost the instance result: leaves=%d status=%+v", leaves, its.Status.InstanceStatus)
+	}
+	if err := cli.Get(ctx, pvcKey, pvc); err != nil {
+		t.Fatal("retained data PVC was deleted", err)
+	}
+	its.Spec.Replicas = ptr.To[int32](2)
+	its.Generation++
+	if err := cli.Update(ctx, its); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 4; i++ {
+		step()
+	}
+	status := its.FindInstanceStatus("data-lifecycle-1")
+	if status == nil || !ptr.Deref(status.DataLoaded, false) || status.MemberJoined == nil || *status.MemberJoined {
+		t.Fatalf("retained expansion did not restore data and track membership separately: %+v", status)
+	}
+	target := &corev1.Pod{}
+	if err := cli.Get(ctx, client.ObjectKey{Namespace: its.Namespace, Name: "data-lifecycle-1"}, target); err != nil {
+		t.Fatal(err)
+	}
+	task, err := workloadlifecycle.GeneratedTask(&target.Spec)
+	if err != nil || task != "" {
+		t.Fatal("retained completed data was reloaded", err)
+	}
+	ready("data-lifecycle-1")
+	step()
+	if joins != 2 || !ptr.Deref(its.FindInstanceStatus("data-lifecycle-1").MemberJoined, false) {
+		t.Fatalf("retained re-expansion skipped actual join: %d %+v", joins, its.Status.InstanceStatus)
+	}
+}
+
+func TestInstanceSetLifecyclePendingCopiesAllowCancellationAndOffline(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		for _, operation := range []struct{ offline, loaded, noSource bool }{{}, {loaded: true}, {noSource: true}, {offline: true}} {
+			t.Run(fmt.Sprintf("instanceAPI=%t/offline=%t/loaded=%t/noSource=%t", instanceAPI, operation.offline, operation.loaded, operation.noSource), func(t *testing.T) {
+				ctx := context.Background()
+				bootstrap := 1
+				if operation.offline {
+					bootstrap = 2
+				}
+				f := newDataLifecycleEntry(t, instanceAPI, int32(bootstrap), appsv1.ParallelPodManagement)
+				if operation.offline {
+					f.its.Spec.LifecycleActions.DataDump.TargetPodSelector = kbappsv1.OrdinalSelector
+					f.its.Spec.LifecycleActions.DataDump.MatchingKey = "0"
+					if err := f.cli.Update(ctx, f.its); err != nil {
+						t.Fatal(err)
+					}
+				}
+				f.bootstrap(t, bootstrap)
+				agent := &its2LifecycleAgent{}
+				kbacli.SetMockClient(agent, nil)
+				defer kbacli.UnsetMockClient()
+				f.its.Spec.Replicas = ptr.To[int32](3)
+				f.its.Spec.ParallelPodManagementConcurrency = ptr.To(intstr.FromInt(3))
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				for round := 0; round < 8; round++ {
+					f.stepWithChildren(t)
+				}
+				for _, pod := range lifecycleEntryPods(t, f.cli) {
+					if pod.Name == f.its.Name+"-0" || (operation.offline && pod.Name == f.its.Name+"-1") {
+						continue
+					}
+					pod.Status.Phase = corev1.PodPending
+					if err := f.cli.Status().Update(ctx, &pod); err != nil {
+						t.Fatal(err)
+					}
+				}
+				removeName := f.its.Name + "-2"
+				pendingName := f.its.Name + "-1"
+				if operation.noSource {
+					f.its.Spec.LifecycleActions.DataDump.TargetPodSelector = kbappsv1.OrdinalSelector
+					f.its.Spec.LifecycleActions.DataDump.MatchingKey = "99"
+				}
+				if operation.loaded {
+					f.markDataLoaded(t, removeName)
+					for round := 0; round < 6; round++ {
+						f.stepWithChildren(t)
+					}
+				}
+				if operation.offline {
+					removeName = f.its.Name + "-0"
+					pendingName = f.its.Name + "-2"
+					f.its.Spec.OfflineInstances = []string{removeName}
+				} else {
+					f.its.Spec.Replicas = ptr.To[int32](2)
+				}
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				for round := 0; round < 16; round++ {
+					f.stepWithChildren(t)
+				}
+				if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: removeName}, &corev1.Pod{}); !apierrors.IsNotFound(err) {
+					t.Fatalf("another pending copy blocked requested runtime removal: %v", err)
+				}
+				status := f.its.FindInstanceStatus(pendingName)
+				if status == nil || status.DataLoaded == nil || *status.DataLoaded || len(agent.calls) != 0 {
+					t.Fatalf("uncompleted copy changed result or membership: %#v calls=%v", status, agent.calls)
+				}
+			})
+		}
+	}
+}
+
+func TestInstanceSetLifecycleDeletionPreservesExternalDataPVC(t *testing.T) {
+	for _, policy := range []kbappsv1.PersistentVolumeClaimRetentionPolicyType{"", kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType, kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType} {
+		t.Run(string(policy), func(t *testing.T) {
+			ctx := context.Background()
+			its := newDataLifecycleITS(1)
+			its.Spec.VolumeClaimTemplates = nil
+			its.Spec.Template.Spec.Volumes = []corev1.Volume{{Name: "data", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "external-data"}}}}
+			if policy != "" {
+				its.Spec.PersistentVolumeClaimRetentionPolicy = &workloads.PersistentVolumeClaimRetentionPolicy{WhenDeleted: policy}
+			}
+			cli := newLifecycleEntryClient(t, its, interceptor.Funcs{})
+			pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "external-data", Namespace: its.Namespace, UID: "external-data", Annotations: map[string]string{"owner": "external"}}}
+			if err := cli.Create(ctx, pvc); err != nil {
+				t.Fatal(err)
+			}
+			f := &lifecycleEntry{cli: cli, its: its}
+			f.bootstrap(t, 1)
+			before := pvc.DeepCopy()
+			if err := cli.Delete(ctx, its); err != nil {
+				t.Fatal(err)
+			}
+			deleted := false
+			for round := 0; round < 8; round++ {
+				r := &InstanceSetReconciler{Client: cli, Scheme: cli.Scheme(), Recorder: record.NewFakeRecorder(100)}
+				if _, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(its)}); err != nil {
+					t.Fatal(err)
+				}
+				if err := cli.Get(ctx, client.ObjectKeyFromObject(its), &workloads.InstanceSet{}); apierrors.IsNotFound(err) {
+					deleted = true
+					break
+				} else if err != nil {
+					t.Fatal(err)
+				}
+			}
+			if !deleted {
+				t.Fatal("external data PVC prevented InstanceSet deletion")
+			}
+			if err := cli.Get(ctx, client.ObjectKeyFromObject(pvc), pvc); err != nil {
+				t.Fatalf("external data PVC was deleted: %v", err)
+			}
+			if pvc.ResourceVersion != before.ResourceVersion || pvc.UID != before.UID || len(pvc.OwnerReferences) != 0 || pvc.Annotations["owner"] != "external" {
+				t.Fatalf("external data PVC was modified: %#v", pvc)
+			}
+			if pods := lifecycleEntryPods(t, cli); len(pods) != 0 {
+				t.Fatalf("owned Pods survived InstanceSet deletion: %v", pods)
+			}
+		})
+	}
+}
+
+func TestInstanceSetLifecycleResumesDataSourceBeforeEarlierNamedTarget(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		for _, policy := range []appsv1.PodManagementPolicyType{appsv1.OrderedReadyPodManagement, appsv1.ParallelPodManagement} {
+			t.Run(fmt.Sprintf("instanceAPI=%t/%s", instanceAPI, policy), func(t *testing.T) {
+				ctx := context.Background()
+				f := newDataLifecycleEntry(t, instanceAPI, 1, policy)
+				its, cli := f.its, f.cli
+				its.Spec.Instances = []workloads.InstanceTemplate{{Name: "z", Replicas: ptr.To[int32](1)}}
+				if err := cli.Update(ctx, its); err != nil {
+					t.Fatal(err)
+				}
+				f.bootstrap(t, 1)
+				sourceName, targetName := its.Name+"-z-0", its.Name+"-a-0"
+				agent := &its2LifecycleAgent{}
+				kbacli.SetMockClient(agent, nil)
+				defer kbacli.UnsetMockClient()
+				f.its.Spec.Replicas = ptr.To[int32](2)
+				f.its.Spec.Instances = append(f.its.Spec.Instances, workloads.InstanceTemplate{Name: "a", Replicas: ptr.To[int32](1)})
+				f.its.Generation++
+				if err := cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				for round := 0; round < 6; round++ {
+					f.stepWithChildren(t)
+				}
+				target := &corev1.Pod{}
+				if err := cli.Get(ctx, client.ObjectKey{Namespace: its.Namespace, Name: targetName}, target); err != nil {
+					t.Fatal(err)
+				}
+				if task, err := workloadlifecycle.GeneratedTask(&target.Spec); err != nil || task == "" || ptr.Deref(f.its.FindInstanceStatus(targetName).DataLoaded, true) {
+					t.Fatalf("expansion was not waiting on its data task: task=%s err=%v status=%#v", task, err, f.its.Status.InstanceStatus)
+				}
+				f.its.Spec.Stop = ptr.To(true)
+				f.its.Generation++
+				if err := cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				for round := 0; round < 12; round++ {
+					f.stepWithChildren(t)
+				}
+				if len(lifecycleEntryPods(t, cli)) != 0 || len(agent.calls) != 0 {
+					t.Fatalf("Stop did not remove runtimes without membership actions: %v", agent.calls)
+				}
+				if instanceAPI {
+					for _, name := range []string{sourceName, targetName} {
+						child := its2LifecycleInstance(t, cli, name)
+						if !ptr.Deref(child.Spec.Stop, false) || child.Status.CurrentState != workloads.InstanceCurrentStateAbsent || child.Status.ObservedGeneration != child.Generation {
+							t.Fatalf("Instance did not acknowledge Stop: %#v", child)
+						}
+					}
+				}
+				f.its.Spec.Stop = ptr.To(false)
+				f.its.Generation++
+				if err := cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				waitForPod := func(name string) *corev1.Pod {
+					t.Helper()
+					for round := 0; round < 8; round++ {
+						f.stepWithChildren(t)
+						pod := &corev1.Pod{}
+						err := cli.Get(ctx, client.ObjectKey{Namespace: its.Namespace, Name: name}, pod)
+						if err == nil {
+							return pod
+						}
+						if !apierrors.IsNotFound(err) {
+							t.Fatal(err)
+						}
+					}
+					t.Fatalf("pending data target blocked resume of %s: %#v", name, f.its.Status.Conditions)
+					return nil
+				}
+				waitForPod(sourceName)
+				f.setReady(t, sourceName, true)
+				target = waitForPod(targetName)
+				if task, err := workloadlifecycle.GeneratedTask(&target.Spec); err != nil || task == "" || len(agent.calls) != 0 {
+					t.Fatalf("resume lost pending loading or executed membership early: task=%s calls=%v err=%v", task, agent.calls, err)
+				}
+			})
+		}
+	}
+}
+
+func TestInstanceSetLifecycleKeepsReplacementDataSourceUntilLoadCompletes(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		for _, policy := range []appsv1.PodManagementPolicyType{appsv1.OrderedReadyPodManagement, appsv1.ParallelPodManagement} {
+			t.Run(fmt.Sprintf("instanceAPI=%t/%s", instanceAPI, policy), func(t *testing.T) {
+				ctx := context.Background()
+				f := newDataLifecycleEntry(t, instanceAPI, 1, policy)
+				f.bootstrap(t, 1)
+				sourceName, targetName := f.its.Name+"-0", f.its.Name+"-1"
+				agent := &its2LifecycleAgent{}
+				kbacli.SetMockClient(agent, nil)
+				defer kbacli.UnsetMockClient()
+				f.setReady(t, sourceName, false)
+				f.its.Spec.Ordinals = workloads.Ordinals{Discrete: []int32{1}}
+				f.its.Spec.ParallelPodManagementConcurrency = ptr.To(intstr.FromInt(2))
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				for round := 0; round < 6; round++ {
+					f.stepWithChildren(t)
+				}
+				if source := f.its.FindInstanceStatus(sourceName); source == nil || source.DesiredState != workloads.InstanceDesiredStateReleased {
+					t.Fatalf("replacement did not release the old allocation: %#v", source)
+				}
+				f.setReady(t, sourceName, true)
+				for round := 0; round < 8; round++ {
+					f.stepWithChildren(t)
+				}
+				target := &corev1.Pod{}
+				if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: targetName}, target); err != nil {
+					t.Fatalf("recovered data source did not unblock replacement: %v", err)
+				}
+				if task, err := workloadlifecycle.GeneratedTask(&target.Spec); err != nil || task == "" {
+					t.Fatalf("replacement has no data task: %s %v", task, err)
+				}
+				if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: sourceName}, &corev1.Pod{}); err != nil || len(agent.calls) != 0 {
+					t.Fatalf("data source retired before loading completed: %v calls=%v", err, agent.calls)
+				}
+				f.markDataLoaded(t, targetName)
+				f.setReady(t, targetName, true)
+				for round := 0; round < 12; round++ {
+					f.stepWithChildren(t)
+				}
+				status := f.its.FindInstanceStatus(targetName)
+				if status == nil || !ptr.Deref(status.DataLoaded, false) || !ptr.Deref(status.MemberJoined, false) || len(agent.calls) != 2 || agent.calls[0] != "memberJoin" || agent.calls[1] != "memberLeave" {
+					t.Fatalf("loaded replacement did not complete membership: status=%#v calls=%v", status, agent.calls)
+				}
+				if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: sourceName}, &corev1.Pod{}); !apierrors.IsNotFound(err) {
+					t.Fatalf("completed replacement retained old runtime: %v", err)
+				}
+			})
+		}
+	}
+}
+
+func TestInstanceSetLifecyclePendingDataDoesNotBlockStopOrCancellation(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		for _, stop := range []bool{false, true} {
+			t.Run(fmt.Sprintf("instanceAPI=%t/stop=%t", instanceAPI, stop), func(t *testing.T) {
+				ctx := context.Background()
+				f := newDataLifecycleEntry(t, instanceAPI, 1, appsv1.OrderedReadyPodManagement)
+				f.bootstrap(t, 1)
+				agent := &its2LifecycleAgent{}
+				kbacli.SetMockClient(agent, nil)
+				defer kbacli.UnsetMockClient()
+				f.its.Spec.Replicas = ptr.To[int32](2)
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				for round := 0; round < 8; round++ {
+					f.stepWithChildren(t)
+				}
+				targetName := f.its.Name + "-1"
+				if status := f.its.FindInstanceStatus(targetName); status == nil || status.DataLoaded == nil || *status.DataLoaded {
+					t.Fatalf("expansion is not waiting for data: %#v", status)
+				}
+				if stop {
+					f.its.Spec.Stop = ptr.To(true)
+				} else {
+					f.its.Spec.Replicas = ptr.To[int32](1)
+				}
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				for round := 0; round < 12; round++ {
+					f.stepWithChildren(t)
+				}
+				wantPods := 1
+				if stop {
+					wantPods = 0
+				}
+				if pods := lifecycleEntryPods(t, f.cli); len(pods) != wantPods || len(agent.calls) != 0 {
+					t.Fatalf("pending data blocked removal or caused membership calls: pods=%v calls=%v", pods, agent.calls)
+				}
+				if stop {
+					status := f.its.FindInstanceStatus(targetName)
+					if status == nil || status.DesiredState != workloads.InstanceDesiredStateOffline || status.DataLoaded == nil || *status.DataLoaded {
+						t.Fatalf("Stop changed pending data result: %#v", status)
+					}
+				} else if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: targetName}, &corev1.Pod{}); !apierrors.IsNotFound(err) {
+					t.Fatalf("cancelled data target still exists: %v", err)
+				}
+			})
+		}
+	}
+}
+
+func TestInstanceSetLifecycleKeepsHealthyDataSource(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		t.Run(fmt.Sprintf("instanceAPI=%t", instanceAPI), func(t *testing.T) {
+			ctx := context.Background()
+			f := newDataLifecycleEntry(t, instanceAPI, 2, appsv1.ParallelPodManagement)
+			f.bootstrap(t, 2)
+			source := &corev1.Pod{}
+			if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-1"}, source); err != nil {
+				t.Fatal(err)
+			}
+			source.Status.PodIP = "10.0.0.2"
+			if err := f.cli.Status().Update(ctx, source); err != nil {
+				t.Fatal(err)
+			}
+			f.its.Spec.Replicas = ptr.To[int32](3)
+			f.its.Generation++
+			if err := f.cli.Update(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			for round := 0; round < 6; round++ {
+				f.stepWithChildren(t)
+			}
+			target := &corev1.Pod{}
+			key := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-2"}
+			if err := f.cli.Get(ctx, key, target); err != nil {
+				t.Fatal(err)
+			}
+			target.Status.Phase = corev1.PodPending
+			if err := f.cli.Status().Update(ctx, target); err != nil {
+				t.Fatal(err)
+			}
+			task, err := workloadlifecycle.GeneratedTask(&target.Spec)
+			if err != nil || task == "" {
+				t.Fatalf("expansion did not create a data task: %s %v", task, err)
+			}
+			for round := 0; round < 32; round++ {
+				f.stepWithChildren(t)
+				if err := f.cli.Get(ctx, key, target); err != nil {
+					t.Fatalf("unchanged healthy donors caused target recreation: %v", err)
+				}
+				if current, err := workloadlifecycle.GeneratedTask(&target.Spec); err != nil || current != task {
+					t.Fatalf("unchanged healthy donors replaced the running task: before=%s after=%s err=%v", task, current, err)
+				}
+			}
+		})
+	}
+}
+
+func TestInstanceSetLifecycleRetainedPendingDataRecovery(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		for _, removePVC := range []bool{false, true} {
+			t.Run(fmt.Sprintf("instanceAPI=%t/removePVC=%t", instanceAPI, removePVC), func(t *testing.T) {
+				ctx := context.Background()
+				f := newDataLifecycleEntry(t, instanceAPI, 1, appsv1.ParallelPodManagement)
+				f.its.Spec.PersistentVolumeClaimRetentionPolicy = &workloads.PersistentVolumeClaimRetentionPolicy{WhenScaled: kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType}
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				f.bootstrap(t, 1)
+				agent := &its2LifecycleAgent{}
+				kbacli.SetMockClient(agent, nil)
+				defer kbacli.UnsetMockClient()
+				f.its.Spec.Replicas = ptr.To[int32](2)
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				for round := 0; round < 12; round++ {
+					f.stepWithChildren(t)
+				}
+				targetKey := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-1"}
+				target := &corev1.Pod{}
+				if err := f.cli.Get(ctx, targetKey, target); err != nil {
+					t.Fatal(err)
+				}
+				if task, err := workloadlifecycle.GeneratedTask(&target.Spec); err != nil || task == "" {
+					t.Fatalf("initial expansion has no data task: %q %v", task, err)
+				}
+				if status := f.its.FindInstanceStatus(target.Name); status == nil || status.DataLoaded == nil || *status.DataLoaded {
+					t.Fatalf("initial expansion did not record pending data: %#v", status)
+				}
+				pvcName, err := lifecycleTestDataPVCName(target)
+				if err != nil {
+					t.Fatal(err)
+				}
+				target.Status.Phase = corev1.PodPending
+				if err := f.cli.Status().Update(ctx, target); err != nil {
+					t.Fatal(err)
+				}
+				f.its.Spec.Replicas = ptr.To[int32](1)
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				for round := 0; round < 24; round++ {
+					f.stepWithChildren(t)
+				}
+				if err := f.cli.Get(ctx, targetKey, &corev1.Pod{}); !apierrors.IsNotFound(err) {
+					t.Fatalf("canceled expansion kept its Pod: %v", err)
+				}
+				pvc := &corev1.PersistentVolumeClaim{}
+				if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: pvcName}, pvc); err != nil {
+					t.Fatal("cancellation did not retain the incomplete data PVC", err)
+				}
+				if len(agent.calls) != 0 {
+					t.Fatalf("cancellation invented data or membership completion: pvc=%#v calls=%v", pvc.Annotations, agent.calls)
+				}
+				if status := f.its.FindInstanceStatus(targetKey.Name); status == nil || status.DesiredState != workloads.InstanceDesiredStateReleased || status.DataLoaded == nil || *status.DataLoaded {
+					t.Fatalf("retained incomplete PVC lost its loading result: %#v", status)
+				}
+				if removePVC {
+					pvc.Finalizers = nil
+					if err := f.cli.Update(ctx, pvc); err != nil {
+						t.Fatal(err)
+					}
+					if err := f.cli.Delete(ctx, pvc); err != nil {
+						t.Fatal(err)
+					}
+					for round := 0; round < 12; round++ {
+						f.stepWithChildren(t)
+					}
+					if status := f.its.FindInstanceStatus(targetKey.Name); status != nil {
+						t.Fatalf("removed retained PVC left a released identity: %#v", status)
+					}
+					return
+				}
+				f.its.Spec.Replicas = ptr.To[int32](2)
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				for round := 0; round < 16; round++ {
+					f.stepWithChildren(t)
+				}
+				status := f.its.FindInstanceStatus(targetKey.Name)
+				if status == nil || status.DataLoaded == nil || *status.DataLoaded {
+					t.Fatalf("re-expansion lost the incomplete data requirement: %#v", status)
+				}
+				if err := f.cli.Get(ctx, targetKey, target); err != nil {
+					t.Fatal(err)
+				}
+				task := its2TaskInput(&workloads.Instance{Spec: workloads.InstanceSpec{Template: corev1.PodTemplateSpec{Spec: target.Spec}}})
+				if task == "" || len(agent.calls) != 0 {
+					t.Fatalf("re-expansion did not restore the task before joining: task=%s calls=%v", task, agent.calls)
+				}
+				f.markDataLoaded(t, target.Name)
+				for round := 0; round < 8; round++ {
+					f.stepWithChildren(t)
+				}
+				f.setReady(t, target.Name, true)
+				for round := 0; round < 12; round++ {
+					f.stepWithChildren(t)
+				}
+				status = f.its.FindInstanceStatus(target.Name)
+				if status == nil || !ptr.Deref(status.DataLoaded, false) || !ptr.Deref(status.MemberJoined, false) || len(agent.calls) != 1 || agent.calls[0] != "memberJoin" {
+					t.Fatalf("re-expanded target did not complete data and join: status=%#v calls=%v", status, agent.calls)
+				}
+			})
+		}
+	}
+}
+
+func TestInstanceSetLifecycleDataResultRetryAndCleanup(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		t.Run(fmt.Sprintf("instanceAPI=%t", instanceAPI), func(t *testing.T) {
+			ctx := context.Background()
+			f := newDataLifecycleEntry(t, instanceAPI, 1, appsv1.ParallelPodManagement)
+			f.bootstrap(t, 1)
+			f.its.Spec.Replicas = ptr.To[int32](2)
+			f.its.Generation++
+			if err := f.cli.Update(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			key := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-1"}
+			for i := 0; i < 12; i++ {
+				f.stepWithChildren(t)
+				if err := f.cli.Get(ctx, key, &corev1.Pod{}); err == nil {
+					break
+				}
+			}
+			pod := &corev1.Pod{}
+			if err := f.cli.Get(ctx, key, pod); err != nil {
+				t.Fatal(err)
+			}
+			before, err := workloadlifecycle.GeneratedTask(&pod.Spec)
+			if err != nil || before == "" {
+				t.Fatalf("missing pending task: %s %v", before, err)
+			}
+			f.its.Spec.MinReadySeconds = 5
+			if err := f.cli.Update(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			source := &corev1.Pod{}
+			if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-0"}, source); err != nil {
+				t.Fatal(err)
+			}
+			for i := range source.Status.Conditions {
+				source.Status.Conditions[i].LastTransitionTime = metav1.NewTime(time.Now().Add(-time.Minute))
+			}
+			if err := f.cli.Status().Update(ctx, source); err != nil {
+				t.Fatal(err)
+			}
+			pod.Status.InitContainerStatuses = []corev1.ContainerStatus{{Name: kbagent.ContainerName4Worker, State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 1}}}}
+			if err := f.cli.Status().Update(ctx, pod); err != nil {
+				t.Fatal(err)
+			}
+			f.stepWithChildren(t)
+			if ptr.Deref(f.its.FindInstanceStatus(key.Name).DataLoaded, false) {
+				t.Fatal("failed worker completed loading")
+			}
+			markDataWorkerComplete(t, f.cli, key)
+			faulty := &its2LifecycleClient{Client: f.cli, rejectDataResult: true}
+			f.cli = faulty
+			for i := 0; i < 3; i++ {
+				f.stepWithChildren(t)
+			}
+			if faulty.dataResultFailures == 0 || ptr.Deref(f.its.FindInstanceStatus(key.Name).DataLoaded, false) {
+				t.Fatal("completion failure was not exercised")
+			}
+			if instanceAPI {
+				inst := its2LifecycleInstance(t, f.cli, key.Name)
+				if ptr.Deref(inst.Status.DataLoaded, false) || its2TaskInput(inst) == "" {
+					t.Fatal("failed status write cleaned Instance task")
+				}
+			}
+			if err := f.cli.Get(ctx, key, pod); err != nil {
+				t.Fatal(err)
+			}
+			if task, err := workloadlifecycle.GeneratedTask(&pod.Spec); err != nil || task != before {
+				t.Fatalf("pending task changed: %s %v", task, err)
+			}
+			faulty.rejectDataResult = false
+			for i := 0; i < 8; i++ {
+				f.stepWithChildren(t)
+			}
+			if !ptr.Deref(f.its.FindInstanceStatus(key.Name).DataLoaded, false) {
+				t.Fatal("successful worker result not recovered")
+			}
+			if f.its.FindInstanceStatus(key.Name).Ready {
+				t.Fatal("fixture did not exercise completion before Pod readiness")
+			}
+			pod.Finalizers = nil
+			if err := f.cli.Update(ctx, pod); err != nil {
+				t.Fatal(err)
+			}
+			if err := f.cli.Delete(ctx, pod); err != nil {
+				t.Fatal(err)
+			}
+			for i := 0; i < 8; i++ {
+				f.stepWithChildren(t)
+			}
+			if err := f.cli.Get(ctx, key, pod); err != nil {
+				t.Fatal(err)
+			}
+			if task, err := workloadlifecycle.GeneratedTask(&pod.Spec); err != nil || task != "" {
+				t.Fatalf("completed instance regenerated loading: %s %v", task, err)
+			}
+		})
+	}
+}
+
+func TestInstanceSetGeneratedDataTaskExecutesWorker(t *testing.T) {
+	ctx := context.Background()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = listener.Close() })
+	its := newDataLifecycleITS(1)
+	its.Spec.Template.Spec.Containers[1].Ports[1].ContainerPort = int32(listener.Addr().(*net.TCPAddr).Port)
+	dataPath := filepath.Join(t.TempDir(), "copied")
+	countPath := filepath.Join(t.TempDir(), "attempts")
+	its.Spec.LifecycleActions.DataDump.Exec.Command = []string{"sh", "-c", "printf 'workload data\\n'"}
+	its.Spec.LifecycleActions.DataLoad.Exec.Command = []string{"sh", "-c", `echo load >> "$COUNT_PATH"; cat > "$DATA_PATH"; exit "$LOAD_EXIT_CODE"`}
+	its.Spec.LifecycleActions.TemplateVars = map[string]string{"DATA_PATH": dataPath, "COUNT_PATH": countPath}
+	cli := newLifecycleEntryClient(t, its, interceptor.Funcs{})
+	key := client.ObjectKeyFromObject(its)
+	step := func() {
+		t.Helper()
+		var err error
+		its, _, err = reconcileLifecycleITS(t, cli, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := 0; i < 4; i++ {
+		step()
+	}
+	source := &corev1.Pod{}
+	if err := cli.Get(ctx, client.ObjectKey{Namespace: its.Namespace, Name: its.Name + "-0"}, source); err != nil {
+		t.Fatal(err)
+	}
+	its.Spec.Replicas = ptr.To[int32](2)
+	its.Generation++
+	if err := cli.Update(ctx, its); err != nil {
+		t.Fatal(err)
+	}
+	source.Status = corev1.PodStatus{Phase: corev1.PodRunning, PodIP: "127.0.0.1", Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: metav1.Now()}}}
+	if err := cli.Status().Update(ctx, source); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 4; i++ {
+		step()
+	}
+	target := &corev1.Pod{}
+	if err := cli.Get(ctx, client.ObjectKey{Namespace: its.Namespace, Name: its.Name + "-1"}, target); err != nil {
+		t.Fatal(err)
+	}
+	var actions []kbaproto.Action
+	var streaming []string
+	for _, env := range source.Spec.Containers[1].Env {
+		if env.Name == "KB_AGENT_PROBE" {
+			t.Fatal("fixture must have no probes")
+		}
+		if env.Name == "KB_AGENT_ACTION" {
+			if err := json.Unmarshal([]byte(env.Value), &actions); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if env.Name == "KB_AGENT_STREAMING" {
+			streaming = strings.Split(env.Value, ",")
+		}
+	}
+	services, err := kbaservice.New(ctrl.Log, actions, nil, streaming)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var transport kbaservice.Service
+	for _, service := range services {
+		if service.Kind() == kbaproto.ServiceStreaming.Kind {
+			transport = service
+		}
+	}
+	if transport == nil {
+		t.Fatal("generated dump action has no streaming transport")
+	}
+	for _, env := range target.Spec.InitContainers[0].Env {
+		if env.ValueFrom == nil {
+			t.Setenv(env.Name, env.Value)
+		}
+	}
+	t.Setenv("KB_AGENT_POD_NAME", target.Name)
+	t.Setenv("KUBECONFIG", filepath.Join(t.TempDir(), "missing"))
+	for attempt, exit := range []string{"1", "0"} {
+		t.Setenv("LOAD_EXIT_CODE", exit)
+		done := make(chan error, 1)
+		go func() {
+			conn, err := listener.Accept()
+			if err != nil {
+				done <- err
+				return
+			}
+			defer conn.Close()
+			done <- transport.HandleConn(ctx, conn)
+		}()
+		mode, err := kbagent.Launch(ctrl.Log, kbaserver.Config{})
+		if mode || (attempt == 0 && err == nil) || (attempt == 1 && err != nil) {
+			t.Fatalf("worker attempt %d: server=%t err=%v", attempt, mode, err)
+		}
+		if err := <-done; err != nil {
+			t.Fatal(err)
+		}
+	}
+	data, err := os.ReadFile(dataPath)
+	if err != nil || string(data) != "workload data\n" {
+		t.Fatalf("copied bytes=%q err=%v", data, err)
+	}
+	attempts, err := os.ReadFile(countPath)
+	if err != nil || string(attempts) != "load\nload\n" {
+		t.Fatalf("reentrant attempts=%q err=%v", attempts, err)
+	}
+}
+
+func TestInstanceSetDataRegistrationWhileStopped(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		for _, replicas := range []int32{0, 1} {
+			t.Run(fmt.Sprintf("instanceAPI=%t/bootstrap=%d", instanceAPI, replicas), func(t *testing.T) {
+				f := newDataLifecycleEntry(t, instanceAPI, replicas, appsv1.ParallelPodManagement)
+				f.bootstrap(t, int(replicas))
+				for _, status := range f.its.Status.InstanceStatus {
+					if status.DataLoaded != nil {
+						t.Fatal("bootstrap invented a data result")
+					}
+				}
+				f.its.Spec.Stop = ptr.To(true)
+				f.its.Spec.Replicas = ptr.To(replicas + 1)
+				f.its.Generation++
+				if err := f.cli.Update(context.Background(), f.its); err != nil {
+					t.Fatal(err)
+				}
+				for i := 0; i < 10; i++ {
+					f.stepWithChildren(t)
+				}
+				status := f.its.FindInstanceStatus(fmt.Sprintf("%s-%d", f.its.Name, replicas))
+				if status == nil || status.DataLoaded == nil || *status.DataLoaded {
+					t.Fatalf("stopped expansion lost pending registration: %#v", status)
+				}
+				if len(lifecycleEntryPods(t, f.cli)) != 0 {
+					t.Fatal("Stop retained or created a runtime")
+				}
+			})
+		}
+	}
+}

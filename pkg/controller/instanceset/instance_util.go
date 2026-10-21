@@ -43,6 +43,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -422,6 +423,9 @@ func buildInstancePodByTemplate(name string, template *instancetemplate.Instance
 	if err = controllerutil.SetControllerReference(parent, pod, model.GetScheme()); err != nil {
 		return nil, err
 	}
+	if err := workloadlifecycle.ConfigurePod(parent, pod); err != nil {
+		return nil, err
+	}
 	return pod, nil
 }
 
@@ -567,6 +571,11 @@ func buildInstanceTemplateRevision(template *corev1.PodTemplateSpec, parent *wor
 	if mutateTemplateFn != nil {
 		mutateTemplateFn(templateCopy)
 	}
+	pod := &corev1.Pod{ObjectMeta: templateCopy.ObjectMeta, Spec: templateCopy.Spec}
+	if err := workloadlifecycle.ConfigurePod(parent, pod); err != nil {
+		return "", err
+	}
+	templateCopy.Spec = pod.Spec
 	podTemplate := filterInPlaceFields(templateCopy)
 	its := builder.NewInstanceSetBuilder(parent.Namespace, parent.Name).
 		SetUID(parent.UID).

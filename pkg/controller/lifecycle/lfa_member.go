@@ -58,8 +58,8 @@ type switchover struct {
 	clusterName  string
 	compName     string
 	role         string // the role that will be transferred to another replica.
-	currentPod   string
-	candidatePod string
+	currentPod   *corev1.Pod
+	candidatePod *corev1.Pod
 }
 
 var _ lifecycleAction = &switchover{}
@@ -72,12 +72,12 @@ func (a *switchover) parameters(ctx context.Context, cli client.Reader) (map[str
 	// refer to ComponentLifecycleActions.Switchover's documentation for explanation of each variable.
 	m := make(map[string]string)
 	compName := constant.GenerateClusterComponentName(a.clusterName, a.compName)
-	if len(a.candidatePod) > 0 {
-		m[switchoverCandidateName] = a.candidatePod
-		m[switchoverCandidateFQDN] = intctrlutil.PodFQDN(a.namespace, compName, a.candidatePod)
+	if len(a.candidatePod.Name) > 0 {
+		m[switchoverCandidateName] = a.candidatePod.Name
+		m[switchoverCandidateFQDN] = memberPodFQDN(a.namespace, compName, a.candidatePod)
 	}
-	m[switchoverCurrentName] = a.currentPod
-	m[switchoverCurrentFQDN] = intctrlutil.PodFQDN(a.namespace, compName, a.currentPod)
+	m[switchoverCurrentName] = a.currentPod.Name
+	m[switchoverCurrentFQDN] = memberPodFQDN(a.namespace, compName, a.currentPod)
 	m[switchoverRole] = a.role
 	return m, nil
 }
@@ -102,7 +102,7 @@ func (a *memberJoin) parameters(ctx context.Context, cli client.Reader) (map[str
 	// - KB_JOIN_MEMBER_POD_NAME: The pod name of the replica being added to the group.
 	compName := constant.GenerateClusterComponentName(a.clusterName, a.compName)
 	return map[string]string{
-		joinMemberPodFQDNVar: intctrlutil.PodFQDN(a.namespace, compName, a.pod.Name),
+		joinMemberPodFQDNVar: memberPodFQDN(a.namespace, compName, a.pod),
 		joinMemberPodNameVar: a.pod.Name,
 	}, nil
 }
@@ -123,11 +123,22 @@ func (a *memberLeave) name() string {
 func (a *memberLeave) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
 	// The container executing this action has access to following variables:
 	//
-	// - KB_LEAVE_MEMBER_POD_FQDN: The pod name of the replica being removed from the group.
+	// - KB_LEAVE_MEMBER_POD_FQDN: The pod FQDN of the replica being removed from the group.
 	// - KB_LEAVE_MEMBER_POD_NAME: The pod name of the replica being removed from the group.
 	compName := constant.GenerateClusterComponentName(a.clusterName, a.compName)
 	return map[string]string{
-		leaveMemberPodFQDNVar: intctrlutil.PodFQDN(a.namespace, compName, a.pod.Name),
+		leaveMemberPodFQDNVar: memberPodFQDN(a.namespace, compName, a.pod),
 		leaveMemberPodNameVar: a.pod.Name,
 	}, nil
+}
+
+func memberPodFQDN(namespace, compName string, pod *corev1.Pod) string {
+	if pod.Spec.Subdomain != "" {
+		hostname := pod.Spec.Hostname
+		if hostname == "" {
+			hostname = pod.Name
+		}
+		return hostname + "." + intctrlutil.ServiceFQDN(namespace, pod.Spec.Subdomain)
+	}
+	return intctrlutil.PodFQDN(namespace, compName, pod.Name)
 }

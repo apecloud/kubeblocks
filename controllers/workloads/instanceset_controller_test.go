@@ -4419,6 +4419,108 @@ func TestInstanceSetZeroToOneJoinsMember(t *testing.T) {
 	}
 }
 
+func TestInstanceSetInitialStepsAreSatisfiedWithoutActions(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		t.Run(fmt.Sprintf("instanceAPI=%t", instanceAPI), func(t *testing.T) {
+			f := newDataLifecycleEntry(t, instanceAPI, 2, appsv1.ParallelPodManagement)
+			agent := &its2LifecycleAgent{}
+			kbacli.SetMockClient(agent, nil)
+			defer kbacli.UnsetMockClient()
+			f.bootstrap(t, 2)
+			for _, status := range f.its.Status.InstanceStatus {
+				if !status.Provisioned || !ptr.Deref(status.DataLoaded, false) || !ptr.Deref(status.MemberJoined, false) {
+					t.Fatalf("initial steps are not satisfied: provisioned=%t data=%v member=%v", status.Provisioned, status.DataLoaded, status.MemberJoined)
+				}
+				if instanceAPI {
+					child := its2LifecycleInstance(t, f.cli, status.PodName)
+					if !ptr.Deref(child.Status.DataLoaded, false) || !ptr.Deref(child.Status.MemberJoined, false) {
+						t.Fatalf("initial Instance results differ from parent: %#v", child.Status)
+					}
+				}
+			}
+			if len(agent.calls) != 0 {
+				t.Fatalf("initialization executed member actions: %v", agent.calls)
+			}
+			for _, pod := range lifecycleEntryPods(t, f.cli) {
+				if task, err := workloadlifecycle.GeneratedTask(&pod.Spec); err != nil || task != "" {
+					t.Fatalf("initialization created a data task: %s %v", task, err)
+				}
+			}
+		})
+	}
+}
+
+func TestInstanceSetReexpandsInitialRetainedPVCWithoutLoading(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		t.Run(fmt.Sprintf("instanceAPI=%t", instanceAPI), func(t *testing.T) {
+			ctx := context.Background()
+			f := newDataLifecycleEntry(t, instanceAPI, 2, appsv1.ParallelPodManagement)
+			f.its.Spec.PersistentVolumeClaimRetentionPolicy = &workloads.PersistentVolumeClaimRetentionPolicy{WhenScaled: kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType}
+			if err := f.cli.Update(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			agent := &its2LifecycleAgent{}
+			kbacli.SetMockClient(agent, nil)
+			defer kbacli.UnsetMockClient()
+			f.bootstrap(t, 2)
+			key := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-1"}
+			pod := &corev1.Pod{}
+			if err := f.cli.Get(ctx, key, pod); err != nil {
+				t.Fatal(err)
+			}
+			pvcName, err := lifecycleTestDataPVCName(pod)
+			if err != nil {
+				t.Fatal(err)
+			}
+			pvc := &corev1.PersistentVolumeClaim{}
+			pvcKey := client.ObjectKey{Namespace: key.Namespace, Name: pvcName}
+			if err := f.cli.Get(ctx, pvcKey, pvc); err != nil {
+				t.Fatal(err)
+			}
+			originalPVC := pvc.DeepCopy()
+			f.its.Spec.Replicas = ptr.To[int32](1)
+			f.its.Generation++
+			if err := f.cli.Update(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			for i := 0; i < 24; i++ {
+				f.stepWithChildren(t)
+			}
+			if err := f.cli.Get(ctx, key, &corev1.Pod{}); !apierrors.IsNotFound(err) {
+				t.Fatalf("scale-in retained runtime: %v", err)
+			}
+			if err := f.cli.Get(ctx, pvcKey, pvc); err != nil || pvc.UID != originalPVC.UID {
+				t.Fatalf("scale-in failed to retain the same PVC: %v", err)
+			}
+			f.its.Spec.Replicas = ptr.To[int32](2)
+			f.its.Generation++
+			if err := f.cli.Update(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			for i := 0; i < 16; i++ {
+				f.stepWithChildren(t)
+			}
+			if err := f.cli.Get(ctx, key, pod); err != nil {
+				t.Fatal(err)
+			}
+			if task, err := workloadlifecycle.GeneratedTask(&pod.Spec); err != nil || task != "" {
+				t.Fatalf("retained initial PVC was assigned another data copy: %s %v", task, err)
+			}
+			f.setReady(t, key.Name, true)
+			for i := 0; i < 8; i++ {
+				f.stepWithChildren(t)
+			}
+			status := f.its.FindInstanceStatus(key.Name)
+			if status == nil || !ptr.Deref(status.DataLoaded, false) || !ptr.Deref(status.MemberJoined, false) {
+				t.Fatalf("re-expanded retained instance did not satisfy data and rejoin: %#v", status)
+			}
+			if len(agent.calls) != 2 || agent.calls[0] != "memberLeave" || agent.calls[1] != "memberJoin" {
+				t.Fatalf("re-expansion skipped actual membership changes: %v", agent.calls)
+			}
+		})
+	}
+}
+
 func newDataLifecycleITS(replicas int32) *workloads.InstanceSet {
 	return &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "data-lifecycle", Namespace: "default", UID: "data-lifecycle", Generation: 1,

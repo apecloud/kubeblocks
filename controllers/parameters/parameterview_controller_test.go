@@ -41,6 +41,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
 	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
@@ -2059,7 +2060,7 @@ var _ = Describe("ParameterView Controller", func() {
 	})
 
 	It("refreshes to Synced when runtime config drifts without a draft", func() {
-		_, _, _, _, _ = mockReconcileResource()
+		_, _, comp, _, _ := mockReconcileResource()
 
 		cfgKey := client.ObjectKey{
 			Namespace: testCtx.DefaultNamespace,
@@ -2074,6 +2075,14 @@ var _ = Describe("ParameterView Controller", func() {
 		})).Should(Succeed())
 		Eventually(testapps.CheckObj(&testCtx, runtimeKey, func(g Gomega, cm *corev1.ConfigMap) {
 			g.Expect(cm.Data[testparameters.MysqlConfigFile]).Should(ContainSubstring("gtid_mode=OFF"))
+			g.Expect(k8sClient.Get(testCtx.Ctx, client.ObjectKeyFromObject(comp), comp)).Should(Succeed())
+			g.Expect(comp.Spec.Configs).Should(HaveLen(1))
+			g.Expect(comp.Spec.Configs[0].ConfigMap).ShouldNot(BeNil())
+			cfg := &parametersv1alpha1.ComponentParameter{}
+			g.Expect(k8sClient.Get(testCtx.Ctx, cfgKey, cfg)).Should(Succeed())
+			item := parameters.GetConfigTemplateItem(&cfg.Spec, configSpecName)
+			g.Expect(item).ShouldNot(BeNil())
+			g.Expect(parameters.IsApplyUpdatedParameters(cm, *item, comp.Generation)).Should(BeTrue())
 		})).Should(Succeed())
 		Expect(testapps.GetAndChangeObj(&testCtx, runtimeKey, func(cm *corev1.ConfigMap) {
 			if cm.Labels == nil {

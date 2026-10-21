@@ -71,11 +71,21 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 	}
 	registered := workloadlifecycle.Register(its, assignments, runtimeNames, resourceNames)
 	previous := its.DeepCopy().Status.InstanceStatus
+	childStatusChanged := false
 	for _, inst := range instances {
 		if status := instanceLifecycleStatus(its, inst.Name); status != nil {
 			status.Provisioned = status.Provisioned || inst.Status.Provisioned
 			if inst.Status.DataLoaded != nil && (!ptr.Deref(status.DataLoaded, false) || *inst.Status.DataLoaded) {
 				status.DataLoaded = ptr.To(*inst.Status.DataLoaded)
+			}
+			if its.Spec.LifecycleActions.MemberJoin != nil && ptr.Deref(status.MemberJoined, true) && inst.Status.MemberJoined == nil && runtimeNames.Has(inst.Name) {
+				current := inst.DeepCopy()
+				current.Status.MemberJoined = ptr.To(true)
+				if err := tree.Update(current, kubebuilderx.WithSubResource("status")); err != nil {
+					return kubebuilderx.Continue, err
+				}
+				inst = current
+				childStatusChanged = true
 			}
 			if inst.Status.MemberJoined != nil {
 				status.MemberJoined = ptr.To(*inst.Status.MemberJoined)
@@ -83,7 +93,7 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 		}
 	}
 
-	if registered || workloadlifecycle.CriticalStatusChanged(previous, its.Status.InstanceStatus) {
+	if registered || childStatusChanged || workloadlifecycle.CriticalStatusChanged(previous, its.Status.InstanceStatus) {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	return kubebuilderx.Continue, nil

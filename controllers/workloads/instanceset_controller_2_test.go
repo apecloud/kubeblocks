@@ -2455,7 +2455,7 @@ func checkITS2LifecycleRegistrationCommit(t *testing.T, storage client.Client) {
 	}
 	for _, status := range stored.Status.InstanceStatus {
 		if status.MemberJoined != nil {
-			t.Fatalf("initial instances must keep unknown engine bootstrap results: %#v", status)
+			t.Fatalf("registration satisfied membership before observing runtime: %#v", status)
 		}
 	}
 	if err := cli.List(context.Background(), list); err != nil {
@@ -2563,6 +2563,7 @@ func TestITS2LifecycleAPIServer(t *testing.T) {
 		{"child-result-conflict", checkITS2MembershipResultRetriesInstanceStatusConflict},
 		{"data-result-conflict", checkITS2DataResultStatusConflict},
 		{"data-recovery", checkITS2LifecycleDataCleanupAndPodRecreation},
+		{"initial-child-result-conflict", checkITS2InitialMembershipRetriesInstanceStatusConflict},
 	}
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
@@ -2576,7 +2577,7 @@ func TestITS2LifecycleAPIServer(t *testing.T) {
 					t.Error(err)
 				}
 			}()
-			storage, err := client.New(cfg, client.Options{Scheme: model.GetScheme()})
+			storage, err := client.NewWithWatch(cfg, client.Options{Scheme: model.GetScheme()})
 			if err != nil {
 				t.Fatal(err)
 			}

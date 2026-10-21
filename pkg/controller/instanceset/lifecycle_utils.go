@@ -71,6 +71,9 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 	for _, pod := range pods {
 		if status := workloadlifecycle.Status(its, pod.Name); status != nil {
 			status.Provisioned = true
+			if its.Spec.LifecycleActions.MemberJoin != nil && status.MemberJoined == nil {
+				status.MemberJoined = ptr.To(true)
+			}
 		}
 	}
 	for _, pod := range pods {

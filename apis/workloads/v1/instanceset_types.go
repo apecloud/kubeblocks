@@ -513,6 +513,7 @@ type ReplicaRole = kbappsv1.ReplicaRole
 // +kubebuilder:object:generate=false
 type Action = kbappsv1.Action
 
+// LifecycleActions defines actions for customizing the behavior of a workload.
 type LifecycleActions struct {
 	// Provides variables which are used to call Actions.
 	//
@@ -524,10 +525,34 @@ type LifecycleActions struct {
 	// +optional
 	Switchover *Action `json:"switchover,omitempty"`
 
-	// Defines the procedure that update replicas with new configuration.
+	// Defines the procedure to update a replica with new configuration.
 	//
 	// +optional
 	Reconfigure *Action `json:"reconfigure,omitempty"`
+
+	// Defines the procedure to add a new replica to the replication group.
+	// This action is initiated after a replica Pod becomes ready.
+	//
+	// +optional
+	MemberJoin *Action `json:"memberJoin,omitempty"`
+
+	// Defines the procedure to remove a replica from the replication group.
+	// The operator waits for successful completion before releasing the replica and cleaning up its resources.
+	//
+	// +optional
+	MemberLeave *Action `json:"memberLeave,omitempty"`
+
+	// Defines the procedure for exporting the data from a replica.
+	// The output must be a valid data dump streamed to stdout.
+	//
+	// +optional
+	DataDump *Action `json:"dataDump,omitempty"`
+
+	// Defines the procedure for importing data into a replica.
+	// Data is received through stdin. The action must be idempotent to allow retries from the beginning.
+	//
+	// +optional
+	DataLoad *Action `json:"dataLoad,omitempty"`
 }
 
 type ConfigTemplate struct {
@@ -595,6 +620,27 @@ type InstanceStatus struct {
 	// +optional
 	// +kubebuilder:validation:Enum=Present;Terminating;Absent
 	CurrentState InstanceCurrentState `json:"currentState,omitempty"`
+
+	// Provisioned records that a Present or Terminating runtime has been observed for this instance.
+	// Once true, it stays true while the status entry is retained. It does not indicate current presence,
+	// readiness, or completion of provisioning work.
+	//
+	// +optional
+	Provisioned bool `json:"provisioned,omitempty"`
+
+	// DataLoaded records the tracked data-loading result. nil means no result is tracked,
+	// false means loading is incomplete, and true means completion has been recorded.
+	// Runtime health and restore conditions do not determine this value.
+	//
+	// +optional
+	DataLoaded *bool `json:"dataLoaded,omitempty"`
+
+	// MemberJoined records the tracked membership result. nil means no result is tracked and does not prove absence,
+	// false records not joined, and true records joined. A successful leave can record false.
+	// Runtime health and role do not determine this value.
+	//
+	// +optional
+	MemberJoined *bool `json:"memberJoined,omitempty"`
 
 	// CurrentRevision identifies the revision currently applied to this instance.
 	// It is empty when CurrentState is Absent.

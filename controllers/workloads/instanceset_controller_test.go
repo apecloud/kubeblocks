@@ -4450,74 +4450,137 @@ func TestInstanceSetInitialStepsAreSatisfiedWithoutActions(t *testing.T) {
 	}
 }
 
-func TestInstanceSetReexpandsInitialRetainedPVCWithoutLoading(t *testing.T) {
+func TestInstanceSetInitialDataWithoutHooksIsUntracked(t *testing.T) {
 	for _, instanceAPI := range []bool{false, true} {
 		t.Run(fmt.Sprintf("instanceAPI=%t", instanceAPI), func(t *testing.T) {
-			ctx := context.Background()
-			f := newDataLifecycleEntry(t, instanceAPI, 2, appsv1.ParallelPodManagement)
-			f.its.Spec.PersistentVolumeClaimRetentionPolicy = &workloads.PersistentVolumeClaimRetentionPolicy{WhenScaled: kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType}
-			if err := f.cli.Update(ctx, f.its); err != nil {
-				t.Fatal(err)
-			}
-			agent := &its2LifecycleAgent{}
-			kbacli.SetMockClient(agent, nil)
-			defer kbacli.UnsetMockClient()
-			f.bootstrap(t, 2)
-			key := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-1"}
-			pod := &corev1.Pod{}
-			if err := f.cli.Get(ctx, key, pod); err != nil {
-				t.Fatal(err)
-			}
-			pvcName, err := lifecycleTestDataPVCName(pod)
-			if err != nil {
-				t.Fatal(err)
-			}
-			pvc := &corev1.PersistentVolumeClaim{}
-			pvcKey := client.ObjectKey{Namespace: key.Namespace, Name: pvcName}
-			if err := f.cli.Get(ctx, pvcKey, pvc); err != nil {
-				t.Fatal(err)
-			}
-			originalPVC := pvc.DeepCopy()
-			f.its.Spec.Replicas = ptr.To[int32](1)
-			f.its.Generation++
-			if err := f.cli.Update(ctx, f.its); err != nil {
-				t.Fatal(err)
-			}
-			for i := 0; i < 24; i++ {
-				f.stepWithChildren(t)
-			}
-			if err := f.cli.Get(ctx, key, &corev1.Pod{}); !apierrors.IsNotFound(err) {
-				t.Fatalf("scale-in retained runtime: %v", err)
-			}
-			if err := f.cli.Get(ctx, pvcKey, pvc); err != nil || pvc.UID != originalPVC.UID {
-				t.Fatalf("scale-in failed to retain the same PVC: %v", err)
-			}
-			f.its.Spec.Replicas = ptr.To[int32](2)
-			f.its.Generation++
-			if err := f.cli.Update(ctx, f.its); err != nil {
-				t.Fatal(err)
-			}
-			for i := 0; i < 16; i++ {
-				f.stepWithChildren(t)
-			}
-			if err := f.cli.Get(ctx, key, pod); err != nil {
-				t.Fatal(err)
-			}
-			if task, err := workloadlifecycle.GeneratedTask(&pod.Spec); err != nil || task != "" {
-				t.Fatalf("retained initial PVC was assigned another data copy: %s %v", task, err)
-			}
-			f.setReady(t, key.Name, true)
-			for i := 0; i < 8; i++ {
-				f.stepWithChildren(t)
-			}
-			status := f.its.FindInstanceStatus(key.Name)
-			if status == nil || !ptr.Deref(status.DataLoaded, false) || !ptr.Deref(status.MemberJoined, false) {
-				t.Fatalf("re-expanded retained instance did not satisfy data and rejoin: %#v", status)
-			}
-			if len(agent.calls) != 2 || agent.calls[0] != "memberLeave" || agent.calls[1] != "memberJoin" {
-				t.Fatalf("re-expansion skipped actual membership changes: %v", agent.calls)
+			f := newMemberLifecycleEntry(t, instanceAPI, 1, appsv1.ParallelPodManagement)
+			f.bootstrap(t, 1)
+			for _, status := range f.its.Status.InstanceStatus {
+				if status.DataLoaded != nil {
+					t.Fatalf("initial instance without data hooks has a data result: %#v", status)
+				}
+				if instanceAPI && its2LifecycleInstance(t, f.cli, status.PodName).Status.DataLoaded != nil {
+					t.Fatal("child without data hooks has a data result")
+				}
 			}
 		})
+	}
+}
+
+func TestInstanceSetReexpandsRetainedDataWithoutLoading(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		for _, retainedReplicas := range []int32{0, 1} {
+			for _, completedExpansion := range []bool{false, true} {
+				t.Run(fmt.Sprintf("instanceAPI=%t/retainedReplicas=%d/completedExpansion=%t", instanceAPI, retainedReplicas, completedExpansion), func(t *testing.T) {
+					ctx := context.Background()
+					initial := int32(2)
+					if completedExpansion {
+						initial = 1
+					}
+					f := newDataLifecycleEntry(t, instanceAPI, initial, appsv1.ParallelPodManagement)
+					f.its.Spec.PersistentVolumeClaimRetentionPolicy = &workloads.PersistentVolumeClaimRetentionPolicy{WhenScaled: kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType}
+					if err := f.cli.Update(ctx, f.its); err != nil {
+						t.Fatal(err)
+					}
+					agent := &its2LifecycleAgent{}
+					kbacli.SetMockClient(agent, nil)
+					defer kbacli.UnsetMockClient()
+					f.bootstrap(t, int(initial))
+					key := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-1"}
+					if completedExpansion {
+						f.its.Spec.Replicas = ptr.To[int32](2)
+						f.its.Generation++
+						if err := f.cli.Update(ctx, f.its); err != nil {
+							t.Fatal(err)
+						}
+						for i := 0; i < 12; i++ {
+							f.stepWithChildren(t)
+						}
+						f.markDataLoaded(t, key.Name)
+						f.setReady(t, key.Name, true)
+						for i := 0; i < 8; i++ {
+							f.stepWithChildren(t)
+						}
+						status := f.its.FindInstanceStatus(key.Name)
+						if status == nil || !ptr.Deref(status.DataLoaded, false) || !ptr.Deref(status.MemberJoined, false) || len(agent.calls) != 1 || agent.calls[0] != "memberJoin" {
+							t.Fatalf("expansion did not complete before shrink: %#v calls=%v", status, agent.calls)
+						}
+						agent.calls = nil
+					}
+					pod := &corev1.Pod{}
+					if err := f.cli.Get(ctx, key, pod); err != nil {
+						t.Fatal(err)
+					}
+					pvcName, err := lifecycleTestDataPVCName(pod)
+					if err != nil {
+						t.Fatal(err)
+					}
+					pvc := &corev1.PersistentVolumeClaim{}
+					pvcKey := client.ObjectKey{Namespace: key.Namespace, Name: pvcName}
+					if err := f.cli.Get(ctx, pvcKey, pvc); err != nil {
+						t.Fatal(err)
+					}
+					originalPVC := pvc.DeepCopy()
+					f.its.Spec.Replicas = ptr.To(retainedReplicas)
+					f.its.Generation++
+					if err := f.cli.Update(ctx, f.its); err != nil {
+						t.Fatal(err)
+					}
+					for i := 0; i < 24; i++ {
+						f.stepWithChildren(t)
+					}
+					if err := f.cli.Get(ctx, key, &corev1.Pod{}); !apierrors.IsNotFound(err) {
+						t.Fatalf("scale-in retained runtime: %v", err)
+					}
+					if err := f.cli.Get(ctx, pvcKey, pvc); err != nil || pvc.UID != originalPVC.UID {
+						t.Fatalf("scale-in failed to retain the same PVC: %v", err)
+					}
+					f.its.Spec.Replicas = ptr.To[int32](2)
+					f.its.Generation++
+					if err := f.cli.Update(ctx, f.its); err != nil {
+						t.Fatal(err)
+					}
+					for i := 0; i < 16; i++ {
+						f.stepWithChildren(t)
+						for _, pod := range lifecycleEntryPods(t, f.cli) {
+							if task, err := workloadlifecycle.GeneratedTask(&pod.Spec); err != nil || task != "" {
+								t.Fatalf("retained data was assigned another copy: %s %v", task, err)
+							}
+							f.setReady(t, pod.Name, true)
+						}
+					}
+					if err := f.cli.Get(ctx, key, pod); err != nil {
+						t.Fatalf("re-expansion runtime missing: %v status=%+v calls=%v pods=%+v", err, f.its.Status, agent.calls, lifecycleEntryPods(t, f.cli))
+					}
+					if actualPVC, err := lifecycleTestDataPVCName(pod); err != nil || actualPVC != pvcName {
+						t.Fatalf("re-expanded instance changed its retained PVC: %s %v", actualPVC, err)
+					}
+					if err := f.cli.Get(ctx, pvcKey, pvc); err != nil || pvc.UID != originalPVC.UID {
+						t.Fatalf("re-expansion replaced the retained PVC: %v", err)
+					}
+					for i := 0; i < 8; i++ {
+						f.stepWithChildren(t)
+					}
+					status := f.its.FindInstanceStatus(key.Name)
+					if status == nil || !ptr.Deref(status.DataLoaded, false) || !ptr.Deref(status.MemberJoined, false) {
+						t.Fatalf("re-expanded retained instance did not satisfy data and rejoin: %#v", status)
+					}
+					changed := int(2 - retainedReplicas)
+					if len(agent.calls) != changed*2 {
+						t.Fatalf("re-expansion skipped actual membership changes: %v", agent.calls)
+					}
+					for i, action := range agent.calls {
+						want := "memberLeave"
+						if i >= changed {
+							want = "memberJoin"
+						}
+						if action != want {
+							t.Fatalf("re-expansion membership order: %v", agent.calls)
+						}
+					}
+				})
+			}
+		}
 	}
 }
 
@@ -5607,8 +5670,8 @@ func TestInstanceSetDataRegistrationWhileStopped(t *testing.T) {
 				f := newDataLifecycleEntry(t, instanceAPI, replicas, appsv1.ParallelPodManagement)
 				f.bootstrap(t, int(replicas))
 				for _, status := range f.its.Status.InstanceStatus {
-					if status.DataLoaded != nil {
-						t.Fatal("bootstrap invented a data result")
+					if !ptr.Deref(status.DataLoaded, false) {
+						t.Fatal("initial data step was not satisfied")
 					}
 				}
 				f.its.Spec.Stop = ptr.To(true)

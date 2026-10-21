@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
@@ -456,6 +457,58 @@ func TestDataResultRequiresAppliedTaskAndCurrentWorkerSuccess(t *testing.T) {
 			}
 			if inst.Status.DataLoaded == nil || *inst.Status.DataLoaded != tc.complete {
 				t.Fatal("Stop erased tracked result")
+			}
+		})
+	}
+}
+
+func TestInitialDataSatisfactionRequiresObservedNoCopyRuntime(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		hooks      bool
+		pod        bool
+		actualTask bool
+		previous   *bool
+		want       *bool
+	}{
+		{name: "no hooks", pod: true},
+		{name: "no runtime", hooks: true},
+		{name: "initial runtime", hooks: true, pod: true, want: ptr.To(true)},
+		{name: "actual pending task", hooks: true, pod: true, actualTask: true},
+		{name: "pending result without task", hooks: true, pod: true, previous: ptr.To(false), want: ptr.To(false)},
+		{name: "pending result with task", hooks: true, pod: true, actualTask: true, previous: ptr.To(false), want: ptr.To(false)},
+		{name: "completed result with task", hooks: true, pod: true, actualTask: true, previous: ptr.To(true), want: ptr.To(true)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			inst := &workloads.Instance{ObjectMeta: metav1.ObjectMeta{Name: "demo-1", Namespace: "default"}, Status: workloads.InstanceStatus2{DataLoaded: tc.previous}}
+			if tc.hooks {
+				inst.Spec.LifecycleActions = &workloads.LifecycleActions{DataDump: &kbappsv1.Action{}, DataLoad: &kbappsv1.Action{}}
+			}
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(inst)
+			if tc.pod {
+				pod := currentPod("current", corev1.PodPending)
+				pod.ObjectMeta = inst.ObjectMeta
+				if tc.actualTask {
+					env, err := kbagent.BuildEnv4Worker([]proto.Task{{Instance: "demo", Task: "newReplica", UID: inst.Name, Replicas: inst.Name, NewReplica: &proto.NewReplicaTask{Remote: "source", Port: 3502, Replicas: inst.Name}}})
+					if err != nil {
+						t.Fatal(err)
+					}
+					pod.Spec.InitContainers = []corev1.Container{{Name: kbagent.ContainerName4Worker, Env: []corev1.EnvVar{*env}}}
+				}
+				if err := tree.Add(pod); err != nil {
+					t.Fatal(err)
+				}
+			}
+			result, err := NewStatusReconciler().Reconcile(tree)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if (inst.Status.DataLoaded == nil) != (tc.want == nil) || (tc.want != nil && *inst.Status.DataLoaded != *tc.want) {
+				t.Fatalf("data=%v want=%v", inst.Status.DataLoaded, tc.want)
+			}
+			if tc.previous == nil && tc.want != nil && result != kubebuilderx.RetryAfter(time.Second) {
+				t.Fatalf("initial satisfaction was not committed separately: %#v", result)
 			}
 		})
 	}

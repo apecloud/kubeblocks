@@ -35,7 +35,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -767,5 +770,53 @@ func TestCopyAndMergeObjects(t *testing.T) {
 		mergedPod.Spec.Containers[0].Image != "mysql:8.4" ||
 		mergedPod.Spec.Containers[0].Resources.Requests.Cpu().String() != "1" {
 		t.Fatalf("unexpected merged pod: %#v", mergedPod)
+	}
+}
+
+func TestPodRevisionKeepsPersistentDataWorkerConfiguration(t *testing.T) {
+	task, err := kbagent.BuildEnv4Worker([]proto.Task{{Instance: "worker", Task: "newReplica", UID: "worker-0", Replicas: "worker-0", NewReplica: &proto.NewReplicaTask{Remote: "source-one", Replicas: "worker-0"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	inst := &workloads.Instance{ObjectMeta: metav1.ObjectMeta{Name: "worker-0", Namespace: "default"}, Spec: workloads.InstanceSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{InitContainers: []corev1.Container{{Name: kbagent.ContainerName4Worker, Image: "agent:v1", Env: []corev1.EnvVar{*task, {Name: "USER_CONFIG", Value: "v1"}}, VolumeMounts: []corev1.VolumeMount{{Name: "data", MountPath: "/data"}}}}}}}}
+	baseline, err := BuildPodRevision(inst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	transient := inst.DeepCopy()
+	transient.Spec.Template.Spec.InitContainers[0].Env[0].Value = `[{"instance":"worker","task":"newReplica","UID":"worker-0","replicas":"worker-0","newReplica":{"remote":"source-two","replicas":"worker-0"}}]`
+	revision, err := BuildPodRevision(transient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if revision != baseline {
+		t.Fatal("generated source parameters changed Pod revision")
+	}
+	cleaned := inst.DeepCopy()
+	if _, err := workloadlifecycle.CleanTask(&cleaned.Spec.Template.Spec); err != nil {
+		t.Fatal(err)
+	}
+	revision, err = BuildPodRevision(cleaned)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if revision != baseline {
+		t.Fatal("task cleanup changed Pod revision")
+	}
+	mutations := []func(*corev1.Container){
+		func(c *corev1.Container) { c.Image = "agent:v2" },
+		func(c *corev1.Container) { c.VolumeMounts[0].MountPath = "/new-data" },
+		func(c *corev1.Container) { c.Env[1].Value = "v2" },
+	}
+	for i, mutate := range mutations {
+		changed := inst.DeepCopy()
+		mutate(&changed.Spec.Template.Spec.InitContainers[0])
+		revision, err = BuildPodRevision(changed)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if revision == baseline {
+			t.Fatalf("persistent worker change %d was hidden by transient filtering", i)
+		}
 	}
 }

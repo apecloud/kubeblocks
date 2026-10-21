@@ -21,9 +21,15 @@ package kbagent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"io"
 	"net"
+	"os"
+	"path/filepath"
+	"strconv"
 	"testing"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2/ktesting"
@@ -166,6 +172,42 @@ func TestInitializeAndEnvAccessors(t *testing.T) {
 	}
 }
 
+func TestInitializeStreamingWithoutProbes(t *testing.T) {
+	logger := ktesting.NewLogger(t, ktesting.NewConfig())
+	actions, _, err := serializeActionNProbe([]proto.Action{{Name: "dataDump", Exec: &proto.ExecAction{Commands: []string{"/bin/sh", "-c", "printf 'copied data'"}}}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	services, err := initialize(logger, map[string]string{actionEnvName: actions, streamingEnvName: "dataDump"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn, peer := net.Pipe()
+	defer conn.Close()
+	defer peer.Close()
+	if err := conn.SetDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		defer peer.Close()
+		done <- streamingService(services).HandleConn(context.Background(), peer)
+	}()
+	if err := json.NewEncoder(conn).Encode(proto.ActionRequest{Action: "dataDump"}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := io.ReadAll(conn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := <-done; err != nil {
+		t.Fatalf("configured dataDump did not execute: %v", err)
+	}
+	if string(data) != "copied data" {
+		t.Fatalf("dataDump produced %q, want copied data", data)
+	}
+}
+
 func TestSerializeDeserializeTask(t *testing.T) {
 	serialized, err := serializeTask([]proto.Task{{Instance: "inst", Task: "task", UID: "u1"}})
 	if err != nil {
@@ -253,4 +295,125 @@ func envVarMap(vars []corev1.EnvVar) map[string]string {
 		got[env.Name] = env.Value
 	}
 	return got
+}
+
+func startWorkerDataSource(t *testing.T) (string, int32, <-chan error) {
+	t.Helper()
+	logger := ktesting.NewLogger(t, ktesting.NewConfig())
+	services, err := service.New(logger, []proto.Action{{Name: "dataDump", Exec: &proto.ExecAction{Commands: []string{"/bin/sh", "-c", "printf 'copied data\\n'"}}}}, nil, []string{"dataDump"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = listener.Close() })
+	finished := make(chan error, 1)
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			finished <- err
+			return
+		}
+		defer conn.Close()
+		finished <- streamingService(services).HandleConn(context.Background(), conn)
+	}()
+	host, port, err := net.SplitHostPort(listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	portNumber, err := strconv.Atoi(port)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return host, int32(portNumber), finished
+}
+
+func configureDataWorker(t *testing.T, command string) (string, string, <-chan error) {
+	t.Helper()
+	t.Setenv("KB_AGENT_POD_NAME", "pod-1")
+	dataPath := filepath.Join(t.TempDir(), "data")
+	countPath := filepath.Join(t.TempDir(), "loads")
+	host, port, source := startWorkerDataSource(t)
+	envs, err := BuildEnv4Server([]proto.Action{{Name: "dataLoad", Exec: &proto.ExecAction{Commands: []string{"/bin/sh", "-c", command}}}}, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, env := range envs {
+		if env.ValueFrom == nil {
+			t.Setenv(env.Name, env.Value)
+		}
+	}
+	taskEnv, err := BuildEnv4Worker([]proto.Task{{Replicas: "pod-1", NewReplica: &proto.NewReplicaTask{Remote: host, Port: port, Parameters: map[string]string{"DATA_PATH": dataPath, "COUNT_PATH": countPath}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(taskEnv.Name, taskEnv.Value)
+	return dataPath, countPath, source
+}
+
+func launchDataWorker(t *testing.T) error {
+	t.Helper()
+	serverMode, err := Launch(ktesting.NewLogger(t, ktesting.NewConfig()), server.Config{})
+	if serverMode {
+		t.Fatal("worker entered server mode")
+	}
+	return err
+}
+
+func TestWorkerStreamsDataWithoutResultStorage(t *testing.T) {
+	t.Setenv("KUBECONFIG", filepath.Join(t.TempDir(), "missing"))
+	dataPath, countPath, source := configureDataWorker(t, `echo load >> "$COUNT_PATH"; cat > "$DATA_PATH"`)
+	if err := launchDataWorker(t); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-source; err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(dataPath)
+	if err != nil || string(data) != "copied data\n" {
+		t.Fatalf("loaded data=%q, %v", data, err)
+	}
+	loads, err := os.ReadFile(countPath)
+	if err != nil || string(loads) != "load\n" {
+		t.Fatalf("loads=%q, %v", loads, err)
+	}
+}
+
+func TestWorkerLoadFailureAndRestartRetry(t *testing.T) {
+	t.Setenv("LOAD_EXIT_CODE", "1")
+	dataPath, countPath, source := configureDataWorker(t, `echo load >> "$COUNT_PATH"; cat > "$DATA_PATH"; exit "$LOAD_EXIT_CODE"`)
+	if err := launchDataWorker(t); err == nil {
+		t.Fatal("failed load exited successfully")
+	}
+	if err := <-source; err != nil {
+		t.Fatal(err)
+	}
+	host, port, source := startWorkerDataSource(t)
+	tasks, err := deserializeTask(os.Getenv(taskEnvName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tasks[0].NewReplica.Remote, tasks[0].NewReplica.Port = host, port
+	taskEnv, err := BuildEnv4Worker(tasks)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(taskEnv.Name, taskEnv.Value)
+	t.Setenv("LOAD_EXIT_CODE", "0")
+	if err := launchDataWorker(t); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-source; err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(dataPath)
+	if err != nil || string(data) != "copied data\n" {
+		t.Fatalf("retried data=%q, %v", data, err)
+	}
+	loads, err := os.ReadFile(countPath)
+	if err != nil || string(loads) != "load\nload\n" {
+		t.Fatalf("retry executions=%q, %v", loads, err)
+	}
 }

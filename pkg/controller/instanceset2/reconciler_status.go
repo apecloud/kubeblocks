@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
 	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancestatus"
+	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -50,7 +51,11 @@ type statusReconciler struct{}
 var _ kubebuilderx.Reconciler = &statusReconciler{}
 
 func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
-	if tree.GetRoot() == nil || !model.IsObjectStatusUpdating(tree.GetRoot()) {
+	if tree.GetRoot() == nil {
+		return kubebuilderx.ConditionUnsatisfied
+	}
+	its := tree.GetRoot().(*workloads.InstanceSet)
+	if !model.IsObjectStatusUpdating(its) && !lifecycleStatusEnabled(its) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
 	return kubebuilderx.ConditionSatisfied
@@ -58,6 +63,15 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	summarizeStatus := model.IsObjectStatusUpdating(its)
+	if lifecycleStatusEnabled(its) {
+		if result, err := observeLifecycleStatus(tree); err != nil || result != kubebuilderx.Continue {
+			return result, err
+		}
+	}
+	if !summarizeStatus {
+		return kubebuilderx.Continue, nil
+	}
 
 	instances := tree.List(&workloads.Instance{})
 	var instanceList []*workloads.Instance
@@ -432,10 +446,18 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		desiredTemplateAssignments = nil
 	}
 
+	resources := make([]instancestatus.ResourceObservation, 0, len(instances))
 	observations := make([]instancestatus.Observation, 0, len(instances))
 	seenInstances := make(map[string]struct{}, len(instances))
 	roleMap := composeRoleMap(*its)
 	for _, inst := range instances {
+		owner := metav1.GetControllerOf(inst)
+		owned := owner != nil && owner.UID == its.UID
+		associated := owner == nil && shouldCloneInstanceAssistantObjects(its) &&
+			inst.Spec.InstanceSetName == its.Name && inst.Labels[WorkloadsInstanceLabelKey] == its.Name
+		if owned || associated {
+			resources = append(resources, instancestatus.ResourceObservation{InstanceName: inst.Name})
+		}
 		if _, ok := seenInstances[inst.Name]; ok {
 			return fmt.Errorf("duplicate Instance object for %q", inst.Name)
 		}
@@ -483,7 +505,20 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		}
 	}
 
+	for _, pod := range lifecyclePods(tree) {
+		resources = append(resources, instancestatus.ResourceObservation{InstanceName: pod.Name})
+	}
+	if tree.Context != nil {
+		if retained, ok := tree.Context.Value(retainedResourcesKey{}).(sets.Set[string]); ok {
+			for name := range retained {
+				resources = append(resources, instancestatus.ResourceObservation{InstanceName: name})
+			}
+		}
+	}
+	requireLeave := its.Spec.LifecycleActions != nil && its.Spec.LifecycleActions.MemberLeave != nil
 	statuses, err := instancestatus.Build(instancestatus.Input{
+		RequireMemberLeave: requireLeave,
+		Resources:          resources,
 		Previous:           its.Status.InstanceStatus,
 		DesiredAssignments: desiredTemplateAssignments,
 		Offline:            offlineNames,
@@ -504,4 +539,8 @@ func observationNames(observations []instancestatus.Observation) []string {
 		names = append(names, observation.InstanceName)
 	}
 	return names
+}
+
+func lifecycleStatusEnabled(its *workloads.InstanceSet) bool {
+	return workloadlifecycle.Enabled(its) && !model.IsObjectDeleting(its) && !model.IsReconciliationPaused(its)
 }

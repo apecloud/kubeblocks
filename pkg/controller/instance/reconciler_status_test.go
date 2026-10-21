@@ -22,6 +22,7 @@ package instance
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -130,6 +131,41 @@ func TestStatusReconcilerPublishesInstanceCurrentState(t *testing.T) {
 			}
 			if !meta.IsStatusConditionTrue(inst.Status.Conditions, string(workloads.InstanceUpdateRestricted)) {
 				t.Fatalf("status reconciliation removed an independently owned condition: %#v", inst.Status.Conditions)
+			}
+		})
+	}
+}
+
+func TestStatusReconcilerMinReadySecondsOnlyWaitsForReadyPods(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		pod       *corev1.Pod
+		ready     bool
+		available bool
+		result    kubebuilderx.Result
+	}{
+		{name: "pending", pod: currentPod("current", corev1.PodPending), result: kubebuilderx.Continue},
+		{name: "newly ready", pod: readyPod("current"), ready: true, result: kubebuilderx.RetryAfter(time.Second)},
+		{name: "available", pod: readyPod("current"), ready: true, available: true, result: kubebuilderx.Continue},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			inst := &workloads.Instance{ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Namespace: "default"},
+				Spec: workloads.InstanceSpec{MinReadySeconds: 30}}
+			tc.pod.Name, tc.pod.Namespace = inst.Name, inst.Namespace
+			if tc.ready {
+				tc.pod.Status.Conditions[0].LastTransitionTime = metav1.Now()
+				if tc.available {
+					tc.pod.Status.Conditions[0].LastTransitionTime = metav1.NewTime(time.Now().Add(-time.Minute))
+				}
+			}
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(inst)
+			if err := tree.Add(tc.pod); err != nil {
+				t.Fatal(err)
+			}
+			result, err := NewStatusReconciler().Reconcile(tree)
+			if err != nil || result != tc.result || inst.Status.Ready != tc.ready || inst.Status.Available != tc.available {
+				t.Fatalf("unexpected availability wait: result=%#v status=%#v err=%v", result, inst.Status, err)
 			}
 		})
 	}

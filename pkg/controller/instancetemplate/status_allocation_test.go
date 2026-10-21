@@ -20,9 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instancetemplate
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 
+	"github.com/klauspost/compress/zstd"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -30,7 +32,59 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
+
+func TestGetInstanceTemplateExtResolvesUnallocatedTemplates(t *testing.T) {
+	for _, compressed := range []bool{false, true} {
+		t.Run(map[bool]string{false: "inline", true: "compressed"}[compressed], func(t *testing.T) {
+			claim := corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "data"}}
+			its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
+				Spec: workloads.InstanceSetSpec{Replicas: ptr.To[int32](0), VolumeClaimTemplates: []corev1.PersistentVolumeClaim{claim}}}
+			claim.Annotations = map[string]string{constant.PVCNamePrefixAnnotationKey: "custom"}
+			templates := []workloads.InstanceTemplate{{Name: "archived", Replicas: ptr.To[int32](0), VolumeClaimTemplates: []corev1.PersistentVolumeClaim{claim}}}
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			if compressed {
+				data, err := json.Marshal(templates)
+				if err != nil {
+					t.Fatal(err)
+				}
+				encoder, err := zstd.NewWriter(nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer encoder.Close()
+				its.Annotations = map[string]string{templateRefAnnotationKey: `{"demo":"templates"}`}
+				if err := tree.Add(&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "templates", Namespace: its.Namespace},
+					BinaryData: map[string][]byte{templateRefDataKey: encoder.EncodeAll(data, nil)}}); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				its.Spec.Instances = templates
+			}
+			ext, err := BuildInstanceSetExt(its, tree)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if ext.InstanceTemplates[""] != nil {
+				t.Fatal("zero allocation unexpectedly includes a default pseudo template")
+			}
+			for _, tc := range []struct{ template, pvcName string }{{"", "data-demo-0"}, {"archived", "custom-0"}} {
+				template := GetInstanceTemplateExt(ext, tc.template)
+				if template == nil || template.Name != tc.template || len(template.VolumeClaimTemplates) != 1 {
+					t.Fatalf("recorded template %q was not resolved: %#v", tc.template, template)
+				}
+				if got := intctrlutil.ComposePVCName(template.VolumeClaimTemplates[0], its.Name, "demo-0"); got != tc.pvcName {
+					t.Fatalf("template %q resolved PVC %q, want %q", tc.template, got, tc.pvcName)
+				}
+			}
+			if got := GetInstanceTemplateExt(ext, "unknown"); got != nil {
+				t.Fatalf("unknown named template was replaced by the default: %#v", got)
+			}
+		})
+	}
+}
 
 func TestBuildAssignmentsTransfersExplicitFlatOrdinals(t *testing.T) {
 	its := &workloads.InstanceSet{

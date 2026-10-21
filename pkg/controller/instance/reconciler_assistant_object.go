@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -36,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 )
 
 const (
@@ -63,6 +65,12 @@ func (r *assistantObjectReconciler) PreCondition(tree *kubebuilderx.ObjectTree) 
 func (r *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	inst := tree.GetRoot().(*workloads.Instance)
 	for _, obj := range inst.Spec.InstanceAssistantObjects {
+		if ptr.Deref(inst.Status.DataLoaded, false) && obj.ConfigMap != nil {
+			obj.ConfigMap = obj.ConfigMap.DeepCopy()
+			if _, err := workloadlifecycle.CleanTaskConfigMap(obj.ConfigMap, inst.Name); err != nil {
+				return kubebuilderx.Continue, err
+			}
+		}
 		if err := r.createOrUpdate(tree, inst, obj); err != nil {
 			return kubebuilderx.Continue, err
 		}

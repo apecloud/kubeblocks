@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -191,6 +192,11 @@ func isImageMatched(pod *corev1.Pod) bool {
 	return true
 }
 
+// BuildPod resolves an Instance template to its runtime Pod, including data PVC mappings.
+func BuildPod(inst *workloads.Instance) (*corev1.Pod, error) {
+	return buildInstancePod(inst, "")
+}
+
 func buildInstancePod(inst *workloads.Instance, revision string) (*corev1.Pod, error) {
 	// 1. build a pod from pod template
 	var err error
@@ -210,6 +216,12 @@ func buildInstancePod(inst *workloads.Instance, revision string) (*corev1.Pod, e
 		AddControllerRevisionHashLabel(revision).
 		SetPodSpec(*inst.Spec.Template.Spec.DeepCopy()).
 		GetObject()
+
+	if ptr.Deref(inst.Status.DataLoaded, false) {
+		if _, err := workloadlifecycle.CleanTask(&pod.Spec, inst.Name); err != nil {
+			return nil, err
+		}
+	}
 
 	// 2. build pvcs from template
 	pvcNameMap := make(map[string]string)

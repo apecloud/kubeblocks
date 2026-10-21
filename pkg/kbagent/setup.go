@@ -163,15 +163,7 @@ func getActionProbeNStreamingEnvValues(envVars map[string]string) (string, strin
 	if !ok {
 		return "", "", ""
 	}
-	dp, ok := envVars[probeEnvName]
-	if !ok {
-		return da, "", ""
-	}
-	ds, ok := envVars[streamingEnvName]
-	if !ok {
-		return da, dp, ""
-	}
-	return da, dp, ds
+	return da, envVars[probeEnvName], envVars[streamingEnvName]
 }
 
 func serializeActionNProbe(actions []proto.Action, probes []proto.Probe) (string, string, error) {
@@ -242,7 +234,6 @@ func runAsWorker(logger logr.Logger, services []service.Service, envVars map[str
 	if err != nil {
 		return err
 	}
-
 	if err := service.RunTasks(logger, actionService(services), tasks); err != nil {
 		return errors.Wrap(err, "failed to run as worker")
 	}

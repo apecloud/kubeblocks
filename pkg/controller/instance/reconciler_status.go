@@ -21,6 +21,7 @@ package instance
 
 import (
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -34,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -54,6 +56,15 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	inst := tree.GetRoot().(*workloads.Instance)
+	// Initialize requirements from current task inputs, never from the mere presence of an action.
+	task, err := workloadlifecycle.DataTask(&inst.Spec.Template.Spec, inst.Name)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	previous := inst.Status.DeepCopy()
+	if task != nil && inst.Status.DataLoaded == nil {
+		inst.Status.DataLoaded = ptr.To(false)
+	}
 	stopped := ptr.Deref(inst.Spec.Stop, false)
 	r.reconcileRestoreCondition(tree, inst)
 
@@ -66,6 +77,20 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.Continue, nil
 	}
 	pod := obj.(*corev1.Pod)
+	inst.Status.Provisioned = true
+	inst.Status.CurrentState = workloads.InstanceCurrentStatePresent
+	if isTerminating(pod) {
+		inst.Status.CurrentState = workloads.InstanceCurrentStateTerminating
+	}
+	result := workloads.InstanceStatus{DataLoaded: inst.Status.DataLoaded}
+	if _, err := workloadlifecycle.ObserveData(&result, pod); err != nil {
+		return kubebuilderx.Continue, err
+	}
+	inst.Status.DataLoaded = result.DataLoaded
+	// Persist results in a separate pass before any mutable input or assistant object is cleaned.
+	if !reflect.DeepEqual(previous.DataLoaded, inst.Status.DataLoaded) {
+		return kubebuilderx.RetryAfter(time.Second), nil
+	}
 	if isTerminating(pod) {
 		setPodUnavailableStatus(inst, workloads.InstanceCurrentStateTerminating, pod.Name, getPodRevision(pod))
 		return kubebuilderx.Continue, nil
@@ -126,7 +151,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 	inst.Status.Configs = configs
 
-	if !stopped && inst.Spec.MinReadySeconds > 0 && !available {
+	if !stopped && inst.Spec.MinReadySeconds > 0 && ready && !available {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	return kubebuilderx.Continue, nil

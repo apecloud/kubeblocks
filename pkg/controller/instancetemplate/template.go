@@ -58,6 +58,18 @@ func BuildInstanceTemplateExt(itsExt *InstanceSetExt) []*InstanceTemplateExt {
 	return templates
 }
 
+// GetInstanceTemplateExt resolves a recorded template independently of its current allocation.
+// The default template remains valid when no replicas are allocated to it.
+func GetInstanceTemplateExt(itsExt *InstanceSetExt, name string) *InstanceTemplateExt {
+	if template := itsExt.InstanceTemplates[name]; template != nil {
+		return buildInstanceTemplateExt(template, itsExt.InstanceSet)
+	}
+	if name == "" {
+		return buildInstanceTemplateExt(&workloads.InstanceTemplate{}, itsExt.InstanceSet)
+	}
+	return nil
+}
+
 // buildInstanceTemplates builds a complete instance template list,
 // i.e. append a pseudo template (which equals to `.spec.template`)
 // to the end of the list, to fill up the replica count.

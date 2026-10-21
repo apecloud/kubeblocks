@@ -48,6 +48,9 @@ type newReplicaTask struct {
 var _ task = &newReplicaTask{}
 
 func (s *newReplicaTask) run(ctx context.Context) (chan error, error) {
+	if s.actionService == nil {
+		return nil, fmt.Errorf("worker action service is required")
+	}
 	action, ok := s.actionService.actions[newReplicaDataLoad]
 	if !ok {
 		return nil, fmt.Errorf("%s is not supported", newReplicaDataLoad)
@@ -58,7 +61,21 @@ func (s *newReplicaTask) run(ctx context.Context) (chan error, error) {
 		return nil, err
 	}
 
-	return nonBlockingCallActionX(ctx, action, s.task.Parameters, nil, &action.TimeoutSeconds, conn, nil, nil)
+	ch, err := nonBlockingCallActionX(ctx, action, s.task.Parameters, nil, &action.TimeoutSeconds, conn, nil, nil)
+	if err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+	result := make(chan error, 1)
+	go func() {
+		defer conn.Close()
+		err, ok := <-ch
+		if !ok {
+			err = fmt.Errorf("runtime error: error chan closed unexpectedly")
+		}
+		result <- err
+	}()
+	return result, nil
 }
 
 func (s *newReplicaTask) status(ctx context.Context, event *proto.TaskEvent) {
@@ -73,6 +90,12 @@ func (s *newReplicaTask) handshake(ctx context.Context) (net.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
+	ok := false
+	defer func() {
+		if !ok {
+			_ = conn.Close()
+		}
+	}()
 
 	// reuse the action request as the handshake packet, define a new one when needed
 	req := proto.ActionRequest{
@@ -99,6 +122,7 @@ func (s *newReplicaTask) handshake(ctx context.Context) (net.Conn, error) {
 		return nil, fmt.Errorf("write streaming handshake request to remote error")
 	}
 
+	ok = true
 	return conn, nil
 }
 
@@ -112,5 +136,5 @@ func (s *newReplicaTask) connectToRemote(ctx context.Context) (net.Conn, error) 
 	dialer := &net.Dialer{
 		Timeout: defaultConnectTimeout,
 	}
-	return dialer.Dial("tcp", net.JoinHostPort(s.task.Remote, strconv.Itoa(int(s.task.Port))))
+	return dialer.DialContext(ctx, "tcp", net.JoinHostPort(s.task.Remote, strconv.Itoa(int(s.task.Port))))
 }

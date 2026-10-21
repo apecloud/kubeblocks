@@ -1614,6 +1614,11 @@ var _ = Describe("Component Controller", func() {
 			}
 		})()).ShouldNot(HaveOccurred())
 
+		By("trigger component reconcile after updating the definition")
+		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+			comp.Annotations["reconcile"] = "after-definition-change"
+		})()).Should(Succeed())
+
 		By("check new file template object")
 		newFileTemplateCMKey := types.NamespacedName{
 			Namespace: testCtx.DefaultNamespace,

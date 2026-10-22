@@ -51,7 +51,7 @@ var _ = Describe("instance util test", func() {
 				Spec:       pod.Spec,
 			}
 
-			result := filterInPlaceFields(podTemplate)
+			result := filterInPlaceFields(podTemplate, false)
 			Expect(result.Annotations).Should(HaveKey(constant.RestartAnnotationKey))
 			Expect(result.Annotations[constant.RestartAnnotationKey]).Should(Equal(restartTime))
 			Expect(result.Labels).Should(BeNil())
@@ -83,8 +83,8 @@ var _ = Describe("instance util test", func() {
 			newTemplate.Spec.InitContainers[0].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
 			newTemplate.Spec.InitContainers[0].Command = kbagent.InitCommand()
 
-			oldFiltered := filterInPlaceFields(oldTemplate)
-			newFiltered := filterInPlaceFields(newTemplate)
+			oldFiltered := filterInPlaceFields(oldTemplate, false)
+			newFiltered := filterInPlaceFields(newTemplate, false)
 			Expect(newFiltered).Should(Equal(oldFiltered))
 			Expect(newTemplate.Spec.InitContainers[0].Command).Should(Equal(kbagent.InitCommand()),
 				"revision normalization must not modify the desired template")

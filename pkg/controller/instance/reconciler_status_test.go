@@ -479,7 +479,7 @@ func TestInitialDataSatisfactionRequiresObservedNoCopyRuntime(t *testing.T) {
 		{name: "no hooks", pod: true},
 		{name: "no runtime", hooks: true},
 		{name: "initial runtime", hooks: true, pod: true, want: ptr.To(true)},
-		{name: "actual pending task", hooks: true, pod: true, actualTask: true},
+		{name: "actual pending task", hooks: true, pod: true, actualTask: true, want: ptr.To(false)},
 		{name: "pending result without task", hooks: true, pod: true, previous: ptr.To(false), want: ptr.To(false)},
 		{name: "pending result with task", hooks: true, pod: true, actualTask: true, previous: ptr.To(false), want: ptr.To(false)},
 		{name: "completed result with task", hooks: true, pod: true, actualTask: true, previous: ptr.To(true), want: ptr.To(true)},

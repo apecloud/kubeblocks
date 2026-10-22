@@ -5908,7 +5908,6 @@ func TestInstanceSetCompletedWorkerSurvivesDonorRebuild(t *testing.T) {
 			if err != nil || string(copied) != "completed data" {
 				t.Fatalf("actual loaded bytes=%q error=%v", copied, err)
 			}
-			t.Logf("real worker returned success and copied bytes=%q", copied)
 			markDataWorkerComplete(t, f.cli, targetKey)
 			target := &corev1.Pod{}
 			if err := f.cli.Get(context.Background(), targetKey, target); err != nil {
@@ -5973,7 +5972,28 @@ func TestInstanceSetCompletedWorkerSurvivesDonorRebuild(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			t.Logf("old=%s refreshed=%s", oldTask, newTask)
+			if !recordFirst {
+				desiredInput := its2TaskInput(inst)
+				conflicted := &its2LifecycleClient{Client: f.cli, rejectDataResult: true}
+				resultLeaf := &InstanceReconciler{Client: conflicted, Scheme: f.cli.Scheme(), Recorder: record.NewFakeRecorder(100)}
+				result, err := resultLeaf.Reconcile(ctx, ctrl.Request{NamespacedName: targetKey})
+				if err != nil || !result.Requeue || conflicted.dataResultFailures == 0 {
+					t.Fatalf("result conflict was not retried: %#v %v", result, err)
+				}
+				pending := its2LifecycleInstance(t, f.cli, targetKey.Name)
+				if ptr.Deref(pending.Status.DataLoaded, false) || its2TaskInput(pending) != desiredInput {
+					t.Fatal("failed result commit changed task or completion")
+				}
+				conflicted.rejectDataResult = false
+				if _, err := resultLeaf.Reconcile(ctx, ctrl.Request{NamespacedName: targetKey}); err != nil {
+					t.Fatal(err)
+				}
+				completed := its2LifecycleInstance(t, f.cli, targetKey.Name)
+				if !ptr.Deref(completed.Status.DataLoaded, false) || its2TaskInput(completed) != desiredInput {
+					t.Fatal("result retry did not commit before task cleanup")
+				}
+			}
+
 			for i := 0; i < 32; i++ {
 				f.stepWithChildren(t)
 			}
@@ -5985,7 +6005,6 @@ func TestInstanceSetCompletedWorkerSurvivesDonorRebuild(t *testing.T) {
 				t.Fatal(err)
 			}
 			inst = its2LifecycleInstance(t, f.cli, targetKey.Name)
-			t.Logf("same Running target phase=%s applied=%s desired=%s child-data=%v", target.Status.Phase, actual, newTask, inst.Status.DataLoaded)
 			if actual != oldTask || (!recordFirst && newTask == oldTask) {
 				t.Fatal("fixture did not refresh desired while retaining applied task")
 			}
@@ -6001,24 +6020,23 @@ func TestInstanceSetCompletedWorkerSurvivesDonorRebuild(t *testing.T) {
 			if !ptr.Deref(f.its.FindInstanceStatus(targetKey.Name).DataLoaded, false) {
 				t.Fatalf("completed Running target stranded: calls=%v status=%+v", agent.calls, f.its.FindInstanceStatus(targetKey.Name))
 			}
-
 		})
 	}
 }
 
-type reviewPVCUIDClient struct {
+type dataPVCUIDClient struct {
 	client.Client
 	creates int
 }
 
-func (c *reviewPVCUIDClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+func (c *dataPVCUIDClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
 	if pvc, ok := obj.(*corev1.PersistentVolumeClaim); ok {
 		c.creates++
-		pvc.UID = types.UID(fmt.Sprintf("review-created-pvc-%d", c.creates))
+		pvc.UID = types.UID(fmt.Sprintf("lifecycle-created-pvc-%d", c.creates))
 	}
 	return c.Client.Create(ctx, obj, opts...)
 }
-func TestReviewNamedTemplateRetainedData(t *testing.T) {
+func TestInstanceSetNamedTemplateRetainsDataResult(t *testing.T) {
 	for _, instanceAPI := range []bool{false, true} {
 		for _, loaded := range []bool{false, true} {
 			for _, remove := range []bool{false, true} {
@@ -6029,7 +6047,7 @@ func TestReviewNamedTemplateRetainedData(t *testing.T) {
 						initial = 2
 					}
 					f := newDataLifecycleEntry(t, instanceAPI, initial, appsv1.ParallelPodManagement)
-					uidClient := &reviewPVCUIDClient{Client: f.cli}
+					uidClient := &dataPVCUIDClient{Client: f.cli}
 					f.cli = uidClient
 					named := workloads.InstanceTemplate{Name: "named", Replicas: ptr.To[int32](1), VolumeClaimTemplates: []corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "data"}, Spec: corev1.PersistentVolumeClaimSpec{AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}, Resources: corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("2Gi")}}}}}}
 					if loaded {
@@ -6095,7 +6113,10 @@ func TestReviewNamedTemplateRetainedData(t *testing.T) {
 					if err := f.cli.Get(ctx, targetKey, &corev1.Pod{}); !apierrors.IsNotFound(err) {
 						t.Fatal("pod still exists", err)
 					}
-					t.Logf("after shrink: UID=%s status=%#v", claim.UID, f.its.FindInstanceStatus(target))
+					status := f.its.FindInstanceStatus(target)
+					if status == nil || status.DataLoaded == nil || *status.DataLoaded != loaded {
+						t.Fatalf("retained claim lost data result after template removal: %#v", status)
+					}
 					f.its.Spec.Replicas = ptr.To[int32](2)
 					f.its.Spec.Instances = []workloads.InstanceTemplate{named}
 					f.its.Generation++
@@ -6128,13 +6149,13 @@ func TestReviewNamedTemplateRetainedData(t *testing.T) {
 	}
 }
 
-func TestReviewNamedOnlyZeroRegrowRetainedData(t *testing.T) {
+func TestInstanceSetNamedOnlyZeroRegrowRetainsDataResult(t *testing.T) {
 	for _, instanceAPI := range []bool{false, true} {
 		for _, remove := range []bool{false, true} {
 			t.Run(fmt.Sprintf("instanceAPI=%t/remove=%t", instanceAPI, remove), func(t *testing.T) {
 				ctx := context.Background()
 				f := newDataLifecycleEntry(t, instanceAPI, 1, appsv1.ParallelPodManagement)
-				f.cli = &reviewPVCUIDClient{Client: f.cli}
+				f.cli = &dataPVCUIDClient{Client: f.cli}
 				named := workloads.InstanceTemplate{Name: "named", Replicas: ptr.To[int32](1)}
 				f.its.Spec.Instances = []workloads.InstanceTemplate{named}
 				f.its.Spec.PersistentVolumeClaimRetentionPolicy = &workloads.PersistentVolumeClaimRetentionPolicy{WhenScaled: kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType}
@@ -6221,10 +6242,28 @@ func TestInstanceSetRoleProbeToolsUpgradePreservesPod(t *testing.T) {
 	for _, instanceAPI := range []bool{false, true} {
 		t.Run(fmt.Sprintf("instanceAPI=%t", instanceAPI), func(t *testing.T) {
 			ctx := context.Background()
-			var produced workloads.InstanceSet
-			if err := json.Unmarshal([]byte(`{"metadata":{"name":"tools-db","namespace":"default","labels":{"app.kubernetes.io/instance":"tools","app.kubernetes.io/managed-by":"kubeblocks","apps.kubeblocks.io/component-name":"db"},"annotations":{"app.kubernetes.io/component":"tools-db","apps.kubeblocks.io/service-version":"1","kubeblocks.io/generation":"0"}},"spec":{"replicas":1,"ordinals":{},"selector":{"matchLabels":{"app.kubernetes.io/instance":"tools","app.kubernetes.io/managed-by":"kubeblocks","apps.kubeblocks.io/component-name":"db","apps.kubeblocks.io/release-phase":"stable"}},"template":{"metadata":{"creationTimestamp":null,"labels":{"app.kubernetes.io/component":"tools-db","app.kubernetes.io/instance":"tools","app.kubernetes.io/managed-by":"kubeblocks","apps.kubeblocks.io/component-name":"db","apps.kubeblocks.io/release-phase":"stable","apps.kubeblocks.io/service-version":"1"}},"spec":{"initContainers":[{"name":"kbagent-worker","image":"docker.io/apecloud/kubeblocks-tools:1.0.0","command":["/bin/kbagent"],"args":["--server=false"],"env":[{"name":"KB_AGENT_NAMESPACE","valueFrom":{"fieldRef":{"apiVersion":"v1","fieldPath":"metadata.namespace"}}},{"name":"KB_AGENT_POD_NAME","valueFrom":{"fieldRef":{"apiVersion":"v1","fieldPath":"metadata.name"}}},{"name":"KB_AGENT_POD_UID","valueFrom":{"fieldRef":{"apiVersion":"v1","fieldPath":"metadata.uid"}}},{"name":"KB_AGENT_NODE_NAME","valueFrom":{"fieldRef":{"apiVersion":"v1","fieldPath":"spec.nodeName"}}},{"name":"KB_AGENT_ACTION","value":"[{\"name\":\"roleProbe\",\"exec\":{\"command\":[\"echo\",\"leader\"]}}]"},{"name":"KB_AGENT_PROBE","value":"[{\"instance\":\"tools-db\",\"action\":\"roleProbe\",\"periodSeconds\":10}]"}],"resources":{},"imagePullPolicy":"IfNotPresent","securityContext":{"runAsGroup":1000}}],"containers":[{"name":"db","image":"database:1","resources":{"limits":{"cpu":"0","memory":"0"}}},{"name":"kbagent","image":"docker.io/apecloud/kubeblocks-tools:1.0.0","command":["/bin/kbagent"],"args":["--port","3501","--streaming-port","3502"],"ports":[{"name":"http","containerPort":3501,"protocol":"TCP"},{"name":"streaming","containerPort":3502,"protocol":"TCP"}],"env":[{"name":"KB_AGENT_NAMESPACE","valueFrom":{"fieldRef":{"apiVersion":"v1","fieldPath":"metadata.namespace"}}},{"name":"KB_AGENT_POD_NAME","valueFrom":{"fieldRef":{"apiVersion":"v1","fieldPath":"metadata.name"}}},{"name":"KB_AGENT_POD_UID","valueFrom":{"fieldRef":{"apiVersion":"v1","fieldPath":"metadata.uid"}}},{"name":"KB_AGENT_NODE_NAME","valueFrom":{"fieldRef":{"apiVersion":"v1","fieldPath":"spec.nodeName"}}},{"name":"KB_AGENT_ACTION","value":"[{\"name\":\"roleProbe\",\"exec\":{\"command\":[\"echo\",\"leader\"]}}]"},{"name":"KB_AGENT_PROBE","value":"[{\"instance\":\"tools-db\",\"action\":\"roleProbe\",\"periodSeconds\":10}]"}],"resources":{},"startupProbe":{"tcpSocket":{"port":3501}},"imagePullPolicy":"IfNotPresent","securityContext":{"runAsGroup":1000}}]}},"persistentVolumeClaimRetentionPolicy":{"whenDeleted":"Delete","whenScaled":"Delete"},"podManagementPolicy":"OrderedReady","parallelPodManagementConcurrency":"100%","podUpdatePolicy":"PreferInPlace","podUpgradePolicy":"PreferInPlace","memberUpdateStrategy":"Serial","lifecycleActions":{}},"status":{"replicas":0,"readyReplicas":0,"availableReplicas":0,"initReplicas":0}}`), &produced); err != nil {
-				t.Fatal(err)
+
+			labels := map[string]string{constant.AppInstanceLabelKey: "tools", constant.AppManagedByLabelKey: constant.AppName, constant.KBAppComponentLabelKey: "db"}
+			env := []corev1.EnvVar{
+				{Name: "KB_AGENT_NAMESPACE", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.namespace"}}},
+				{Name: "KB_AGENT_POD_NAME", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.name"}}},
+				{Name: "KB_AGENT_POD_UID", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.uid"}}},
+				{Name: "KB_AGENT_NODE_NAME", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{APIVersion: "v1", FieldPath: "spec.nodeName"}}},
+				{Name: "KB_AGENT_ACTION", Value: `[{"name":"roleProbe","exec":{"command":["echo","leader"]}}]`},
+				{Name: "KB_AGENT_PROBE", Value: `[{"instance":"tools-db","action":"roleProbe","periodSeconds":10}]`},
 			}
+			worker := corev1.Container{Name: kbagent.ContainerName4Worker, Image: "docker.io/apecloud/kubeblocks-tools:1.0.0", Command: []string{"/bin/kbagent"}, Args: []string{"--server=false"}, Env: env, ImagePullPolicy: corev1.PullIfNotPresent, SecurityContext: &corev1.SecurityContext{RunAsGroup: ptr.To[int64](1000)}}
+			agent := *worker.DeepCopy()
+			agent.Name = kbagent.ContainerName
+			agent.Args = []string{"--port", "3501", "--streaming-port", "3502"}
+			agent.Ports = []corev1.ContainerPort{{Name: "http", ContainerPort: 3501, Protocol: corev1.ProtocolTCP}, {Name: "streaming", ContainerPort: 3502, Protocol: corev1.ProtocolTCP}}
+			agent.StartupProbe = &corev1.Probe{ProbeHandler: corev1.ProbeHandler{TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt32(3501)}}}
+			produced := workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "tools-db", Namespace: "default", Labels: labels}, Spec: workloads.InstanceSetSpec{
+				Replicas: ptr.To[int32](1), Selector: &metav1.LabelSelector{MatchLabels: labels},
+				Template:            corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: labels}, Spec: corev1.PodSpec{InitContainers: []corev1.Container{worker}, Containers: []corev1.Container{{Name: "db", Image: "database:1", Resources: corev1.ResourceRequirements{Limits: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("0"), corev1.ResourceMemory: resource.MustParse("0")}}}, agent}}},
+				PodManagementPolicy: appsv1.OrderedReadyPodManagement, PodUpdatePolicy: "PreferInPlace", PodUpgradePolicy: "PreferInPlace", MemberUpdateStrategy: ptr.To(workloads.SerialUpdateStrategy), LifecycleActions: &workloads.LifecycleActions{},
+			}}
+
 			produced.Spec.EnableInstanceAPI = ptr.To(instanceAPI)
 			specs := []*workloads.InstanceSet{produced.DeepCopy(), produced.DeepCopy()}
 			specs[1].Spec.Template.Spec.InitContainers[0].Image = "docker.io/apecloud/kubeblocks-tools:1.1.0"
@@ -6281,7 +6320,6 @@ func TestInstanceSetRoleProbeToolsUpgradePreservesPod(t *testing.T) {
 					t.Fatal("no DataLoad must remain untracked")
 				}
 			}
-			t.Logf("stable before update: %+v", f.its.Status)
 			f.its.Spec = specs[1].Spec
 			f.its.Generation++
 			if err := cli.Update(ctx, f.its); err != nil {
@@ -6302,9 +6340,9 @@ func TestInstanceSetRoleProbeToolsUpgradePreservesPod(t *testing.T) {
 			if err := cli.Get(ctx, key, pod); err != nil {
 				t.Fatal(err)
 			}
-			_, worker := intctrlutil.GetContainerByName(pod.Spec.InitContainers, kbagent.ContainerName4Worker)
-			if worker == nil || worker.Image != "docker.io/apecloud/kubeblocks-tools:1.1.0" {
-				t.Fatalf("tools image did not converge in place: %+v", worker)
+			_, currentWorker := intctrlutil.GetContainerByName(pod.Spec.InitContainers, kbagent.ContainerName4Worker)
+			if currentWorker == nil || currentWorker.Image != "docker.io/apecloud/kubeblocks-tools:1.1.0" {
+				t.Fatalf("tools image did not converge in place: %+v", currentWorker)
 			}
 			if pod.UID != "tools-upgrade-target" || pod.Spec.Containers[0].Image != "database:1" {
 				t.Fatal("tools upgrade changed database identity or image")
@@ -6327,7 +6365,7 @@ func TestInstanceSetJoinOnlyReallocationSeparatesData(t *testing.T) {
 			t.Run(fmt.Sprintf("instanceAPI=%t/retain=%t", instanceAPI, retain), func(t *testing.T) {
 				ctx := context.Background()
 				f := newDataLifecycleEntry(t, instanceAPI, 2, appsv1.ParallelPodManagement)
-				f.cli = &reviewPVCUIDClient{Client: f.cli}
+				f.cli = &dataPVCUIDClient{Client: f.cli}
 				f.its.Spec.LifecycleActions.MemberLeave = nil
 				f.its.Spec.PersistentVolumeClaimRetentionPolicy = &workloads.PersistentVolumeClaimRetentionPolicy{WhenScaled: kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType}
 				if retain {
@@ -6374,7 +6412,6 @@ func TestInstanceSetJoinOnlyReallocationSeparatesData(t *testing.T) {
 						t.Fatalf("shrink did not delete Instance: %v", err)
 					}
 				}
-				t.Logf("after runtime and PVC release, status=%#v", f.its.FindInstanceStatus(key.Name))
 				f.its.Spec.Replicas = ptr.To[int32](2)
 				f.its.Generation++
 				if err := f.cli.Update(ctx, f.its); err != nil {
@@ -6404,7 +6441,6 @@ func TestInstanceSetJoinOnlyReallocationSeparatesData(t *testing.T) {
 				}
 				task, err := workloadlifecycle.GeneratedTask(&target.Spec)
 				status := f.its.FindInstanceStatus(key.Name)
-				t.Logf("fresh PVC and Pod exist; task=%q status=%#v calls=%v", task, status, agent.calls)
 				if err != nil || (task == "") != retain {
 					t.Fatalf("wrong load decision retain=%t task=%q err=%v", retain, task, err)
 				}

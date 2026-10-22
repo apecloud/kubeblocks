@@ -56,7 +56,7 @@ func supportPodVerticalScaling() bool {
 	return viper.GetBool(constant.FeatureGateInPlacePodVerticalScaling)
 }
 
-func filterInPlaceFields(src *corev1.PodTemplateSpec) *corev1.PodTemplateSpec {
+func filterInPlaceFields(src *corev1.PodTemplateSpec, preserveDataWorkerImage bool) *corev1.PodTemplateSpec {
 	template := src.DeepCopy()
 	workloadlifecycle.FilterTransient(&template.Spec)
 	// filter annotations
@@ -77,7 +77,7 @@ func filterInPlaceFields(src *corev1.PodTemplateSpec) *corev1.PodTemplateSpec {
 		template.Spec.Containers[i].Image = ""
 	}
 	for i := range template.Spec.InitContainers {
-		if !workloadlifecycle.IsDataWorker(&template.Spec.InitContainers[i]) {
+		if !preserveDataWorkerImage || !workloadlifecycle.IsDataWorker(&template.Spec.InitContainers[i]) {
 			template.Spec.InitContainers[i].Image = ""
 		}
 	}

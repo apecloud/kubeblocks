@@ -657,11 +657,11 @@ func TestWorkloadDataWorkerRevisionTracksConfigurationButNotTaskCleanup(t *testi
 	if err := workloadlifecycle.ConfigureDataTask(its, pod, source); err != nil {
 		t.Fatal(err)
 	}
-	before := filterInPlaceFields(&corev1.PodTemplateSpec{Spec: pod.Spec})
+	before := filterInPlaceFields(&corev1.PodTemplateSpec{Spec: pod.Spec}, true)
 	if _, err := workloadlifecycle.CleanTask(&pod.Spec, pod.Name); err != nil {
 		t.Fatal(err)
 	}
-	after := filterInPlaceFields(&corev1.PodTemplateSpec{Spec: pod.Spec})
+	after := filterInPlaceFields(&corev1.PodTemplateSpec{Spec: pod.Spec}, true)
 	if !reflect.DeepEqual(before, after) {
 		t.Fatal("cleaned task changed revision inputs")
 	}

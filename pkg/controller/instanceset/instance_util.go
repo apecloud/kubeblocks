@@ -579,7 +579,7 @@ func buildInstanceTemplateRevision(template *corev1.PodTemplateSpec, parent *wor
 		return "", err
 	}
 	templateCopy.Spec = pod.Spec
-	podTemplate := filterInPlaceFields(templateCopy)
+	podTemplate := filterInPlaceFields(templateCopy, parent.Spec.LifecycleActions != nil && parent.Spec.LifecycleActions.DataLoad != nil)
 	its := builder.NewInstanceSetBuilder(parent.Namespace, parent.Name).
 		SetUID(parent.UID).
 		AddAnnotationsInMap(parent.Annotations).

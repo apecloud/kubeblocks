@@ -780,6 +780,7 @@ func TestPodRevisionKeepsPersistentDataWorkerConfiguration(t *testing.T) {
 		t.Fatal(err)
 	}
 	inst := &workloads.Instance{ObjectMeta: metav1.ObjectMeta{Name: "worker-0", Namespace: "default"}, Spec: workloads.InstanceSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{InitContainers: []corev1.Container{{Name: kbagent.ContainerName4Worker, Image: "agent:v1", Env: []corev1.EnvVar{*task, {Name: "USER_CONFIG", Value: "v1"}}, VolumeMounts: []corev1.VolumeMount{{Name: "data", MountPath: "/data"}}}}}}}}
+	inst.Spec.LifecycleActions = &workloads.LifecycleActions{DataLoad: &kbappsv1.Action{}}
 	baseline, err := BuildPodRevision(inst)
 	if err != nil {
 		t.Fatal(err)
@@ -804,6 +805,12 @@ func TestPodRevisionKeepsPersistentDataWorkerConfiguration(t *testing.T) {
 	if revision != baseline {
 		t.Fatal("task cleanup changed Pod revision")
 	}
+	cleaned.Spec.Template.Spec.InitContainers[0].Image = "agent:v2"
+	revision, err = BuildPodRevision(cleaned)
+	if err != nil || revision == baseline {
+		t.Fatalf("completed data worker image excluded from revision: %s %v", revision, err)
+	}
+
 	mutations := []func(*corev1.Container){
 		func(c *corev1.Container) { c.Image = "agent:v2" },
 		func(c *corev1.Container) { c.VolumeMounts[0].MountPath = "/new-data" },

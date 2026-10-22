@@ -677,6 +677,13 @@ func TestWorkloadDataWorkerRevisionTracksConfigurationButNotTaskCleanup(t *testi
 	if first == second {
 		t.Fatal("configured action excluded from revision")
 	}
+	templates[0].PodTemplateSpec.Spec.InitContainers[0].Image = "tools:v2"
+	changedImage, err := buildInstanceTemplateRevision(&templates[0].PodTemplateSpec, its, nil)
+	if err != nil || changedImage == second {
+		t.Fatalf("data worker image excluded from revision: %s %v", changedImage, err)
+	}
+	templates[0].PodTemplateSpec.Spec.InitContainers[0].Image = "tools"
+
 	its.Spec.LifecycleActions.DataLoad = action
 	templates[0].PodTemplateSpec.Spec.InitContainers[0].VolumeMounts[0].MountPath = "/different"
 	third, err := buildInstanceTemplateRevision(&templates[0].PodTemplateSpec, its, nil)

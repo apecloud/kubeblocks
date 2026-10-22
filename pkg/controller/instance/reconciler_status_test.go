@@ -415,31 +415,36 @@ func TestDataResultRequiresAppliedTaskAndCurrentWorkerSuccess(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		actual   bool
+		target   string
 		remote   string
 		worker   corev1.ContainerStatus
 		complete bool
 	}{
 		{name: "missing task", worker: corev1.ContainerStatus{Name: kbagent.ContainerName4Worker, State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 0}}}},
-		{name: "different applied input", actual: true, remote: "old-source", worker: corev1.ContainerStatus{Name: kbagent.ContainerName4Worker, State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 0}}}},
+		{name: "different applied input", actual: true, remote: "old-source", complete: true, worker: corev1.ContainerStatus{Name: kbagent.ContainerName4Worker, State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 0}}}},
+		{name: "different target", actual: true, target: "demo-2", remote: "source", worker: corev1.ContainerStatus{Name: kbagent.ContainerName4Worker, State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 0}}}},
 		{name: "unrelated init", actual: true, remote: "source", worker: corev1.ContainerStatus{Name: "other-init", State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 0}}}},
 		{name: "running worker", actual: true, remote: "source", worker: corev1.ContainerStatus{Name: kbagent.ContainerName4Worker, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}, LastTerminationState: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 0}}}},
 		{name: "failed worker", actual: true, remote: "source", worker: corev1.ContainerStatus{Name: kbagent.ContainerName4Worker, State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 1}}}},
 		{name: "matching success", actual: true, remote: "source", worker: corev1.ContainerStatus{Name: kbagent.ContainerName4Worker, State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 0}}}, complete: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			taskSpec := func(remote string) corev1.PodSpec {
-				env, err := kbagent.BuildEnv4Worker([]proto.Task{{Instance: "demo", Task: "newReplica", UID: "demo-1", Replicas: "demo-1", NewReplica: &proto.NewReplicaTask{Remote: remote, Port: 3502, Replicas: "demo-1"}}})
+			taskSpec := func(remote, target string) corev1.PodSpec {
+				if target == "" {
+					target = "demo-1"
+				}
+				env, err := kbagent.BuildEnv4Worker([]proto.Task{{Instance: "demo", Task: "newReplica", UID: target, Replicas: target, NewReplica: &proto.NewReplicaTask{Remote: remote, Port: 3502, Replicas: target}}})
 				if err != nil {
 					t.Fatal(err)
 				}
 				return corev1.PodSpec{InitContainers: []corev1.Container{{Name: kbagent.ContainerName4Worker, Env: []corev1.EnvVar{*env}}}}
 			}
-			inst := &workloads.Instance{ObjectMeta: metav1.ObjectMeta{Name: "demo-1", Namespace: "default"}, Spec: workloads.InstanceSpec{Template: corev1.PodTemplateSpec{Spec: taskSpec("source")}}}
+			inst := &workloads.Instance{ObjectMeta: metav1.ObjectMeta{Name: "demo-1", Namespace: "default"}, Spec: workloads.InstanceSpec{Template: corev1.PodTemplateSpec{Spec: taskSpec("source", "demo-1")}}}
 			tree := kubebuilderx.NewObjectTree()
 			tree.SetRoot(inst)
 			pod := &corev1.Pod{ObjectMeta: inst.ObjectMeta, Status: corev1.PodStatus{Phase: corev1.PodPending, InitContainerStatuses: []corev1.ContainerStatus{tc.worker}}}
 			if tc.actual {
-				pod.Spec = taskSpec(tc.remote)
+				pod.Spec = taskSpec(tc.remote, tc.target)
 			}
 			if err := tree.Add(pod); err != nil {
 				t.Fatal(err)

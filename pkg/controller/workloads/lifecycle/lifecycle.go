@@ -118,7 +118,6 @@ func Register(its *workloads.InstanceSet, assignments []instancetemplate.Assignm
 		its.Status.InstanceStatus = append(its.Status.InstanceStatus, status)
 		changed = true
 	}
-	// Zero initial replicas still need an observable first commit. A later increase is expansion.
 	if bootstrap && len(assignments) == 0 {
 		its.Status.ObservedGeneration = its.Generation
 		changed = true
@@ -140,6 +139,13 @@ func NeedsLeave(its *workloads.InstanceSet, status *workloads.InstanceStatus) bo
 		return false
 	}
 	return ptr.Deref(status.MemberJoined, false) || (status.MemberJoined == nil && status.Provisioned)
+}
+
+func NeedsMemberRetirement(its *workloads.InstanceSet, status *workloads.InstanceStatus) bool {
+	if NeedsLeave(its, status) {
+		return true
+	}
+	return Enabled(its) && its.Spec.LifecycleActions.MemberJoin != nil && status != nil && ptr.Deref(status.MemberJoined, false)
 }
 
 // DataTask returns the workload-owned data task matching this instance.

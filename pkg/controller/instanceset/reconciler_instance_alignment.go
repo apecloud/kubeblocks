@@ -129,7 +129,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	}
 	retirementNames := deleteNameSet.Clone()
 	for _, status := range its.Status.InstanceStatus {
-		if !newNameSet.Has(status.PodName) && workloadlifecycle.NeedsLeave(its, &status) {
+		if !newNameSet.Has(status.PodName) && workloadlifecycle.NeedsMemberRetirement(its, &status) {
 			retirementNames.Insert(status.PodName)
 		}
 	}
@@ -149,7 +149,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		for _, name := range candidates {
 			pod := oldInstanceMap[name]
 			absent := pod == nil
-			if absent && !workloadlifecycle.NeedsLeave(its, workloadlifecycle.Status(its, name)) {
+			if absent && !workloadlifecycle.NeedsMemberRetirement(its, workloadlifecycle.Status(its, name)) {
 				continue
 			}
 			if !isOrderedReady && concurrency <= 0 {
@@ -166,7 +166,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 					waiting = true
 					continue
 				}
-				if workloadlifecycle.NeedsLeave(its, workloadlifecycle.Status(its, name)) {
+				if workloadlifecycle.NeedsMemberRetirement(its, workloadlifecycle.Status(its, name)) {
 					if absent {
 						pod = &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: its.Namespace},
 							Spec: corev1.PodSpec{Hostname: name, Subdomain: getHeadlessSvcName(its.Name)}}
@@ -204,7 +204,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 					waiting = true
 					continue
 				}
-				if workloadlifecycle.Enabled(its) && !slices.Contains(its.Spec.OfflineInstances, name) && workloadlifecycle.NeedsLeave(its, workloadlifecycle.Status(its, name)) {
+				if workloadlifecycle.Enabled(its) && !slices.Contains(its.Spec.OfflineInstances, name) && workloadlifecycle.NeedsMemberRetirement(its, workloadlifecycle.Status(its, name)) {
 					continue
 				}
 				if retiredNames.Has(name) || (!oldNameSet.Has(name) && metav1.IsControlledBy(obj, its)) {

@@ -107,74 +107,74 @@ func reconcileMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, 
 	if join && (its.Spec.LifecycleActions.MemberJoin == nil || status.MemberJoined == nil || *status.MemberJoined) {
 		return kubebuilderx.Continue, nil
 	}
-	if !join && !workloadlifecycle.NeedsLeave(its, status) {
+	if !join && !workloadlifecycle.NeedsMemberRetirement(its, status) {
 		return kubebuilderx.Continue, nil
-	}
-	pods := lifecyclePods(tree)
-	leave := !join
-	if join {
-		current, err := tree.Get(&workloads.Instance{ObjectMeta: metav1.ObjectMeta{Name: status.PodName, Namespace: its.Namespace}})
-		if err != nil {
-			return kubebuilderx.Continue, err
-		}
-		if current == nil || !current.GetDeletionTimestamp().IsZero() || ptr.Deref(current.(*workloads.Instance).Spec.Stop, false) {
-			return kubebuilderx.Continue, nil
-		}
 	}
 	if join && status.DataLoaded != nil && !*status.DataLoaded {
 		return kubebuilderx.Continue, nil
 	}
-	var pod *corev1.Pod
-	for _, p := range pods {
-		if p.Name == status.PodName {
-			pod = p
-			break
+	if join || its.Spec.LifecycleActions.MemberLeave != nil {
+		pods := lifecyclePods(tree)
+		leave := !join
+		if join {
+			current, err := tree.Get(&workloads.Instance{ObjectMeta: metav1.ObjectMeta{Name: status.PodName, Namespace: its.Namespace}})
+			if err != nil {
+				return kubebuilderx.Continue, err
+			}
+			if current == nil || !current.GetDeletionTimestamp().IsZero() || ptr.Deref(current.(*workloads.Instance).Spec.Stop, false) {
+				return kubebuilderx.Continue, nil
+			}
 		}
-	}
-	if join && (pod == nil || !pod.DeletionTimestamp.IsZero()) {
-		return lifecycleWait(tree, its, fmt.Errorf("waiting for runtime of member %s", status.PodName))
-	}
-	if pod == nil {
-		// Leave may run on a peer after Stop removed the member's Pod.
-		pod = &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: inst.Name, Namespace: inst.Namespace},
-			Spec: corev1.PodSpec{Hostname: inst.Spec.Template.Spec.Hostname, Subdomain: inst.Spec.Template.Spec.Subdomain}}
-	}
-	if join && !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
-		return kubebuilderx.Continue, nil
-	}
-	action := its.Spec.LifecycleActions.MemberJoin
-	if leave {
-		action = its.Spec.LifecycleActions.MemberLeave
-	}
-	opts, err := workloadlifecycle.ValidateExecution(action, pod, pods)
-	if err != nil {
-		return lifecycleWait(tree, its, err)
-	}
-	lfa, err := newMemberLifecycle(its, pod, pods)
-	if err != nil {
-		return lifecycleWait(tree, its, err)
-	}
-	if leave && its.Spec.LifecycleActions.Switchover != nil && exclusiveRole(its, pod) {
-		opts, err := workloadlifecycle.ValidateExecution(its.Spec.LifecycleActions.Switchover, pod, pods)
+		var pod *corev1.Pod
+		for _, p := range pods {
+			if p.Name == status.PodName {
+				pod = p
+				break
+			}
+		}
+		if join && (pod == nil || !pod.DeletionTimestamp.IsZero()) {
+			return lifecycleWait(tree, its, fmt.Errorf("waiting for runtime of member %s", status.PodName))
+		}
+		if pod == nil {
+			pod = &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: inst.Name, Namespace: inst.Namespace},
+				Spec: corev1.PodSpec{Hostname: inst.Spec.Template.Spec.Hostname, Subdomain: inst.Spec.Template.Spec.Subdomain}}
+		}
+		if join && !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
+			return kubebuilderx.Continue, nil
+		}
+		action := its.Spec.LifecycleActions.MemberJoin
+		if leave {
+			action = its.Spec.LifecycleActions.MemberLeave
+		}
+		opts, err := workloadlifecycle.ValidateExecution(action, pod, pods)
 		if err != nil {
 			return lifecycleWait(tree, its, err)
 		}
-		if err := lfa.Switchover(tree.Context, reader, opts, ""); err != nil {
+		lfa, err := newMemberLifecycle(its, pod, pods)
+		if err != nil {
 			return lifecycleWait(tree, its, err)
 		}
-		return lifecycleWait(tree, its, fmt.Errorf("waiting for %s to relinquish its exclusive role", pod.Name))
+		if leave && its.Spec.LifecycleActions.Switchover != nil && exclusiveRole(its, pod) {
+			opts, err := workloadlifecycle.ValidateExecution(its.Spec.LifecycleActions.Switchover, pod, pods)
+			if err != nil {
+				return lifecycleWait(tree, its, err)
+			}
+			if err := lfa.Switchover(tree.Context, reader, opts, ""); err != nil {
+				return lifecycleWait(tree, its, err)
+			}
+			return lifecycleWait(tree, its, fmt.Errorf("waiting for %s to relinquish its exclusive role", pod.Name))
+		}
+		if leave {
+			err = lfa.MemberLeave(tree.Context, reader, opts)
+		} else {
+			err = lfa.MemberJoin(tree.Context, reader, opts)
+		}
+		if err != nil {
+			return lifecycleWait(tree, its, err)
+		}
 	}
-	if leave {
-		err = lfa.MemberLeave(tree.Context, reader, opts)
-	} else {
-		err = lfa.MemberJoin(tree.Context, reader, opts)
-	}
-	if err != nil {
-		return lifecycleWait(tree, its, err)
-	}
-	// Commit the Instance result before aggregation or cleanup; Update checks its resource version.
 	current := inst.DeepCopy()
-	current.Status.MemberJoined = ptr.To(!leave)
+	current.Status.MemberJoined = ptr.To(join)
 	if err := tree.Update(current, kubebuilderx.WithSubResource("status")); err != nil {
 		return kubebuilderx.Continue, err
 	}

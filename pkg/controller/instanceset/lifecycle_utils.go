@@ -106,54 +106,56 @@ func reconcileMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, 
 	if join && (its.Spec.LifecycleActions.MemberJoin == nil || status.MemberJoined == nil || *status.MemberJoined) {
 		return kubebuilderx.Continue, nil
 	}
-	if !join && !workloadlifecycle.NeedsLeave(its, status) {
+	if !join && !workloadlifecycle.NeedsMemberRetirement(its, status) {
 		return kubebuilderx.Continue, nil
 	}
-	pods := make([]*corev1.Pod, 0)
-	for _, obj := range tree.List(&corev1.Pod{}) {
-		pods = append(pods, obj.(*corev1.Pod))
-	}
-	leave := !join
-	if join && (!pod.DeletionTimestamp.IsZero() || (workloadlifecycle.HasData(its) && status.DataLoaded != nil && !*status.DataLoaded) || !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds)) {
-		return kubebuilderx.Continue, nil
-	}
-	action := its.Spec.LifecycleActions.MemberJoin
-	if leave {
-		action = its.Spec.LifecycleActions.MemberLeave
-	}
-	opts, err := workloadlifecycle.ValidateExecution(action, pod, pods)
-	if err != nil {
-		return lifecycleWait(tree, its, err)
-	}
-	lfa, err := newLifecycleAction(its, tree, pod)
-	if err != nil {
-		return lifecycleWait(tree, its, err)
-	}
-	if leave && its.Spec.LifecycleActions.Switchover != nil {
-		exclusive := false
-		for _, role := range its.Spec.Roles {
-			if role.IsExclusive && role.Name == pod.Labels[constant.RoleLabelKey] {
-				exclusive = true
+	if join || its.Spec.LifecycleActions.MemberLeave != nil {
+		pods := make([]*corev1.Pod, 0)
+		for _, obj := range tree.List(&corev1.Pod{}) {
+			pods = append(pods, obj.(*corev1.Pod))
+		}
+		leave := !join
+		if join && (!pod.DeletionTimestamp.IsZero() || (workloadlifecycle.HasData(its) && status.DataLoaded != nil && !*status.DataLoaded) || !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds)) {
+			return kubebuilderx.Continue, nil
+		}
+		action := its.Spec.LifecycleActions.MemberJoin
+		if leave {
+			action = its.Spec.LifecycleActions.MemberLeave
+		}
+		opts, err := workloadlifecycle.ValidateExecution(action, pod, pods)
+		if err != nil {
+			return lifecycleWait(tree, its, err)
+		}
+		lfa, err := newLifecycleAction(its, tree, pod)
+		if err != nil {
+			return lifecycleWait(tree, its, err)
+		}
+		if leave && its.Spec.LifecycleActions.Switchover != nil {
+			exclusive := false
+			for _, role := range its.Spec.Roles {
+				if role.IsExclusive && role.Name == pod.Labels[constant.RoleLabelKey] {
+					exclusive = true
+				}
+			}
+			if exclusive {
+				opts, err := workloadlifecycle.ValidateExecution(its.Spec.LifecycleActions.Switchover, pod, pods)
+				if err != nil {
+					return lifecycleWait(tree, its, err)
+				}
+				if err := lfa.Switchover(tree.Context, reader, opts, ""); err != nil {
+					return lifecycleWait(tree, its, err)
+				}
+				return lifecycleWait(tree, its, fmt.Errorf("waiting for %s to relinquish its exclusive role", pod.Name))
 			}
 		}
-		if exclusive {
-			opts, err := workloadlifecycle.ValidateExecution(its.Spec.LifecycleActions.Switchover, pod, pods)
-			if err != nil {
-				return lifecycleWait(tree, its, err)
-			}
-			if err := lfa.Switchover(tree.Context, reader, opts, ""); err != nil {
-				return lifecycleWait(tree, its, err)
-			}
-			return lifecycleWait(tree, its, fmt.Errorf("waiting for %s to relinquish its exclusive role", pod.Name))
+		if join {
+			err = lfa.MemberJoin(tree.Context, reader, opts)
+		} else {
+			err = lfa.MemberLeave(tree.Context, reader, opts)
 		}
-	}
-	if join {
-		err = lfa.MemberJoin(tree.Context, reader, opts)
-	} else {
-		err = lfa.MemberLeave(tree.Context, reader, opts)
-	}
-	if err != nil {
-		return lifecycleWait(tree, its, err)
+		if err != nil {
+			return lifecycleWait(tree, its, err)
+		}
 	}
 	status.MemberJoined = ptr.To(join)
 	meta.RemoveStatusCondition(&its.Status.Conditions, "InstanceLifecycle")

@@ -108,7 +108,6 @@ func loadCompressedInstanceTemplates(ctx context.Context, reader client.Reader, 
 
 type retainedResourcesKey struct{}
 
-// Runtime resources belong to Instance. They are observations only in the parent tree.
 func loadLifecycleRuntime(ctx context.Context, reader client.Reader, tree *kubebuilderx.ObjectTree) error {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return nil

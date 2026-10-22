@@ -3238,7 +3238,6 @@ func TestInstanceSetLifecycleMemberOnlyExecutesGeneratedAgentActions(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Route the out-of-cluster controller to the real HTTP agent instead of Kubernetes port forwarding.
 	kbacli.SetMockClient(agentClient, nil)
 	t.Cleanup(kbacli.UnsetMockClient)
 	markReady(target.Name)
@@ -3830,7 +3829,7 @@ func TestInstanceSetLifecycleRegistersExpansionWhileStopped(t *testing.T) {
 			targetName := f.its.Name + "-1"
 			status := f.its.FindInstanceStatus(targetName)
 			if status == nil || status.EffectiveDesiredState() != workloads.InstanceDesiredStateOffline || status.MemberJoined == nil || *status.MemberJoined {
-				t.Fatalf("stopped expansion lost loading or membership requirements: %#v", f.its.Status.InstanceStatus)
+				t.Fatalf("stopped expansion lost membership requirements: %#v", f.its.Status.InstanceStatus)
 			}
 			if len(lifecycleEntryPods(t, f.cli)) != 0 || len(agent.calls) != 0 {
 				t.Fatal("stopped allocation created runtime or executed a member action")
@@ -3858,7 +3857,7 @@ func TestInstanceSetLifecycleRegistersExpansionWhileStopped(t *testing.T) {
 			}
 			status = f.its.FindInstanceStatus(targetName)
 			if status == nil || !ptr.Deref(status.MemberJoined, false) || len(agent.calls) != 1 || agent.calls[0] != "memberJoin" {
-				t.Fatalf("resumed allocation did not complete loading and Join: %#v calls=%v", status, agent.calls)
+				t.Fatalf("resumed allocation did not complete Join: %#v calls=%v", status, agent.calls)
 			}
 		})
 
@@ -4184,8 +4183,6 @@ func checkITS2MembershipResultRetriesInstanceStatusConflict(t *testing.T, storag
 	agent := &memberResultConflictAgent{dispatch: func() {
 		calls++
 		if calls == 1 {
-			// A concurrent leaf observes readiness loss while the remote Join is in flight.
-			// Its status update changes the child's resource version before the member result commits.
 			f.setReady(t, target.Name, false)
 		}
 	}}
@@ -6472,5 +6469,223 @@ func TestInstanceSetJoinOnlyReallocationSeparatesData(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestInstanceSetJoinOnlyMemberReallocation(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		for _, storage := range []string{"none", "Delete", "Retain"} {
+			t.Run(fmt.Sprintf("instanceAPI=%t/storage=%s", instanceAPI, storage), func(t *testing.T) {
+				ctx := context.Background()
+				f := newMemberLifecycleEntry(t, instanceAPI, 1, appsv1.ParallelPodManagement)
+				f.its.Spec.LifecycleActions.MemberLeave = nil
+				if storage == "none" {
+					f.its.Spec.VolumeClaimTemplates = nil
+					f.its.Spec.Template.Spec.Containers[0].VolumeMounts = nil
+				} else {
+					f.its.Spec.VolumeClaimTemplates = newMemberLifecycleITS(1).Spec.VolumeClaimTemplates
+					f.its.Spec.PersistentVolumeClaimRetentionPolicy = &workloads.PersistentVolumeClaimRetentionPolicy{
+						WhenScaled: kbappsv1.PersistentVolumeClaimRetentionPolicyType(storage),
+					}
+				}
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				f.bootstrap(t, 1)
+				agent := &its2LifecycleAgent{}
+				kbacli.SetMockClient(agent, nil)
+				defer kbacli.UnsetMockClient()
+				f.its.Spec.Replicas = ptr.To[int32](2)
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				f.bootstrap(t, 2)
+				key := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-1"}
+				if len(agent.calls) != 1 || agent.calls[0] != "memberJoin" || !ptr.Deref(f.its.FindInstanceStatus(key.Name).MemberJoined, false) {
+					t.Fatalf("first expansion did not commit Join: calls=%v status=%#v", agent.calls, f.its.Status)
+				}
+				f.its.Spec.Replicas = ptr.To[int32](1)
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				for round := 0; round < 24; round++ {
+					f.stepWithChildren(t)
+				}
+				if err := f.cli.Get(ctx, key, &corev1.Pod{}); !apierrors.IsNotFound(err) {
+					t.Fatalf("scale-in did not remove the member Pod: %v", err)
+				}
+				if instanceAPI {
+					if err := f.cli.Get(ctx, key, &workloads.Instance{}); !apierrors.IsNotFound(err) {
+						t.Fatalf("scale-in did not remove the member Instance: %v", err)
+					}
+				}
+				claimErr := f.cli.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: "data-" + key.Name}, &corev1.PersistentVolumeClaim{})
+				if storage == "Retain" && claimErr != nil {
+					t.Fatalf("scale-in did not retain storage: %v", claimErr)
+				}
+				if storage != "Retain" && !apierrors.IsNotFound(claimErr) {
+					t.Fatalf("scale-in left unexpected storage: %v", claimErr)
+				}
+				f.its.Spec.Replicas = ptr.To[int32](2)
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				f.bootstrap(t, 2)
+				if !reflect.DeepEqual(agent.calls, []string{"memberJoin", "memberJoin"}) || !ptr.Deref(f.its.FindInstanceStatus(key.Name).MemberJoined, false) {
+					t.Fatalf("reallocated member did not Join again: calls=%v status=%#v", agent.calls, f.its.FindInstanceStatus(key.Name))
+				}
+			})
+		}
+	}
+}
+
+func TestInstanceSetJoinOnlyMemberSurvivesRuntimeRemoval(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		for _, stop := range []bool{false, true} {
+			t.Run(fmt.Sprintf("instanceAPI=%t/stop=%t", instanceAPI, stop), func(t *testing.T) {
+				ctx := context.Background()
+				f := newMemberLifecycleEntry(t, instanceAPI, 1, appsv1.ParallelPodManagement)
+				f.its.Spec.LifecycleActions.MemberLeave = nil
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				f.bootstrap(t, 1)
+				agent := &its2LifecycleAgent{}
+				kbacli.SetMockClient(agent, nil)
+				defer kbacli.UnsetMockClient()
+				name := f.its.Name + "-0"
+				if stop {
+					f.its.Spec.Stop = ptr.To(true)
+					f.its.Generation++
+					if err := f.cli.Update(ctx, f.its); err != nil {
+						t.Fatal(err)
+					}
+					for round := 0; round < 16; round++ {
+						f.stepWithChildren(t)
+					}
+					if len(lifecycleEntryPods(t, f.cli)) != 0 {
+						t.Fatal("Stop did not remove the Pod")
+					}
+					f.its.Spec.Stop = ptr.To(false)
+					f.its.Generation++
+					if err := f.cli.Update(ctx, f.its); err != nil {
+						t.Fatal(err)
+					}
+				} else {
+					pod := &corev1.Pod{}
+					if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: name}, pod); err != nil {
+						t.Fatal(err)
+					}
+					if err := f.cli.Delete(ctx, pod); err != nil {
+						t.Fatal(err)
+					}
+				}
+				f.bootstrap(t, 1)
+				if status := f.its.FindInstanceStatus(name); status == nil || !ptr.Deref(status.MemberJoined, false) || len(agent.calls) != 0 {
+					t.Fatalf("allocated member lost membership across runtime removal: calls=%v status=%#v", agent.calls, status)
+				}
+			})
+		}
+	}
+}
+
+func TestInstanceSetJoinOnlyRetirementRetriesStatusConflict(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		t.Run(fmt.Sprintf("instanceAPI=%t", instanceAPI), func(t *testing.T) {
+			ctx := context.Background()
+			f := newMemberLifecycleEntry(t, instanceAPI, 1, appsv1.ParallelPodManagement)
+			f.its.Spec.LifecycleActions.MemberLeave = nil
+			if err := f.cli.Update(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			f.bootstrap(t, 1)
+			agent := &its2LifecycleAgent{}
+			kbacli.SetMockClient(agent, nil)
+			defer kbacli.UnsetMockClient()
+			f.its.Spec.Replicas = ptr.To[int32](2)
+			f.its.Generation++
+			if err := f.cli.Update(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			f.bootstrap(t, 2)
+			if !reflect.DeepEqual(agent.calls, []string{"memberJoin"}) {
+				t.Fatalf("expansion did not execute Join: %v", agent.calls)
+			}
+			key := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-1"}
+			storage := f.cli
+			if wrapped, ok := storage.(*its2LifecycleClient); ok {
+				storage = wrapped.Client
+			}
+			conflicted := false
+			f.cli = interceptor.NewClient(storage.(client.WithWatch), interceptor.Funcs{SubResourceUpdate: func(ctx context.Context, delegate client.Client, subresource string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+				if subresource == "status" && !conflicted {
+					var joined *bool
+					if inst, ok := obj.(*workloads.Instance); ok && inst.Name == key.Name {
+						joined = inst.Status.MemberJoined
+					} else if its, ok := obj.(*workloads.InstanceSet); ok && !instanceAPI {
+						if status := its.FindInstanceStatus(key.Name); status != nil {
+							joined = status.MemberJoined
+						}
+					}
+					if joined != nil && !*joined {
+						conflicted = true
+						return apierrors.NewConflict(schema.GroupResource{Group: workloads.GroupVersion.Group, Resource: "status"}, obj.GetName(), fmt.Errorf("injected retirement status conflict"))
+					}
+				}
+				return delegate.SubResource(subresource).Update(ctx, obj, opts...)
+			}})
+			f.its.Spec.Replicas = ptr.To[int32](1)
+			f.its.Generation++
+			if err := f.cli.Update(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			var result ctrl.Result
+			for round := 0; round < 12 && !conflicted; round++ {
+				result = f.step(t)
+			}
+			if !conflicted || !result.Requeue || !ptr.Deref(f.its.FindInstanceStatus(key.Name).MemberJoined, false) {
+				t.Fatalf("failed retirement status write did not preserve membership: conflict=%t result=%#v status=%#v", conflicted, result, f.its.Status)
+			}
+			if err := f.cli.Get(ctx, key, &corev1.Pod{}); err != nil {
+				t.Fatalf("failed retirement status write removed the Pod: %v", err)
+			}
+			if instanceAPI {
+				child := its2LifecycleInstance(t, f.cli, key.Name)
+				if !ptr.Deref(child.Status.MemberJoined, false) || ptr.Deref(child.Spec.ScaledDown, false) {
+					t.Fatalf("failed retirement status write advanced child cleanup: %#v", child)
+				}
+			}
+			f.step(t)
+			if status := f.its.FindInstanceStatus(key.Name); status == nil || status.MemberJoined == nil || *status.MemberJoined {
+				t.Fatalf("retry did not commit retirement: %#v", status)
+			}
+			if err := f.cli.Get(ctx, key, &corev1.Pod{}); err != nil {
+				t.Fatalf("retirement result was not committed before Pod cleanup: %v", err)
+			}
+			if instanceAPI && ptr.Deref(its2LifecycleInstance(t, f.cli, key.Name).Status.MemberJoined, true) {
+				t.Fatal("retirement did not commit the child result")
+			}
+			for round := 0; round < 24; round++ {
+				f.stepWithChildren(t)
+			}
+			if err := f.cli.Get(ctx, key, &corev1.Pod{}); !apierrors.IsNotFound(err) {
+				t.Fatalf("retirement did not recover cleanup after conflict: %v", err)
+			}
+			if !reflect.DeepEqual(agent.calls, []string{"memberJoin"}) {
+				t.Fatalf("retirement without Leave dispatched an action: %v", agent.calls)
+			}
+			f.its.Spec.Replicas = ptr.To[int32](2)
+			f.its.Generation++
+			if err := f.cli.Update(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			f.bootstrap(t, 2)
+			if !reflect.DeepEqual(agent.calls, []string{"memberJoin", "memberJoin"}) {
+				t.Fatalf("reallocation after retirement conflict did not Join again: %v", agent.calls)
+			}
+		})
 	}
 }

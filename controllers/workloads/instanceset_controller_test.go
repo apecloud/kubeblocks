@@ -5022,9 +5022,10 @@ func TestInstanceSetLifecycleAdoptsLeaveBeforeScaleIn(t *testing.T) {
 				observeRoles()
 				logPath := filepath.Join(t.TempDir(), "leave")
 				f.its.Spec.LifecycleActions.MemberLeave = &kbappsv1.Action{TargetPodSelector: selector, Exec: &kbappsv1.ExecAction{Command: []string{"sh", "-c", "printf 'leave\\n' >> \"$1\"", "sh", logPath}}}
-				if selector == kbappsv1.OrdinalSelector {
+				switch selector {
+				case kbappsv1.OrdinalSelector:
 					f.its.Spec.LifecycleActions.MemberLeave.MatchingKey = "1"
-				} else if selector == kbappsv1.RoleSelector {
+				case kbappsv1.RoleSelector:
 					f.its.Spec.LifecycleActions.MemberLeave.MatchingKey = "follower"
 				}
 				f.its.Spec.Replicas = ptr.To[int32](1)

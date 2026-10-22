@@ -126,7 +126,7 @@ func (r *updateReconciler) reconcileUpdates(tree *kubebuilderx.ObjectTree, nameT
 	}
 
 	// handle 'MemberUpdate'
-	memberUpdateQuota, err := r.memberUpdateQuotaWithPredicate(its, oldPodList, satisfied)
+	memberUpdateQuota, err := r.memberUpdateQuota(its, oldPodList, satisfied)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
@@ -295,11 +295,7 @@ func (r *updateReconciler) rollingUpdateQuota(its *workloads.InstanceSet, podLis
 	return replicas, unavailable, nil
 }
 
-func (r *updateReconciler) memberUpdateQuota(its *workloads.InstanceSet, podList []*corev1.Pod) (int, error) {
-	return r.memberUpdateQuotaWithPredicate(its, podList, nil)
-}
-
-func (r *updateReconciler) memberUpdateQuotaWithPredicate(its *workloads.InstanceSet, podList []*corev1.Pod, satisfied func(*corev1.Pod) (bool, error)) (int, error) {
+func (r *updateReconciler) memberUpdateQuota(its *workloads.InstanceSet, podList []*corev1.Pod, satisfied func(*corev1.Pod) (bool, error)) (int, error) {
 	// if it's a roleful InstanceSet, we use updateCount to represent Pods can be updated according to the spec.memberUpdateStrategy.
 	updateCount := len(podList)
 	if len(its.Spec.Roles) > 0 {

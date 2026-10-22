@@ -82,7 +82,7 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 	childStatusChanged := false
 	for _, inst := range instances {
 		if status := instanceLifecycleStatus(its, inst.Name); status != nil {
-			status.Provisioned = status.Provisioned || inst.Status.Provisioned
+			status.Provisioned = status.Provisioned || inst.Status.Provisioned || runtimeNames.Has(inst.Name)
 			if inst.Status.DataLoaded != nil && (!ptr.Deref(status.DataLoaded, false) || *inst.Status.DataLoaded) {
 				status.DataLoaded = ptr.To(*inst.Status.DataLoaded)
 			}

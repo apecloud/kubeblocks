@@ -163,7 +163,15 @@ func getActionProbeNStreamingEnvValues(envVars map[string]string) (string, strin
 	if !ok {
 		return "", "", ""
 	}
-	return da, envVars[probeEnvName], envVars[streamingEnvName]
+	dp, ok := envVars[probeEnvName]
+	if !ok {
+		return da, "", ""
+	}
+	ds, ok := envVars[streamingEnvName]
+	if !ok {
+		return da, dp, ""
+	}
+	return da, dp, ds
 }
 
 func serializeActionNProbe(actions []proto.Action, probes []proto.Probe) (string, string, error) {

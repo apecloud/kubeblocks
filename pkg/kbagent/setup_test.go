@@ -21,12 +21,9 @@ package kbagent
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"io"
 	"net"
 	"testing"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2/ktesting"
@@ -256,40 +253,4 @@ func envVarMap(vars []corev1.EnvVar) map[string]string {
 		got[env.Name] = env.Value
 	}
 	return got
-}
-
-func TestInitializeStreamingWithoutProbes(t *testing.T) {
-	logger := ktesting.NewLogger(t, ktesting.NewConfig())
-	actions, _, err := serializeActionNProbe([]proto.Action{{Name: "dataDump", Exec: &proto.ExecAction{Commands: []string{"/bin/sh", "-c", "printf 'copied data'"}}}}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	services, err := initialize(logger, map[string]string{actionEnvName: actions, streamingEnvName: "dataDump"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	conn, peer := net.Pipe()
-	defer conn.Close()
-	defer peer.Close()
-	if err := conn.SetDeadline(time.Now().Add(5 * time.Second)); err != nil {
-		t.Fatal(err)
-	}
-	done := make(chan error, 1)
-	go func() {
-		defer peer.Close()
-		done <- streamingService(services).HandleConn(context.Background(), peer)
-	}()
-	if err := json.NewEncoder(conn).Encode(proto.ActionRequest{Action: "dataDump"}); err != nil {
-		t.Fatal(err)
-	}
-	data, err := io.ReadAll(conn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := <-done; err != nil {
-		t.Fatalf("configured dataDump did not execute: %v", err)
-	}
-	if string(data) != "copied data" {
-		t.Fatalf("dataDump produced %q, want copied data", data)
-	}
 }

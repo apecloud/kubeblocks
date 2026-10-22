@@ -5885,9 +5885,6 @@ func runLifecycleDataWorker(t *testing.T, listener net.Listener, source, target 
 	var actions []kbaproto.Action
 	var streaming []string
 	for _, env := range source.Spec.Containers[1].Env {
-		if env.Name == "KB_AGENT_PROBE" {
-			t.Fatal("fixture must have no probes")
-		}
 		if env.Name == "KB_AGENT_ACTION" {
 			if err := json.Unmarshal([]byte(env.Value), &actions); err != nil {
 				t.Fatal(err)

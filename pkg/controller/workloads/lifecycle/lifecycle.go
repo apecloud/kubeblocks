@@ -572,20 +572,31 @@ func CleanTask(spec *corev1.PodSpec, name string) (bool, error) {
 			if worker.Env[j].Name != taskEnv {
 				continue
 			}
-			cm := &corev1.ConfigMap{Data: map[string]string{taskEnv: worker.Env[j].Value}}
-			cleaned, err := CleanTaskConfigMap(cm, name)
-			if err != nil {
+			value := worker.Env[j].Value
+			if value == "" {
+				continue
+			}
+			var tasks []proto.Task
+			if err := json.Unmarshal([]byte(value), &tasks); err != nil {
 				return false, err
 			}
-			if !cleaned {
+			before := len(tasks)
+			tasks = slices.DeleteFunc(tasks, func(task proto.Task) bool {
+				return generatedDataTask(task, name)
+			})
+			if before == len(tasks) {
 				continue
 			}
 			changed = true
-			if value, ok := cm.Data[taskEnv]; ok {
-				worker.Env[j].Value = value
-			} else {
+			if len(tasks) == 0 {
 				worker.Env = append(worker.Env[:j], worker.Env[j+1:]...)
 				j--
+			} else {
+				encoded, err := json.Marshal(tasks)
+				if err != nil {
+					return false, err
+				}
+				worker.Env[j].Value = string(encoded)
 			}
 		}
 	}
@@ -626,35 +637,6 @@ func ValidateExecution(action *apps.Action, target *corev1.Pod, pods []*corev1.P
 	return nil, nil
 }
 
-// CleanTaskConfigMap preserves unrelated tasks and clears only workload-generated data-copy instructions.
-func CleanTaskConfigMap(cm *corev1.ConfigMap, name string) (bool, error) {
-	value := cm.Data[taskEnv]
-	if value == "" {
-		return false, nil
-	}
-	var tasks []proto.Task
-	if err := json.Unmarshal([]byte(value), &tasks); err != nil {
-		return false, err
-	}
-	before := len(tasks)
-	tasks = slices.DeleteFunc(tasks, func(task proto.Task) bool {
-		return generatedDataTask(task, name)
-	})
-	if before == len(tasks) {
-		return false, nil
-	}
-	if len(tasks) == 0 {
-		delete(cm.Data, taskEnv)
-	} else {
-		encoded, err := json.Marshal(tasks)
-		if err != nil {
-			return false, err
-		}
-		cm.Data[taskEnv] = string(encoded)
-	}
-	return true, nil
-}
-
 func envValueForTask(envs []corev1.EnvVar) string {
 	for _, env := range envs {
 		if env.Name == taskEnv {
@@ -664,12 +646,10 @@ func envValueForTask(envs []corev1.EnvVar) string {
 	return ""
 }
 
-// IsDataWorker identifies the prepared data worker container.
 func IsDataWorker(container *corev1.Container) bool {
 	return container.Name == kbagent.ContainerName4Worker
 }
 
-// GeneratedTask returns workload-generated data-copy instructions for update comparison.
 func GeneratedTask(spec *corev1.PodSpec) (string, error) {
 	task, err := DataTask(spec, "")
 	if err != nil || task == nil {

@@ -258,13 +258,6 @@ func lifecycleCreateInstance(tree *kubebuilderx.ObjectTree, its *workloads.Insta
 		if _, err := workloadlifecycle.CleanTask(&inst.Spec.Template.Spec, inst.Name); err != nil {
 			return err
 		}
-		for i := range inst.Spec.InstanceAssistantObjects {
-			if cm := inst.Spec.InstanceAssistantObjects[i].ConfigMap; cm != nil {
-				if _, err := workloadlifecycle.CleanTaskConfigMap(cm, inst.Name); err != nil {
-					return err
-				}
-			}
-		}
 		return nil
 	}
 	if ptr.Deref(its.Spec.Stop, false) {

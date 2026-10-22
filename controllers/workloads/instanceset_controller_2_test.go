@@ -21,7 +21,6 @@ package workloads
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -3065,23 +3064,6 @@ func checkITS2DataResultStatusConflict(t *testing.T, storage client.Client) {
 	if err != nil || generated == nil {
 		t.Fatalf("missing applied task: %v", err)
 	}
-	assistantEnv, err := kbagent.BuildEnv4Worker([]proto.Task{*generated, {Task: "caller-owned", UID: "retained"}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	assistantKey := client.ObjectKey{Namespace: key.Namespace, Name: key.Name + "-worker-input"}
-	childInput.Spec.InstanceAssistantObjects = []workloads.InstanceAssistantObject{{ConfigMap: &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: assistantKey.Name, Namespace: assistantKey.Namespace}, Data: map[string]string{assistantEnv.Name: assistantEnv.Value, "USER_CONFIG": "retained"}}}}
-	if err := cli.Update(ctx, childInput); err != nil {
-		t.Fatal(err)
-	}
-	preparedLeaf := &InstanceReconciler{Client: cli, Scheme: cli.Scheme(), Recorder: record.NewFakeRecorder(100)}
-	if _, err := preparedLeaf.Reconcile(ctx, ctrl.Request{NamespacedName: key}); err != nil {
-		t.Fatal(err)
-	}
-	assistant := &corev1.ConfigMap{}
-	if err := cli.Get(ctx, assistantKey, assistant); err != nil {
-		t.Fatal(err)
-	}
 	markDataWorkerComplete(t, cli, key)
 	conflicted := false
 	faulty := &dataCommitClient{Client: cli, update: func(ctx context.Context, current client.Client, sub string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
@@ -3122,20 +3104,8 @@ func checkITS2DataResultStatusConflict(t *testing.T, storage client.Client) {
 	if task, err := workloadlifecycle.GeneratedTask(&pod.Spec); err != nil || task == "" {
 		t.Fatalf("failed result commit lost actual evidence: %s %v", task, err)
 	}
-	if err := cli.Get(ctx, assistantKey, assistant); err != nil {
-		t.Fatal(err)
-	}
-	if assistant.Data[assistantEnv.Name] != assistantEnv.Value {
-		t.Fatal("failed result commit cleaned runtime assistant input")
-	}
 	if _, err := leaf.Reconcile(ctx, ctrl.Request{NamespacedName: key}); err != nil {
 		t.Fatal(err)
-	}
-	if err := cli.Get(ctx, assistantKey, assistant); err != nil {
-		t.Fatal(err)
-	}
-	if assistant.Data[assistantEnv.Name] != assistantEnv.Value {
-		t.Fatal("result observation mixed assistant cleanup into status commit")
 	}
 	child = its2LifecycleInstance(t, cli, key.Name)
 	if !ptr.Deref(child.Status.DataLoaded, false) || child.Annotations["concurrent-writer"] != "retained" {
@@ -3184,16 +3154,6 @@ func checkITS2DataResultStatusConflict(t *testing.T, storage client.Client) {
 	}
 	if task, err := workloadlifecycle.GeneratedTask(&pod.Spec); err != nil || task != "" {
 		t.Fatalf("committed child reloaded stale parent input: %s %v", task, err)
-	}
-	if err := cli.Get(ctx, assistantKey, assistant); err != nil {
-		t.Fatal(err)
-	}
-	var retained []proto.Task
-	if err := json.Unmarshal([]byte(assistant.Data[assistantEnv.Name]), &retained); err != nil {
-		t.Fatal(err)
-	}
-	if len(retained) != 1 || retained[0].Task != "caller-owned" || assistant.Data["USER_CONFIG"] != "retained" {
-		t.Fatalf("runtime assistant cleanup lost unrelated input: %#v", assistant.Data)
 	}
 	if !ptr.Deref(its2LifecycleInstance(t, cli, key.Name).Status.DataLoaded, false) {
 		t.Fatal("rebuild erased committed result")

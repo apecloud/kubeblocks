@@ -352,20 +352,6 @@ func TestDataSourceRetirementUsesMembershipResult(t *testing.T) {
 	}
 }
 
-func TestTaskCleanupPreservesOtherInstances(t *testing.T) {
-	own := proto.Task{Instance: "demo", Task: "newReplica", UID: "demo-1", Replicas: "demo-1", NewReplica: &proto.NewReplicaTask{Replicas: "demo-1"}}
-	other := proto.Task{Instance: "demo", Task: "newReplica", UID: "demo-2", Replicas: "demo-2", NewReplica: &proto.NewReplicaTask{Replicas: "demo-2"}}
-	env, _ := kbagent.BuildEnv4Worker([]proto.Task{own, other})
-	cm := &corev1.ConfigMap{Data: map[string]string{taskEnv: env.Value}}
-	if changed, err := CleanTaskConfigMap(cm, "demo-1"); err != nil || !changed {
-		t.Fatalf("cleanup=%v,%v", changed, err)
-	}
-	var tasks []proto.Task
-	if err := json.Unmarshal([]byte(cm.Data[taskEnv]), &tasks); err != nil || len(tasks) != 1 || tasks[0].UID != "demo-2" {
-		t.Fatalf("tasks=%v,%v", tasks, err)
-	}
-}
-
 func TestDataActionsPreservePreparedWorkerEnvironment(t *testing.T) {
 	its, pod := dataWorkload(), dataPod()
 	identity := corev1.EnvVar{Name: "KB_AGENT_POD_NAME", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"}}}

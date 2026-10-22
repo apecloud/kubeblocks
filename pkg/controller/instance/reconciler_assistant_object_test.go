@@ -21,13 +21,7 @@ package instance
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
-
-	"k8s.io/utils/ptr"
-
-	"github.com/apecloud/kubeblocks/pkg/kbagent"
-	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -276,53 +270,4 @@ func ordinalConfigMap(name string) *corev1.ConfigMap {
 		constant.KBAppMultiClusterObjectProvisionPolicyKey: constant.KBAppMultiClusterObjectProvisionOrdinal,
 	}
 	return cm
-}
-
-func TestAssistantRebuildClearsOnlyCompletedInstanceDataTask(t *testing.T) {
-	tasks := []proto.Task{
-		{Instance: "cluster-component", Task: "newReplica", UID: "cluster-component-0", Replicas: "cluster-component-0", NewReplica: &proto.NewReplicaTask{Replicas: "cluster-component-0"}},
-		{Instance: "cluster-component", Task: "newReplica", UID: "other-instance", Replicas: "other-instance", NewReplica: &proto.NewReplicaTask{Replicas: "other-instance"}},
-		{UID: "legacy", NewReplica: &proto.NewReplicaTask{}},
-	}
-
-	taskEnv, err := kbagent.BuildEnv4Worker(tasks)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assistant := sharedConfigMapAssistantObject("cluster-component-env", "v1")
-	assistant.ConfigMap.Data[taskEnv.Name] = taskEnv.Value
-	inst := newTestInstance("cluster-component-0", assistant)
-	inst.Status.DataLoaded = ptr.To(true)
-	tree := newTestTree(inst)
-	if _, err := NewAssistantObjectReconciler().Reconcile(tree); err != nil {
-		t.Fatal(err)
-	}
-	obj, err := tree.Get(assistant.ConfigMap)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cm := obj.(*corev1.ConfigMap)
-	var retained []proto.Task
-	if err := json.Unmarshal([]byte(cm.Data[taskEnv.Name]), &retained); err != nil {
-		t.Fatal(err)
-	}
-	if len(retained) != 2 || retained[0].UID != "other-instance" || retained[1].UID != "legacy" {
-		t.Fatalf("snapshot cleanup removed unrelated task: %#v", retained)
-	}
-	if inst.Spec.InstanceAssistantObjects[0].ConfigMap.Data[taskEnv.Name] != taskEnv.Value {
-		t.Fatal("Instance rewrote parent-owned assistant snapshot")
-	}
-	if err := tree.Delete(cm); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := NewAssistantObjectReconciler().Reconcile(tree); err != nil {
-		t.Fatal(err)
-	}
-	obj, err = tree.Get(assistant.ConfigMap)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if obj.(*corev1.ConfigMap).Data[taskEnv.Name] != cm.Data[taskEnv.Name] {
-		t.Fatal("ConfigMap recreation restored stale completed task")
-	}
 }

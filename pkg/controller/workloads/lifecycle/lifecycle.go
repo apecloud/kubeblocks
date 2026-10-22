@@ -90,18 +90,26 @@ func Validate(its *workloads.InstanceSet) error {
 	return nil
 }
 
-// Register records a complete current allocation before any runtime is created.
+// Register records the current allocation before runtime creation or retirement.
 // Existing resources prevent a lost observation from being classified as empty data.
 func Register(its *workloads.InstanceSet, assignments []instancetemplate.Assignment, runtimeNames, resourceNames sets.Set[string]) bool {
 	if !Enabled(its) {
 		return false
 	}
 	bootstrap := its.Status.ObservedGeneration == 0 && len(its.Status.InstanceStatus) == 0 && runtimeNames.Len() == 0 && resourceNames.Len() == 0
+	desired := sets.New[string]()
+	for _, a := range assignments {
+		desired.Insert(a.InstanceName)
+	}
 	known := make(map[string]int, len(its.Status.InstanceStatus))
+	changed := false
 	for i, s := range its.Status.InstanceStatus {
 		known[s.PodName] = i
+		if HasData(its) && !desired.Has(s.PodName) && !slices.Contains(its.Spec.OfflineInstances, s.PodName) && s.EffectiveDesiredState() != workloads.InstanceDesiredStateReleased {
+			its.Status.InstanceStatus[i].DesiredState = workloads.InstanceDesiredStateReleased
+			changed = true
+		}
 	}
-	changed := false
 	for _, a := range assignments {
 		if i, ok := known[a.InstanceName]; ok {
 			status := &its.Status.InstanceStatus[i]

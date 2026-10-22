@@ -30,6 +30,7 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	apps "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
@@ -65,8 +66,17 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 	for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
 		name := obj.GetLabels()[constant.KBAppPodNameLabelKey]
 		status := workloadlifecycle.Status(its, name)
-		if workloadlifecycle.HasData(its) && desired.Has(name) && status != nil && status.EffectiveDesiredState() == workloads.InstanceDesiredStateReleased && !obj.GetDeletionTimestamp().IsZero() {
-			return lifecycleWait(tree, its, fmt.Errorf("waiting for storage of released instance %s to be deleted", name))
+		if workloadlifecycle.HasData(its) && desired.Has(name) && status != nil && status.EffectiveDesiredState() == workloads.InstanceDesiredStateReleased {
+			if !obj.GetDeletionTimestamp().IsZero() {
+				return lifecycleWait(tree, its, fmt.Errorf("waiting for storage of released instance %s to be deleted", name))
+			}
+			retention := its.Spec.PersistentVolumeClaimRetentionPolicy
+			if !isStopRequested(its) && !names.Has(name) && metav1.IsControlledBy(obj, its) && (retention == nil || retention.WhenScaled != apps.RetainPersistentVolumeClaimRetentionPolicyType) {
+				if err := tree.Delete(obj); err != nil {
+					return kubebuilderx.Continue, err
+				}
+				return lifecycleWait(tree, its, fmt.Errorf("waiting for storage of released instance %s to be deleted", name))
+			}
 		}
 		resources.Insert(name)
 	}

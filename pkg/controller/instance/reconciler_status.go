@@ -99,7 +99,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 		inst.Status.DataLoaded = result.DataLoaded
 	}
-	// Persist results in a separate pass before any mutable input or assistant object is cleaned.
 	if !reflect.DeepEqual(previous.DataLoaded, inst.Status.DataLoaded) {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}

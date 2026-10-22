@@ -66,7 +66,6 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 	for _, a := range assignments {
 		desired.Insert(a.InstanceName)
 	}
-	// Read the actual completion fact first and commit it alone before cleanup or a member action.
 	previous := its.DeepCopy().Status.InstanceStatus
 	for _, pod := range pods {
 		if status := workloadlifecycle.Status(its, pod.Name); status != nil {

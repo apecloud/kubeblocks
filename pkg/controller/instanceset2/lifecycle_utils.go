@@ -127,7 +127,6 @@ func reconcileMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, 
 			return lifecycleWait(tree, its, fmt.Errorf("waiting for runtime of member %s", status.PodName))
 		}
 		if pod == nil {
-			// Leave may run on a peer after Stop removed the member's Pod.
 			pod = &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: inst.Name, Namespace: inst.Namespace},
 				Spec: corev1.PodSpec{Hostname: inst.Spec.Template.Spec.Hostname, Subdomain: inst.Spec.Template.Spec.Subdomain}}
 		}
@@ -165,7 +164,6 @@ func reconcileMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, 
 			return lifecycleWait(tree, its, err)
 		}
 	}
-	// Commit the Instance result before aggregation or cleanup; Update checks its resource version.
 	current := inst.DeepCopy()
 	current.Status.MemberJoined = ptr.To(join)
 	if err := tree.Update(current, kubebuilderx.WithSubResource("status")); err != nil {

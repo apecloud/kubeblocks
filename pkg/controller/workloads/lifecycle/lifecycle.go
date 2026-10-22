@@ -103,7 +103,6 @@ func Register(its *workloads.InstanceSet, assignments []instancetemplate.Assignm
 		its.Status.InstanceStatus = append(its.Status.InstanceStatus, status)
 		changed = true
 	}
-	// Zero initial replicas still need an observable first commit. A later increase is expansion.
 	if bootstrap && len(assignments) == 0 {
 		its.Status.ObservedGeneration = its.Generation
 		changed = true

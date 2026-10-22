@@ -62,7 +62,6 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 		resources.Insert(obj.GetLabels()[constant.KBAppPodNameLabelKey])
 	}
 	registered := workloadlifecycle.Register(its, assignments, names, resources)
-	// Commit the first observed Pod before cleanup or a member action.
 	previous := its.DeepCopy().Status.InstanceStatus
 	for _, pod := range pods {
 		if status := workloadlifecycle.Status(its, pod.Name); status != nil {

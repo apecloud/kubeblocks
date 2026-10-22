@@ -3238,7 +3238,6 @@ func TestInstanceSetLifecycleMemberOnlyExecutesGeneratedAgentActions(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Route the out-of-cluster controller to the real HTTP agent instead of Kubernetes port forwarding.
 	kbacli.SetMockClient(agentClient, nil)
 	t.Cleanup(kbacli.UnsetMockClient)
 	markReady(target.Name)
@@ -3830,7 +3829,7 @@ func TestInstanceSetLifecycleRegistersExpansionWhileStopped(t *testing.T) {
 			targetName := f.its.Name + "-1"
 			status := f.its.FindInstanceStatus(targetName)
 			if status == nil || status.EffectiveDesiredState() != workloads.InstanceDesiredStateOffline || status.MemberJoined == nil || *status.MemberJoined {
-				t.Fatalf("stopped expansion lost loading or membership requirements: %#v", f.its.Status.InstanceStatus)
+				t.Fatalf("stopped expansion lost membership requirements: %#v", f.its.Status.InstanceStatus)
 			}
 			if len(lifecycleEntryPods(t, f.cli)) != 0 || len(agent.calls) != 0 {
 				t.Fatal("stopped allocation created runtime or executed a member action")
@@ -3858,7 +3857,7 @@ func TestInstanceSetLifecycleRegistersExpansionWhileStopped(t *testing.T) {
 			}
 			status = f.its.FindInstanceStatus(targetName)
 			if status == nil || !ptr.Deref(status.MemberJoined, false) || len(agent.calls) != 1 || agent.calls[0] != "memberJoin" {
-				t.Fatalf("resumed allocation did not complete loading and Join: %#v calls=%v", status, agent.calls)
+				t.Fatalf("resumed allocation did not complete Join: %#v calls=%v", status, agent.calls)
 			}
 		})
 
@@ -4184,8 +4183,6 @@ func checkITS2MembershipResultRetriesInstanceStatusConflict(t *testing.T, storag
 	agent := &memberResultConflictAgent{dispatch: func() {
 		calls++
 		if calls == 1 {
-			// A concurrent leaf observes readiness loss while the remote Join is in flight.
-			// Its status update changes the child's resource version before the member result commits.
 			f.setReady(t, target.Name, false)
 		}
 	}}

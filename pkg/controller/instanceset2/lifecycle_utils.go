@@ -40,8 +40,6 @@ import (
 
 const lifecycleCondition = "InstanceLifecycle"
 
-var newMemberLifecycle = workloadlifecycle.NewLifecycle
-
 func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its := tree.GetRoot().(*workloads.InstanceSet)
 	assignments, _, err := instancetemplate.BuildAssignments(tree, its)
@@ -157,7 +155,7 @@ func reconcileMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, 
 		if err != nil {
 			return lifecycleWait(tree, its, err)
 		}
-		lfa, err := newMemberLifecycle(its, pod, pods)
+		lfa, err := workloadlifecycle.NewLifecycle(its, pod, pods)
 		if err != nil {
 			return lifecycleWait(tree, its, err)
 		}

@@ -281,7 +281,7 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 		if err := refreshInstanceData(tree, its, desired); err != nil {
 			return lifecycleWait(tree, its, err)
 		}
-		if !equality.Semantic.DeepEqual(inst.Spec.Template.Spec, desired.Spec.Template.Spec) || !equality.Semantic.DeepEqual(inst.Spec.InstanceAssistantObjects, desired.Spec.InstanceAssistantObjects) {
+		if !equality.Semantic.DeepEqual(inst.Spec.Template.Spec, desired.Spec.Template.Spec) {
 			if err := tree.Update(desired); err != nil {
 				return kubebuilderx.Continue, err
 			}

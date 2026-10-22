@@ -113,7 +113,7 @@ func Register(its *workloads.InstanceSet, assignments []instancetemplate.Assignm
 	for _, a := range assignments {
 		if i, ok := known[a.InstanceName]; ok {
 			status := &its.Status.InstanceStatus[i]
-			if HasData(its) && status.EffectiveDesiredState() == workloads.InstanceDesiredStateReleased && !runtimeNames.Has(a.InstanceName) && !resourceNames.Has(a.InstanceName) {
+			if HasData(its) && status.EffectiveDesiredState() != workloads.InstanceDesiredStateActive && !runtimeNames.Has(a.InstanceName) && !resourceNames.Has(a.InstanceName) {
 				status.DesiredState = workloads.InstanceDesiredStateActive
 				status.TemplateName = ptr.To(a.TemplateName)
 				status.DataLoaded = ptr.To(false)
@@ -551,13 +551,4 @@ func envValueForTask(envs []corev1.EnvVar) string {
 
 func IsDataWorker(container *corev1.Container) bool {
 	return container.Name == kbagent.ContainerName4Worker
-}
-
-func GeneratedTask(spec *corev1.PodSpec) (string, error) {
-	task, err := DataTask(spec, "")
-	if err != nil || task == nil {
-		return "", err
-	}
-	data, err := json.Marshal(task)
-	return string(data), err
 }

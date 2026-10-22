@@ -2862,7 +2862,7 @@ func checkITS2LifecycleDataRecovery(t *testing.T, storage client.Client, onDelet
 	if err := cli.Get(ctx, key, pod); err != nil {
 		t.Fatal(err)
 	}
-	if task, err := workloadlifecycle.GeneratedTask(&pod.Spec); err != nil || task != "" {
+	if task, err := generatedDataTask(&pod.Spec); err != nil || task != "" {
 		t.Fatalf("completed Pod regained task: %s %v", task, err)
 	}
 }
@@ -3101,7 +3101,7 @@ func checkITS2DataResultStatusConflict(t *testing.T, storage client.Client) {
 	if err := cli.Get(ctx, key, pod); err != nil {
 		t.Fatal(err)
 	}
-	if task, err := workloadlifecycle.GeneratedTask(&pod.Spec); err != nil || task == "" {
+	if task, err := generatedDataTask(&pod.Spec); err != nil || task == "" {
 		t.Fatalf("failed result commit lost actual evidence: %s %v", task, err)
 	}
 	if _, err := leaf.Reconcile(ctx, ctrl.Request{NamespacedName: key}); err != nil {
@@ -3152,7 +3152,7 @@ func checkITS2DataResultStatusConflict(t *testing.T, storage client.Client) {
 	if err := cli.Get(ctx, key, pod); err != nil {
 		t.Fatal(err)
 	}
-	if task, err := workloadlifecycle.GeneratedTask(&pod.Spec); err != nil || task != "" {
+	if task, err := generatedDataTask(&pod.Spec); err != nil || task != "" {
 		t.Fatalf("committed child reloaded stale parent input: %s %v", task, err)
 	}
 	if !ptr.Deref(its2LifecycleInstance(t, cli, key.Name).Status.DataLoaded, false) {

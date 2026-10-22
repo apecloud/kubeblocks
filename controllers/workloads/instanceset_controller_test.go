@@ -4708,7 +4708,7 @@ func TestInstanceSetInitialStepsAreSatisfiedWithoutActions(t *testing.T) {
 				t.Fatalf("initialization executed member actions: %v", agent.calls)
 			}
 			for _, pod := range lifecycleEntryPods(t, f.cli) {
-				if task, err := workloadlifecycle.GeneratedTask(&pod.Spec); err != nil || task != "" {
+				if task, err := generatedDataTask(&pod.Spec); err != nil || task != "" {
 					t.Fatalf("initialization created a data task: %s %v", task, err)
 				}
 			}
@@ -4809,7 +4809,7 @@ func TestInstanceSetReexpandsRetainedDataWithoutLoading(t *testing.T) {
 					for i := 0; i < 16; i++ {
 						f.stepWithChildren(t)
 						for _, pod := range lifecycleEntryPods(t, f.cli) {
-							if task, err := workloadlifecycle.GeneratedTask(&pod.Spec); err != nil || task != "" {
+							if task, err := generatedDataTask(&pod.Spec); err != nil || task != "" {
 								t.Fatalf("retained data was assigned another copy: %s %v", task, err)
 							}
 							f.setReady(t, pod.Name, true)
@@ -4891,13 +4891,22 @@ func newDataLifecycleEntry(t *testing.T, instanceAPI bool, replicas int32, polic
 	return &lifecycleEntry{cli: cli, its: its, instanceAPI: instanceAPI}
 }
 
+func generatedDataTask(spec *corev1.PodSpec) (string, error) {
+	task, err := workloadlifecycle.DataTask(spec, "")
+	if err != nil || task == nil {
+		return "", err
+	}
+	data, err := json.Marshal(task)
+	return string(data), err
+}
+
 func markDataWorkerComplete(t *testing.T, cli client.Client, key client.ObjectKey) {
 	t.Helper()
 	pod := &corev1.Pod{}
 	if err := cli.Get(context.Background(), key, pod); err != nil {
 		t.Fatal(err)
 	}
-	task, err := workloadlifecycle.GeneratedTask(&pod.Spec)
+	task, err := generatedDataTask(&pod.Spec)
 	if err != nil || task == "" {
 		t.Fatalf("worker completion requires a data task: %q %v", task, err)
 	}
@@ -5090,7 +5099,7 @@ func TestInstanceSetLifecycleRefreshesPendingWorkerAfterDonorAddressChanges(t *t
 	if err := cli.Status().Update(ctx, target); err != nil {
 		t.Fatal(err)
 	}
-	oldTask, err := workloadlifecycle.GeneratedTask(&target.Spec)
+	oldTask, err := generatedDataTask(&target.Spec)
 	if err != nil || oldTask == "" {
 		t.Fatalf("missing generated worker %s %v", oldTask, err)
 	}
@@ -5104,7 +5113,7 @@ func TestInstanceSetLifecycleRefreshesPendingWorkerAfterDonorAddressChanges(t *t
 	if err := cli.Get(ctx, targetKey, target); err != nil {
 		t.Fatal(err)
 	}
-	current, err := workloadlifecycle.GeneratedTask(&target.Spec)
+	current, err := generatedDataTask(&target.Spec)
 	if err != nil || current == oldTask {
 		t.Fatalf("pending worker kept stale donor: %s %v", current, err)
 	}
@@ -5226,7 +5235,7 @@ func TestInstanceSetLifecycleReexpandRetainedDataRestoresResultAndJoins(t *testi
 	if err := cli.Get(ctx, client.ObjectKey{Namespace: its.Namespace, Name: "data-lifecycle-1"}, target); err != nil {
 		t.Fatal(err)
 	}
-	task, err := workloadlifecycle.GeneratedTask(&target.Spec)
+	task, err := generatedDataTask(&target.Spec)
 	if err != nil || task != "" {
 		t.Fatal("retained completed data was reloaded", err)
 	}
@@ -5393,7 +5402,7 @@ func TestInstanceSetLifecycleResumesDataSourceBeforeEarlierNamedTarget(t *testin
 				if err := cli.Get(ctx, client.ObjectKey{Namespace: its.Namespace, Name: targetName}, target); err != nil {
 					t.Fatal(err)
 				}
-				if task, err := workloadlifecycle.GeneratedTask(&target.Spec); err != nil || task == "" || ptr.Deref(f.its.FindInstanceStatus(targetName).DataLoaded, true) {
+				if task, err := generatedDataTask(&target.Spec); err != nil || task == "" || ptr.Deref(f.its.FindInstanceStatus(targetName).DataLoaded, true) {
 					t.Fatalf("expansion was not waiting on its data task: task=%s err=%v status=%#v", task, err, f.its.Status.InstanceStatus)
 				}
 				f.its.Spec.Stop = ptr.To(true)
@@ -5439,7 +5448,7 @@ func TestInstanceSetLifecycleResumesDataSourceBeforeEarlierNamedTarget(t *testin
 				waitForPod(sourceName)
 				f.setReady(t, sourceName, true)
 				target = waitForPod(targetName)
-				if task, err := workloadlifecycle.GeneratedTask(&target.Spec); err != nil || task == "" || len(agent.calls) != 0 {
+				if task, err := generatedDataTask(&target.Spec); err != nil || task == "" || len(agent.calls) != 0 {
 					t.Fatalf("resume lost pending loading or executed membership early: task=%s calls=%v err=%v", task, agent.calls, err)
 				}
 			})
@@ -5479,7 +5488,7 @@ func TestInstanceSetLifecycleKeepsReplacementDataSourceUntilLoadCompletes(t *tes
 				if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: targetName}, target); err != nil {
 					t.Fatalf("recovered data source did not unblock replacement: %v", err)
 				}
-				if task, err := workloadlifecycle.GeneratedTask(&target.Spec); err != nil || task == "" {
+				if task, err := generatedDataTask(&target.Spec); err != nil || task == "" {
 					t.Fatalf("replacement has no data task: %s %v", task, err)
 				}
 				if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: sourceName}, &corev1.Pod{}); err != nil || len(agent.calls) != 0 {
@@ -5587,7 +5596,7 @@ func TestInstanceSetLifecycleKeepsHealthyDataSource(t *testing.T) {
 			if err := f.cli.Status().Update(ctx, target); err != nil {
 				t.Fatal(err)
 			}
-			task, err := workloadlifecycle.GeneratedTask(&target.Spec)
+			task, err := generatedDataTask(&target.Spec)
 			if err != nil || task == "" {
 				t.Fatalf("expansion did not create a data task: %s %v", task, err)
 			}
@@ -5596,7 +5605,7 @@ func TestInstanceSetLifecycleKeepsHealthyDataSource(t *testing.T) {
 				if err := f.cli.Get(ctx, key, target); err != nil {
 					t.Fatalf("unchanged healthy donors caused target recreation: %v", err)
 				}
-				if current, err := workloadlifecycle.GeneratedTask(&target.Spec); err != nil || current != task {
+				if current, err := generatedDataTask(&target.Spec); err != nil || current != task {
 					t.Fatalf("unchanged healthy donors replaced the running task: before=%s after=%s err=%v", task, current, err)
 				}
 			}
@@ -5631,7 +5640,7 @@ func TestInstanceSetLifecycleRetainedPendingDataRecovery(t *testing.T) {
 				if err := f.cli.Get(ctx, targetKey, target); err != nil {
 					t.Fatal(err)
 				}
-				if task, err := workloadlifecycle.GeneratedTask(&target.Spec); err != nil || task == "" {
+				if task, err := generatedDataTask(&target.Spec); err != nil || task == "" {
 					t.Fatalf("initial expansion has no data task: %q %v", task, err)
 				}
 				if status := f.its.FindInstanceStatus(target.Name); status == nil || status.DataLoaded == nil || *status.DataLoaded {
@@ -5740,7 +5749,7 @@ func TestInstanceSetLifecycleDataResultRetryAndCleanup(t *testing.T) {
 			if err := f.cli.Get(ctx, key, pod); err != nil {
 				t.Fatal(err)
 			}
-			before, err := workloadlifecycle.GeneratedTask(&pod.Spec)
+			before, err := generatedDataTask(&pod.Spec)
 			if err != nil || before == "" {
 				t.Fatalf("missing pending task: %s %v", before, err)
 			}
@@ -5784,7 +5793,7 @@ func TestInstanceSetLifecycleDataResultRetryAndCleanup(t *testing.T) {
 			if err := f.cli.Get(ctx, key, pod); err != nil {
 				t.Fatal(err)
 			}
-			if task, err := workloadlifecycle.GeneratedTask(&pod.Spec); err != nil || task != before {
+			if task, err := generatedDataTask(&pod.Spec); err != nil || task != before {
 				t.Fatalf("pending task changed: %s %v", task, err)
 			}
 			faulty.rejectDataResult = false
@@ -5810,7 +5819,7 @@ func TestInstanceSetLifecycleDataResultRetryAndCleanup(t *testing.T) {
 			if err := f.cli.Get(ctx, key, pod); err != nil {
 				t.Fatal(err)
 			}
-			if task, err := workloadlifecycle.GeneratedTask(&pod.Spec); err != nil || task != "" {
+			if task, err := generatedDataTask(&pod.Spec); err != nil || task != "" {
 				t.Fatalf("completed instance regenerated loading: %s %v", task, err)
 			}
 		})
@@ -6075,7 +6084,7 @@ func TestInstanceSetCompletedWorkerSurvivesDonorRebuild(t *testing.T) {
 			if err := f.cli.Status().Update(context.Background(), target); err != nil {
 				t.Fatal(err)
 			}
-			oldTask, err := workloadlifecycle.GeneratedTask(&target.Spec)
+			oldTask, err := generatedDataTask(&target.Spec)
 			if err != nil || oldTask == "" {
 				t.Fatalf("missing task: %q %v", oldTask, err)
 			}
@@ -6121,7 +6130,7 @@ func TestInstanceSetCompletedWorkerSurvivesDonorRebuild(t *testing.T) {
 				f.step(t)
 			}
 			inst := its2LifecycleInstance(t, f.cli, targetKey.Name)
-			newTask, err := workloadlifecycle.GeneratedTask(&inst.Spec.Template.Spec)
+			newTask, err := generatedDataTask(&inst.Spec.Template.Spec)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -6153,7 +6162,7 @@ func TestInstanceSetCompletedWorkerSurvivesDonorRebuild(t *testing.T) {
 			if err := f.cli.Get(context.Background(), targetKey, target); err != nil {
 				t.Fatal(err)
 			}
-			actual, err := workloadlifecycle.GeneratedTask(&target.Spec)
+			actual, err := generatedDataTask(&target.Spec)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -6286,7 +6295,7 @@ func TestInstanceSetNamedTemplateRetainsDataResult(t *testing.T) {
 					if err := f.cli.Get(ctx, key, claim); err != nil || claim.UID != initialUID {
 						t.Fatal("regrow changed PVC identity", err)
 					}
-					task, err := workloadlifecycle.GeneratedTask(&pod.Spec)
+					task, err := generatedDataTask(&pod.Spec)
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -6372,7 +6381,7 @@ func TestInstanceSetNamedOnlyZeroRegrowRetainsDataResult(t *testing.T) {
 				if err := f.cli.Get(ctx, targetKey, pod); err != nil {
 					t.Fatalf("regrow cannot recreate runtime using retained UID=%s: %v status=%#v conditions=%#v", initialUID, err, f.its.FindInstanceStatus(target), f.its.Status.Conditions)
 				}
-				task, err := workloadlifecycle.GeneratedTask(&pod.Spec)
+				task, err := generatedDataTask(&pod.Spec)
 				if err != nil || task != "" {
 					t.Fatalf("retained named data unexpectedly copied: %s %v", task, err)
 				}
@@ -6500,7 +6509,7 @@ func TestInstanceSetRoleProbeToolsUpgradePreservesPod(t *testing.T) {
 			if pod.UID != "tools-upgrade-target" || pod.Spec.Containers[0].Image != "database:1" {
 				t.Fatal("tools upgrade changed database identity or image")
 			}
-			if task, err := workloadlifecycle.GeneratedTask(&pod.Spec); err != nil || task != "" {
+			if task, err := generatedDataTask(&pod.Spec); err != nil || task != "" {
 				t.Fatalf("tools upgrade generated data task: %s %v", task, err)
 			}
 			for _, status := range f.its.Status.InstanceStatus {
@@ -6630,7 +6639,7 @@ func TestInstanceSetImmediateRegrowthReloadsDeletedData(t *testing.T) {
 					if err := f.cli.Get(ctx, key, target); err != nil {
 						t.Fatal(err)
 					}
-					task, err := workloadlifecycle.GeneratedTask(&target.Spec)
+					task, err := generatedDataTask(&target.Spec)
 					if err != nil || task != "" || !ptr.Deref(f.its.FindInstanceStatus(key.Name).DataLoaded, false) {
 						t.Fatalf("resume lost satisfied data: task=%q err=%v", task, err)
 					}
@@ -6774,7 +6783,7 @@ func TestInstanceSetImmediateRegrowthReloadsDeletedData(t *testing.T) {
 				if (claim.UID == oldClaim.UID) != retained {
 					t.Fatal("regrowth did not follow PVC retention")
 				}
-				task, err := workloadlifecycle.GeneratedTask(&target.Spec)
+				task, err := generatedDataTask(&target.Spec)
 				status = f.its.FindInstanceStatus(key.Name)
 				if err != nil || (task == "") != retained || status == nil || status.DataLoaded == nil || *status.DataLoaded != retained {
 					t.Fatalf("regrowth reused the wrong data result: task=%q status=%#v err=%v", task, status, err)
@@ -6903,7 +6912,7 @@ func TestInstanceSetJoinOnlyReallocationSeparatesData(t *testing.T) {
 				if err := f.cli.Get(ctx, key, target); err != nil {
 					t.Fatal(err)
 				}
-				task, err := workloadlifecycle.GeneratedTask(&target.Spec)
+				task, err := generatedDataTask(&target.Spec)
 				status := f.its.FindInstanceStatus(key.Name)
 				if err != nil || (task == "") != retain {
 					t.Fatalf("wrong load decision retain=%t task=%q err=%v", retain, task, err)
@@ -7154,5 +7163,132 @@ func TestInstanceSetJoinOnlyRetirementRetriesStatusConflict(t *testing.T) {
 				t.Fatalf("reallocation after retirement conflict did not Join again: %v", agent.calls)
 			}
 		})
+	}
+}
+
+func TestInstanceSetLifecycleOnlineAfterOfflineFollowsDataRetention(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		for _, policy := range []kbappsv1.PersistentVolumeClaimRetentionPolicyType{kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType, kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType} {
+			t.Run(fmt.Sprintf("instanceAPI=%t/policy=%s", instanceAPI, policy), func(t *testing.T) {
+				ctx := context.Background()
+				f := newDataLifecycleEntry(t, instanceAPI, 2, appsv1.ParallelPodManagement)
+				f.its.Spec.PersistentVolumeClaimRetentionPolicy = &workloads.PersistentVolumeClaimRetentionPolicy{WhenScaled: policy}
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				agent := &its2LifecycleAgent{}
+				kbacli.SetMockClient(agent, nil)
+				defer kbacli.UnsetMockClient()
+				f.bootstrap(t, 2)
+				name := f.its.Name + "-0"
+				key := client.ObjectKey{Namespace: f.its.Namespace, Name: name}
+				oldPod := &corev1.Pod{}
+				if err := f.cli.Get(ctx, key, oldPod); err != nil {
+					t.Fatal(err)
+				}
+				pvcName, err := lifecycleTestDataPVCName(oldPod)
+				if err != nil {
+					t.Fatal(err)
+				}
+				pvcKey := client.ObjectKey{Namespace: key.Namespace, Name: pvcName}
+				initial := f.its.FindInstanceStatus(name)
+				if initial == nil || !ptr.Deref(initial.DataLoaded, false) {
+					t.Fatalf("initial state not satisfied: %#v", initial)
+				}
+				// Offline/online Ops update the replica count and OfflineInstances together.
+				f.its.Spec.Replicas = ptr.To[int32](1)
+				f.its.Spec.OfflineInstances = []string{name}
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				for i := 0; i < 24; i++ {
+					f.stepWithChildren(t)
+					for _, p := range lifecycleEntryPods(t, f.cli) {
+						f.setReady(t, p.Name, true)
+					}
+				}
+				if err := f.cli.Get(ctx, key, &corev1.Pod{}); !apierrors.IsNotFound(err) {
+					t.Fatalf("offline runtime remains: %v", err)
+				}
+				absent := f.cli.Get(ctx, pvcKey, &corev1.PersistentVolumeClaim{})
+				if policy == kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType && !apierrors.IsNotFound(absent) {
+					t.Fatalf("delete policy did not delete claim: %v", absent)
+				}
+				if policy == kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType && absent != nil {
+					t.Fatalf("retain policy lost claim: %v", absent)
+				}
+				failure := &its2LifecycleClient{Client: f.cli, failStatus: policy == kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType}
+				f.cli = failure
+				f.its.Spec.Replicas = ptr.To[int32](2)
+				f.its.Spec.OfflineInstances = nil
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				if policy == kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType {
+					result := f.step(t)
+					status := f.its.FindInstanceStatus(name)
+					if failure.failStatus || !result.Requeue || status == nil || !ptr.Deref(status.DataLoaded, false) {
+						t.Fatalf("failed reset did not preserve the committed result: result=%+v status=%+v", result, status)
+					}
+					if err := f.cli.Get(ctx, key, &corev1.Pod{}); !apierrors.IsNotFound(err) {
+						t.Fatalf("failed reset created runtime: %v", err)
+					}
+					if instanceAPI && !apierrors.IsNotFound(f.cli.Get(ctx, key, &workloads.Instance{})) {
+						t.Fatal("failed reset created a child Instance")
+					}
+					f.step(t)
+					if status = f.its.FindInstanceStatus(name); status == nil || ptr.Deref(status.DataLoaded, true) {
+						t.Fatalf("retry did not commit the loading requirement: %+v", status)
+					}
+					if err := f.cli.Get(ctx, key, &corev1.Pod{}); !apierrors.IsNotFound(err) {
+						t.Fatalf("reset created runtime before status commit: %v", err)
+					}
+					if instanceAPI && !apierrors.IsNotFound(f.cli.Get(ctx, key, &workloads.Instance{})) {
+						t.Fatal("reset created a child Instance before status commit")
+					}
+				}
+				for i := 0; i < 24; i++ {
+					f.stepWithChildren(t)
+					for _, p := range lifecycleEntryPods(t, f.cli) {
+						if p.Name != name {
+							f.setReady(t, p.Name, true)
+						}
+					}
+				}
+				pod := &corev1.Pod{}
+				if err := f.cli.Get(ctx, key, pod); err != nil {
+					t.Fatalf("online runtime not created: %v", err)
+				}
+				if err := f.cli.Get(ctx, pvcKey, &corev1.PersistentVolumeClaim{}); err != nil {
+					t.Fatalf("online storage not created: %v", err)
+				}
+				status := f.its.FindInstanceStatus(name)
+				task, err := workloadlifecycle.DataTask(&pod.Spec, name)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if policy == kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType {
+					if status == nil || ptr.Deref(status.DataLoaded, true) || task == nil {
+						t.Fatalf("empty recreated storage skipped loading: loaded=%t status=%+v appliedTask=%+v", status != nil && ptr.Deref(status.DataLoaded, false), status, task)
+					}
+				} else if status == nil || !ptr.Deref(status.DataLoaded, false) || task != nil {
+					t.Fatalf("retained storage needs unexpected loading: status=%+v task=%+v", status, task)
+				}
+				if policy == kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType {
+					f.markDataLoaded(t, name)
+				}
+				f.setReady(t, name, true)
+				f.bootstrap(t, 2)
+				status = f.its.FindInstanceStatus(name)
+				if status == nil || !ptr.Deref(status.DataLoaded, false) {
+					t.Fatalf("online data completion was not committed: %+v", status)
+				}
+				if instanceAPI && !ptr.Deref(its2LifecycleInstance(t, f.cli, name).Status.DataLoaded, false) {
+					t.Fatal("child did not commit data completion")
+				}
+			})
+		}
 	}
 }

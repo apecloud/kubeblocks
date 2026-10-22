@@ -127,6 +127,13 @@ func NeedsLeave(its *workloads.InstanceSet, status *workloads.InstanceStatus) bo
 	return ptr.Deref(status.MemberJoined, false) || (status.MemberJoined == nil && status.Provisioned)
 }
 
+func NeedsMemberRetirement(its *workloads.InstanceSet, status *workloads.InstanceStatus) bool {
+	if NeedsLeave(its, status) {
+		return true
+	}
+	return Enabled(its) && its.Spec.LifecycleActions.MemberJoin != nil && status != nil && ptr.Deref(status.MemberJoined, false)
+}
+
 func NewLifecycle(its *workloads.InstanceSet, pod *corev1.Pod, pods []*corev1.Pod) (publiclifecycle.Lifecycle, error) {
 	a := its.Spec.LifecycleActions
 	return publiclifecycle.New(its.Namespace, its.Labels[constant.AppInstanceLabelKey], its.Labels[constant.KBAppComponentLabelKey], &apps.ComponentLifecycleActions{Switchover: a.Switchover, Reconfigure: a.Reconfigure, MemberJoin: a.MemberJoin, MemberLeave: a.MemberLeave}, a.TemplateVars, pod, pods)

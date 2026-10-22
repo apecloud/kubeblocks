@@ -172,7 +172,7 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 					waiting = true
 					continue
 				}
-				if status := instanceLifecycleStatus(its, inst.Name); workloadlifecycle.NeedsLeave(its, status) {
+				if status := instanceLifecycleStatus(its, inst.Name); workloadlifecycle.NeedsMemberRetirement(its, status) {
 					return reconcileMember(tree, its, inst, false, r.reader)
 				}
 			}

@@ -23,12 +23,12 @@ package lifecycle
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"slices"
 	"sort"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 
@@ -421,7 +421,7 @@ func ActionConfigured(its *workloads.InstanceSet, pod *corev1.Pod, name string) 
 		}
 	}
 	index = slices.IndexFunc(actions, func(a proto.Action) bool { return a.Name == name })
-	if index < 0 || !reflect.DeepEqual(actions[index], *Action(name, action)) {
+	if index < 0 || !equality.Semantic.DeepEqual(actions[index], *Action(name, action)) {
 		return false, nil
 	}
 	expected := pod.DeepCopy()
@@ -433,7 +433,7 @@ func ActionConfigured(its *workloads.InstanceSet, pod *corev1.Pod, name string) 
 		for _, required := range action.Exec.Env {
 			desiredIndex := slices.IndexFunc(server.Env, func(e corev1.EnvVar) bool { return e.Name == required.Name })
 			actualIndex := slices.IndexFunc(actual.Env, func(e corev1.EnvVar) bool { return e.Name == required.Name })
-			if actualIndex < 0 || !reflect.DeepEqual(actual.Env[actualIndex], server.Env[desiredIndex]) {
+			if actualIndex < 0 || !equality.Semantic.DeepEqual(actual.Env[actualIndex], server.Env[desiredIndex]) {
 				return false, nil
 			}
 		}

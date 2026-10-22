@@ -400,6 +400,7 @@ func TestDataActionsPreservePreparedWorkerEnvironment(t *testing.T) {
 
 func TestActionConfiguredUsesNamedActionAndMergedExecEnv(t *testing.T) {
 	its := memberWorkload()
+	its.Spec.LifecycleActions.MemberLeave.Exec.Args = []string{}
 	its.Spec.LifecycleActions.MemberLeave.Exec.Env = []corev1.EnvVar{{Name: "HOOK_INPUT", Value: "leave"}}
 	its.Spec.LifecycleActions.Switchover = testAction("switch")
 	its.Spec.LifecycleActions.Switchover.Exec.Env = []corev1.EnvVar{{Name: "HOOK_INPUT", Value: "switch"}}

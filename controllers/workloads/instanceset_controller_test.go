@@ -7378,7 +7378,7 @@ func TestInstanceSetJoinOnlyRetirementRetriesStatusConflict(t *testing.T) {
 
 func TestInstanceSetLifecycleAdoptsLeaveBeforeScaleIn(t *testing.T) {
 	for _, instanceAPI := range []bool{false, true} {
-		for _, selector := range []kbappsv1.TargetPodSelector{"", kbappsv1.AnyReplica, kbappsv1.OrdinalSelector} {
+		for _, selector := range []kbappsv1.TargetPodSelector{"", kbappsv1.AnyReplica, kbappsv1.OrdinalSelector, kbappsv1.RoleSelector} {
 			t.Run(fmt.Sprintf("instanceAPI=%t/selector=%s", instanceAPI, selector), func(t *testing.T) {
 				ctx := context.Background()
 				f := newMemberLifecycleEntry(t, instanceAPI, 2, appsv1.ParallelPodManagement)
@@ -7389,14 +7389,51 @@ func TestInstanceSetLifecycleAdoptsLeaveBeforeScaleIn(t *testing.T) {
 				}
 				f.its.Spec.LifecycleActions.MemberJoin = &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"true"}}}
 				f.its.Spec.LifecycleActions.MemberLeave = nil
+				if selector == kbappsv1.RoleSelector {
+					f.its.Spec.Roles = []workloads.ReplicaRole{{Name: "leader"}, {Name: "follower"}}
+				}
 				if err := f.cli.Update(ctx, f.its); err != nil {
 					t.Fatal(err)
 				}
+				observeRoles := func() {
+					if selector != kbappsv1.RoleSelector {
+						return
+					}
+					for _, pod := range lifecycleEntryPods(t, f.cli) {
+						role := "leader"
+						if pod.Name == f.its.Name+"-1" {
+							role = "follower"
+						}
+						event := roleProbeEvent(pod.Namespace, "role-"+pod.Name, &pod, role, time.Now())
+						if !handleRoleEvent(t, ctx, f.cli, event) {
+							t.Fatal("role event was not handled")
+						}
+						observed := &corev1.Pod{}
+						if err := f.cli.Get(ctx, client.ObjectKeyFromObject(&pod), observed); err != nil {
+							t.Fatal(err)
+						}
+						if observed.Labels[constant.RoleLabelKey] != role {
+							t.Fatalf("role event did not apply %s to %s", role, pod.Name)
+						}
+					}
+				}
+				if selector == kbappsv1.RoleSelector {
+					for round := 0; round < 24; round++ {
+						f.stepWithChildren(t)
+						for _, pod := range lifecycleEntryPods(t, f.cli) {
+							f.setReady(t, pod.Name, true)
+						}
+						observeRoles()
+					}
+				}
 				f.bootstrap(t, 2)
+				observeRoles()
 				logPath := filepath.Join(t.TempDir(), "leave")
 				f.its.Spec.LifecycleActions.MemberLeave = &kbappsv1.Action{TargetPodSelector: selector, Exec: &kbappsv1.ExecAction{Command: []string{"sh", "-c", "printf 'leave\\n' >> \"$1\"", "sh", logPath}}}
 				if selector == kbappsv1.OrdinalSelector {
 					f.its.Spec.LifecycleActions.MemberLeave.MatchingKey = "1"
+				} else if selector == kbappsv1.RoleSelector {
+					f.its.Spec.LifecycleActions.MemberLeave.MatchingKey = "follower"
 				}
 				f.its.Spec.Replicas = ptr.To[int32](1)
 				f.its.Generation++
@@ -7471,6 +7508,7 @@ func TestInstanceSetLifecycleAdoptsLeaveBeforeScaleIn(t *testing.T) {
 						rolled = rolled || generatedMemberAction(t, &pod, "memberLeave")
 						f.setReady(t, pod.Name, true)
 					}
+					observeRoles()
 					if leaveCalls == 0 {
 						status := f.its.FindInstanceStatus(f.its.Name + "-1")
 						if status == nil || !ptr.Deref(status.MemberJoined, false) {

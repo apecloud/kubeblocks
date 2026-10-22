@@ -197,7 +197,7 @@ func restoreInitialImmutableParameters(spec *parametersv1alpha1.ComponentParamet
 				continue
 			}
 			for key, value := range parameters.EncodeParameterOverlay(initialParams.Parameters) {
-				if !slices.Contains(paramsDef.Spec.ImmutableParameters, key) {
+				if !slices.Contains(paramsDef.Spec.ImmutableParameters, core.GetValidFieldName(key)) {
 					continue
 				}
 				if item.ConfigFileParams == nil {

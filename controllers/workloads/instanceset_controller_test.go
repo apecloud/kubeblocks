@@ -6003,6 +6003,151 @@ func runLifecycleDataWorker(t *testing.T, listener net.Listener, source, target 
 	return err
 }
 
+func TestInstanceSetDataHookAdoptionBeforeExpansion(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		for _, simultaneous := range []bool{false, true} {
+			t.Run(fmt.Sprintf("instanceAPI=%t/simultaneous=%t", instanceAPI, simultaneous), func(t *testing.T) {
+				ctx := context.Background()
+				listener, err := net.Listen("tcp", "127.0.0.1:0")
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() { _ = listener.Close() })
+				f := newDataLifecycleEntry(t, instanceAPI, 1, appsv1.ParallelPodManagement)
+				if instanceAPI {
+					f.cli = &setStopClient{Client: f.cli}
+				}
+				f.its.Spec.Template.Spec.Containers[1].Ports[1].ContainerPort = int32(listener.Addr().(*net.TCPAddr).Port)
+				f.its.Spec.LifecycleActions.DataDump = nil
+				f.its.Spec.LifecycleActions.DataLoad = nil
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				f.bootstrap(t, 1)
+				sourceKey := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-0"}
+				targetKey := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-1"}
+				source := &corev1.Pod{}
+				if err := f.cli.Get(ctx, sourceKey, source); err != nil {
+					t.Fatal(err)
+				}
+				source.UID = "old-donor"
+				if err := f.cli.Update(ctx, source); err != nil {
+					t.Fatal(err)
+				}
+				source.Status.PodIP = "127.0.0.1"
+				if err := f.cli.Status().Update(ctx, source); err != nil {
+					t.Fatal(err)
+				}
+				copiedPath := filepath.Join(t.TempDir(), "copied")
+				f.its.Spec.LifecycleActions.DataDump = &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"sh", "-c", "printf valid-dump"}}}
+				f.its.Spec.LifecycleActions.DataLoad = &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"sh", "-c", `cat > "$DATA_PATH"`}}}
+				f.its.Spec.LifecycleActions.TemplateVars = map[string]string{"DATA_PATH": copiedPath}
+				if simultaneous {
+					f.its.Spec.Replicas = ptr.To[int32](2)
+				}
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				donorConfigured := func(pod *corev1.Pod) bool {
+					for _, env := range pod.Spec.Containers[1].Env {
+						if env.Name != "KB_AGENT_ACTION" {
+							continue
+						}
+						var actions []kbaproto.Action
+						if err := json.Unmarshal([]byte(env.Value), &actions); err != nil {
+							t.Fatal(err)
+						}
+						for _, action := range actions {
+							if action.Name == "dataDump" {
+								return true
+							}
+						}
+					}
+					return false
+				}
+				target := &corev1.Pod{}
+				expanding := simultaneous
+				for round := 0; round < 40; round++ {
+					f.stepWithChildren(t)
+					sourceErr := f.cli.Get(ctx, sourceKey, source)
+					if sourceErr != nil && !apierrors.IsNotFound(sourceErr) {
+						t.Fatal(sourceErr)
+					}
+					configured := sourceErr == nil && donorConfigured(source)
+					if instanceAPI {
+						child := &workloads.Instance{}
+						if err := f.cli.Get(ctx, targetKey, child); err == nil {
+							task, err := workloadlifecycle.GeneratedTask(&child.Spec.Template.Spec)
+							if err != nil {
+								t.Fatal(err)
+							}
+							if task != "" && !configured {
+								t.Fatal("data task admitted before donor installed the newly enabled dataDump")
+							}
+						} else if !apierrors.IsNotFound(err) {
+							t.Fatal(err)
+						}
+					}
+					if err := f.cli.Get(ctx, targetKey, target); err == nil {
+						if !configured {
+							t.Fatal("target Pod admitted before donor installed the newly enabled dataDump")
+						}
+						break
+					} else if !apierrors.IsNotFound(err) {
+						t.Fatal(err)
+					}
+					if sourceErr == nil {
+						f.setReady(t, source.Name, true)
+						if err := f.cli.Get(ctx, sourceKey, source); apierrors.IsNotFound(err) {
+							continue
+						} else if err != nil {
+							t.Fatal(err)
+						}
+						source.Status.PodIP = "127.0.0.1"
+						if err := f.cli.Status().Update(ctx, source); err != nil {
+							t.Fatal(err)
+						}
+					}
+					if configured && !expanding && f.its.Status.ReadyReplicas == 1 {
+						f.its.Spec.Replicas = ptr.To[int32](2)
+						f.its.Generation++
+						if err := f.cli.Update(ctx, f.its); err != nil {
+							t.Fatal(err)
+						}
+						expanding = true
+					}
+				}
+				if err := f.cli.Get(ctx, targetKey, target); err != nil {
+					t.Fatalf("ordinary donor rollout did not unblock expansion: %v", err)
+				}
+				if source.UID == "old-donor" || !donorConfigured(source) {
+					t.Fatal("expansion did not wait for the ordinary donor rollout")
+				}
+				task, err := workloadlifecycle.DataTask(&target.Spec, target.Name)
+				if err != nil || task == nil || task.NewReplica.Remote != source.Status.PodIP {
+					t.Fatalf("task did not select the applied donor: task=%+v donor=%s err=%v", task, source.Status.PodIP, err)
+				}
+				if err := runLifecycleDataWorker(t, listener, source, target, "0"); err != nil {
+					t.Fatal(err)
+				}
+				copied, err := os.ReadFile(copiedPath)
+				if err != nil || string(copied) != "valid-dump" {
+					t.Fatalf("copied bytes=%q err=%v", copied, err)
+				}
+				markDataWorkerComplete(t, f.cli, targetKey)
+				for round := 0; round < 8; round++ {
+					f.stepWithChildren(t)
+				}
+				status := f.its.FindInstanceStatus(target.Name)
+				if status == nil || !ptr.Deref(status.DataLoaded, false) {
+					t.Fatalf("successful copy was not committed: %#v", status)
+				}
+			})
+		}
+	}
+}
+
 func TestInstanceSetDataRegistrationWhileStopped(t *testing.T) {
 	for _, instanceAPI := range []bool{false, true} {
 		for _, replicas := range []int32{0, 1} {

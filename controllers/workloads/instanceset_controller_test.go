@@ -5714,6 +5714,24 @@ func TestInstanceSetGeneratedDataTaskExecutesWorker(t *testing.T) {
 	if err := cli.Get(ctx, client.ObjectKey{Namespace: its.Namespace, Name: its.Name + "-1"}, target); err != nil {
 		t.Fatal(err)
 	}
+	for attempt, exit := range []string{"1", "0"} {
+		err := runLifecycleDataWorker(t, listener, source, target, exit)
+		if (attempt == 0 && err == nil) || (attempt == 1 && err != nil) {
+			t.Fatalf("worker attempt %d: %v", attempt, err)
+		}
+	}
+	data, err := os.ReadFile(dataPath)
+	if err != nil || string(data) != "workload data\n" {
+		t.Fatalf("copied bytes=%q err=%v", data, err)
+	}
+	attempts, err := os.ReadFile(countPath)
+	if err != nil || string(attempts) != "load\nload\n" {
+		t.Fatalf("reentrant attempts=%q err=%v", attempts, err)
+	}
+}
+
+func runLifecycleDataWorker(t *testing.T, listener net.Listener, source, target *corev1.Pod, exit string) error {
+	t.Helper()
 	var actions []kbaproto.Action
 	var streaming []string
 	for _, env := range source.Spec.Containers[1].Env {
@@ -5749,34 +5767,25 @@ func TestInstanceSetGeneratedDataTaskExecutesWorker(t *testing.T) {
 	}
 	t.Setenv("KB_AGENT_POD_NAME", target.Name)
 	t.Setenv("KUBECONFIG", filepath.Join(t.TempDir(), "missing"))
-	for attempt, exit := range []string{"1", "0"} {
-		t.Setenv("LOAD_EXIT_CODE", exit)
-		done := make(chan error, 1)
-		go func() {
-			conn, err := listener.Accept()
-			if err != nil {
-				done <- err
-				return
-			}
-			defer conn.Close()
-			done <- transport.HandleConn(ctx, conn)
-		}()
-		mode, err := kbagent.Launch(ctrl.Log, kbaserver.Config{})
-		if mode || (attempt == 0 && err == nil) || (attempt == 1 && err != nil) {
-			t.Fatalf("worker attempt %d: server=%t err=%v", attempt, mode, err)
+	t.Setenv("LOAD_EXIT_CODE", exit)
+	done := make(chan error, 1)
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			done <- err
+			return
 		}
-		if err := <-done; err != nil {
-			t.Fatal(err)
-		}
+		defer conn.Close()
+		done <- transport.HandleConn(context.Background(), conn)
+	}()
+	mode, err := kbagent.Launch(ctrl.Log, kbaserver.Config{})
+	if mode {
+		t.Fatal("data worker launched in server mode")
 	}
-	data, err := os.ReadFile(dataPath)
-	if err != nil || string(data) != "workload data\n" {
-		t.Fatalf("copied bytes=%q err=%v", data, err)
+	if transportErr := <-done; transportErr != nil {
+		t.Fatal(transportErr)
 	}
-	attempts, err := os.ReadFile(countPath)
-	if err != nil || string(attempts) != "load\nload\n" {
-		t.Fatalf("reentrant attempts=%q err=%v", attempts, err)
-	}
+	return err
 }
 
 func TestInstanceSetDataRegistrationWhileStopped(t *testing.T) {
@@ -6353,6 +6362,209 @@ func TestInstanceSetRoleProbeToolsUpgradePreservesPod(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestInstanceSetImmediateRegrowthReloadsDeletedData(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		for _, scenario := range []string{"deleted", "deleting", "reset-conflict", "retained", "cancelled"} {
+			t.Run(fmt.Sprintf("instanceAPI=%t/%s", instanceAPI, scenario), func(t *testing.T) {
+				ctx := context.Background()
+				f := newDataLifecycleEntry(t, instanceAPI, 2, appsv1.ParallelPodManagement)
+				f.cli = &dataPVCUIDClient{Client: f.cli}
+				listener, err := net.Listen("tcp", "127.0.0.1:0")
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() { _ = listener.Close() })
+				dataPath := filepath.Join(t.TempDir(), "copied")
+				f.its.Spec.Template.Spec.Containers[1].Ports[1].ContainerPort = int32(listener.Addr().(*net.TCPAddr).Port)
+				f.its.Spec.LifecycleActions.DataDump = &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"sh", "-c", "printf 'regrown data\\n'"}}}
+				f.its.Spec.LifecycleActions.DataLoad = &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"sh", "-c", `cat > "$DATA_PATH"; exit "$LOAD_EXIT_CODE"`}}}
+				f.its.Spec.LifecycleActions.TemplateVars = map[string]string{"DATA_PATH": dataPath}
+				f.its.Spec.PersistentVolumeClaimRetentionPolicy = &workloads.PersistentVolumeClaimRetentionPolicy{WhenScaled: kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType}
+				if scenario == "retained" {
+					f.its.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled = kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType
+				}
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				f.bootstrap(t, 2)
+				source := &corev1.Pod{}
+				if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-0"}, source); err != nil {
+					t.Fatal(err)
+				}
+				source.Status.PodIP = "127.0.0.1"
+				if err := f.cli.Status().Update(ctx, source); err != nil {
+					t.Fatal(err)
+				}
+				key := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-1"}
+				target := &corev1.Pod{}
+				if err := f.cli.Get(ctx, key, target); err != nil {
+					t.Fatal(err)
+				}
+				claimName, err := lifecycleTestDataPVCName(target)
+				if err != nil {
+					t.Fatal(err)
+				}
+				claimKey := client.ObjectKey{Namespace: key.Namespace, Name: claimName}
+				oldClaim := &corev1.PersistentVolumeClaim{}
+				if err := f.cli.Get(ctx, claimKey, oldClaim); err != nil {
+					t.Fatal(err)
+				}
+				if scenario == "deleting" && !instanceAPI {
+					oldClaim.Finalizers = []string{"kubernetes.io/pvc-protection"}
+					if err := f.cli.Update(ctx, oldClaim); err != nil {
+						t.Fatal(err)
+					}
+				}
+				agent := &its2LifecycleAgent{}
+				kbacli.SetMockClient(agent, nil)
+				defer kbacli.UnsetMockClient()
+				f.its.Spec.Replicas = ptr.To[int32](1)
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				removed := false
+				for i := 0; i < 24; i++ {
+					if scenario == "cancelled" {
+						f.step(t)
+					} else {
+						f.stepWithChildren(t)
+					}
+					podGone := apierrors.IsNotFound(f.cli.Get(ctx, key, &corev1.Pod{}))
+					claim := &corev1.PersistentVolumeClaim{}
+					claimErr := f.cli.Get(ctx, claimKey, claim)
+					child := &workloads.Instance{}
+					childErr := f.cli.Get(ctx, key, child)
+					if scenario == "cancelled" {
+						status := f.its.FindInstanceStatus(key.Name)
+						removed = status != nil && status.MemberJoined != nil && !*status.MemberJoined && !podGone && claimErr == nil && claim.DeletionTimestamp.IsZero()
+					} else if scenario == "deleting" {
+						removed = podGone && ((!instanceAPI && claimErr == nil && !claim.DeletionTimestamp.IsZero()) || (instanceAPI && childErr == nil && !child.DeletionTimestamp.IsZero()))
+					} else {
+						removed = podGone && (!instanceAPI || apierrors.IsNotFound(childErr)) && ((scenario == "retained" && claimErr == nil) || apierrors.IsNotFound(claimErr))
+					}
+					if removed {
+						break
+					}
+				}
+				status := f.its.FindInstanceStatus(key.Name)
+				if !removed || status == nil || (scenario != "cancelled" && status.DesiredState != workloads.InstanceDesiredStateReleased) || !ptr.Deref(status.DataLoaded, false) {
+					t.Fatalf("scale-in did not reach the release boundary: removed=%t status=%#v", removed, status)
+				}
+				if !reflect.DeepEqual(agent.calls, []string{"memberLeave"}) {
+					t.Fatalf("scale-in did not commit Leave: %v", agent.calls)
+				}
+				agent.calls = nil
+				f.its.Spec.Replicas = ptr.To[int32](2)
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				if scenario == "deleting" {
+					for i := 0; i < 2; i++ {
+						result := f.step(t)
+						status = f.its.FindInstanceStatus(key.Name)
+						if result.RequeueAfter == 0 || status == nil || status.DesiredState != workloads.InstanceDesiredStateReleased || f.its.Status.ObservedGeneration == f.its.Generation {
+							t.Fatalf("regrowth consumed a deleting allocation: result=%#v status=%#v", result, f.its.Status)
+						}
+					}
+					if !instanceAPI {
+						claim := &corev1.PersistentVolumeClaim{}
+						if err := f.cli.Get(ctx, claimKey, claim); err != nil {
+							t.Fatal(err)
+						}
+						claim.Finalizers = nil
+						if err := f.cli.Update(ctx, claim); err != nil {
+							t.Fatal(err)
+						}
+					}
+				}
+				if scenario == "reset-conflict" {
+					failure := &its2LifecycleClient{Client: f.cli, failStatus: true}
+					f.cli = failure
+					result := f.step(t)
+					status = f.its.FindInstanceStatus(key.Name)
+					if failure.failStatus || !result.Requeue || status == nil || !ptr.Deref(status.DataLoaded, false) || status.DesiredState != workloads.InstanceDesiredStateReleased {
+						t.Fatalf("failed reset write did not preserve the old allocation: result=%#v status=%#v", result, status)
+					}
+					if !apierrors.IsNotFound(f.cli.Get(ctx, key, &corev1.Pod{})) || (instanceAPI && !apierrors.IsNotFound(f.cli.Get(ctx, key, &workloads.Instance{}))) {
+						t.Fatal("failed reset write created runtime")
+					}
+					f.step(t)
+					status = f.its.FindInstanceStatus(key.Name)
+					if status == nil || status.DataLoaded == nil || *status.DataLoaded {
+						t.Fatalf("retry did not commit the new data requirement: %#v", status)
+					}
+					if !apierrors.IsNotFound(f.cli.Get(ctx, key, &corev1.Pod{})) || (instanceAPI && !apierrors.IsNotFound(f.cli.Get(ctx, key, &workloads.Instance{}))) {
+						t.Fatal("reset result was not committed before runtime creation")
+					}
+				}
+				for i := 0; i < 24; i++ {
+					f.stepWithChildren(t)
+					if err := f.cli.Get(ctx, key, target); err == nil {
+						break
+					}
+				}
+				if err := f.cli.Get(ctx, key, target); err != nil {
+					t.Fatal(err)
+				}
+				claim := &corev1.PersistentVolumeClaim{}
+				if err := f.cli.Get(ctx, claimKey, claim); err != nil {
+					t.Fatal(err)
+				}
+				retained := scenario == "retained" || scenario == "cancelled"
+				if (claim.UID == oldClaim.UID) != retained {
+					t.Fatal("regrowth did not follow PVC retention")
+				}
+				task, err := workloadlifecycle.GeneratedTask(&target.Spec)
+				status = f.its.FindInstanceStatus(key.Name)
+				if err != nil || (task == "") != retained || status == nil || status.DataLoaded == nil || *status.DataLoaded != retained {
+					t.Fatalf("regrowth reused the wrong data result: task=%q status=%#v err=%v", task, status, err)
+				}
+				f.setReady(t, key.Name, retained)
+				if !retained {
+					for i := 0; i < 4; i++ {
+						f.stepWithChildren(t)
+					}
+					if err := f.cli.Get(ctx, key, target); err != nil {
+						t.Fatal(err)
+					}
+					if err := runLifecycleDataWorker(t, listener, source, target, "1"); err == nil {
+						t.Fatal("failed data action exited successfully")
+					}
+					target.Status.InitContainerStatuses = []corev1.ContainerStatus{{Name: kbagent.ContainerName4Worker, State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 1}}}}
+					if err := f.cli.Status().Update(ctx, target); err != nil {
+						t.Fatal(err)
+					}
+					for i := 0; i < 4; i++ {
+						f.stepWithChildren(t)
+					}
+					status = f.its.FindInstanceStatus(key.Name)
+					if ptr.Deref(status.DataLoaded, true) || ptr.Deref(status.MemberJoined, true) || len(agent.calls) != 0 {
+						t.Fatalf("failed copy satisfied data or joined: %#v calls=%v", status, agent.calls)
+					}
+					if err := runLifecycleDataWorker(t, listener, source, target, "0"); err != nil {
+						t.Fatal(err)
+					}
+					data, err := os.ReadFile(dataPath)
+					if err != nil || string(data) != "regrown data\n" {
+						t.Fatalf("copied bytes=%q err=%v", data, err)
+					}
+					f.markDataLoaded(t, key.Name)
+					f.setReady(t, key.Name, true)
+				}
+				for i := 0; i < 12; i++ {
+					f.stepWithChildren(t)
+				}
+				status = f.its.FindInstanceStatus(key.Name)
+				if !ptr.Deref(status.DataLoaded, false) || !ptr.Deref(status.MemberJoined, false) || !reflect.DeepEqual(agent.calls, []string{"memberJoin"}) {
+					t.Fatalf("regrowth did not join after data success: %#v calls=%v", status, agent.calls)
+				}
+			})
+		}
 	}
 }
 

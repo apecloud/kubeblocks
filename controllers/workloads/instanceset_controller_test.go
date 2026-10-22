@@ -3466,6 +3466,221 @@ func (f *lifecycleEntry) bootstrap(t *testing.T, replicas int) {
 	t.Fatalf("bootstrap did not converge: %#v", f.its.Status)
 }
 
+func TestInstanceSetLeaveWaitsForObservedRuntimeRetirement(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		for _, scenario := range []string{"delayed", "child-observed", "join-and-leave", "observation-conflict", "leave-error", "result-conflict"} {
+			if !instanceAPI && scenario == "child-observed" {
+				continue
+			}
+			t.Run(fmt.Sprintf("instanceAPI=%t/%s", instanceAPI, scenario), func(t *testing.T) {
+				ctx := context.Background()
+				f := newMemberLifecycleEntry(t, instanceAPI, 1, appsv1.OrderedReadyPodManagement)
+				if scenario != "join-and-leave" {
+					f.its.Spec.LifecycleActions.MemberJoin = nil
+					if err := f.cli.Update(ctx, f.its); err != nil {
+						t.Fatal(err)
+					}
+				}
+				key := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-0"}
+				pod := &corev1.Pod{}
+				for round := 0; round < 12; round++ {
+					f.stepWithChildren(t)
+					if err := f.cli.Get(ctx, key, pod); err == nil {
+						break
+					} else if !apierrors.IsNotFound(err) {
+						t.Fatal(err)
+					}
+				}
+				if pod.Name == "" {
+					t.Fatal("controllers did not create the runtime Pod")
+				}
+				if instanceAPI && its2LifecycleInstance(t, f.cli, key.Name).Status.Provisioned {
+					t.Fatal("child observed runtime before its creation reconcile completed")
+				}
+				pod.Status.PodIP = "10.0.0.1"
+				pod.Status.Phase = corev1.PodRunning
+				pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}
+				if err := f.cli.Status().Update(ctx, pod); err != nil {
+					t.Fatal(err)
+				}
+				if scenario == "child-observed" {
+					leaf := &InstanceReconciler{Client: f.cli, Scheme: f.cli.Scheme(), Recorder: record.NewFakeRecorder(100)}
+					if _, err := leaf.Reconcile(ctx, ctrl.Request{NamespacedName: key}); err != nil {
+						t.Fatal(err)
+					}
+					if !its2LifecycleInstance(t, f.cli, key.Name).Status.Provisioned {
+						t.Fatal("child did not observe its runtime")
+					}
+				}
+
+				calls, successes := 0, 0
+				agent := kbacli.NewMockClient(gomock.NewController(t))
+				agent.EXPECT().Action(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, req kbaproto.ActionRequest) (kbaproto.ActionResponse, error) {
+					if req.Action != "memberLeave" {
+						t.Fatalf("unexpected membership action: %s", req.Action)
+					}
+					calls++
+					if scenario == "leave-error" && calls == 1 {
+						return kbaproto.ActionResponse{}, fmt.Errorf("injected Leave failure")
+					}
+					successes++
+					return kbaproto.ActionResponse{}, nil
+				}).AnyTimes()
+				kbacli.SetMockClient(agent, nil)
+				defer kbacli.UnsetMockClient()
+				conflicted := false
+				if scenario == "observation-conflict" || scenario == "result-conflict" {
+					storage := f.cli
+					if wrapped, ok := storage.(*its2LifecycleClient); ok {
+						storage = wrapped.Client
+					}
+					f.cli = interceptor.NewClient(storage.(client.WithWatch), interceptor.Funcs{SubResourceUpdate: func(ctx context.Context, delegate client.Client, subresource string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+						var provisioned bool
+						var joined *bool
+						switch proposed := obj.(type) {
+						case *workloads.InstanceSet:
+							if status := proposed.FindInstanceStatus(key.Name); status != nil && (scenario == "observation-conflict" || !instanceAPI) {
+								provisioned, joined = status.Provisioned, status.MemberJoined
+							}
+						case *workloads.Instance:
+							if proposed.Name == key.Name && scenario == "result-conflict" {
+								joined = proposed.Status.MemberJoined
+							}
+						}
+						if subresource == "status" && !conflicted && ((scenario == "observation-conflict" && provisioned) || (scenario == "result-conflict" && joined != nil && !*joined)) {
+							conflicted = true
+							return apierrors.NewConflict(schema.GroupResource{Group: workloads.GroupVersion.Group, Resource: "status"}, obj.GetName(), fmt.Errorf("injected %s", scenario))
+						}
+						return delegate.SubResource(subresource).Update(ctx, obj, opts...)
+					}})
+				}
+				f.its.Spec.Replicas = ptr.To[int32](0)
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				assertRuntimeRetained := func() {
+					t.Helper()
+					if err := f.cli.Get(ctx, key, pod); err != nil || !pod.DeletionTimestamp.IsZero() {
+						t.Fatalf("retirement removed runtime before committed Leave: pod=%#v err=%v", pod, err)
+					}
+					if instanceAPI {
+						child := its2LifecycleInstance(t, f.cli, key.Name)
+						if ptr.Deref(child.Spec.ScaledDown, false) || !child.DeletionTimestamp.IsZero() {
+							t.Fatalf("retirement advanced cleanup before committed Leave: %#v", child)
+						}
+						if scenario != "child-observed" && child.Status.Provisioned {
+							t.Fatal("parent observation changed child provisioning history")
+						}
+					}
+				}
+				result := f.step(t)
+				if scenario == "observation-conflict" {
+					status := f.its.FindInstanceStatus(key.Name)
+					if !conflicted || !result.Requeue || status == nil || status.Provisioned || status.MemberJoined != nil || calls != 0 {
+						t.Fatalf("failed observation commit advanced retirement: conflict=%t result=%#v status=%#v calls=%d", conflicted, result, status, calls)
+					}
+					assertRuntimeRetained()
+					result = f.step(t)
+				}
+				status := f.its.FindInstanceStatus(key.Name)
+				if status == nil || (scenario != "join-and-leave" && (!status.Provisioned || status.MemberJoined != nil)) || result.RequeueAfter == 0 || calls != 0 {
+					t.Fatalf("runtime observation was not committed before Leave: result=%#v status=%#v calls=%d", result, status, calls)
+				}
+				assertRuntimeRetained()
+				for round := 0; round < 12; round++ {
+					f.step(t)
+					assertRuntimeRetained()
+					status = f.its.FindInstanceStatus(key.Name)
+					if status == nil || (scenario != "join-and-leave" && !status.Provisioned) {
+						t.Fatalf("parent forgot its runtime observation: %#v", status)
+					}
+					if status.MemberJoined != nil && !*status.MemberJoined {
+						break
+					}
+					if scenario != "join-and-leave" && status.MemberJoined != nil {
+						t.Fatalf("runtime observation invented membership: %#v", status)
+					}
+				}
+				wantCalls := 1
+				if scenario == "leave-error" || scenario == "result-conflict" {
+					wantCalls++
+				}
+				wantSuccesses := 1
+				if scenario == "result-conflict" {
+					wantSuccesses++
+				}
+				if status.MemberJoined == nil || *status.MemberJoined || calls != wantCalls || successes != wantSuccesses || (scenario == "result-conflict" && !conflicted) {
+					t.Fatalf("Leave result did not recover and commit before cleanup: status=%#v calls=%d successes=%d conflict=%t", status, calls, successes, conflicted)
+				}
+				if instanceAPI && ptr.Deref(its2LifecycleInstance(t, f.cli, key.Name).Status.MemberJoined, true) {
+					t.Fatal("Leave result was not committed to the child")
+				}
+				for round := 0; round < 24; round++ {
+					f.stepWithChildren(t)
+				}
+				if err := f.cli.Get(ctx, key, &corev1.Pod{}); !apierrors.IsNotFound(err) || calls != wantCalls {
+					t.Fatalf("committed Leave did not permit runtime cleanup exactly once: calls=%d err=%v", calls, err)
+				}
+			})
+		}
+	}
+}
+
+func TestInstanceSetLeaveSkipsUnprovisionedAllocation(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		t.Run(fmt.Sprintf("instanceAPI=%t", instanceAPI), func(t *testing.T) {
+			ctx := context.Background()
+			f := newMemberLifecycleEntry(t, instanceAPI, 1, appsv1.OrderedReadyPodManagement)
+			f.its.Spec.LifecycleActions.MemberJoin = nil
+			if err := f.cli.Update(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			key := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-0"}
+			for round := 0; round < 12; round++ {
+				f.step(t)
+				if !instanceAPI {
+					break
+				}
+				if err := f.cli.Get(ctx, key, &workloads.Instance{}); err == nil {
+					break
+				} else if !apierrors.IsNotFound(err) {
+					t.Fatal(err)
+				}
+			}
+			status := f.its.FindInstanceStatus(key.Name)
+			if status == nil || status.Provisioned || status.MemberJoined != nil || len(lifecycleEntryPods(t, f.cli)) != 0 {
+				t.Fatalf("registration invented runtime or membership: %#v", status)
+			}
+			if instanceAPI {
+				its2LifecycleInstance(t, f.cli, key.Name)
+			}
+			agent := &its2LifecycleAgent{}
+			kbacli.SetMockClient(agent, nil)
+			defer kbacli.UnsetMockClient()
+			f.its.Spec.Replicas = ptr.To[int32](0)
+			f.its.Generation++
+			if err := f.cli.Update(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			for round := 0; round < 24; round++ {
+				f.stepWithChildren(t)
+				if len(lifecycleEntryPods(t, f.cli)) != 0 {
+					t.Fatal("unprovisioned retirement created runtime")
+				}
+			}
+			if len(agent.calls) != 0 || len(lifecycleEntryPods(t, f.cli)) != 0 {
+				t.Fatalf("unprovisioned retirement dispatched Leave or created runtime: %v", agent.calls)
+			}
+			if instanceAPI {
+				if err := f.cli.Get(ctx, key, &workloads.Instance{}); !apierrors.IsNotFound(err) {
+					t.Fatalf("unprovisioned child was not retired: %v", err)
+				}
+			}
+		})
+	}
+}
+
 func TestInstanceSetLifecycleInitialMembershipSatisfiedOnObservation(t *testing.T) {
 	for _, instanceAPI := range []bool{false, true} {
 		for _, configured := range []bool{false, true} {

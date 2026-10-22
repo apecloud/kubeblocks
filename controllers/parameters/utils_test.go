@@ -93,6 +93,10 @@ func mockConfigResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersDefi
 }
 
 func mockReconcileResource(setupBeforeComponent ...func(*corev1.ConfigMap, *appsv1.ComponentDefinition)) (*corev1.ConfigMap, *appsv1.Cluster, *appsv1.Component, *component.SynthesizedComponent, *workloads.InstanceSet) {
+	return mockReconcileResourceWithInitial(nil, setupBeforeComponent...)
+}
+
+func mockReconcileResourceWithInitial(initial *parametersv1alpha1.ParameterInputs, setupBeforeComponent ...func(*corev1.ConfigMap, *appsv1.ComponentDefinition)) (*corev1.ConfigMap, *appsv1.Cluster, *appsv1.Component, *component.SynthesizedComponent, *workloads.InstanceSet) {
 	configmap, paramsDef := mockConfigResource()
 
 	By("Create a component definition obj and mock to available")
@@ -144,8 +148,13 @@ func mockReconcileResource(setupBeforeComponent ...func(*corev1.ConfigMap, *apps
 			Name: ptr.To(configSpecName),
 		}).
 		AddAnnotations(constant.LegacyConfigManagerRequiredAnnotationKey, "true").
-		Create(&testCtx).
 		GetObject()
+	if initial != nil {
+		Expect(parametersv1alpha1.SetInitialParameters(clusterObj, parametersv1alpha1.InitialParameters{
+			defaultCompName: *initial,
+		})).Should(Succeed())
+	}
+	Expect(testCtx.CreateObj(testCtx.Ctx, clusterObj)).Should(Succeed())
 
 	By("Create a component obj")
 	fullCompName := constant.GenerateClusterComponentName(clusterName, defaultCompName)

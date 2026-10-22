@@ -61,6 +61,14 @@ func MergeAndValidateConfigs(baseConfigs map[string]string,
 	updatedParams []core.ParamPairs,
 	paramsDefs []*parametersv1alpha1.ParametersDefinition,
 	configDescs []parametersv1alpha1.ComponentConfigDescription) (map[string]string, error) {
+	return mergeAndValidateConfigs(baseConfigs, updatedParams, nil, paramsDefs, configDescs)
+}
+
+func mergeAndValidateConfigs(baseConfigs map[string]string,
+	updatedParams []core.ParamPairs,
+	initialParameters map[string]map[string]any,
+	paramsDefs []*parametersv1alpha1.ParametersDefinition,
+	configDescs []parametersv1alpha1.ComponentConfigDescription) (map[string]string, error) {
 	var (
 		err             error
 		newCfg          map[string]string
@@ -80,7 +88,7 @@ func MergeAndValidateConfigs(baseConfigs map[string]string,
 
 	// merge param to config file
 	for _, params := range updatedParams {
-		validUpdatedParameters, err := filterImmutableParameters(params.UpdatedParams, params.Key, paramsDefs)
+		validUpdatedParameters, err := filterImmutableParameters(params.UpdatedParams, params.Key, paramsDefs, initialParameters[params.Key])
 		if err != nil {
 			return nil, err
 		}
@@ -195,7 +203,7 @@ func resolveParametersDef(paramsDefs []*parametersv1alpha1.ParametersDefinition,
 	return nil
 }
 
-func filterImmutableParameters(parameters map[string]any, fileName string, paramsDefs []*parametersv1alpha1.ParametersDefinition) (map[string]any, error) {
+func filterImmutableParameters(parameters map[string]any, fileName string, paramsDefs []*parametersv1alpha1.ParametersDefinition, initialParameters map[string]any) (map[string]any, error) {
 	paramsDef := resolveParametersDef(paramsDefs, fileName)
 	if paramsDef == nil || len(paramsDef.Spec.ImmutableParameters) == 0 {
 		return parameters, nil
@@ -205,7 +213,10 @@ func filterImmutableParameters(parameters map[string]any, fileName string, param
 	validParameters := make(map[string]any, len(parameters))
 	for key, val := range parameters {
 		if slices.Contains(immutableParams, key) {
-			return nil, fmt.Errorf("immutable parameter %s cannot be modified", key)
+			initialValue, ok := initialParameters[key]
+			if !ok || !reflect.DeepEqual(val, initialValue) {
+				return nil, fmt.Errorf("immutable parameter %s cannot be modified", key)
+			}
 		}
 		validParameters[key] = val
 	}

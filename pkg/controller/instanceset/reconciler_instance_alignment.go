@@ -167,8 +167,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 				}
 				if workloadlifecycle.NeedsMemberRetirement(its, workloadlifecycle.Status(its, name)) {
 					if absent {
-						pod = &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: its.Namespace},
-							Spec: corev1.PodSpec{Hostname: name, Subdomain: getHeadlessSvcName(its.Name)}}
+						pod = &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: its.Namespace}}
 					}
 
 					if its.Spec.LifecycleActions.MemberLeave != nil {

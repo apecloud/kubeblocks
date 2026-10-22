@@ -6365,13 +6365,52 @@ func TestInstanceSetRoleProbeToolsUpgradePreservesPod(t *testing.T) {
 	}
 }
 
+type delayedDataPVCClient struct {
+	client.Client
+	claim *corev1.PersistentVolumeClaim
+}
+
+func (c *delayedDataPVCClient) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+	if err := c.Client.List(ctx, list, opts...); err != nil {
+		return err
+	}
+	if claims, ok := list.(*corev1.PersistentVolumeClaimList); ok && c.claim != nil {
+		for i := range claims.Items {
+			if claims.Items[i].Name == c.claim.Name {
+				claims.Items[i] = *c.claim.DeepCopy()
+				c.claim = nil
+				break
+			}
+		}
+	}
+	return nil
+}
+
 func TestInstanceSetImmediateRegrowthReloadsDeletedData(t *testing.T) {
 	for _, instanceAPI := range []bool{false, true} {
-		for _, scenario := range []string{"deleted", "deleting", "reset-conflict", "retained", "cancelled"} {
+		for _, scenario := range []string{"deleted", "deleting", "stale-pvc", "reset-conflict", "release-conflict", "data-only-release-conflict", "retained", "cancelled", "stopped"} {
+			if instanceAPI && scenario == "stale-pvc" {
+				continue
+			}
 			t.Run(fmt.Sprintf("instanceAPI=%t/%s", instanceAPI, scenario), func(t *testing.T) {
 				ctx := context.Background()
 				f := newDataLifecycleEntry(t, instanceAPI, 2, appsv1.ParallelPodManagement)
-				f.cli = &dataPVCUIDClient{Client: f.cli}
+				dataOnly := scenario == "data-only-release-conflict"
+				rejectRelease := scenario == "release-conflict" || dataOnly
+				releaseFailed := false
+				storage := f.cli
+				if wrapped, ok := storage.(*its2LifecycleClient); ok {
+					storage = wrapped.Client
+				}
+				f.cli = &dataPVCUIDClient{Client: interceptor.NewClient(storage.(client.WithWatch), interceptor.Funcs{SubResourceUpdate: func(ctx context.Context, delegate client.Client, subresource string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+					if its, ok := obj.(*workloads.InstanceSet); ok && subresource == "status" && rejectRelease {
+						if status := its.FindInstanceStatus(its.Name + "-1"); status != nil && status.DesiredState == workloads.InstanceDesiredStateReleased {
+							releaseFailed = true
+							return apierrors.NewConflict(schema.GroupResource{Group: workloads.GroupVersion.Group, Resource: "instancesets"}, obj.GetName(), fmt.Errorf("injected Released status conflict"))
+						}
+					}
+					return delegate.SubResource(subresource).Update(ctx, obj, opts...)
+				}})}
 				listener, err := net.Listen("tcp", "127.0.0.1:0")
 				if err != nil {
 					t.Fatal(err)
@@ -6382,6 +6421,10 @@ func TestInstanceSetImmediateRegrowthReloadsDeletedData(t *testing.T) {
 				f.its.Spec.LifecycleActions.DataDump = &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"sh", "-c", "printf 'regrown data\\n'"}}}
 				f.its.Spec.LifecycleActions.DataLoad = &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"sh", "-c", `cat > "$DATA_PATH"; exit "$LOAD_EXIT_CODE"`}}}
 				f.its.Spec.LifecycleActions.TemplateVars = map[string]string{"DATA_PATH": dataPath}
+				if dataOnly {
+					f.its.Spec.LifecycleActions.MemberJoin = nil
+					f.its.Spec.LifecycleActions.MemberLeave = nil
+				}
 				f.its.Spec.PersistentVolumeClaimRetentionPolicy = &workloads.PersistentVolumeClaimRetentionPolicy{WhenScaled: kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType}
 				if scenario == "retained" {
 					f.its.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled = kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType
@@ -6412,7 +6455,41 @@ func TestInstanceSetImmediateRegrowthReloadsDeletedData(t *testing.T) {
 				if err := f.cli.Get(ctx, claimKey, oldClaim); err != nil {
 					t.Fatal(err)
 				}
-				if scenario == "deleting" && !instanceAPI {
+				if scenario == "stopped" {
+					f.its.Spec.Stop = ptr.To(true)
+					for _, replicas := range []int32{2, 1, 2} {
+						f.its.Spec.Replicas = ptr.To(replicas)
+						f.its.Generation++
+						if err := f.cli.Update(ctx, f.its); err != nil {
+							t.Fatal(err)
+						}
+						for i := 0; i < 12; i++ {
+							f.stepWithChildren(t)
+						}
+						claim := &corev1.PersistentVolumeClaim{}
+						if err := f.cli.Get(ctx, claimKey, claim); err != nil || claim.UID != oldClaim.UID || !claim.DeletionTimestamp.IsZero() {
+							t.Fatalf("stopped allocation change retired storage: %v", err)
+						}
+						if len(lifecycleEntryPods(t, f.cli)) != 0 {
+							t.Fatal("stopped allocation change created runtime")
+						}
+					}
+					f.its.Spec.Stop = ptr.To(false)
+					f.its.Generation++
+					if err := f.cli.Update(ctx, f.its); err != nil {
+						t.Fatal(err)
+					}
+					f.bootstrap(t, 2)
+					if err := f.cli.Get(ctx, key, target); err != nil {
+						t.Fatal(err)
+					}
+					task, err := workloadlifecycle.GeneratedTask(&target.Spec)
+					if err != nil || task != "" || !ptr.Deref(f.its.FindInstanceStatus(key.Name).DataLoaded, false) {
+						t.Fatalf("resume lost satisfied data: task=%q err=%v", task, err)
+					}
+					return
+				}
+				if (scenario == "deleting" || scenario == "stale-pvc") && !instanceAPI {
 					oldClaim.Finalizers = []string{"kubernetes.io/pvc-protection"}
 					if err := f.cli.Update(ctx, oldClaim); err != nil {
 						t.Fatal(err)
@@ -6438,10 +6515,29 @@ func TestInstanceSetImmediateRegrowthReloadsDeletedData(t *testing.T) {
 					claimErr := f.cli.Get(ctx, claimKey, claim)
 					child := &workloads.Instance{}
 					childErr := f.cli.Get(ctx, key, child)
+					if releaseFailed && rejectRelease {
+						status := f.its.FindInstanceStatus(key.Name)
+						if status == nil || status.EffectiveDesiredState() != workloads.InstanceDesiredStateActive || podGone || claimErr != nil || !claim.DeletionTimestamp.IsZero() || (instanceAPI && (childErr != nil || ptr.Deref(child.Spec.ScaledDown, false) || !child.DeletionTimestamp.IsZero())) {
+							t.Fatalf("failed Released write advanced cleanup: status=%#v podGone=%t claimErr=%v claimDeleting=%t childErr=%v scaledDown=%t", status, podGone, claimErr, !claim.DeletionTimestamp.IsZero(), childErr, ptr.Deref(child.Spec.ScaledDown, false))
+						}
+						rejectRelease = false
+						f.step(t)
+						status = f.its.FindInstanceStatus(key.Name)
+						if status == nil || status.DesiredState != workloads.InstanceDesiredStateReleased {
+							t.Fatalf("release retry did not persist Released before cleanup: %#v", status)
+						}
+						if err := f.cli.Get(ctx, key, &corev1.Pod{}); err != nil {
+							t.Fatalf("release retry removed runtime before committing status: %v", err)
+						}
+						if err := f.cli.Get(ctx, claimKey, claim); err != nil || !claim.DeletionTimestamp.IsZero() {
+							t.Fatalf("release retry removed storage before committing status: %v", err)
+						}
+						continue
+					}
 					if scenario == "cancelled" {
 						status := f.its.FindInstanceStatus(key.Name)
 						removed = status != nil && status.MemberJoined != nil && !*status.MemberJoined && !podGone && claimErr == nil && claim.DeletionTimestamp.IsZero()
-					} else if scenario == "deleting" {
+					} else if scenario == "deleting" || scenario == "stale-pvc" {
 						removed = podGone && ((!instanceAPI && claimErr == nil && !claim.DeletionTimestamp.IsZero()) || (instanceAPI && childErr == nil && !child.DeletionTimestamp.IsZero()))
 					} else {
 						removed = podGone && (!instanceAPI || apierrors.IsNotFound(childErr)) && ((scenario == "retained" && claimErr == nil) || apierrors.IsNotFound(claimErr))
@@ -6454,7 +6550,10 @@ func TestInstanceSetImmediateRegrowthReloadsDeletedData(t *testing.T) {
 				if !removed || status == nil || (scenario != "cancelled" && status.DesiredState != workloads.InstanceDesiredStateReleased) || !ptr.Deref(status.DataLoaded, false) {
 					t.Fatalf("scale-in did not reach the release boundary: removed=%t status=%#v", removed, status)
 				}
-				if !reflect.DeepEqual(agent.calls, []string{"memberLeave"}) {
+				if (scenario == "release-conflict" || dataOnly) && !releaseFailed {
+					t.Fatal("release status conflict was not exercised")
+				}
+				if !dataOnly && !reflect.DeepEqual(agent.calls, []string{"memberLeave"}) || dataOnly && len(agent.calls) != 0 {
 					t.Fatalf("scale-in did not commit Leave: %v", agent.calls)
 				}
 				agent.calls = nil
@@ -6463,7 +6562,15 @@ func TestInstanceSetImmediateRegrowthReloadsDeletedData(t *testing.T) {
 				if err := f.cli.Update(ctx, f.its); err != nil {
 					t.Fatal(err)
 				}
-				if scenario == "deleting" {
+				if scenario == "stale-pvc" {
+					f.cli = &delayedDataPVCClient{Client: f.cli, claim: oldClaim.DeepCopy()}
+					f.step(t)
+					status = f.its.FindInstanceStatus(key.Name)
+					if status == nil || status.DesiredState != workloads.InstanceDesiredStateReleased || !apierrors.IsNotFound(f.cli.Get(ctx, key, &corev1.Pod{})) {
+						t.Fatalf("stale PVC observation consumed released allocation: %#v", status)
+					}
+				}
+				if scenario == "deleting" || scenario == "stale-pvc" {
 					for i := 0; i < 2; i++ {
 						result := f.step(t)
 						status = f.its.FindInstanceStatus(key.Name)
@@ -6543,7 +6650,7 @@ func TestInstanceSetImmediateRegrowthReloadsDeletedData(t *testing.T) {
 						f.stepWithChildren(t)
 					}
 					status = f.its.FindInstanceStatus(key.Name)
-					if ptr.Deref(status.DataLoaded, true) || ptr.Deref(status.MemberJoined, true) || len(agent.calls) != 0 {
+					if ptr.Deref(status.DataLoaded, true) || (!dataOnly && ptr.Deref(status.MemberJoined, true)) || len(agent.calls) != 0 {
 						t.Fatalf("failed copy satisfied data or joined: %#v calls=%v", status, agent.calls)
 					}
 					if err := runLifecycleDataWorker(t, listener, source, target, "0"); err != nil {
@@ -6560,7 +6667,7 @@ func TestInstanceSetImmediateRegrowthReloadsDeletedData(t *testing.T) {
 					f.stepWithChildren(t)
 				}
 				status = f.its.FindInstanceStatus(key.Name)
-				if !ptr.Deref(status.DataLoaded, false) || !ptr.Deref(status.MemberJoined, false) || !reflect.DeepEqual(agent.calls, []string{"memberJoin"}) {
+				if !ptr.Deref(status.DataLoaded, false) || (!dataOnly && (!ptr.Deref(status.MemberJoined, false) || !reflect.DeepEqual(agent.calls, []string{"memberJoin"}))) || (dataOnly && (status.MemberJoined != nil || len(agent.calls) != 0)) {
 					t.Fatalf("regrowth did not join after data success: %#v calls=%v", status, agent.calls)
 				}
 			})

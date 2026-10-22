@@ -51,6 +51,10 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 		}
 		return kubebuilderx.Continue, err
 	}
+	desired := sets.New[string]()
+	for _, a := range assignments {
+		desired.Insert(a.InstanceName)
+	}
 	runtimeNames, resourceNames := sets.New[string](), sets.New[string]()
 	pods := lifecyclePods(tree)
 	for _, pod := range pods {
@@ -60,6 +64,10 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 	instances := []*workloads.Instance{}
 	for _, obj := range tree.List(&workloads.Instance{}) {
 		inst := obj.(*workloads.Instance)
+		status := instanceLifecycleStatus(its, inst.Name)
+		if workloadlifecycle.HasData(its) && desired.Has(inst.Name) && status != nil && status.EffectiveDesiredState() == workloads.InstanceDesiredStateReleased && !inst.DeletionTimestamp.IsZero() {
+			return lifecycleWait(tree, its, fmt.Errorf("waiting for released instance %s to be deleted", inst.Name))
+		}
 		instances = append(instances, inst)
 		resourceNames.Insert(inst.Name)
 		if inst.Status.CurrentState == workloads.InstanceCurrentStatePresent || inst.Status.CurrentState == workloads.InstanceCurrentStateTerminating {

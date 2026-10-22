@@ -50,6 +50,10 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 		}
 		return kubebuilderx.Continue, err
 	}
+	desired := sets.New[string]()
+	for _, a := range assignments {
+		desired.Insert(a.InstanceName)
+	}
 	pods := make([]*corev1.Pod, 0)
 	names := sets.New[string]()
 	resources := sets.New[string]()
@@ -59,13 +63,14 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 		names.Insert(pod.Name)
 	}
 	for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
-		resources.Insert(obj.GetLabels()[constant.KBAppPodNameLabelKey])
+		name := obj.GetLabels()[constant.KBAppPodNameLabelKey]
+		status := workloadlifecycle.Status(its, name)
+		if workloadlifecycle.HasData(its) && desired.Has(name) && status != nil && status.EffectiveDesiredState() == workloads.InstanceDesiredStateReleased && !obj.GetDeletionTimestamp().IsZero() {
+			return lifecycleWait(tree, its, fmt.Errorf("waiting for storage of released instance %s to be deleted", name))
+		}
+		resources.Insert(name)
 	}
 	registered := workloadlifecycle.Register(its, assignments, names, resources)
-	desired := sets.New[string]()
-	for _, a := range assignments {
-		desired.Insert(a.InstanceName)
-	}
 	previous := its.DeepCopy().Status.InstanceStatus
 	for _, pod := range pods {
 		if status := workloadlifecycle.Status(its, pod.Name); status != nil {

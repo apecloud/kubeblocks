@@ -97,13 +97,20 @@ func Register(its *workloads.InstanceSet, assignments []instancetemplate.Assignm
 		return false
 	}
 	bootstrap := its.Status.ObservedGeneration == 0 && len(its.Status.InstanceStatus) == 0 && runtimeNames.Len() == 0 && resourceNames.Len() == 0
-	known := sets.New[string]()
-	for _, s := range its.Status.InstanceStatus {
-		known.Insert(s.PodName)
+	known := make(map[string]int, len(its.Status.InstanceStatus))
+	for i, s := range its.Status.InstanceStatus {
+		known[s.PodName] = i
 	}
 	changed := false
 	for _, a := range assignments {
-		if known.Has(a.InstanceName) {
+		if i, ok := known[a.InstanceName]; ok {
+			status := &its.Status.InstanceStatus[i]
+			if HasData(its) && status.EffectiveDesiredState() == workloads.InstanceDesiredStateReleased && !runtimeNames.Has(a.InstanceName) && !resourceNames.Has(a.InstanceName) {
+				status.DesiredState = workloads.InstanceDesiredStateActive
+				status.TemplateName = ptr.To(a.TemplateName)
+				status.DataLoaded = ptr.To(false)
+				changed = true
+			}
 			continue
 		}
 		status := workloads.InstanceStatus{PodName: a.InstanceName, TemplateName: ptr.To(a.TemplateName), DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStateAbsent}
@@ -115,6 +122,7 @@ func Register(its *workloads.InstanceSet, assignments []instancetemplate.Assignm
 				status.MemberJoined = ptr.To(false)
 			}
 		}
+		known[a.InstanceName] = len(its.Status.InstanceStatus)
 		its.Status.InstanceStatus = append(its.Status.InstanceStatus, status)
 		changed = true
 	}

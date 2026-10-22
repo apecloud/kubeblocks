@@ -71,7 +71,7 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 	childStatusChanged := false
 	for _, inst := range instances {
 		if status := instanceLifecycleStatus(its, inst.Name); status != nil {
-			status.Provisioned = status.Provisioned || inst.Status.Provisioned
+			status.Provisioned = status.Provisioned || inst.Status.Provisioned || runtimeNames.Has(inst.Name)
 			if its.Spec.LifecycleActions.MemberJoin != nil && ptr.Deref(status.MemberJoined, true) && inst.Status.MemberJoined == nil && runtimeNames.Has(inst.Name) {
 				current := inst.DeepCopy()
 				current.Status.MemberJoined = ptr.To(true)

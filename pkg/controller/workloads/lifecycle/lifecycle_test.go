@@ -253,3 +253,37 @@ func TestStandaloneAgentRegistersSwitchover(t *testing.T) {
 		t.Fatal("new switchover accepts a Component dependency")
 	}
 }
+
+func TestActionConfiguredUsesNamedActionAndMergedExecEnv(t *testing.T) {
+	its := memberWorkload()
+	its.Spec.LifecycleActions.MemberLeave.Exec.Env = []corev1.EnvVar{{Name: "HOOK_INPUT", Value: "leave"}}
+	its.Spec.LifecycleActions.Switchover = testAction("switch")
+	its.Spec.LifecycleActions.Switchover.Exec.Env = []corev1.EnvVar{{Name: "HOOK_INPUT", Value: "switch"}}
+	pod := memberPod()
+	configured := func(want bool) {
+		t.Helper()
+		got, err := ActionConfigured(its, pod, "memberLeave")
+		if err != nil || got != want {
+			t.Fatalf("configured=%t want=%t error=%v", got, want, err)
+		}
+	}
+	configured(false)
+	if err := ConfigurePod(its, pod); err != nil {
+		t.Fatal(err)
+	}
+	configured(true)
+	its.Spec.LifecycleActions.MemberJoin.Exec.Command = []string{"changed-unrelated-join"}
+	configured(true)
+	for i := range pod.Spec.Containers[1].Env {
+		if pod.Spec.Containers[1].Env[i].Name == "HOOK_INPUT" {
+			pod.Spec.Containers[1].Env[i].Value = "stale"
+		}
+	}
+	configured(false)
+	if err := ConfigurePod(its, pod); err != nil {
+		t.Fatal(err)
+	}
+	configured(true)
+	its.Spec.LifecycleActions.MemberLeave.Exec.Command = []string{"changed-leave"}
+	configured(false)
+}

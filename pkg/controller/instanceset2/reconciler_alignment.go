@@ -173,6 +173,12 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 					continue
 				}
 				if status := instanceLifecycleStatus(its, inst.Name); workloadlifecycle.NeedsMemberRetirement(its, status) {
+
+					if its.Spec.LifecycleActions.MemberLeave != nil {
+						if result, err := adoptLeaveAction(tree, its, inst); err != nil || result != kubebuilderx.Continue {
+							return result, err
+						}
+					}
 					return reconcileMember(tree, its, inst, false, r.reader)
 				}
 			}

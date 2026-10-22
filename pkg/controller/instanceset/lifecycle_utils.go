@@ -159,9 +159,12 @@ func adoptLeaveAction(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet,
 		return lifecycleWait(tree, its, err)
 	}
 	if len(targets) == 0 {
-		targets, err = workloadlifecycle.ActionTargets(its.Spec.LifecycleActions.MemberLeave, pod, []*corev1.Pod{pod})
-		if err != nil {
-			return lifecycleWait(tree, its, err)
+		present := false
+		for _, current := range pods {
+			present = present || current.Name == pod.Name
+		}
+		if !present {
+			targets = []*corev1.Pod{pod}
 		}
 	}
 	required := sets.New[string]()

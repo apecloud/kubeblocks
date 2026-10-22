@@ -282,3 +282,68 @@ func lifecycleCreateInstance(tree *kubebuilderx.ObjectTree, its *workloads.Insta
 	inst.Spec.Template.Spec = pod.Spec
 	return nil
 }
+
+func adoptLeaveAction(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, inst *workloads.Instance) (kubebuilderx.Result, error) {
+	pods := lifecyclePods(tree)
+	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: inst.Name, Namespace: inst.Namespace}}
+	for _, current := range pods {
+		if current.Name == inst.Name {
+			pod = current
+		}
+	}
+	targets, err := workloadlifecycle.ActionTargets(its.Spec.LifecycleActions.MemberLeave, pod, pods)
+	if err != nil {
+		return lifecycleWait(tree, its, err)
+	}
+	required := sets.New[string]()
+	missing := false
+	for _, target := range targets {
+		required.Insert(target.Name)
+		configured, err := workloadlifecycle.ActionConfigured(its, target, "memberLeave")
+		if err != nil {
+			return kubebuilderx.Continue, err
+		}
+		missing = missing || !configured
+	}
+	if !missing {
+		return kubebuilderx.Continue, nil
+	}
+	desired := map[string]*workloads.Instance{}
+	for _, obj := range tree.List(&workloads.Instance{}) {
+		current := obj.(*workloads.Instance)
+		copy := current.DeepCopy()
+		if required.Has(current.Name) {
+			copy.Spec.LifecycleActions = its.Spec.LifecycleActions.DeepCopy()
+			copy.Spec.InstanceUpdateStrategyType = nil
+			if its.Spec.InstanceUpdateStrategy != nil {
+				copy.Spec.InstanceUpdateStrategyType = ptr.To(its.Spec.InstanceUpdateStrategy.Type)
+			}
+			copy.Spec.PodUpdatePolicy = its.Spec.PodUpdatePolicy
+			copy.Spec.PodUpgradePolicy = its.Spec.PodUpgradePolicy
+			if err := configureInstance(its, copy); err != nil {
+				return kubebuilderx.Continue, err
+			}
+			stampInstanceRevision(copy)
+		}
+		desired[copy.Name] = copy
+	}
+	satisfied := func(current *workloads.Instance) bool {
+		if !required.Has(current.Name) {
+			return true
+		}
+		if getInstanceRevision(current) != getInstanceRevision(desired[current.Name]) || current.Generation != current.Status.ObservedGeneration || !current.Status.UpToDate {
+			return false
+		}
+		for _, pod := range pods {
+			if pod.Name == current.Name {
+				configured, err := workloadlifecycle.ActionConfigured(its, pod, "memberLeave")
+				return err == nil && configured
+			}
+		}
+		return false
+	}
+	if _, err := (&updateReconciler{}).reconcileUpdates(tree, desired, satisfied); err != nil {
+		return kubebuilderx.Continue, err
+	}
+	return lifecycleWait(tree, its, fmt.Errorf("waiting for memberLeave runtime configuration"))
+}

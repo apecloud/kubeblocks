@@ -83,6 +83,12 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (result kube
 		return kubebuilderx.Continue, err
 	}
 
+	return r.reconcileUpdates(tree, nameToTemplateMap, nil)
+}
+
+func (r *updateReconciler) reconcileUpdates(tree *kubebuilderx.ObjectTree, nameToTemplateMap map[string]*instancetemplate.InstanceTemplateExt, satisfied func(*corev1.Pod) (bool, error)) (kubebuilderx.Result, error) {
+	its := tree.GetRoot().(*workloads.InstanceSet)
+
 	// 2. validate the update set
 	newNameSet := sets.New[string]()
 	for name := range nameToTemplateMap {
@@ -91,7 +97,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (result kube
 	oldNameSet := sets.New[string]()
 	oldInstanceMap := make(map[string]*corev1.Pod)
 	var oldPodList []*corev1.Pod
-	result = kubebuilderx.Continue
+	result := kubebuilderx.Continue
 	for _, object := range tree.List(&corev1.Pod{}) {
 		oldNameSet.Insert(object.GetName())
 		pod, _ := object.(*corev1.Pod)
@@ -120,7 +126,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (result kube
 	}
 
 	// handle 'MemberUpdate'
-	memberUpdateQuota, err := r.memberUpdateQuota(its, oldPodList)
+	memberUpdateQuota, err := r.memberUpdateQuotaWithPredicate(its, oldPodList, satisfied)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
@@ -137,7 +143,17 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (result kube
 		if isTerminating(pod) {
 			continue
 		}
-		updatePolicy, _, _, err := getPodUpdatePolicy(its, pod)
+
+		if satisfied != nil {
+			done, err := satisfied(pod)
+			if err != nil {
+				return kubebuilderx.Continue, err
+			}
+			if done {
+				continue
+			}
+		}
+		updatePolicy, _, _, err := getPodUpdatePolicyWithTemplate(its, pod, nameToTemplateMap[pod.Name])
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
@@ -164,12 +180,23 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (result kube
 		if updatingPods >= memberUpdateQuota {
 			break
 		}
+
+		if satisfied != nil {
+			done, err := satisfied(pod)
+			if err != nil {
+				return kubebuilderx.Continue, err
+			}
+			if done {
+				updatedPods++
+				continue
+			}
+		}
 		if canBeUpdated, retry := r.isPodCanBeUpdated(tree, its, pod); !canBeUpdated {
 			needRetry = retry
 			break
 		}
 
-		updatePolicy, specUpdatePolicy, recreateReason, err := getPodUpdatePolicy(its, pod)
+		updatePolicy, specUpdatePolicy, recreateReason, err := getPodUpdatePolicyWithTemplate(its, pod, nameToTemplateMap[pod.Name])
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
@@ -269,10 +296,18 @@ func (r *updateReconciler) rollingUpdateQuota(its *workloads.InstanceSet, podLis
 }
 
 func (r *updateReconciler) memberUpdateQuota(its *workloads.InstanceSet, podList []*corev1.Pod) (int, error) {
+	return r.memberUpdateQuotaWithPredicate(its, podList, nil)
+}
+
+func (r *updateReconciler) memberUpdateQuotaWithPredicate(its *workloads.InstanceSet, podList []*corev1.Pod, satisfied func(*corev1.Pod) (bool, error)) (int, error) {
 	// if it's a roleful InstanceSet, we use updateCount to represent Pods can be updated according to the spec.memberUpdateStrategy.
 	updateCount := len(podList)
 	if len(its.Spec.Roles) > 0 {
-		plan := NewUpdatePlan(*its, podList, r.isInstUpdated)
+		isUpdated := r.isInstUpdated
+		if satisfied != nil {
+			isUpdated = func(_ *workloads.InstanceSet, pod *corev1.Pod) (bool, error) { return satisfied(pod) }
+		}
+		plan := NewUpdatePlan(*its, podList, isUpdated)
 		podsToBeUpdated, err := plan.Execute()
 		if err != nil {
 			return -1, err

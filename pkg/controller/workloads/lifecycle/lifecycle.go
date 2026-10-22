@@ -23,6 +23,7 @@ package lifecycle
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"slices"
 	"sort"
 	"strings"
@@ -355,6 +356,72 @@ func ConfigureDataTask(its *workloads.InstanceSet, pod, source *corev1.Pod) erro
 	}
 	setEnv(worker, *env)
 	return nil
+}
+
+// ActionConfigured observes the action definition installed in the actual agent runtime.
+func ActionConfigured(its *workloads.InstanceSet, pod *corev1.Pod, name string) (bool, error) {
+	if pod == nil {
+		return false, nil
+	}
+	var action *apps.Action
+	switch name {
+	case "memberJoin":
+		action = its.Spec.LifecycleActions.MemberJoin
+	case "memberLeave":
+		action = its.Spec.LifecycleActions.MemberLeave
+	case "switchover":
+		action = its.Spec.LifecycleActions.Switchover
+	default:
+		return false, fmt.Errorf("unknown workload action %s", name)
+	}
+	if action == nil {
+		return true, nil
+	}
+	index := slices.IndexFunc(pod.Spec.Containers, func(c corev1.Container) bool { return c.Name == kbagent.ContainerName })
+	if index < 0 {
+		return false, nil
+	}
+	actual := pod.Spec.Containers[index]
+	var actions []proto.Action
+	for _, env := range actual.Env {
+		if env.Name == "KB_AGENT_ACTION" && env.Value != "" {
+			if err := json.Unmarshal([]byte(env.Value), &actions); err != nil {
+				return false, err
+			}
+		}
+	}
+	index = slices.IndexFunc(actions, func(a proto.Action) bool { return a.Name == name })
+	if index < 0 || !reflect.DeepEqual(actions[index], *Action(name, action)) {
+		return false, nil
+	}
+	expected := pod.DeepCopy()
+	if err := ConfigurePod(its, expected); err != nil {
+		return false, err
+	}
+	server := expected.Spec.Containers[slices.IndexFunc(expected.Spec.Containers, func(c corev1.Container) bool { return c.Name == kbagent.ContainerName })]
+	if action.Exec != nil {
+		for _, required := range action.Exec.Env {
+			desiredIndex := slices.IndexFunc(server.Env, func(e corev1.EnvVar) bool { return e.Name == required.Name })
+			actualIndex := slices.IndexFunc(actual.Env, func(e corev1.EnvVar) bool { return e.Name == required.Name })
+			if actualIndex < 0 || !reflect.DeepEqual(actual.Env[actualIndex], server.Env[desiredIndex]) {
+				return false, nil
+			}
+		}
+	}
+	return true, nil
+}
+
+// ActionTargets includes every possible AnyReplica executor before selection is pinned for execution.
+func ActionTargets(action *apps.Action, pod *corev1.Pod, pods []*corev1.Pod) ([]*corev1.Pod, error) {
+	selection := action.DeepCopy()
+	selector := selection.TargetPodSelector
+	if selector == "" && selection.Exec != nil {
+		selector = selection.Exec.TargetPodSelector
+	}
+	if selector == apps.AnyReplica {
+		selection.TargetPodSelector = apps.AllReplicas
+	}
+	return publiclifecycle.SelectTargetPods(pods, pod, selection)
 }
 
 func setEnv(c *corev1.Container, env corev1.EnvVar) {

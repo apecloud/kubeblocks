@@ -118,17 +118,6 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (result kube
 		return kubebuilderx.Continue, nil
 	}
 
-	// 3. do update
-	instanceUpdateStrategy := its.Spec.InstanceUpdateStrategy
-	if instanceUpdateStrategy != nil && instanceUpdateStrategy.Type == kbappsv1.OnDeleteStrategyType {
-		instanceUpdateStrategy = nil
-	}
-
-	// handle 'RollingUpdate'
-	replicas, maxUnavailable, err := parseReplicasNMaxUnavailable(instanceUpdateStrategy, len(oldInstanceList))
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
 	desiredInstanceMap := make(map[string]*workloads.Instance, len(oldInstanceList))
 	for _, inst := range oldInstanceList {
 		desired, err := buildInstanceByTemplate(tree, inst.Name, nameToTemplateMap[inst.Name], its)
@@ -141,13 +130,38 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (result kube
 		desiredInstanceMap[inst.Name] = desired
 	}
 
+	return r.reconcileUpdates(tree, desiredInstanceMap, nil)
+}
+
+func (r *updateReconciler) reconcileUpdates(tree *kubebuilderx.ObjectTree, desiredInstanceMap map[string]*workloads.Instance, satisfied func(*workloads.Instance) bool) (kubebuilderx.Result, error) {
+	its := tree.GetRoot().(*workloads.InstanceSet)
+	oldInstanceList := []*workloads.Instance{}
+	for _, obj := range tree.List(&workloads.Instance{}) {
+		oldInstanceList = append(oldInstanceList, obj.(*workloads.Instance))
+	}
+	isUpdated := func(inst *workloads.Instance) bool { return isInstanceUpdated(its, inst) }
+	if satisfied != nil {
+		isUpdated = satisfied
+	}
+
+	// 3. do update
+	instanceUpdateStrategy := its.Spec.InstanceUpdateStrategy
+	if instanceUpdateStrategy != nil && instanceUpdateStrategy.Type == kbappsv1.OnDeleteStrategyType {
+		instanceUpdateStrategy = nil
+	}
+
+	// handle 'RollingUpdate'
+	replicas, maxUnavailable, err := parseReplicasNMaxUnavailable(instanceUpdateStrategy, len(oldInstanceList))
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
 	// Account for existing rolling participants against both admission budgets before sorting candidates.
 	// Otherwise traversal order could admit another Instance into a full availability or member-plan window.
 	occupiedRollingSlots := 0
 	occupiedMemberPlanSlots := 0
 	for _, inst := range oldInstanceList {
 		specHandedOffButNotConverged := copyAndMergeInstance(inst, desiredInstanceMap[inst.Name]) == nil &&
-			!isInstanceUpdated(its, inst)
+			!isUpdated(inst)
 		if specHandedOffButNotConverged {
 			occupiedMemberPlanSlots++
 		}
@@ -160,7 +174,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (result kube
 	// if it's a roleful InstanceSet, we use updateCount to represent Pods can be updated according to the spec.memberUpdateStrategy.
 	updateCount := len(oldInstanceList)
 	if len(its.Spec.Roles) > 0 {
-		plan := newUpdatePlan(*its, oldInstanceList)
+		plan := newUpdatePlanWithPredicate(*its, oldInstanceList, isUpdated)
 		instancesToBeUpdated, err := plan.Execute()
 		if err != nil {
 			return kubebuilderx.Continue, err
@@ -202,6 +216,10 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (result kube
 			break
 		}
 
+		if satisfied != nil && satisfied(inst) {
+			updatedInstances++
+			continue
+		}
 		if !canBeUpdated(inst) {
 			break
 		}

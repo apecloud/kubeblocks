@@ -408,6 +408,10 @@ func equalResourcesInPlaceFields(old, new *corev1.Pod) bool {
 }
 
 func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (podUpdatePolicy, workloads.PodUpdatePolicyType, string, error) {
+	return getPodUpdatePolicyWithTemplate(its, pod, nil)
+}
+
+func getPodUpdatePolicyWithTemplate(its *workloads.InstanceSet, pod *corev1.Pod, template *instancetemplate.InstanceTemplateExt) (podUpdatePolicy, workloads.PodUpdatePolicyType, string, error) {
 	updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
 	if err != nil {
 		return noOpsPolicy, "", "", err
@@ -416,16 +420,11 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (podUpdateP
 	if err != nil {
 		return noOpsPolicy, "", "", err
 	}
-
-	// In case of the ITS is stopping and replicas is 0, we can't compose the instance template and instance
-	// to choose the update policy, so we use the pod update policy directly.
-	if ptr.Deref(its.Spec.Replicas, 0) == 0 {
-		// the update revisions will be empty
+	if template == nil && ptr.Deref(its.Spec.Replicas, 0) == 0 {
 		if getPodRevision(pod) != updateRevisions[pod.Name] {
 			return recreatePolicy, its.Spec.PodUpdatePolicy, "0 replica", nil
 		}
 	}
-
 	configRestart, configs, err := hasConfigRestart(its, pod)
 	if err != nil {
 		return noOpsPolicy, "", "", err
@@ -433,29 +432,39 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (podUpdateP
 	if configRestart {
 		return recreatePolicy, its.Spec.PodUpdatePolicy, fmt.Sprintf("config restart: %s", strings.Join(configs, ",")), nil
 	}
+	suppliedTemplate := template != nil
+	if template == nil {
+		itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
+		if err != nil {
+			return noOpsPolicy, "", "", err
+		}
+		templateList := instancetemplate.BuildInstanceTemplateExt(itsExt)
+		templateName, err := getTemplateNameByPod(itsExt, pod)
+		if err != nil {
+			return noOpsPolicy, "", "", err
+		}
+		index := slices.IndexFunc(templateList, func(templateExt *instancetemplate.InstanceTemplateExt) bool { return templateName == templateExt.Name })
+		if index < 0 {
+			return noOpsPolicy, "", "", errors.Wrapf(errTemplateNotFound, "pod: %s/%s", pod.Namespace, pod.Name)
+		}
+		template = templateList[index]
+	}
 
-	itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
+	newPod, err := buildInstancePodByTemplateForUpdate(pod, template, its)
 	if err != nil {
 		return noOpsPolicy, "", "", err
 	}
-	templateList := instancetemplate.BuildInstanceTemplateExt(itsExt)
-	templateName, err := getTemplateNameByPod(itsExt, pod)
-	if err != nil {
-		return noOpsPolicy, "", "", err
-	}
-	index := slices.IndexFunc(templateList, func(templateExt *instancetemplate.InstanceTemplateExt) bool {
-		return templateName == templateExt.Name
-	})
-	if index < 0 {
-		return noOpsPolicy, "", "", errors.Wrapf(errTemplateNotFound, "pod: %s/%s", pod.Namespace, pod.Name)
-	}
-	newPod, err := buildInstancePodByTemplateForUpdate(pod, templateList[index], its)
-	if err != nil {
-		return noOpsPolicy, "", "", err
+	updateRevision, ok := updateRevisions[pod.Name]
+	if !ok && suppliedTemplate {
+		desired, err := buildInstancePodByTemplate(pod.Name, template, its, "")
+		if err != nil {
+			return noOpsPolicy, "", "", err
+		}
+		updateRevision = getPodRevision(desired)
 	}
 
 	specUpdatePolicy := getPodUpdatePolicyInSpec(its, pod, newPod)
-	if getPodRevision(pod) != updateRevisions[pod.Name] && getPodRevision(pod) != proposedRevisions[pod.Name] {
+	if getPodRevision(pod) != updateRevision && getPodRevision(pod) != proposedRevisions[pod.Name] {
 		return recreatePolicy, specUpdatePolicy, "revision update", nil
 	}
 

@@ -7369,3 +7369,333 @@ func TestInstanceSetJoinOnlyRetirementRetriesStatusConflict(t *testing.T) {
 		})
 	}
 }
+
+func TestInstanceSetLifecycleAdoptsLeaveBeforeScaleIn(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		for _, selector := range []kbappsv1.TargetPodSelector{kbappsv1.TargetPodSelector(""), kbappsv1.AnyReplica} {
+			t.Run(fmt.Sprintf("instanceAPI=%t/selector=%s", instanceAPI, selector), func(t *testing.T) {
+				ctx := context.Background()
+				f := newMemberLifecycleEntry(t, instanceAPI, 2, appsv1.ParallelPodManagement)
+				if instanceAPI {
+					f.cli = &setStopClient{Client: f.cli}
+					f.its.Spec.VolumeClaimTemplates = newMemberLifecycleITS(2).Spec.VolumeClaimTemplates
+					f.its.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: "data", MountPath: "/data"}}
+				}
+				f.its.Spec.LifecycleActions.MemberJoin = &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"true"}}}
+				f.its.Spec.LifecycleActions.MemberLeave = nil
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				f.bootstrap(t, 2)
+				logPath := filepath.Join(t.TempDir(), "leave")
+				f.its.Spec.LifecycleActions.MemberLeave = &kbappsv1.Action{TargetPodSelector: selector, Exec: &kbappsv1.ExecAction{Command: []string{"sh", "-c", "printf 'leave\\n' >> \"$1\"", "sh", logPath}}}
+				f.its.Spec.Replicas = ptr.To[int32](1)
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				var rolled, retiringAbsent, retiringRecreated bool
+				var leaveCalls int
+				agent := kbacli.NewMockClient(gomock.NewController(t))
+				agent.EXPECT().Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbaproto.ActionRequest) (kbaproto.ActionResponse, error) {
+					if req.Action != "memberLeave" {
+						t.Fatalf("unexpected action after bootstrap: %s", req.Action)
+					}
+					pods := lifecycleEntryPods(t, f.cli)
+					var target *corev1.Pod
+					for _, pod := range pods {
+						if pod.Name == f.its.Name+"-1" {
+							target = &pod
+						}
+						if selector == kbappsv1.AnyReplica && !generatedMemberAction(t, &pod, "memberLeave") {
+							t.Fatalf("Leave selected before every eligible peer adopted it: %s", pod.Name)
+						}
+					}
+					if selector == kbappsv1.AnyReplica && len(pods) > 0 {
+						target = &pods[0]
+					}
+					if target == nil || !generatedMemberAction(t, target, "memberLeave") {
+						t.Fatal("Leave called before the retiring runtime adopted its action")
+					}
+					actions, probes := generatedMemberActions(t, target)
+					listener, err := net.Listen("tcp", "127.0.0.1:0")
+					if err != nil {
+						t.Fatal(err)
+					}
+					port := listener.Addr().(*net.TCPAddr).Port
+					if err := listener.Close(); err != nil {
+						t.Fatal(err)
+					}
+					services, err := kbaservice.New(ctrl.Log, actions, probes, nil)
+					if err != nil {
+						t.Fatal(err)
+					}
+					server := kbaserver.NewHTTPServer(ctrl.Log, kbaserver.Config{Address: "127.0.0.1", Port: port}, services)
+					if err := server.StartNonBlocking(); err != nil {
+						t.Fatal(err)
+					}
+					defer func() { _ = server.Close() }()
+					kbacli.UnsetMockClient()
+					realClient, err := kbacli.NewClient(func() (string, int32, error) { return "127.0.0.1", int32(port), nil })
+					kbacli.SetMockClient(agent, nil)
+					if err != nil {
+						t.Fatal(err)
+					}
+					defer func() { _ = realClient.Close() }()
+					leaveCalls++
+					return realClient.Action(ctx, req)
+				}).AnyTimes()
+				kbacli.SetMockClient(agent, nil)
+				t.Cleanup(kbacli.UnsetMockClient)
+				for round := 0; round < 64; round++ {
+					f.stepWithChildren(t)
+					pods := lifecycleEntryPods(t, f.cli)
+					retiringPresent := false
+					for _, pod := range pods {
+						if pod.Name == f.its.Name+"-1" {
+							retiringPresent = true
+							retiringRecreated = retiringRecreated || (retiringAbsent && generatedMemberAction(t, &pod, "memberLeave"))
+						}
+					}
+					retiringAbsent = retiringAbsent || (!retiringPresent && leaveCalls == 0)
+					for _, pod := range pods {
+						rolled = rolled || generatedMemberAction(t, &pod, "memberLeave")
+						f.setReady(t, pod.Name, true)
+					}
+					if leaveCalls == 0 {
+						status := f.its.FindInstanceStatus(f.its.Name + "-1")
+						if status == nil || !ptr.Deref(status.MemberJoined, false) {
+							t.Fatalf("rollout lost retiring membership: %#v", status)
+						}
+						pvcs := &corev1.PersistentVolumeClaimList{}
+						if err := f.cli.List(ctx, pvcs); err != nil {
+							t.Fatal(err)
+						}
+						if len(pvcs.Items) != 2 {
+							t.Fatalf("rollout lost PVCs before Leave: %d", len(pvcs.Items))
+						}
+					}
+				}
+				if !rolled || leaveCalls != 1 || len(lifecycleEntryPods(t, f.cli)) != 1 {
+					t.Fatalf("Leave adoption did not converge: rolled=%t calls=%d pods=%d status=%#v", rolled, leaveCalls, len(lifecycleEntryPods(t, f.cli)), f.its.Status)
+				}
+				if selector == "" && !retiringRecreated {
+					t.Fatal("test did not observe retiring runtime recreation across controller restart")
+				}
+				output, err := os.ReadFile(logPath)
+				if err != nil || string(output) != "leave\n" {
+					t.Fatalf("generated Leave command: %q, %v", output, err)
+				}
+			})
+		}
+	}
+}
+
+func generatedMemberActions(t *testing.T, pod *corev1.Pod) ([]kbaproto.Action, []kbaproto.Probe) {
+	t.Helper()
+	var actions []kbaproto.Action
+	var probes []kbaproto.Probe
+	for _, container := range pod.Spec.Containers {
+		if container.Name != kbagent.ContainerName {
+			continue
+		}
+		for _, env := range container.Env {
+			if env.Name == "KB_AGENT_ACTION" {
+				if err := json.Unmarshal([]byte(env.Value), &actions); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if env.Name == "KB_AGENT_PROBE" {
+				if err := json.Unmarshal([]byte(env.Value), &probes); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+	}
+	return actions, probes
+}
+
+func generatedMemberAction(t *testing.T, pod *corev1.Pod, name string) bool {
+	t.Helper()
+	actions, _ := generatedMemberActions(t, pod)
+	for _, action := range actions {
+		if action.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func TestInstanceSetLifecycleLeaveAdoptionRespectsUpdatePolicy(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		for _, policy := range []string{"OnDelete", "StrictInPlace", "Stop", "Offline"} {
+			t.Run(fmt.Sprintf("instanceAPI=%t/policy=%s", instanceAPI, policy), func(t *testing.T) {
+				f := newMemberLifecycleEntry(t, instanceAPI, 2, appsv1.ParallelPodManagement)
+				if instanceAPI {
+					f.cli = &setStopClient{Client: f.cli}
+				}
+				f.its.Spec.LifecycleActions.MemberLeave = nil
+				if err := f.cli.Update(context.Background(), f.its); err != nil {
+					t.Fatal(err)
+				}
+				f.bootstrap(t, 2)
+				f.its.Spec.LifecycleActions.MemberLeave = &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"true"}}}
+				f.its.Spec.Replicas = ptr.To[int32](1)
+				switch policy {
+				case "OnDelete":
+					f.its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{Type: kbappsv1.OnDeleteStrategyType}
+				case "StrictInPlace":
+					f.its.Spec.PodUpdatePolicy = kbappsv1.StrictInPlacePodUpdatePolicyType
+				case "Stop":
+					f.its.Spec.Stop = ptr.To(true)
+				case "Offline":
+					f.its.Spec.OfflineInstances = []string{f.its.Name + "-1"}
+				}
+				f.its.Generation++
+				if err := f.cli.Update(context.Background(), f.its); err != nil {
+					t.Fatal(err)
+				}
+				agent := kbacli.NewMockClient(gomock.NewController(t))
+				kbacli.SetMockClient(agent, nil)
+				t.Cleanup(kbacli.UnsetMockClient)
+				for round := 0; round < 24; round++ {
+					f.stepWithChildren(t)
+				}
+				pods := lifecycleEntryPods(t, f.cli)
+				expected := 2
+				if policy == "Stop" {
+					expected = 0
+				}
+				if policy == "Offline" {
+					expected = 1
+				}
+				if len(pods) != expected {
+					t.Fatalf("policy %s changed runtime count to %d", policy, len(pods))
+				}
+				for _, pod := range pods {
+					if policy != "Offline" && generatedMemberAction(t, &pod, "memberLeave") {
+						t.Fatalf("policy %s unexpectedly rolled %s", policy, pod.Name)
+					}
+				}
+				if policy == "OnDelete" || policy == "StrictInPlace" {
+					if condition := meta.FindStatusCondition(f.its.Status.Conditions, "InstanceLifecycle"); condition == nil {
+						t.Fatal("policy-blocked adoption did not publish a wait")
+					}
+					status := f.its.FindInstanceStatus(f.its.Name + "-1")
+					if status == nil || !ptr.Deref(status.MemberJoined, false) {
+						t.Fatalf("policy wait lost membership: %#v", status)
+					}
+				}
+				if policy == "OnDelete" {
+					key := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-1"}
+					pod := &corev1.Pod{}
+					if err := f.cli.Get(context.Background(), key, pod); err != nil {
+						t.Fatal(err)
+					}
+					if err := f.cli.Delete(context.Background(), pod); err != nil {
+						t.Fatal(err)
+					}
+					agent.EXPECT().Action(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, req kbaproto.ActionRequest) (kbaproto.ActionResponse, error) {
+						if req.Action != "memberLeave" {
+							t.Fatalf("unexpected action: %s", req.Action)
+						}
+						actual := &corev1.Pod{}
+						if err := f.cli.Get(context.Background(), key, actual); err != nil {
+							t.Fatal(err)
+						}
+						if !generatedMemberAction(t, actual, "memberLeave") {
+							t.Fatal("manual rollout did not install Leave")
+						}
+						return kbaproto.ActionResponse{}, nil
+					}).Times(1)
+					for round := 0; round < 24; round++ {
+						f.stepWithChildren(t)
+						for _, pod := range lifecycleEntryPods(t, f.cli) {
+							f.setReady(t, pod.Name, true)
+						}
+					}
+					if len(lifecycleEntryPods(t, f.cli)) != 1 {
+						t.Fatal("OnDelete did not resume after manual runtime rollout")
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestInstanceSetLifecycleAdoptsLeaveBeforeScaleToZero(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		t.Run(fmt.Sprintf("instanceAPI=%t", instanceAPI), func(t *testing.T) {
+			ctx := context.Background()
+			f := newMemberLifecycleEntry(t, instanceAPI, 1, appsv1.ParallelPodManagement)
+			if instanceAPI {
+				f.cli = &setStopClient{Client: f.cli}
+			}
+			f.its.Spec.LifecycleActions.MemberLeave = nil
+			if err := f.cli.Update(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			f.bootstrap(t, 1)
+			f.its.Spec.LifecycleActions.MemberLeave = &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"true"}}}
+			f.its.Spec.Replicas = ptr.To[int32](0)
+			f.its.Generation++
+			if err := f.cli.Update(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			calls := 0
+			agent := kbacli.NewMockClient(gomock.NewController(t))
+			agent.EXPECT().Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbaproto.ActionRequest) (kbaproto.ActionResponse, error) {
+				pods := lifecycleEntryPods(t, f.cli)
+				if len(pods) != 1 || !generatedMemberAction(t, &pods[0], "memberLeave") {
+					t.Fatal("Leave called before retiring runtime adopted its action")
+				}
+				actions, probes := generatedMemberActions(t, &pods[0])
+				listener, err := net.Listen("tcp", "127.0.0.1:0")
+				if err != nil {
+					t.Fatal(err)
+				}
+				port := listener.Addr().(*net.TCPAddr).Port
+				if err := listener.Close(); err != nil {
+					t.Fatal(err)
+				}
+				services, err := kbaservice.New(ctrl.Log, actions, probes, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				server := kbaserver.NewHTTPServer(ctrl.Log, kbaserver.Config{Address: "127.0.0.1", Port: port}, services)
+				if err := server.StartNonBlocking(); err != nil {
+					t.Fatal(err)
+				}
+				defer func() { _ = server.Close() }()
+				kbacli.UnsetMockClient()
+				realClient, err := kbacli.NewClient(func() (string, int32, error) { return "127.0.0.1", int32(port), nil })
+				kbacli.SetMockClient(agent, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer func() { _ = realClient.Close() }()
+				calls++
+				return realClient.Action(ctx, req)
+			}).AnyTimes()
+			kbacli.SetMockClient(agent, nil)
+			t.Cleanup(kbacli.UnsetMockClient)
+			for round := 0; round < 48; round++ {
+				before := calls
+				f.stepWithChildren(t)
+				pods := lifecycleEntryPods(t, f.cli)
+				if before == 0 && calls == 1 {
+					status := f.its.FindInstanceStatus(f.its.Name + "-0")
+					if len(pods) != 1 || status == nil || ptr.Deref(status.MemberJoined, true) {
+						t.Fatalf("Leave was not committed before cleanup: pods=%d status=%#v", len(pods), status)
+					}
+				}
+				for _, pod := range pods {
+					f.setReady(t, pod.Name, true)
+				}
+			}
+			if calls != 1 || len(lifecycleEntryPods(t, f.cli)) != 0 {
+				t.Fatalf("default-template retirement to zero did not converge: calls=%d pods=%d status=%#v", calls, len(lifecycleEntryPods(t, f.cli)), f.its.Status)
+			}
+		})
+	}
+}

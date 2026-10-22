@@ -171,6 +171,12 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 						pod = &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: its.Namespace},
 							Spec: corev1.PodSpec{Hostname: name, Subdomain: getHeadlessSvcName(its.Name)}}
 					}
+
+					if its.Spec.LifecycleActions.MemberLeave != nil {
+						if result, err := adoptLeaveAction(tree, its, pod); err != nil || result != kubebuilderx.Continue {
+							return result, err
+						}
+					}
 					return reconcileMember(tree, its, pod, false, r.reader)
 				}
 			}

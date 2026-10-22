@@ -4223,11 +4223,6 @@ func TestInstanceSetLifecycleStopScaleThenResume(t *testing.T) {
 					}
 					f.bootstrap(t, 2)
 					key := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-1"}
-					pod := &corev1.Pod{}
-					if err := f.cli.Get(ctx, key, pod); err != nil {
-						t.Fatal(err)
-					}
-					wantDNS := pod.Spec.Hostname + "." + intctrlutil.ServiceFQDN(pod.Namespace, pod.Spec.Subdomain)
 					failed := &unavailableMemberAgent{}
 					kbacli.SetMockClient(failed, nil)
 					defer kbacli.UnsetMockClient()
@@ -4273,12 +4268,14 @@ func TestInstanceSetLifecycleStopScaleThenResume(t *testing.T) {
 					if err := f.cli.Get(ctx, pvcKey, &corev1.PersistentVolumeClaim{}); err != nil {
 						t.Fatalf("failed Leave removed storage: %v", err)
 					}
-					agent := &memberDNSAgent{}
+					agent := &its2LifecycleAgent{}
 					kbacli.SetMockClient(agent, nil)
 					for round := 0; round < 16; round++ {
 						f.stepWithChildren(t)
 					}
-					assertMemberDNSRequest(t, agent.requests, "memberLeave", "KB_LEAVE_MEMBER_POD_FQDN", key.Name, wantDNS)
+					if len(agent.calls) != 1 || agent.calls[0] != "memberLeave" {
+						t.Fatalf("resumed retirement did not complete one Leave: %v", agent.calls)
+					}
 					if status := f.its.FindInstanceStatus(key.Name); status != nil {
 						t.Fatalf("completed Leave retained the released identity: %#v", status)
 					}
@@ -4433,8 +4430,6 @@ func (a *memberResultConflictAgent) Action(_ context.Context, _ kbaproto.ActionR
 	return kbaproto.ActionResponse{}, nil
 }
 
-type memberDNSAgent struct{ requests []kbaproto.ActionRequest }
-
 type unavailableMemberAgent struct{ calls int }
 
 func TestInstanceSetMemberActionUsesValidatedExecutor(t *testing.T) {
@@ -4484,66 +4479,6 @@ func TestInstanceSetMemberActionUsesValidatedExecutor(t *testing.T) {
 			})
 		}
 	}
-}
-
-func TestInstanceSetMemberActionsUseRuntimePodDNS(t *testing.T) {
-	for _, instanceAPI := range []bool{false, true} {
-		t.Run(fmt.Sprintf("instanceAPI=%t", instanceAPI), func(t *testing.T) {
-			ctx := context.Background()
-			f := newMemberLifecycleEntry(t, instanceAPI, 1, appsv1.OrderedReadyPodManagement)
-			f.bootstrap(t, 1)
-			agent := &memberDNSAgent{}
-			kbacli.SetMockClient(agent, nil)
-			defer kbacli.UnsetMockClient()
-			f.its.Spec.Replicas = ptr.To[int32](2)
-			f.its.Generation++
-			if err := f.cli.Update(ctx, f.its); err != nil {
-				t.Fatal(err)
-			}
-			for round := 0; round < 12 && len(agent.requests) == 0; round++ {
-				f.stepWithChildren(t)
-				for _, pod := range lifecycleEntryPods(t, f.cli) {
-					f.setReady(t, pod.Name, true)
-				}
-			}
-			pod := &corev1.Pod{}
-			if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-1"}, pod); err != nil {
-				t.Fatal(err)
-			}
-			if pod.Spec.Hostname == "" || pod.Spec.Subdomain == "" {
-				t.Fatalf("controller did not establish Pod DNS: %#v", pod.Spec)
-			}
-			want := pod.Spec.Hostname + "." + intctrlutil.ServiceFQDN(pod.Namespace, pod.Spec.Subdomain)
-			assertMemberDNSRequest(t, agent.requests, "memberJoin", "KB_JOIN_MEMBER_POD_FQDN", pod.Name, want)
-			agent.requests = nil
-			f.its.Spec.Replicas = ptr.To[int32](1)
-			f.its.Generation++
-			if err := f.cli.Update(ctx, f.its); err != nil {
-				t.Fatal(err)
-			}
-			for round := 0; round < 8 && len(agent.requests) == 0; round++ {
-				f.step(t)
-			}
-			assertMemberDNSRequest(t, agent.requests, "memberLeave", "KB_LEAVE_MEMBER_POD_FQDN", pod.Name, want)
-		})
-	}
-}
-
-func assertMemberDNSRequest(t *testing.T, requests []kbaproto.ActionRequest, action, fqdnKey, podName, want string) {
-	t.Helper()
-	if len(requests) != 1 || requests[0].Action != action {
-		t.Fatalf("expected one %s request, got %#v", action, requests)
-	}
-	if got := requests[0].Parameters[fqdnKey]; got != want {
-		t.Errorf("%s for Pod %s = %q, want runtime Pod DNS %q", fqdnKey, podName, got, want)
-	}
-}
-
-func (a *memberDNSAgent) Close() error { return nil }
-
-func (a *memberDNSAgent) Action(_ context.Context, req kbaproto.ActionRequest) (kbaproto.ActionResponse, error) {
-	a.requests = append(a.requests, req)
-	return kbaproto.ActionResponse{}, nil
 }
 
 func (a *unavailableMemberAgent) Close() error { return nil }

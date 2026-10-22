@@ -230,7 +230,7 @@ func TestValidationRejectsUnownedPreconditionsAndNonblockingActions(t *testing.T
 	}
 }
 
-func TestStandaloneAgentRegistersSwitchover(t *testing.T) {
+func TestConfigurePodRegistersSwitchover(t *testing.T) {
 	its := memberWorkload()
 	its.Spec.LifecycleActions.Switchover = testAction("switch")
 	pod := memberPod()
@@ -246,7 +246,7 @@ func TestStandaloneAgentRegistersSwitchover(t *testing.T) {
 		found = found || action.Name == "switchover"
 	}
 	if !found {
-		t.Fatal("standalone server cannot execute its configured switchover")
+		t.Fatal("prepared agent server is missing the configured switchover")
 	}
 	its.Spec.LifecycleActions.Switchover.PreCondition = ptr.To(apps.ComponentReadyPreConditionType)
 	if err := Validate(its); err == nil {

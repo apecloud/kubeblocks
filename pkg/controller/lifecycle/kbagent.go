@@ -86,21 +86,13 @@ func (a *kbagent) RoleProbe(ctx context.Context, cli client.Reader, opts *Option
 
 func (a *kbagent) Switchover(ctx context.Context, cli client.Reader, opts *Options, candidate string) error {
 	roleName := a.pod.Labels[constant.RoleLabelKey]
-	candidatePod := &corev1.Pod{}
-	candidatePod.Name = candidate
-	for _, pod := range a.pods {
-		if pod.Name == candidate {
-			candidatePod = pod
-			break
-		}
-	}
 	lfa := &switchover{
 		namespace:    a.namespace,
 		clusterName:  a.clusterName,
 		compName:     a.compName,
 		role:         roleName,
-		currentPod:   a.pod,
-		candidatePod: candidatePod,
+		currentPod:   a.pod.Name,
+		candidatePod: candidate,
 	}
 	return a.ignoreOutput(a.checkedCallAction(ctx, cli, a.lifecycleActions.Switchover, lfa, opts))
 }

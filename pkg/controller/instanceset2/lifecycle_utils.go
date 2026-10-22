@@ -144,8 +144,7 @@ func reconcileMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, 
 			return lifecycleWait(tree, its, fmt.Errorf("waiting for runtime of member %s", status.PodName))
 		}
 		if pod == nil {
-			pod = &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: inst.Name, Namespace: inst.Namespace},
-				Spec: corev1.PodSpec{Hostname: inst.Spec.Template.Spec.Hostname, Subdomain: inst.Spec.Template.Spec.Subdomain}}
+			pod = &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: inst.Name, Namespace: inst.Namespace}}
 		}
 		if join && !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
 			return kubebuilderx.Continue, nil

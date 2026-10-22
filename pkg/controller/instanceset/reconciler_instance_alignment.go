@@ -170,12 +170,6 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 					if absent {
 						pod = &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: its.Namespace}}
 					}
-
-					if its.Spec.LifecycleActions.MemberLeave != nil {
-						if result, err := adoptLeaveAction(tree, its, pod); err != nil || result != kubebuilderx.Continue {
-							return result, err
-						}
-					}
 					return reconcileMember(tree, its, pod, false, r.reader)
 				}
 			}
@@ -244,7 +238,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if _, ok := createNameSet[name]; !ok {
 			pod := oldInstanceMap[name]
 			if changed, err := recreatePendingDataPod(tree, its, pod); err != nil {
-				return adoptDataActions(tree, its, pod.Name, err)
+				return lifecycleWait(tree, its, err)
 			} else if changed {
 				return kubebuilderx.RetryAfter(time.Second), nil
 			}
@@ -269,7 +263,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		}
 
 		if err := lifecycleCreatePod(tree, its, newPod); err != nil {
-			return adoptDataActions(tree, its, newPod.Name, err)
+			return lifecycleWait(tree, its, err)
 		}
 		if err := tree.Add(newPod); err != nil {
 			return kubebuilderx.Continue, err

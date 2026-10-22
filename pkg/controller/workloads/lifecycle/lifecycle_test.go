@@ -336,10 +336,6 @@ func TestDataSourceRetirementUsesMembershipResult(t *testing.T) {
 			tc.status.PodName = "demo-0"
 			its.Status.InstanceStatus = []workloads.InstanceStatus{tc.status}
 			pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "demo-0"}, Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: kbagent.ContainerName, Ports: []corev1.ContainerPort{{Name: kbagent.DefaultStreamingPortName, ContainerPort: 3502}}}}}, Status: corev1.PodStatus{Phase: corev1.PodRunning, PodIP: "10.0.0.1", Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}}}
-			pod.Spec.InitContainers = dataPod().Spec.InitContainers
-			if err := ConfigurePod(its, pod); err != nil {
-				t.Fatal(err)
-			}
 			source, err := SourcePod(its, []*corev1.Pod{pod}, "demo-1", nil)
 			if tc.usable {
 				if err != nil || source != pod {
@@ -382,88 +378,4 @@ func TestDataActionsPreservePreparedWorkerEnvironment(t *testing.T) {
 			t.Fatal("workload injected missing caller identity environment")
 		}
 	}
-}
-
-func TestActionConfiguredUsesNamedActionAndMergedExecEnv(t *testing.T) {
-	its := memberWorkload()
-	its.Spec.LifecycleActions.MemberLeave.Exec.Args = []string{}
-	its.Spec.LifecycleActions.MemberLeave.Exec.Env = []corev1.EnvVar{{Name: "HOOK_INPUT", Value: "leave"}}
-	its.Spec.LifecycleActions.Switchover = testAction("switch")
-	its.Spec.LifecycleActions.Switchover.Exec.Env = []corev1.EnvVar{{Name: "HOOK_INPUT", Value: "switch"}}
-	pod := memberPod()
-	configured := func(want bool) {
-		t.Helper()
-		got, err := ActionConfigured(its, pod, "memberLeave")
-		if err != nil || got != want {
-			t.Fatalf("configured=%t want=%t error=%v", got, want, err)
-		}
-	}
-	configured(false)
-	if err := ConfigurePod(its, pod); err != nil {
-		t.Fatal(err)
-	}
-	configured(true)
-	its.Spec.LifecycleActions.MemberJoin.Exec.Command = []string{"changed-unrelated-join"}
-	configured(true)
-	for i := range pod.Spec.Containers[1].Env {
-		if pod.Spec.Containers[1].Env[i].Name == "HOOK_INPUT" {
-			pod.Spec.Containers[1].Env[i].Value = "stale"
-		}
-	}
-	configured(false)
-	if err := ConfigurePod(its, pod); err != nil {
-		t.Fatal(err)
-	}
-	configured(true)
-	its.Spec.LifecycleActions.MemberLeave.Exec.Command = []string{"changed-leave"}
-	configured(false)
-}
-
-func TestDataSourceRequiresAppliedDumpConfiguration(t *testing.T) {
-	its := dataWorkload()
-	its.Spec.LifecycleActions.DataDump.Exec.Env = []corev1.EnvVar{{Name: "DUMP_INPUT", Value: "desired"}}
-	first, second := dataPod(), dataPod()
-	first.Name, second.Name = "demo-0", "demo-1"
-	for i, pod := range []*corev1.Pod{first, second} {
-		pod.Spec.Containers[1].Ports = []corev1.ContainerPort{{Name: kbagent.DefaultStreamingPortName, ContainerPort: 3502}}
-		pod.Status = corev1.PodStatus{Phase: corev1.PodRunning, PodIP: fmt.Sprintf("10.0.0.%d", i+1), Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}}
-		if err := ConfigurePod(its, pod); err != nil {
-			t.Fatal(err)
-		}
-	}
-	target := dataPod()
-	target.Name = "demo-2"
-	if err := ConfigureDataTask(its, target, second); err != nil {
-		t.Fatal(err)
-	}
-	selectSource := func(want *corev1.Pod) {
-		t.Helper()
-		got, err := SourcePod(its, []*corev1.Pod{first, second}, target.Name, &target.Spec)
-		if err != nil || got != want {
-			t.Fatalf("source=%v want=%v err=%v", got, want, err)
-		}
-	}
-	selectSource(second)
-	for _, envName := range []string{"DUMP_INPUT", "KB_AGENT_STREAMING", "KB_AGENT_ACTION"} {
-		t.Run(envName, func(t *testing.T) {
-			before := second.DeepCopy()
-			for i := range second.Spec.Containers[1].Env {
-				if second.Spec.Containers[1].Env[i].Name == envName {
-					second.Spec.Containers[1].Env[i].Value = ""
-				}
-			}
-			selectSource(first)
-			second.Spec = before.Spec
-		})
-	}
-	its.Spec.LifecycleActions.DataDump.Exec.Command = []string{"changed-dump"}
-	if source, err := SourcePod(its, []*corev1.Pod{first, second}, target.Name, &target.Spec); err == nil || source != nil {
-		t.Fatal("old action was admitted after desired dump changed")
-	}
-	if err := ConfigurePod(its, first); err != nil {
-		t.Fatal(err)
-	}
-	selectSource(first)
-	its.Spec.LifecycleActions.MemberJoin.Exec.Command = []string{"unrelated-join-change"}
-	selectSource(first)
 }

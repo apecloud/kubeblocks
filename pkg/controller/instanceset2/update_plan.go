@@ -30,17 +30,12 @@ import (
 )
 
 func newUpdatePlan(its workloads.InstanceSet, instances []*workloads.Instance) updatePlan {
-	return newUpdatePlanWithPredicate(its, instances, func(inst *workloads.Instance) bool { return isInstanceUpdated(&its, inst) })
-}
-
-func newUpdatePlanWithPredicate(its workloads.InstanceSet, instances []*workloads.Instance, isUpdated func(*workloads.Instance) bool) updatePlan {
 	var instanceList []workloads.Instance
 	for _, inst := range instances {
 		instanceList = append(instanceList, *inst)
 	}
 	return &realUpdatePlan{
 		its:       its,
-		isUpdated: isUpdated,
 		instances: instanceList,
 		dag:       graph.NewDAG(),
 	}
@@ -61,7 +56,6 @@ var (
 )
 
 type realUpdatePlan struct {
-	isUpdated            func(*workloads.Instance) bool
 	its                  workloads.InstanceSet
 	instances            []workloads.Instance
 	dag                  *graph.DAG
@@ -86,7 +80,7 @@ func (p *realUpdatePlan) planWalkFunc(vertex graph.Vertex) error {
 	}
 
 	// if instance is the latest version, we do nothing
-	if p.isUpdated(inst) {
+	if isInstanceUpdated(&p.its, inst) {
 		if !intctrlutil.IsInstanceReady(inst) {
 			return ErrWait
 		}

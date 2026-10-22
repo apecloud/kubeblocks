@@ -28,7 +28,6 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 
@@ -229,8 +228,7 @@ func SortDataSourcesFirst(its *workloads.InstanceSet, names []string) {
 	})
 }
 
-// DataSources returns eligible endpoints before checking their installed dump configuration.
-func DataSources(its *workloads.InstanceSet, pods []*corev1.Pod, target string) ([]*corev1.Pod, error) {
+func SourcePod(its *workloads.InstanceSet, pods []*corev1.Pod, target string, current *corev1.PodSpec) (*corev1.Pod, error) {
 	candidates := slices.Clone(pods)
 	slices.SortFunc(candidates, func(a, b *corev1.Pod) int { return strings.Compare(a.Name, b.Name) })
 	available := make([]*corev1.Pod, 0, len(candidates))
@@ -263,24 +261,6 @@ func DataSources(its *workloads.InstanceSet, pods []*corev1.Pod, target string) 
 				return nil, err
 			}
 			available = selected
-		}
-	}
-	return available, nil
-}
-
-func SourcePod(its *workloads.InstanceSet, pods []*corev1.Pod, target string, current *corev1.PodSpec) (*corev1.Pod, error) {
-	candidates, err := DataSources(its, pods, target)
-	if err != nil {
-		return nil, err
-	}
-	available := make([]*corev1.Pod, 0, len(candidates))
-	for _, pod := range candidates {
-		configured, err := ActionConfigured(its, pod, "dataDump")
-		if err != nil {
-			return nil, err
-		}
-		if configured {
-			available = append(available, pod)
 		}
 	}
 	if current != nil {
@@ -375,83 +355,6 @@ func ConfigureDataTask(its *workloads.InstanceSet, pod, source *corev1.Pod) erro
 	}
 	setEnv(worker, *env)
 	return nil
-}
-
-// ActionConfigured observes the action definition installed in the actual agent runtime.
-func ActionConfigured(its *workloads.InstanceSet, pod *corev1.Pod, name string) (bool, error) {
-	if pod == nil {
-		return false, nil
-	}
-	var action *apps.Action
-	switch name {
-	case "memberJoin":
-		action = its.Spec.LifecycleActions.MemberJoin
-	case "memberLeave":
-		action = its.Spec.LifecycleActions.MemberLeave
-	case "switchover":
-		action = its.Spec.LifecycleActions.Switchover
-	case "dataDump":
-		action = its.Spec.LifecycleActions.DataDump
-	default:
-		return false, fmt.Errorf("unknown workload action %s", name)
-	}
-	if action == nil {
-		return true, nil
-	}
-	index := slices.IndexFunc(pod.Spec.Containers, func(c corev1.Container) bool { return c.Name == kbagent.ContainerName })
-	if index < 0 {
-		return false, nil
-	}
-	actual := pod.Spec.Containers[index]
-	if name == "dataDump" {
-		streaming := false
-		for _, env := range actual.Env {
-			streaming = streaming || (env.Name == "KB_AGENT_STREAMING" && slices.Contains(strings.Split(env.Value, ","), name))
-		}
-		if !streaming {
-			return false, nil
-		}
-	}
-	var actions []proto.Action
-	for _, env := range actual.Env {
-		if env.Name == "KB_AGENT_ACTION" && env.Value != "" {
-			if err := json.Unmarshal([]byte(env.Value), &actions); err != nil {
-				return false, err
-			}
-		}
-	}
-	index = slices.IndexFunc(actions, func(a proto.Action) bool { return a.Name == name })
-	if index < 0 || !equality.Semantic.DeepEqual(actions[index], *Action(name, action)) {
-		return false, nil
-	}
-	expected := pod.DeepCopy()
-	if err := ConfigurePod(its, expected); err != nil {
-		return false, err
-	}
-	server := expected.Spec.Containers[slices.IndexFunc(expected.Spec.Containers, func(c corev1.Container) bool { return c.Name == kbagent.ContainerName })]
-	if action.Exec != nil {
-		for _, required := range action.Exec.Env {
-			desiredIndex := slices.IndexFunc(server.Env, func(e corev1.EnvVar) bool { return e.Name == required.Name })
-			actualIndex := slices.IndexFunc(actual.Env, func(e corev1.EnvVar) bool { return e.Name == required.Name })
-			if actualIndex < 0 || !equality.Semantic.DeepEqual(actual.Env[actualIndex], server.Env[desiredIndex]) {
-				return false, nil
-			}
-		}
-	}
-	return true, nil
-}
-
-// ActionTargets includes every possible AnyReplica executor before selection is pinned for execution.
-func ActionTargets(action *apps.Action, pod *corev1.Pod, pods []*corev1.Pod) ([]*corev1.Pod, error) {
-	selection := action.DeepCopy()
-	selector := selection.TargetPodSelector
-	if selector == "" && selection.Exec != nil {
-		selector = selection.Exec.TargetPodSelector
-	}
-	if selector == apps.AnyReplica {
-		selection.TargetPodSelector = apps.AllReplicas
-	}
-	return publiclifecycle.SelectTargetPods(pods, pod, selection)
 }
 
 func setEnv(c *corev1.Container, env corev1.EnvVar) {

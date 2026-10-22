@@ -226,6 +226,14 @@ func adoptLeaveAction(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet,
 	if !missing {
 		return kubebuilderx.Continue, nil
 	}
+	return adoptActionConfiguration(tree, its, targets, required, "memberLeave")
+}
+
+func adoptActionConfiguration(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, targets []*corev1.Pod, required sets.Set[string], action string) (kubebuilderx.Result, error) {
+	pods := []*corev1.Pod{}
+	for _, obj := range tree.List(&corev1.Pod{}) {
+		pods = append(pods, obj.(*corev1.Pod))
+	}
 	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
 	if err != nil {
 		return kubebuilderx.Continue, err
@@ -271,10 +279,35 @@ func adoptLeaveAction(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet,
 		if !required.Has(current.Name) {
 			return true, nil
 		}
-		return workloadlifecycle.ActionConfigured(its, current, "memberLeave")
+		return workloadlifecycle.ActionConfigured(its, current, action)
 	}
 	if _, err := (&updateReconciler{}).reconcileUpdates(tree, participants, satisfied); err != nil {
 		return kubebuilderx.Continue, err
 	}
-	return lifecycleWait(tree, its, fmt.Errorf("waiting for memberLeave runtime configuration"))
+	return lifecycleWait(tree, its, fmt.Errorf("waiting for %s runtime configuration", action))
+}
+
+func adoptDataActions(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, target string, cause error) (kubebuilderx.Result, error) {
+	pods := []*corev1.Pod{}
+	for _, obj := range tree.List(&corev1.Pod{}) {
+		pods = append(pods, obj.(*corev1.Pod))
+	}
+	targets, err := workloadlifecycle.DataSources(its, pods, target)
+	if err != nil {
+		return lifecycleWait(tree, its, err)
+	}
+	required := sets.New[string]()
+	for _, pod := range targets {
+		configured, err := workloadlifecycle.ActionConfigured(its, pod, "dataDump")
+		if err != nil {
+			return kubebuilderx.Continue, err
+		}
+		if !configured {
+			required.Insert(pod.Name)
+		}
+	}
+	if required.Len() == 0 {
+		return lifecycleWait(tree, its, cause)
+	}
+	return adoptActionConfiguration(tree, its, targets, required, "dataDump")
 }

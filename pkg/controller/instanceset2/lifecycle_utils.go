@@ -308,6 +308,11 @@ func adoptLeaveAction(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet,
 	if !missing {
 		return kubebuilderx.Continue, nil
 	}
+	return adoptActionConfiguration(tree, its, required, "memberLeave")
+}
+
+func adoptActionConfiguration(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, required sets.Set[string], action string) (kubebuilderx.Result, error) {
+	pods := lifecyclePods(tree)
 	desired := map[string]*workloads.Instance{}
 	for _, obj := range tree.List(&workloads.Instance{}) {
 		current := obj.(*workloads.Instance)
@@ -336,7 +341,7 @@ func adoptLeaveAction(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet,
 		}
 		for _, pod := range pods {
 			if pod.Name == current.Name {
-				configured, err := workloadlifecycle.ActionConfigured(its, pod, "memberLeave")
+				configured, err := workloadlifecycle.ActionConfigured(its, pod, action)
 				return err == nil && configured
 			}
 		}
@@ -345,5 +350,26 @@ func adoptLeaveAction(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet,
 	if _, err := (&updateReconciler{}).reconcileUpdates(tree, desired, satisfied); err != nil {
 		return kubebuilderx.Continue, err
 	}
-	return lifecycleWait(tree, its, fmt.Errorf("waiting for memberLeave runtime configuration"))
+	return lifecycleWait(tree, its, fmt.Errorf("waiting for %s runtime configuration", action))
+}
+
+func adoptDataActions(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, target string, cause error) (kubebuilderx.Result, error) {
+	targets, err := workloadlifecycle.DataSources(its, lifecyclePods(tree), target)
+	if err != nil {
+		return lifecycleWait(tree, its, err)
+	}
+	required := sets.New[string]()
+	for _, pod := range targets {
+		configured, err := workloadlifecycle.ActionConfigured(its, pod, "dataDump")
+		if err != nil {
+			return kubebuilderx.Continue, err
+		}
+		if !configured {
+			required.Insert(pod.Name)
+		}
+	}
+	if required.Len() == 0 {
+		return lifecycleWait(tree, its, cause)
+	}
+	return adoptActionConfiguration(tree, its, required, "dataDump")
 }

@@ -248,7 +248,7 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 			return kubebuilderx.Continue, err
 		}
 		if err := lifecycleCreateInstance(tree, its, newInst); err != nil {
-			return lifecycleWait(tree, its, err)
+			return adoptDataActions(tree, its, newInst.Name, err)
 		}
 		if current != nil {
 			merged := copyAndMergeInstance(current, newInst)
@@ -285,7 +285,7 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 		}
 		desired := inst.DeepCopy()
 		if err := refreshInstanceData(tree, its, desired); err != nil {
-			return lifecycleWait(tree, its, err)
+			return adoptDataActions(tree, its, inst.Name, err)
 		}
 		if !equality.Semantic.DeepEqual(inst.Spec.Template.Spec, desired.Spec.Template.Spec) || !equality.Semantic.DeepEqual(inst.Spec.InstanceAssistantObjects, desired.Spec.InstanceAssistantObjects) {
 			if err := tree.Update(desired); err != nil {

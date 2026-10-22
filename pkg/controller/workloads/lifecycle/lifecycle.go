@@ -229,7 +229,8 @@ func SortDataSourcesFirst(its *workloads.InstanceSet, names []string) {
 	})
 }
 
-func SourcePod(its *workloads.InstanceSet, pods []*corev1.Pod, target string, current *corev1.PodSpec) (*corev1.Pod, error) {
+// DataSources returns eligible endpoints before checking their installed dump configuration.
+func DataSources(its *workloads.InstanceSet, pods []*corev1.Pod, target string) ([]*corev1.Pod, error) {
 	candidates := slices.Clone(pods)
 	slices.SortFunc(candidates, func(a, b *corev1.Pod) int { return strings.Compare(a.Name, b.Name) })
 	available := make([]*corev1.Pod, 0, len(candidates))
@@ -262,6 +263,24 @@ func SourcePod(its *workloads.InstanceSet, pods []*corev1.Pod, target string, cu
 				return nil, err
 			}
 			available = selected
+		}
+	}
+	return available, nil
+}
+
+func SourcePod(its *workloads.InstanceSet, pods []*corev1.Pod, target string, current *corev1.PodSpec) (*corev1.Pod, error) {
+	candidates, err := DataSources(its, pods, target)
+	if err != nil {
+		return nil, err
+	}
+	available := make([]*corev1.Pod, 0, len(candidates))
+	for _, pod := range candidates {
+		configured, err := ActionConfigured(its, pod, "dataDump")
+		if err != nil {
+			return nil, err
+		}
+		if configured {
+			available = append(available, pod)
 		}
 	}
 	if current != nil {
@@ -371,6 +390,8 @@ func ActionConfigured(its *workloads.InstanceSet, pod *corev1.Pod, name string) 
 		action = its.Spec.LifecycleActions.MemberLeave
 	case "switchover":
 		action = its.Spec.LifecycleActions.Switchover
+	case "dataDump":
+		action = its.Spec.LifecycleActions.DataDump
 	default:
 		return false, fmt.Errorf("unknown workload action %s", name)
 	}
@@ -382,6 +403,15 @@ func ActionConfigured(its *workloads.InstanceSet, pod *corev1.Pod, name string) 
 		return false, nil
 	}
 	actual := pod.Spec.Containers[index]
+	if name == "dataDump" {
+		streaming := false
+		for _, env := range actual.Env {
+			streaming = streaming || (env.Name == "KB_AGENT_STREAMING" && slices.Contains(strings.Split(env.Value, ","), name))
+		}
+		if !streaming {
+			return false, nil
+		}
+	}
 	var actions []proto.Action
 	for _, env := range actual.Env {
 		if env.Name == "KB_AGENT_ACTION" && env.Value != "" {

@@ -6068,12 +6068,14 @@ func TestInstanceSetDataHookAdoptionBeforeExpansion(t *testing.T) {
 				}
 				target := &corev1.Pod{}
 				expanding := simultaneous
+				sawDonorAbsent := false
 				for round := 0; round < 40; round++ {
 					f.stepWithChildren(t)
 					sourceErr := f.cli.Get(ctx, sourceKey, source)
 					if sourceErr != nil && !apierrors.IsNotFound(sourceErr) {
 						t.Fatal(sourceErr)
 					}
+					sawDonorAbsent = sawDonorAbsent || apierrors.IsNotFound(sourceErr)
 					configured := sourceErr == nil && donorConfigured(source)
 					if instanceAPI {
 						child := &workloads.Instance{}
@@ -6100,6 +6102,7 @@ func TestInstanceSetDataHookAdoptionBeforeExpansion(t *testing.T) {
 					if sourceErr == nil {
 						f.setReady(t, source.Name, true)
 						if err := f.cli.Get(ctx, sourceKey, source); apierrors.IsNotFound(err) {
+							sawDonorAbsent = true
 							continue
 						} else if err != nil {
 							t.Fatal(err)
@@ -6120,6 +6123,9 @@ func TestInstanceSetDataHookAdoptionBeforeExpansion(t *testing.T) {
 				}
 				if err := f.cli.Get(ctx, targetKey, target); err != nil {
 					t.Fatalf("ordinary donor rollout did not unblock expansion: %v", err)
+				}
+				if !sawDonorAbsent {
+					t.Fatal("fixture did not exercise donor recreation after ordinary rollout deletion")
 				}
 				if source.UID == "old-donor" || !donorConfigured(source) {
 					t.Fatal("expansion did not wait for the ordinary donor rollout")
@@ -7697,5 +7703,90 @@ func TestInstanceSetLifecycleAdoptsLeaveBeforeScaleToZero(t *testing.T) {
 				t.Fatalf("default-template retirement to zero did not converge: calls=%d pods=%d status=%#v", calls, len(lifecycleEntryPods(t, f.cli)), f.its.Status)
 			}
 		})
+	}
+}
+
+func TestInstanceSetDataAdoptionRespectsUpdatePolicy(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		for _, policy := range []string{"OnDelete", "StrictInPlace", "Unavailable", "Stop", "Offline"} {
+			t.Run(fmt.Sprintf("instanceAPI=%t/policy=%s", instanceAPI, policy), func(t *testing.T) {
+				ctx := context.Background()
+				replicas := int32(1)
+				if policy == "Unavailable" {
+					replicas = 2
+				}
+				f := newDataLifecycleEntry(t, instanceAPI, replicas, appsv1.ParallelPodManagement)
+				if instanceAPI {
+					f.cli = &setStopClient{Client: f.cli}
+				}
+				dump, load := f.its.Spec.LifecycleActions.DataDump, f.its.Spec.LifecycleActions.DataLoad
+				f.its.Spec.LifecycleActions.DataDump, f.its.Spec.LifecycleActions.DataLoad = nil, nil
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				f.bootstrap(t, int(replicas))
+				if policy == "Unavailable" {
+					f.setReady(t, f.its.Name+"-1", false)
+				}
+				f.its.Spec.LifecycleActions.DataDump, f.its.Spec.LifecycleActions.DataLoad = dump, load
+				f.its.Spec.Replicas = ptr.To(replicas + 1)
+				switch policy {
+				case "OnDelete":
+					f.its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{Type: kbappsv1.OnDeleteStrategyType}
+				case "StrictInPlace":
+					f.its.Spec.PodUpdatePolicy = kbappsv1.StrictInPlacePodUpdatePolicyType
+				case "Stop":
+					f.its.Spec.Stop = ptr.To(true)
+				case "Offline":
+					f.its.Spec.OfflineInstances = []string{f.its.Name + "-0"}
+				}
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				for round := 0; round < 16; round++ {
+					f.stepWithChildren(t)
+				}
+				pods := lifecycleEntryPods(t, f.cli)
+				expected := int(replicas)
+				if policy == "Stop" || policy == "Offline" {
+					expected = 0
+				}
+				if len(pods) != expected {
+					t.Fatalf("policy %s allowed dependent admission or blocked cleanup: pods=%d want=%d", policy, len(pods), expected)
+				}
+				for _, pod := range pods {
+					configured, err := workloadlifecycle.ActionConfigured(f.its, &pod, "dataDump")
+					if err != nil || configured {
+						t.Fatalf("policy %s bypassed ordinary donor rollout: configured=%t err=%v", policy, configured, err)
+					}
+				}
+				if policy == "OnDelete" {
+					key := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-0"}
+					pod := &corev1.Pod{}
+					if err := f.cli.Get(ctx, key, pod); err != nil {
+						t.Fatal(err)
+					}
+					if err := f.cli.Delete(ctx, pod); err != nil {
+						t.Fatal(err)
+					}
+					for round := 0; round < 16; round++ {
+						f.stepWithChildren(t)
+						if err := f.cli.Get(ctx, key, pod); err == nil {
+							configured, err := workloadlifecycle.ActionConfigured(f.its, pod, "dataDump")
+							if err != nil || !configured {
+								t.Fatalf("recreated donor lacks desired dump: %v", err)
+							}
+							f.setReady(t, pod.Name, true)
+						} else if !apierrors.IsNotFound(err) {
+							t.Fatal(err)
+						}
+					}
+					if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-1"}, &corev1.Pod{}); err != nil {
+						t.Fatalf("manual donor rollout did not unblock target: %v", err)
+					}
+				}
+			})
+		}
 	}
 }

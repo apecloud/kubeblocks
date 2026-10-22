@@ -245,7 +245,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if _, ok := createNameSet[name]; !ok {
 			pod := oldInstanceMap[name]
 			if changed, err := recreatePendingDataPod(tree, its, pod); err != nil {
-				return lifecycleWait(tree, its, err)
+				return adoptDataActions(tree, its, pod.Name, err)
 			} else if changed {
 				return kubebuilderx.RetryAfter(time.Second), nil
 			}
@@ -270,7 +270,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		}
 
 		if err := lifecycleCreatePod(tree, its, newPod); err != nil {
-			return lifecycleWait(tree, its, err)
+			return adoptDataActions(tree, its, newPod.Name, err)
 		}
 		if err := tree.Add(newPod); err != nil {
 			return kubebuilderx.Continue, err

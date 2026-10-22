@@ -206,18 +206,17 @@ var _ = Describe("ComponentParameter Controller", func() {
 		})
 
 		It("should project init first and let desired override it", func() {
-			_, _, _, _, _ = mockReconcileResource()
+			_, _, _, _, _ = mockReconcileResourceWithInitial(&parametersv1alpha1.ParameterInputs{
+				Assignments: map[string]*string{
+					"max_connections": cfgutil.ToPointer("1000"),
+				},
+			})
 
 			cfgKey := client.ObjectKey{
 				Namespace: testCtx.DefaultNamespace,
 				Name:      core.GenerateComponentConfigurationName(clusterName, defaultCompName),
 			}
 			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *parametersv1alpha1.ComponentParameter) {
-				cfg.Spec.Initial = &parametersv1alpha1.ParameterInputs{
-					Assignments: map[string]*string{
-						"max_connections": cfgutil.ToPointer("1000"),
-					},
-				}
 				cfg.Spec.Desired = &parametersv1alpha1.ParameterInputs{
 					Assignments: map[string]*string{
 						"max_connections": cfgutil.ToPointer("2000"),

@@ -39,6 +39,7 @@ type ComponentParameter struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
+	// +kubebuilder:validation:Required
 	Spec   ComponentParameterSpec   `json:"spec,omitempty"`
 	Status ComponentParameterStatus `json:"status,omitempty"`
 }
@@ -57,6 +58,7 @@ func init() {
 }
 
 // ComponentParameterSpec defines the desired and execution state of ComponentParameter.
+// +kubebuilder:validation:XValidation:rule="has(self.initial) == has(oldSelf.initial) && (!has(self.initial) || self.initial == oldSelf.initial)",message="spec.initial cannot be changed after creation"
 type ComponentParameterSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
@@ -86,6 +88,8 @@ type ComponentParameterSpec struct {
 	ConfigItemDetails []ConfigTemplateItemDetail `json:"configItemDetails,omitempty"`
 
 	// Initial provides the initial parameter inputs used when the managed runtime configuration is created.
+	// It can only be supplied at creation and cannot be changed or removed afterward.
+	// Managed assignments and updates may specify immutable parameters.
 	//
 	// +optional
 	Initial *ParameterInputs `json:"initial,omitempty"`

@@ -111,7 +111,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 		tplParams, ok := params[configTemplateName]
 		Expect(ok).Should(BeTrue())
 		item.ConfigFileParams = deRef(tplParams)
-		result, err := ApplyParameters(item, cmObj, configDescs, pds)
+		result, err := ApplyParameters(item, cmObj, configDescs, pds, nil)
 		Expect(err).Should(Succeed())
 		configReaders, err := cfgcore.LoadRawConfigObject(result.Data, configdesc.FileFormatConfig, []string{configdesc.Name})
 		Expect(err).Should(Succeed())

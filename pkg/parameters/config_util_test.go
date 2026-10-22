@@ -805,7 +805,7 @@ func Test_filterImmutableParameters(t *testing.T) {
 					ImmutableParameters: tt.args.immutableParams,
 				},
 			}}
-			got, err := filterImmutableParameters(tt.args.parameters, "test", paramsDefs)
+			got, err := filterImmutableParameters(tt.args.parameters, "test", paramsDefs, nil)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("filterImmutableParameters() error = %v, wantErr %v", err, tt.wantErr)
 				return

@@ -103,12 +103,17 @@ func reconcileParameterValuesIntoSpec(ctx context.Context, cli client.Client, co
 	if err != nil {
 		return false, err
 	}
+	initialParameters, err := classifyManagedParameterInputs(compParam.Spec.Initial, fetchTask.ComponentDefObj, configmaps, configDescs, paramsDefs)
+	if err != nil {
+		return false, err
+	}
 	if err := applyParameterInputs(specCopy, compParam.Spec.Initial, false, ctx, cli, fetchTask, configmaps, configDescs, paramsDefs); err != nil {
 		return false, err
 	}
 	if err := applyParameterInputs(specCopy, compParam.Spec.Desired, true, ctx, cli, fetchTask, configmaps, configDescs, paramsDefs); err != nil {
 		return false, err
 	}
+	restoreInitialImmutableParameters(specCopy, initialParameters, paramsDefs)
 	if reflect.DeepEqual(compParam.Spec, *specCopy) {
 		return false, nil
 	}
@@ -128,21 +133,11 @@ func applyParameterInputs(spec *parametersv1alpha1.ComponentParameterSpec,
 	if err := validateCustomTemplate(ctx, cli, inputs.Templates); err != nil {
 		return err
 	}
-	managedInputs, err := normalizeManagedParameterInputs(inputs)
+	classifiedParameters, err := classifyManagedParameterInputs(inputs, fetchTask.ComponentDefObj, configmaps, configDescs, paramsDefs)
 	if err != nil {
 		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "%s", err.Error())
 	}
-	if len(managedInputs) != 0 {
-		classifiedParameters, err := parameters.ClassifyComponentParameters(
-			parametersv1alpha1.ComponentParameters(managedInputs),
-			paramsDefs,
-			fetchTask.ComponentDefObj.Spec.Configs,
-			configmaps,
-			configDescs,
-		)
-		if err != nil {
-			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "%s", err.Error())
-		}
+	if len(classifiedParameters) != 0 {
 		for templateName, paramsInFile := range classifiedParameters {
 			configDescriptions := parameters.GetComponentConfigDescriptions(configDescs, templateName)
 			if len(configDescriptions) == 0 {
@@ -152,7 +147,12 @@ func applyParameterInputs(spec *parametersv1alpha1.ComponentParameterSpec,
 			if item == nil {
 				return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "not found config template item: %s", templateName)
 			}
-			if _, err := parameters.DoMerge(resolveBaseData(configmaps[templateName], paramsInFile), parameters.DerefMapValues(paramsInFile), paramsDefs, configDescriptions); err != nil {
+			patch := parameters.DerefMapValues(paramsInFile)
+			var initial map[string]parametersv1alpha1.ParametersInFile
+			if !override {
+				initial = patch
+			}
+			if _, err := parameters.DoMergeWithInitialParameters(resolveBaseData(configmaps[templateName], paramsInFile), patch, initial, paramsDefs, configDescriptions); err != nil {
 				return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "%s", err.Error())
 			}
 			mergeItemParameters(item, parameters.DerefMapValues(paramsInFile), override)
@@ -171,6 +171,47 @@ func applyParameterInputs(spec *parametersv1alpha1.ComponentParameterSpec,
 		return err
 	}
 	return nil
+}
+
+func classifyManagedParameterInputs(inputs *parametersv1alpha1.ParameterInputs,
+	compDef *appsv1.ComponentDefinition,
+	configmaps map[string]*corev1.ConfigMap,
+	configDescs []parametersv1alpha1.ComponentConfigDescription,
+	paramsDefs []*parametersv1alpha1.ParametersDefinition) (map[string]map[string]*parametersv1alpha1.ParametersInFile, error) {
+	managedInputs, err := normalizeManagedParameterInputs(inputs)
+	if err != nil {
+		return nil, err
+	}
+	return parameters.ClassifyComponentParameters(parametersv1alpha1.ComponentParameters(managedInputs),
+		paramsDefs, compDef.Spec.Configs, configmaps, configDescs)
+}
+
+func restoreInitialImmutableParameters(spec *parametersv1alpha1.ComponentParameterSpec,
+	initial map[string]map[string]*parametersv1alpha1.ParametersInFile,
+	paramsDefs []*parametersv1alpha1.ParametersDefinition) {
+	for templateName, files := range initial {
+		item := parameters.GetConfigTemplateItem(spec, templateName)
+		for file, initialParams := range files {
+			paramsDef := resolveParameterDefinition(paramsDefs, file)
+			if paramsDef == nil {
+				continue
+			}
+			for key, value := range parameters.EncodeParameterOverlay(initialParams.Parameters) {
+				if !slices.Contains(paramsDef.Spec.ImmutableParameters, key) {
+					continue
+				}
+				if item.ConfigFileParams == nil {
+					item.ConfigFileParams = map[string]parametersv1alpha1.ParametersInFile{}
+				}
+				merged := item.ConfigFileParams[file]
+				if merged.Parameters == nil {
+					merged.Parameters = map[string]*string{}
+				}
+				merged.Parameters[key] = value
+				item.ConfigFileParams[file] = merged
+			}
+		}
+	}
 }
 
 func normalizeManagedParameterInputs(inputs *parametersv1alpha1.ParameterInputs) (map[string]*string, error) {
@@ -367,6 +408,7 @@ type taskContext struct {
 	ctx                context.Context
 	component          *component.SynthesizedComponent
 	paramsDefs         []*parametersv1alpha1.ParametersDefinition
+	initialParameters  map[string]map[string]*parametersv1alpha1.ParametersInFile
 }
 
 func newTaskContext(ctx context.Context, cli client.Client, componentParameter *parametersv1alpha1.ComponentParameter, fetchTask *Task) (*taskContext, error) {
@@ -384,12 +426,21 @@ func newTaskContext(ctx context.Context, cli client.Client, componentParameter *
 	if err != nil {
 		return nil, err
 	}
+	configmaps, err := resolveComponentRefConfigMap(ctx, cli, componentParameter.Namespace, componentParameter.Spec.ClusterName, componentParameter.Spec.ComponentName)
+	if err != nil {
+		return nil, err
+	}
+	initialParameters, err := classifyManagedParameterInputs(componentParameter.Spec.Initial, cmpd, configmaps, configDescs, paramsDefs)
+	if err != nil {
+		return nil, err
+	}
 
 	return &taskContext{ctx: ctx,
 		componentParameter: componentParameter,
 		configDescs:        configDescs,
 		component:          synthesizedComp,
 		paramsDefs:         paramsDefs,
+		initialParameters:  initialParameters,
 	}, nil
 }
 
@@ -506,7 +557,8 @@ func syncImpl(taskCtx *taskContext,
 	}
 	updatedConfig = baseConfig
 	if len(item.ConfigFileParams) != 0 {
-		if updatedConfig, err = parameters.ApplyParameters(item, baseConfig, taskCtx.configDescs, taskCtx.paramsDefs); err != nil {
+		initial := parameters.DerefMapValues(taskCtx.initialParameters[item.Name])
+		if updatedConfig, err = parameters.ApplyParameters(item, baseConfig, taskCtx.configDescs, taskCtx.paramsDefs, initial); err != nil {
 			return failStatus(err)
 		}
 	}

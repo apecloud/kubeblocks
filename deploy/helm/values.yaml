@@ -351,6 +351,37 @@ dataProtection:
   ## @param zeroResourceForUnset
   zeroResourceForUnset: true
   leaderElectId: ""
+  ## Leader election timings of the Data Protection controller manager, in seconds.
+  ## They follow the main manager defaults (see `manager.leaderElection`) and are independent:
+  ## tuning one does not affect the other.
+  ##
+  ## Leave them unset to keep the defaults (30 / 25 / 5 seconds), which is also the behavior of an
+  ## installation or upgrade without overrides.
+  ##
+  ## leaseDuration: how long a non-leader candidate waits before forcing acquisition of an
+  ##                expired lease. Must be greater than renewDeadline.
+  ## renewDeadline: the total retry budget the acting leader has for refreshing its leadership
+  ##                before giving up. It is a time budget, NOT a fixed retry count and NOT an
+  ##                independent per-request timeout. Must be greater than 1.2 * retryPeriod.
+  ## retryPeriod:   the interval the leader elector waits between two attempts.
+  ##
+  ## Raising these values (renewDeadline in particular) lets the controller tolerate a longer
+  ## API server stall before it gives up leadership, at the cost of a slower leadership takeover.
+  ## It does not resolve the underlying API connectivity or latency problem.
+  ##
+  ## Example — tolerate a 45 second API stall before stepping down:
+  ##   dataProtection:
+  ##     leaderElection:
+  ##       leaseDuration: 60
+  ##       renewDeadline: 45
+  ##       retryPeriod: 15
+  leaderElection:
+    # default is 30 seconds
+    leaseDuration:
+    # default is 25 seconds
+    renewDeadline:
+    # default is 5 seconds
+    retryPeriod:
   # customizing the encryption key is strongly recommended.
   # if you do not specify a custom key, the default key will be used.
   # using the default key can potentially lead to the exposure of database passwords

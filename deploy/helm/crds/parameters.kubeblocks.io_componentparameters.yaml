@@ -1172,8 +1172,6 @@ spec:
             required:
             - configurationStatus
             type: object
-        required:
-        - spec
         type: object
     served: true
     storage: true

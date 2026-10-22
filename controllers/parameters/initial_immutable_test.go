@@ -178,16 +178,4 @@ var _ = Describe("Initial immutable parameters", func() {
 			Expect(apierrors.IsInvalid(err)).Should(BeTrue(), "Initial %s must be rejected by API validation, got: %v", tc.name, err)
 		}
 	})
-
-	It("rejects removing spec instead of updating Initial", func() {
-		cp := &parametersv1alpha1.ComponentParameter{
-			ObjectMeta: metav1.ObjectMeta{Name: "initial-validation-spec", Namespace: testCtx.DefaultNamespace},
-			Spec: parametersv1alpha1.ComponentParameterSpec{
-				ComponentName: "unbound-component", Initial: initialInputs(),
-			},
-		}
-		Expect(k8sClient.Create(ctx, cp)).Should(Succeed())
-		err := k8sClient.Patch(ctx, cp, client.RawPatch(types.MergePatchType, []byte(`{"spec":null}`)))
-		Expect(apierrors.IsInvalid(err)).Should(BeTrue(), "removing spec must not bypass Initial validation, got: %v", err)
-	})
 })

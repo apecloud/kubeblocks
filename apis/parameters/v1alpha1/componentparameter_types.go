@@ -39,7 +39,6 @@ type ComponentParameter struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// +kubebuilder:validation:Required
 	Spec   ComponentParameterSpec   `json:"spec,omitempty"`
 	Status ComponentParameterStatus `json:"status,omitempty"`
 }

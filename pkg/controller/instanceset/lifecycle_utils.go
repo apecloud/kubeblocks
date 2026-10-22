@@ -175,6 +175,9 @@ func adoptLeaveAction(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet,
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
+	if _, ok := itsExt.InstanceTemplates[instancetemplate.DefaultTemplateName]; !ok {
+		itsExt.InstanceTemplates[instancetemplate.DefaultTemplateName] = &workloads.InstanceTemplate{}
+	}
 	templates := map[string]*instancetemplate.InstanceTemplateExt{}
 	for _, template := range instancetemplate.BuildInstanceTemplateExt(itsExt) {
 		templates[template.Name] = template

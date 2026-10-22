@@ -7378,7 +7378,7 @@ func TestInstanceSetJoinOnlyRetirementRetriesStatusConflict(t *testing.T) {
 
 func TestInstanceSetLifecycleAdoptsLeaveBeforeScaleIn(t *testing.T) {
 	for _, instanceAPI := range []bool{false, true} {
-		for _, selector := range []kbappsv1.TargetPodSelector{kbappsv1.TargetPodSelector(""), kbappsv1.AnyReplica} {
+		for _, selector := range []kbappsv1.TargetPodSelector{"", kbappsv1.AnyReplica, kbappsv1.OrdinalSelector} {
 			t.Run(fmt.Sprintf("instanceAPI=%t/selector=%s", instanceAPI, selector), func(t *testing.T) {
 				ctx := context.Background()
 				f := newMemberLifecycleEntry(t, instanceAPI, 2, appsv1.ParallelPodManagement)
@@ -7395,6 +7395,9 @@ func TestInstanceSetLifecycleAdoptsLeaveBeforeScaleIn(t *testing.T) {
 				f.bootstrap(t, 2)
 				logPath := filepath.Join(t.TempDir(), "leave")
 				f.its.Spec.LifecycleActions.MemberLeave = &kbappsv1.Action{TargetPodSelector: selector, Exec: &kbappsv1.ExecAction{Command: []string{"sh", "-c", "printf 'leave\\n' >> \"$1\"", "sh", logPath}}}
+				if selector == kbappsv1.OrdinalSelector {
+					f.its.Spec.LifecycleActions.MemberLeave.MatchingKey = "1"
+				}
 				f.its.Spec.Replicas = ptr.To[int32](1)
 				f.its.Generation++
 				if err := f.cli.Update(ctx, f.its); err != nil {
@@ -7631,7 +7634,7 @@ func TestInstanceSetLifecycleLeaveAdoptionRespectsUpdatePolicy(t *testing.T) {
 
 func TestInstanceSetLifecycleAdoptsLeaveBeforeScaleToZero(t *testing.T) {
 	for _, instanceAPI := range []bool{false, true} {
-		for _, selector := range []kbappsv1.TargetPodSelector{"", kbappsv1.AnyReplica, kbappsv1.AllReplicas} {
+		for _, selector := range []kbappsv1.TargetPodSelector{"", kbappsv1.AnyReplica, kbappsv1.AllReplicas, kbappsv1.OrdinalSelector} {
 			t.Run(fmt.Sprintf("instanceAPI=%t/selector=%s", instanceAPI, selector), func(t *testing.T) {
 				ctx := context.Background()
 				f := newMemberLifecycleEntry(t, instanceAPI, 1, appsv1.ParallelPodManagement)
@@ -7644,6 +7647,9 @@ func TestInstanceSetLifecycleAdoptsLeaveBeforeScaleToZero(t *testing.T) {
 				}
 				f.bootstrap(t, 1)
 				f.its.Spec.LifecycleActions.MemberLeave = &kbappsv1.Action{TargetPodSelector: selector, Exec: &kbappsv1.ExecAction{Command: []string{"true"}}}
+				if selector == kbappsv1.OrdinalSelector {
+					f.its.Spec.LifecycleActions.MemberLeave.MatchingKey = "0"
+				}
 				f.its.Spec.Replicas = ptr.To[int32](0)
 				f.its.Generation++
 				if err := f.cli.Update(ctx, f.its); err != nil {

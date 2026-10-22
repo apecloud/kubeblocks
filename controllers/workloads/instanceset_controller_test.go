@@ -6534,12 +6534,13 @@ func TestInstanceSetImmediateRegrowthReloadsDeletedData(t *testing.T) {
 						}
 						continue
 					}
-					if scenario == "cancelled" {
+					switch scenario {
+					case "cancelled":
 						status := f.its.FindInstanceStatus(key.Name)
 						removed = status != nil && status.MemberJoined != nil && !*status.MemberJoined && !podGone && claimErr == nil && claim.DeletionTimestamp.IsZero()
-					} else if scenario == "deleting" || scenario == "stale-pvc" {
+					case "deleting", "stale-pvc":
 						removed = podGone && ((!instanceAPI && claimErr == nil && !claim.DeletionTimestamp.IsZero()) || (instanceAPI && childErr == nil && !child.DeletionTimestamp.IsZero()))
-					} else {
+					default:
 						removed = podGone && (!instanceAPI || apierrors.IsNotFound(childErr)) && ((scenario == "retained" && claimErr == nil) || apierrors.IsNotFound(claimErr))
 					}
 					if removed {

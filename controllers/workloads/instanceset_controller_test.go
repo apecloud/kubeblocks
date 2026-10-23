@@ -3109,10 +3109,13 @@ func TestInstanceSetLifecycleMemberActionsRespectStatusFailureAndLatestSpec(t *t
 	}
 	markReady("member-lifecycle-1")
 	its = step()
+	its = step()
 	if joins != 1 || !ptr.Deref(its.FindInstanceStatus("member-lifecycle-1").MemberJoined, false) {
 		t.Fatalf("member join did not execute and persist: calls=%d status=%+v", joins, its.Status.InstanceStatus)
 	}
 	setReplicas(1)
+	its = step()
+	its = step()
 	rejectLeave = true
 	stored, result, err := reconcileLifecycleITS(t, cli, key)
 	if err != nil || !result.Requeue || leaves != 1 || !ptr.Deref(stored.FindInstanceStatus("member-lifecycle-1").MemberJoined, false) || len(lifecycleEntryPods(t, cli)) != 2 {
@@ -3122,10 +3125,13 @@ func TestInstanceSetLifecycleMemberActionsRespectStatusFailureAndLatestSpec(t *t
 	setReplicas(2)
 	rejectLeave = false
 	its = step()
+	its = step()
 	if leaves != 1 || joins != 1 || len(lifecycleEntryPods(t, cli)) != 2 {
 		t.Fatalf("retry acted on obsolete shrink: join=%d leave=%d pods=%+v", joins, leaves, lifecycleEntryPods(t, cli))
 	}
 	setReplicas(1)
+	its = step()
+	its = step()
 	its = step()
 	if leaves != 2 || ptr.Deref(its.FindInstanceStatus("member-lifecycle-1").MemberJoined, true) || len(lifecycleEntryPods(t, cli)) != 2 {
 		t.Fatalf("leave completion was not committed before removal: leave=%d status=%+v pods=%+v", leaves, its.Status.InstanceStatus, lifecycleEntryPods(t, cli))
@@ -3242,6 +3248,7 @@ func TestInstanceSetLifecycleMemberOnlyExecutesGeneratedAgentActions(t *testing.
 	t.Cleanup(kbacli.UnsetMockClient)
 	markReady(target.Name)
 	step()
+	step()
 	if !ptr.Deref(its.FindInstanceStatus(target.Name).MemberJoined, false) {
 		t.Fatalf("real agent join completion was not persisted: status=%+v conditions=%+v", its.Status.InstanceStatus, its.Status.Conditions)
 	}
@@ -3250,6 +3257,8 @@ func TestInstanceSetLifecycleMemberOnlyExecutesGeneratedAgentActions(t *testing.
 	if err := cli.Update(ctx, its); err != nil {
 		t.Fatal(err)
 	}
+	step()
+	step()
 	step()
 	if ptr.Deref(its.FindInstanceStatus(target.Name).MemberJoined, true) || len(lifecycleEntryPods(t, cli)) != 2 {
 		t.Fatal("real agent leave completion was not committed before runtime removal")
@@ -3663,6 +3672,8 @@ func TestInstanceSetLeaveSkipsUnprovisionedAllocation(t *testing.T) {
 			if err := f.cli.Update(ctx, f.its); err != nil {
 				t.Fatal(err)
 			}
+			f.step(t)
+			f.step(t)
 			for round := 0; round < 24; round++ {
 				f.stepWithChildren(t)
 				if len(lifecycleEntryPods(t, f.cli)) != 0 {
@@ -3838,6 +3849,7 @@ func TestInstanceSetLifecycleReachesUpdateAndPollsSuccessfulExits(t *testing.T) 
 			if err := f.cli.Update(context.Background(), f.its); err != nil {
 				t.Fatal(err)
 			}
+			f.step(t)
 			if result := f.step(t); result.RequeueAfter != 5*time.Second {
 				t.Fatalf("successful OnDelete exit lost observation poll: %#v", result)
 			}
@@ -3885,6 +3897,7 @@ func TestInstanceSetLifecyclePollsUnalignedUpdateExit(t *testing.T) {
 				t.Fatal(err)
 			}
 			f.step(t)
+			f.step(t)
 			if result := f.step(t); result.RequeueAfter != 5*time.Second {
 				t.Fatalf("unaligned update exit lost observation poll: %#v", result)
 			}
@@ -3897,6 +3910,7 @@ func TestInstanceSetLifecyclePollsUnalignedUpdateExit(t *testing.T) {
 
 func TestITS2LifecycleInstanceWithoutRuntimeIsNotProvisioned(t *testing.T) {
 	its, cli, r := its2LifecycleFixture(t, 1)
+	its2LifecycleRound(t, r, its)
 	its2LifecycleRound(t, r, its)
 	its2LifecycleRound(t, r, its)
 	child := its2LifecycleInstance(t, cli, "lifecycle-0")
@@ -3916,6 +3930,8 @@ func TestITS2LifecycleInstanceWithoutRuntimeIsNotProvisioned(t *testing.T) {
 	agent := &its2LifecycleAgent{}
 	kbacli.SetMockClient(agent, nil)
 	defer kbacli.UnsetMockClient()
+	its2LifecycleRound(t, r, its)
+	its2LifecycleRound(t, r, its)
 	its2LifecycleRound(t, r, its)
 	if len(agent.calls) != 0 || !ptr.Deref(its2LifecycleInstance(t, cli, child.Name).Spec.ScaledDown, false) {
 		t.Fatalf("unprovisioned identity required an invented Leave: %v", agent.calls)
@@ -3939,6 +3955,8 @@ func TestInstanceSetLifecycleAllocationSwitchSeparatesCreationAndMemberResult(t 
 			if len(agent.calls) != 0 || len(lifecycleEntryPods(t, f.cli)) != 2 {
 				t.Fatal("registration changed runtime or membership")
 			}
+			f.step(t)
+			f.step(t)
 			f.step(t)
 			if len(agent.calls) != 0 {
 				t.Fatal("member action shared an uncommitted creation round")
@@ -7287,6 +7305,77 @@ func TestInstanceSetLifecycleOnlineAfterOfflineFollowsDataRetention(t *testing.T
 				}
 				if instanceAPI && !ptr.Deref(its2LifecycleInstance(t, f.cli, name).Status.DataLoaded, false) {
 					t.Fatal("child did not commit data completion")
+				}
+			})
+		}
+	}
+}
+
+func TestInstanceSetLifecycleTargetCommitPrecedesRetirement(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		for _, target := range []string{"released", "offline", "stop"} {
+			t.Run(fmt.Sprintf("instanceAPI=%t/%s", instanceAPI, target), func(t *testing.T) {
+				f := newMemberLifecycleEntry(t, instanceAPI, 1, appsv1.ParallelPodManagement)
+				f.bootstrap(t, 1)
+				name := f.its.Name + "-0"
+				agent := &its2LifecycleAgent{}
+				kbacli.SetMockClient(agent, nil)
+				defer kbacli.UnsetMockClient()
+				switch target {
+				case "released":
+					f.its.Spec.Replicas = ptr.To[int32](0)
+				case "offline":
+					f.its.Spec.OfflineInstances = []string{name}
+					f.its.Spec.Replicas = ptr.To[int32](0)
+				case "stop":
+					f.its.Spec.Stop = ptr.To(true)
+				}
+				f.its.Generation++
+				if err := f.cli.Update(context.Background(), f.its); err != nil {
+					t.Fatal(err)
+				}
+				original := f.cli
+				if wrapped, ok := original.(*its2LifecycleClient); ok {
+					original = wrapped.Client
+				}
+				reject := true
+				f.cli = interceptor.NewClient(original.(client.WithWatch), interceptor.Funcs{SubResourceUpdate: func(ctx context.Context, cli client.Client, subresource string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+					if _, ok := obj.(*workloads.InstanceSet); ok && subresource == "status" && reject {
+						return apierrors.NewConflict(schema.GroupResource{Group: workloads.GroupVersion.Group, Resource: "instancesets"}, obj.GetName(), fmt.Errorf("target commit conflict"))
+					}
+					return cli.SubResource(subresource).Update(ctx, obj, opts...)
+				}})
+				assertRuntime := func() {
+					t.Helper()
+					pods := lifecycleEntryPods(t, f.cli)
+					if len(agent.calls) != 0 || len(pods) != 1 || !pods[0].DeletionTimestamp.IsZero() {
+						t.Fatalf("uncommitted target caused retirement: calls=%v pods=%#v", agent.calls, pods)
+					}
+					if instanceAPI {
+						child := its2LifecycleInstance(t, f.cli, name)
+						if ptr.Deref(child.Spec.ScaledDown, false) || ptr.Deref(child.Spec.Stop, false) || !child.DeletionTimestamp.IsZero() {
+							t.Fatalf("uncommitted target changed child: %#v", child)
+						}
+					}
+				}
+				f.step(t)
+				assertRuntime()
+				reject = false
+				f.step(t)
+				assertRuntime()
+				reject = true
+				f.step(t)
+				assertRuntime()
+				reject = false
+				f.step(t)
+				assertRuntime()
+				want := workloads.InstanceDesiredStateOffline
+				if target == "released" {
+					want = workloads.InstanceDesiredStateReleased
+				}
+				status := f.its.FindInstanceStatus(name)
+				if status == nil || status.EffectiveDesiredState() != want || status.EffectiveCurrentState() != workloads.InstanceCurrentStatePresent {
+					t.Fatalf("target did not commit independently of runtime: %#v", status)
 				}
 			})
 		}

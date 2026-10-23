@@ -64,6 +64,7 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	previous := its.DeepCopy().Status.InstanceStatus
 	summarizeStatus := model.IsObjectStatusUpdating(its)
 	if lifecycleStatusEnabled(its) {
 		if result, err := observeLifecycleStatus(tree); err != nil || result != kubebuilderx.Continue {
@@ -224,6 +225,9 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	// 4. set instance status
 	if err = setInstanceStatus(tree, its, podList); err != nil {
 		return kubebuilderx.Continue, err
+	}
+	if lifecycleStatusEnabled(its) && workloadlifecycle.CriticalStatusChanged(previous, its.Status.InstanceStatus) {
+		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 
 	if !stopping && its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {

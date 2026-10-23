@@ -2491,6 +2491,7 @@ func checkITS2LifecycleLeaveCommitAndSpecReversal(t *testing.T, storage client.C
 	its, cli, r := its2LifecycleFixture(t, 1, storage)
 	its2LifecycleRound(t, r, its)
 	its2LifecycleRound(t, r, its)
+	its2LifecycleRound(t, r, its)
 	inst := its2LifecycleInstance(t, cli, "lifecycle-0")
 	inst.Status.CurrentState = workloads.InstanceCurrentStatePresent
 	inst.Status.Ready = true
@@ -2518,6 +2519,8 @@ func checkITS2LifecycleLeaveCommitAndSpecReversal(t *testing.T, storage client.C
 	agent := &its2LifecycleAgent{}
 	kbacli.SetMockClient(agent, nil)
 	defer kbacli.UnsetMockClient()
+	its2LifecycleRound(t, r, its)
+	its2LifecycleRound(t, r, its)
 	cli.failStatus = true
 	its2LifecycleRound(t, r, its)
 	inst = its2LifecycleInstance(t, cli, "lifecycle-0")
@@ -2541,6 +2544,8 @@ func checkITS2LifecycleLeaveCommitAndSpecReversal(t *testing.T, storage client.C
 	if err := cli.Update(context.Background(), stored); err != nil {
 		t.Fatal(err)
 	}
+	its2LifecycleRound(t, r, its)
+	its2LifecycleRound(t, r, its)
 	its2LifecycleRound(t, r, its)
 	stored = its2LifecycleRead(t, cli, its)
 	inst = its2LifecycleInstance(t, cli, "lifecycle-0")
@@ -2589,6 +2594,7 @@ func TestITS2LifecycleOfflineDoesNotLeaveMember(t *testing.T) {
 	its, cli, r := its2LifecycleFixture(t, 1)
 	its2LifecycleRound(t, r, its)
 	its2LifecycleRound(t, r, its)
+	its2LifecycleRound(t, r, its)
 	stored := its2LifecycleRead(t, cli, its)
 	stored.Status.InstanceStatus[0].MemberJoined = ptr.To(true)
 	stored.Status.InstanceStatus[0].Provisioned = true
@@ -2631,6 +2637,7 @@ func TestITS2LifecycleAbsentBootstrapMemberStillNeedsLeave(t *testing.T) {
 	its, cli, r := its2LifecycleFixture(t, 1)
 	its2LifecycleRound(t, r, its)
 	its2LifecycleRound(t, r, its)
+	its2LifecycleRound(t, r, its)
 	stored := its2LifecycleRead(t, cli, its)
 	stored.Status.InstanceStatus[0].Provisioned = true
 	if err := cli.Status().Update(context.Background(), stored); err != nil {
@@ -2655,6 +2662,7 @@ func TestITS2LifecycleAbsentBootstrapMemberStillNeedsLeave(t *testing.T) {
 
 func TestITS2LifecycleBootstrapInstanceStatusPrecedesLeave(t *testing.T) {
 	its, cli, r := its2LifecycleFixture(t, 1)
+	its2LifecycleRound(t, r, its)
 	its2LifecycleRound(t, r, its)
 	its2LifecycleRound(t, r, its)
 	inst := its2LifecycleInstance(t, cli, "lifecycle-0")
@@ -2696,6 +2704,8 @@ func TestITS2LifecycleBootstrapInstanceStatusPrecedesLeave(t *testing.T) {
 	if len(agent.calls) != 0 || !stored.FindInstanceStatus(inst.Name).Provisioned || ptr.Deref(its2LifecycleInstance(t, cli, inst.Name).Spec.ScaledDown, false) {
 		t.Fatalf("runtime observation was not committed before membership: calls=%v status=%#v", agent.calls, stored.Status.InstanceStatus)
 	}
+	its2LifecycleRound(t, r, its)
+	its2LifecycleRound(t, r, its)
 	its2LifecycleRound(t, r, its)
 	stored = its2LifecycleRead(t, cli, its)
 	if len(agent.calls) != 1 || agent.calls[0] != "memberLeave" {
@@ -3182,4 +3192,38 @@ type dataCommitWriter struct {
 
 func (w *dataCommitWriter) Update(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
 	return w.owner.update(ctx, w.owner.Client, "status", obj, opts...)
+}
+
+func TestITS2LifecycleStopPublishesTargetBeforeChildObservation(t *testing.T) {
+	f := newMemberLifecycleEntry(t, true, 1, appsv1.ParallelPodManagement)
+	for round := 0; round < 12 && len(lifecycleEntryPods(t, f.cli)) == 0; round++ {
+		f.stepWithChildren(t)
+	}
+	pods := lifecycleEntryPods(t, f.cli)
+	if len(pods) != 1 {
+		t.Fatal("initial runtime was not created")
+	}
+	child := its2LifecycleInstance(t, f.cli, pods[0].Name)
+	if child.Status.CurrentState != workloads.InstanceCurrentStateAbsent {
+		t.Fatalf("fixture already observed runtime: %#v", child.Status)
+	}
+	f.its.Spec.Stop = ptr.To(true)
+	f.its.Generation++
+	if err := f.cli.Update(context.Background(), f.its); err != nil {
+		t.Fatal(err)
+	}
+	for round := 0; round < 6; round++ {
+		f.step(t)
+		status := f.its.FindInstanceStatus(child.Name)
+		if status != nil && status.EffectiveDesiredState() == workloads.InstanceDesiredStateOffline {
+			if ptr.Deref(its2LifecycleInstance(t, f.cli, child.Name).Spec.Stop, false) {
+				t.Fatal("child stopped in target commit round")
+			}
+			if len(lifecycleEntryPods(t, f.cli)) != 1 {
+				t.Fatal("target commit removed runtime")
+			}
+			return
+		}
+	}
+	t.Fatalf("unobserved child prevented Stop target publication: %#v", f.its.Status)
 }

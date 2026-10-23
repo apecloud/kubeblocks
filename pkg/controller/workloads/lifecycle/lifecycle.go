@@ -447,15 +447,24 @@ func Action(name string, action *apps.Action) *proto.Action {
 // CriticalStatusChanged reports facts that must be committed before changing runtime inputs or membership.
 // Ordinary health, revision, and progress observations do not stop the reconciliation chain.
 func CriticalStatusChanged(previous, current []workloads.InstanceStatus) bool {
+	if len(previous) != len(current) {
+		return true
+	}
 	for _, status := range current {
+		found := false
 		for _, old := range previous {
 			if status.PodName != old.PodName {
 				continue
 			}
-			if status.Provisioned != old.Provisioned || !sameBoolResult(status.DataLoaded, old.DataLoaded) || !sameBoolResult(status.MemberJoined, old.MemberJoined) {
+			found = true
+			if status.EffectiveDesiredState() != old.EffectiveDesiredState() || !ptr.Equal(status.TemplateName, old.TemplateName) ||
+				status.Provisioned != old.Provisioned || !sameBoolResult(status.DataLoaded, old.DataLoaded) || !sameBoolResult(status.MemberJoined, old.MemberJoined) {
 				return true
 			}
 			break
+		}
+		if !found {
+			return true
 		}
 	}
 	return false

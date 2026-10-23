@@ -63,6 +63,7 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	previous := its.DeepCopy().Status.InstanceStatus
 	summarizeStatus := model.IsObjectStatusUpdating(its)
 	if lifecycleStatusEnabled(its) {
 		if result, err := observeLifecycleStatus(tree); err != nil || result != kubebuilderx.Continue {
@@ -200,6 +201,9 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	// 4. set instance status
 	if err := setInstanceStatus(tree, its, instanceList); err != nil {
 		return kubebuilderx.Continue, err
+	}
+	if lifecycleStatusEnabled(its) && workloadlifecycle.CriticalStatusChanged(previous, its.Status.InstanceStatus) {
+		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 
 	pendingLifecycle := isStopRequested(its)
@@ -392,12 +396,6 @@ func buildFailureCondition(its *workloads.InstanceSet, instances []*workloads.In
 }
 
 func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, instances []*workloads.Instance) error {
-	for _, inst := range instances {
-		if (isStopRequested(its) || ptr.Deref(inst.Spec.Stop, false)) &&
-			(inst.Status.CurrentState == "" || (inst.Status.CurrentState == workloads.InstanceCurrentStateAbsent && !hasObservedStoppedRuntime(inst))) {
-			return nil
-		}
-	}
 	desiredAssignments, templateNames, err := instancetemplate.BuildAssignments(tree, its)
 	if err != nil {
 		return err
@@ -485,6 +483,15 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 			}
 			observations = append(observations, observation)
 		case workloads.InstanceCurrentStateAbsent, "":
+			if (isStopRequested(its) || ptr.Deref(inst.Spec.Stop, false)) && !hasObservedStoppedRuntime(inst) {
+				if previous := its.FindInstanceStatus(inst.Name); previous != nil && previous.EffectiveCurrentState() != workloads.InstanceCurrentStateAbsent {
+					observations = append(observations, instancestatus.Observation{
+						InstanceName: inst.Name, State: previous.EffectiveCurrentState(), Revision: previous.CurrentRevision,
+						UpToDate: previous.UpToDate, Ready: previous.Ready, Available: previous.Available,
+						Failed: previous.Failed, Role: previous.Role, Configs: previous.Configs, VolumeExpansion: previous.VolumeExpansion,
+					})
+				}
+			}
 		default:
 			return fmt.Errorf("instance %q has invalid current state %q", inst.Name, inst.Status.CurrentState)
 		}

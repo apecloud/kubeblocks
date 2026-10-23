@@ -518,3 +518,36 @@ func TestInitialDataSatisfactionRequiresObservedNoCopyRuntime(t *testing.T) {
 		})
 	}
 }
+
+func TestCompletedDataStillWaitsForMinReadySeconds(t *testing.T) {
+	inst := &workloads.Instance{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Namespace: "default"},
+		Spec: workloads.InstanceSpec{
+			MinReadySeconds: 3600,
+			LifecycleActions: &workloads.LifecycleActions{
+				DataDump: &kbappsv1.Action{}, DataLoad: &kbappsv1.Action{},
+			},
+		},
+	}
+	pod := readyPod("current")
+	pod.ObjectMeta = inst.ObjectMeta
+	pod.Status.Conditions[0].LastTransitionTime = metav1.Now()
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(inst)
+	if err := tree.Add(pod); err != nil {
+		t.Fatal(err)
+	}
+	result, err := NewStatusReconciler().Reconcile(tree)
+	if err != nil || result != kubebuilderx.RetryAfter(time.Second) || !ptr.Deref(inst.Status.DataLoaded, false) {
+		t.Fatalf("initial data result was not recorded separately: result=%#v status=%#v err=%v", result, inst.Status, err)
+	}
+	result, err = NewStatusReconciler().Reconcile(tree)
+	if err != nil || result != kubebuilderx.RetryAfter(time.Second) || !inst.Status.Ready || inst.Status.Available {
+		t.Fatalf("completed data skipped readiness countdown: result=%#v status=%#v err=%v", result, inst.Status, err)
+	}
+	pod.Status.Conditions[0].LastTransitionTime = metav1.NewTime(time.Now().Add(-2 * time.Hour))
+	result, err = NewStatusReconciler().Reconcile(tree)
+	if err != nil || result != kubebuilderx.Continue || !inst.Status.Ready || !inst.Status.Available {
+		t.Fatalf("elapsed readiness countdown did not make the Instance available: result=%#v status=%#v err=%v", result, inst.Status, err)
+	}
+}

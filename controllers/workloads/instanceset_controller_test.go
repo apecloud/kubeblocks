@@ -6310,8 +6310,16 @@ func TestInstanceSetCompletedWorkerSurvivesDonorRebuild(t *testing.T) {
 func TestInstanceSetCompletedDataWorkerRestartRecovers(t *testing.T) {
 	for _, instanceAPI := range []bool{false, true} {
 		for _, onDelete := range []bool{false, true} {
-			for _, waiting := range []bool{false, true} {
-				t.Run(fmt.Sprintf("instanceAPI=%t/onDelete=%t/waiting=%t", instanceAPI, onDelete, waiting), func(t *testing.T) {
+			for _, scenario := range []struct {
+				waiting         bool
+				minReadySeconds int32
+			}{
+				{waiting: false},
+				{waiting: true},
+				{waiting: false, minReadySeconds: 1},
+				{waiting: true, minReadySeconds: 1},
+			} {
+				t.Run(fmt.Sprintf("instanceAPI=%t/onDelete=%t/waiting=%t/minReadySeconds=%d", instanceAPI, onDelete, scenario.waiting, scenario.minReadySeconds), func(t *testing.T) {
 					ctx := context.Background()
 					listener, err := net.Listen("tcp", "127.0.0.1:0")
 					if err != nil {
@@ -6423,13 +6431,49 @@ func TestInstanceSetCompletedDataWorkerRestartRecovers(t *testing.T) {
 					if err != nil || task == "" || !strings.Contains(task, "127.0.0.1") {
 						t.Fatalf("target did not retain the old donor task: %q %v", task, err)
 					}
+					if scenario.minReadySeconds > 0 {
+						f.its.Spec.MinReadySeconds = scenario.minReadySeconds
+						f.its.Generation++
+						if err := f.cli.Update(ctx, f.its); err != nil {
+							t.Fatal(err)
+						}
+						for _, podKey := range []client.ObjectKey{donorKey, key} {
+							observed := &corev1.Pod{}
+							if err := f.cli.Get(ctx, podKey, observed); err != nil {
+								t.Fatal(err)
+							}
+							for i := range observed.Status.Conditions {
+								if observed.Status.Conditions[i].Type == corev1.PodReady {
+									observed.Status.Conditions[i].LastTransitionTime = metav1.NewTime(time.Now().Add(-time.Minute))
+								}
+							}
+							if err := f.cli.Status().Update(ctx, observed); err != nil {
+								t.Fatal(err)
+							}
+						}
+						for i := 0; i < 8; i++ {
+							f.stepWithChildren(t)
+						}
+						if f.its.Status.AvailableReplicas != 2 {
+							t.Fatalf("readiness countdown did not converge before the restart: %#v", f.its.Status)
+						}
+						if instanceAPI {
+							child := its2LifecycleInstance(t, f.cli, key.Name)
+							if child.Spec.MinReadySeconds != scenario.minReadySeconds || child.Status.ObservedGeneration != child.Generation || !ptr.Deref(child.Status.DataLoaded, false) || !child.Status.Available {
+								t.Fatalf("readiness configuration did not converge before the restart: spec=%#v status=%#v", child.Spec, child.Status)
+							}
+						}
+						if err := f.cli.Get(ctx, key, target); err != nil {
+							t.Fatal(err)
+						}
+					}
 					target.Status.Phase = corev1.PodPending
 					target.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionFalse}}
 					worker := &target.Status.InitContainerStatuses[0]
 					worker.LastTerminationState = worker.State
 					worker.State = corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 1}}
 					worker.RestartCount = 1
-					if waiting {
+					if scenario.waiting {
 						worker.LastTerminationState = worker.State
 						worker.State = corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: "CrashLoopBackOff"}}
 						worker.RestartCount++

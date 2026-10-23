@@ -5771,6 +5771,10 @@ func TestInstanceSetLifecycleDataResultRetryAndCleanup(t *testing.T) {
 			if err != nil || before == "" {
 				t.Fatalf("missing pending task: %s %v", before, err)
 			}
+			pod.UID = "uncommitted-worker-result"
+			if err := f.cli.Update(ctx, pod); err != nil {
+				t.Fatal(err)
+			}
 			f.its.Spec.MinReadySeconds = 5
 			if err := f.cli.Update(ctx, f.its); err != nil {
 				t.Fatal(err)
@@ -5785,6 +5789,7 @@ func TestInstanceSetLifecycleDataResultRetryAndCleanup(t *testing.T) {
 			if err := f.cli.Status().Update(ctx, source); err != nil {
 				t.Fatal(err)
 			}
+			pod.Status.Phase = corev1.PodPending
 			pod.Status.InitContainerStatuses = []corev1.ContainerStatus{{Name: kbagent.ContainerName4Worker, State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 1}}}}
 			if err := f.cli.Status().Update(ctx, pod); err != nil {
 				t.Fatal(err)
@@ -5810,6 +5815,9 @@ func TestInstanceSetLifecycleDataResultRetryAndCleanup(t *testing.T) {
 			}
 			if err := f.cli.Get(ctx, key, pod); err != nil {
 				t.Fatal(err)
+			}
+			if pod.UID != "uncommitted-worker-result" {
+				t.Fatal("failed result commit replaced the task Pod")
 			}
 			if task, err := generatedDataTask(&pod.Spec); err != nil || task != before {
 				t.Fatalf("pending task changed: %s %v", task, err)
@@ -6201,6 +6209,188 @@ func TestInstanceSetCompletedWorkerSurvivesDonorRebuild(t *testing.T) {
 				t.Fatalf("completed Running target stranded: calls=%v status=%+v", agent.calls, f.its.FindInstanceStatus(targetKey.Name))
 			}
 		})
+	}
+}
+
+func TestInstanceSetCompletedDataWorkerRestartRecovers(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		for _, onDelete := range []bool{false, true} {
+			for _, waiting := range []bool{false, true} {
+				t.Run(fmt.Sprintf("instanceAPI=%t/onDelete=%t/waiting=%t", instanceAPI, onDelete, waiting), func(t *testing.T) {
+					ctx := context.Background()
+					listener, err := net.Listen("tcp", "127.0.0.1:0")
+					if err != nil {
+						t.Fatal(err)
+					}
+					t.Cleanup(func() { _ = listener.Close() })
+					f := newDataLifecycleEntry(t, instanceAPI, 1, appsv1.ParallelPodManagement)
+					f.cli = &dataPVCUIDClient{Client: f.cli}
+					dataPath := filepath.Join(t.TempDir(), "copied-data")
+					f.its.Spec.Template.Spec.Containers[1].Ports[1].ContainerPort = int32(listener.Addr().(*net.TCPAddr).Port)
+					f.its.Spec.LifecycleActions.DataDump.Exec.Command = []string{"sh", "-c", "printf 'retained data'"}
+					f.its.Spec.LifecycleActions.DataLoad.Exec.Command = []string{"sh", "-c", `cat > "$DATA_PATH"`}
+					f.its.Spec.LifecycleActions.TemplateVars = map[string]string{"DATA_PATH": dataPath}
+					if onDelete {
+						f.its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{Type: kbappsv1.OnDeleteStrategyType}
+					}
+					if err := f.cli.Update(ctx, f.its); err != nil {
+						t.Fatal(err)
+					}
+					f.bootstrap(t, 1)
+					donorKey := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-0"}
+					donor := &corev1.Pod{}
+					if err := f.cli.Get(ctx, donorKey, donor); err != nil {
+						t.Fatal(err)
+					}
+					donor.Status.PodIP = "127.0.0.1"
+					if err := f.cli.Status().Update(ctx, donor); err != nil {
+						t.Fatal(err)
+					}
+					f.its.Spec.Replicas = ptr.To[int32](2)
+					f.its.Generation++
+					if err := f.cli.Update(ctx, f.its); err != nil {
+						t.Fatal(err)
+					}
+					for i := 0; i < 12; i++ {
+						f.stepWithChildren(t)
+					}
+					key := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-1"}
+					target := &corev1.Pod{}
+					if err := f.cli.Get(ctx, key, target); err != nil {
+						t.Fatal(err)
+					}
+					target.UID = "completed-task-target"
+					if err := f.cli.Update(ctx, target); err != nil {
+						t.Fatal(err)
+					}
+					claimName, err := lifecycleTestDataPVCName(target)
+					if err != nil {
+						t.Fatal(err)
+					}
+					claimKey := client.ObjectKey{Namespace: key.Namespace, Name: claimName}
+					claim := &corev1.PersistentVolumeClaim{}
+					if err := f.cli.Get(ctx, claimKey, claim); err != nil {
+						t.Fatal(err)
+					}
+					claimUID := claim.UID
+					if err := runLifecycleDataWorker(t, listener, donor, target, "0"); err != nil {
+						t.Fatal(err)
+					}
+					markDataWorkerComplete(t, f.cli, key)
+					if err := f.cli.Get(ctx, key, target); err != nil {
+						t.Fatal(err)
+					}
+					target.Status.Phase = corev1.PodPending
+					if err := f.cli.Status().Update(ctx, target); err != nil {
+						t.Fatal(err)
+					}
+					for i := 0; i < 8; i++ {
+						f.stepWithChildren(t)
+					}
+					if !ptr.Deref(f.its.FindInstanceStatus(key.Name).DataLoaded, false) {
+						t.Fatal("controller did not commit successful worker result")
+					}
+					if err := f.cli.Get(ctx, key, target); err != nil || target.UID != "completed-task-target" {
+						t.Fatalf("successful worker's first Pending window replaced the Pod: %v", err)
+					}
+					agent := &its2LifecycleAgent{}
+					kbacli.SetMockClient(agent, nil)
+					defer kbacli.UnsetMockClient()
+					f.setReady(t, key.Name, true)
+					for i := 0; i < 8; i++ {
+						f.stepWithChildren(t)
+					}
+					donor.Finalizers = nil
+					if err := f.cli.Update(ctx, donor); err != nil {
+						t.Fatal(err)
+					}
+					if err := f.cli.Delete(ctx, donor); err != nil {
+						t.Fatal(err)
+					}
+					for i := 0; i < 8; i++ {
+						f.stepWithChildren(t)
+					}
+					f.setReady(t, donorKey.Name, true)
+					if err := f.cli.Get(ctx, donorKey, donor); err != nil {
+						t.Fatal(err)
+					}
+					donor.Status.PodIP = "10.0.0.9"
+					if err := f.cli.Status().Update(ctx, donor); err != nil {
+						t.Fatal(err)
+					}
+					for i := 0; i < 8; i++ {
+						f.stepWithChildren(t)
+					}
+					if err := f.cli.Get(ctx, key, target); err != nil || target.UID != "completed-task-target" {
+						t.Fatalf("donor rebuild replaced the completed Running target: %v", err)
+					}
+					task, err := generatedDataTask(&target.Spec)
+					if err != nil || task == "" || !strings.Contains(task, "127.0.0.1") {
+						t.Fatalf("target did not retain the old donor task: %q %v", task, err)
+					}
+					target.Status.Phase = corev1.PodPending
+					target.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionFalse}}
+					worker := &target.Status.InitContainerStatuses[0]
+					worker.LastTerminationState = worker.State
+					worker.State = corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 1}}
+					worker.RestartCount = 1
+					if waiting {
+						worker.LastTerminationState = worker.State
+						worker.State = corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: "CrashLoopBackOff"}}
+						worker.RestartCount++
+					}
+					if err := f.cli.Status().Update(ctx, target); err != nil {
+						t.Fatal(err)
+					}
+					for i := 0; i < 16; i++ {
+						f.stepWithChildren(t)
+					}
+					if err := f.cli.Get(ctx, key, target); err != nil {
+						t.Fatal(err)
+					}
+					if target.UID == "completed-task-target" {
+						t.Fatal("completed task left restarted worker blocked on the obsolete donor")
+					}
+					if task, err := generatedDataTask(&target.Spec); err != nil || task != "" {
+						t.Fatalf("recovered Pod retained completed task: %q %v", task, err)
+					}
+					if name, err := lifecycleTestDataPVCName(target); err != nil || name != claimName {
+						t.Fatalf("recovery changed the data claim: %q %v", name, err)
+					}
+					if err := f.cli.Get(ctx, claimKey, claim); err != nil || claim.UID != claimUID || !claim.DeletionTimestamp.IsZero() {
+						t.Fatalf("recovery retired retained storage: %v", err)
+					}
+					if data, err := os.ReadFile(dataPath); err != nil || string(data) != "retained data" {
+						t.Fatalf("recovery changed loaded bytes: %q %v", data, err)
+					}
+					target.UID = "recovered-task-target"
+					if err := f.cli.Update(ctx, target); err != nil {
+						t.Fatal(err)
+					}
+					target.Status.Phase = corev1.PodPending
+					if err := f.cli.Status().Update(ctx, target); err != nil {
+						t.Fatal(err)
+					}
+					for i := 0; i < 4; i++ {
+						f.stepWithChildren(t)
+					}
+					if err := f.cli.Get(ctx, key, target); err != nil || target.UID != "recovered-task-target" {
+						t.Fatalf("repeated recovery replaced the task-free Pending Pod: %v", err)
+					}
+					f.setReady(t, key.Name, true)
+					for i := 0; i < 8; i++ {
+						f.stepWithChildren(t)
+					}
+					if err := f.cli.Get(ctx, key, target); err != nil || target.UID != "recovered-task-target" {
+						t.Fatalf("repeated recovery replaced the task-free Pod: %v", err)
+					}
+					status := f.its.FindInstanceStatus(key.Name)
+					if !ptr.Deref(status.DataLoaded, false) || !status.Ready || !ptr.Deref(status.MemberJoined, false) {
+						t.Fatalf("recovered target did not become ready with committed data: %+v", status)
+					}
+				})
+			}
+		}
 	}
 }
 

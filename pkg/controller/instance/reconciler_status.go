@@ -162,7 +162,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 	inst.Status.Configs = configs
 
-	if !stopped && inst.Spec.MinReadySeconds > 0 && !available && (ready || inst.Status.DataLoaded == nil || *inst.Status.DataLoaded) {
+	if !stopped && inst.Spec.MinReadySeconds > 0 && !available && (ready || inst.Status.DataLoaded == nil) {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	return kubebuilderx.Continue, nil

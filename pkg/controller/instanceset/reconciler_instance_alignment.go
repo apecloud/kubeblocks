@@ -327,7 +327,10 @@ var _ kubebuilderx.Reconciler = &instanceAlignmentReconciler{}
 
 func recreatePendingDataPod(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
 	status := workloadlifecycle.Status(its, pod.Name)
-	if !workloadlifecycle.HasData(its) || status == nil || status.DataLoaded == nil || *status.DataLoaded || pod.Status.Phase != corev1.PodPending || model.IsObjectDeleting(pod) {
+	if !workloadlifecycle.HasData(its) || status == nil || status.DataLoaded == nil || pod.Status.Phase != corev1.PodPending || model.IsObjectDeleting(pod) {
+		return false, nil
+	}
+	if *status.DataLoaded && workloadlifecycle.DataWorkerSucceeded(pod) {
 		return false, nil
 	}
 

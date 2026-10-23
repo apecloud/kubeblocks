@@ -300,8 +300,15 @@ func buildBlockedCondition(inst *workloads.Instance, message string) *metav1.Con
 
 // A pending Pod cannot receive changed init task inputs in place.
 func needsDataTaskPodReplacement(inst *workloads.Instance, pod *corev1.Pod) (bool, error) {
-	if ptr.Deref(inst.Status.DataLoaded, false) {
+	if model.IsObjectDeleting(pod) {
 		return false, nil
+	}
+	if ptr.Deref(inst.Status.DataLoaded, false) {
+		if workloadlifecycle.DataWorkerSucceeded(pod) {
+			return false, nil
+		}
+		task, err := workloadlifecycle.DataTask(&pod.Spec, pod.Name)
+		return task != nil, err
 	}
 	desired, err := buildInstancePod(inst, "")
 	if err != nil {

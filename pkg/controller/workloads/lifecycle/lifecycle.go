@@ -178,10 +178,7 @@ func ObserveData(status *workloads.InstanceStatus, pod *corev1.Pod) (bool, error
 	if err != nil || task == nil {
 		return false, err
 	}
-	complete := slices.ContainsFunc(pod.Status.InitContainerStatuses, func(s corev1.ContainerStatus) bool {
-		return s.Name == kbagent.ContainerName4Worker && s.State.Terminated != nil && s.State.Terminated.ExitCode == 0
-	})
-	if complete {
+	if DataWorkerSucceeded(pod) {
 		status.DataLoaded = ptr.To(true)
 		return true, nil
 	}
@@ -190,6 +187,13 @@ func ObserveData(status *workloads.InstanceStatus, pod *corev1.Pod) (bool, error
 		return true, nil
 	}
 	return false, nil
+}
+
+// DataWorkerSucceeded reports whether the current data worker terminated successfully.
+func DataWorkerSucceeded(pod *corev1.Pod) bool {
+	return slices.ContainsFunc(pod.Status.InitContainerStatuses, func(s corev1.ContainerStatus) bool {
+		return s.Name == kbagent.ContainerName4Worker && s.State.Terminated != nil && s.State.Terminated.ExitCode == 0
+	})
 }
 
 func generatedDataTask(task proto.Task, name string) bool {

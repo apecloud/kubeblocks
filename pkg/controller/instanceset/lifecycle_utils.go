@@ -166,10 +166,11 @@ func reconcileMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, 
 }
 
 func lifecycleWait(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, err error) (kubebuilderx.Result, error) {
-	meta.SetStatusCondition(&its.Status.Conditions, metav1.Condition{Type: "InstanceLifecycle", Status: metav1.ConditionFalse, ObservedGeneration: its.Generation, Reason: "Waiting", Message: err.Error()})
-	if tree.EventRecorder != nil {
+	previous := meta.FindStatusCondition(its.Status.Conditions, "InstanceLifecycle")
+	if tree.EventRecorder != nil && (previous == nil || previous.Message != err.Error()) {
 		tree.EventRecorder.Event(its, corev1.EventTypeWarning, "InstanceLifecycle", err.Error())
 	}
+	meta.SetStatusCondition(&its.Status.Conditions, metav1.Condition{Type: "InstanceLifecycle", Status: metav1.ConditionFalse, ObservedGeneration: its.Generation, Reason: "Waiting", Message: err.Error()})
 	return kubebuilderx.RetryAfter(2 * time.Second), nil
 }
 

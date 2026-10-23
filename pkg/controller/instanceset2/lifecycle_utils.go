@@ -34,6 +34,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -45,6 +46,9 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 	assignments, _, err := instancetemplate.BuildAssignments(tree, its)
 	if err != nil {
 		if instancetemplate.IsAssignmentIncomplete(err) {
+			if its.Generation != its.Status.ObservedGeneration {
+				return kubebuilderx.Continue, nil
+			}
 			return lifecycleWait(tree, its, err)
 		}
 		return kubebuilderx.Continue, err
@@ -85,7 +89,7 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 		}
 	}
 
-	if registered || childStatusChanged || workloadlifecycle.CriticalStatusChanged(previous, its.Status.InstanceStatus) {
+	if childStatusChanged || (!model.IsObjectStatusUpdating(its) && (registered || workloadlifecycle.CriticalStatusChanged(previous, its.Status.InstanceStatus))) {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	return kubebuilderx.Continue, nil

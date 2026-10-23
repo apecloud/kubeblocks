@@ -3373,6 +3373,7 @@ type lifecycleEntry struct {
 	cli         client.Client
 	its         *workloads.InstanceSet
 	instanceAPI bool
+	recorder    record.EventRecorder
 }
 
 func newMemberLifecycleEntry(t *testing.T, instanceAPI bool, replicas int32, policy appsv1.PodManagementPolicyType) *lifecycleEntry {
@@ -3401,11 +3402,15 @@ func (f *lifecycleEntry) step(t *testing.T) ctrl.Result {
 	req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(f.its)}
 	var result ctrl.Result
 	var err error
+	recorder := f.recorder
+	if recorder == nil {
+		recorder = record.NewFakeRecorder(100)
+	}
 	if f.instanceAPI {
-		r := &InstanceSetReconciler2{Client: f.cli, Scheme: f.cli.Scheme(), Recorder: record.NewFakeRecorder(100)}
+		r := &InstanceSetReconciler2{Client: f.cli, Scheme: f.cli.Scheme(), Recorder: recorder}
 		result, err = r.Reconcile(context.Background(), req)
 	} else {
-		r := &InstanceSetReconciler{Client: f.cli, Scheme: f.cli.Scheme(), Recorder: record.NewFakeRecorder(100)}
+		r := &InstanceSetReconciler{Client: f.cli, Scheme: f.cli.Scheme(), Recorder: recorder}
 		result, err = r.Reconcile(context.Background(), req)
 	}
 	if err != nil {
@@ -4223,6 +4228,96 @@ func TestInstanceSetLifecycleLeaveWaitsWithoutExecutor(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestInstanceSetLifecycleWarningOnlyWhenWaitMessageChanges(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		t.Run(fmt.Sprintf("instanceAPI=%t", instanceAPI), func(t *testing.T) {
+			ctx := context.Background()
+			f := newMemberLifecycleEntry(t, instanceAPI, 1, appsv1.ParallelPodManagement)
+			f.bootstrap(t, 1)
+			recorder := record.NewFakeRecorder(100)
+			f.recorder = recorder
+			failure := errors.New("member leave is unavailable")
+			calls := 0
+			agent := kbacli.NewMockClient(gomock.NewController(t))
+			agent.EXPECT().Action(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, req kbaproto.ActionRequest) (kbaproto.ActionResponse, error) {
+				if req.Action != "memberLeave" {
+					t.Fatalf("unexpected membership action: %s", req.Action)
+				}
+				calls++
+				return kbaproto.ActionResponse{}, failure
+			}).AnyTimes()
+			kbacli.SetMockClient(agent, nil)
+			defer kbacli.UnsetMockClient()
+			f.its.Spec.Replicas = ptr.To[int32](0)
+			f.its.Generation++
+			if err := f.cli.Update(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			name := f.its.Name + "-0"
+			reason, retryAfter := "InstanceLifecycle", 2*time.Second
+			if instanceAPI {
+				reason, retryAfter = "LifecycleWaiting", time.Second
+			}
+			assertWait := func(result ctrl.Result) string {
+				t.Helper()
+				condition := meta.FindStatusCondition(f.its.Status.Conditions, "InstanceLifecycle")
+				if condition == nil || condition.Status != metav1.ConditionFalse || condition.Reason != "Waiting" || condition.ObservedGeneration != f.its.Generation || !strings.Contains(condition.Message, failure.Error()) {
+					t.Fatalf("waiting did not persist the current lifecycle failure: %#v", condition)
+				}
+				if !result.Requeue || result.RequeueAfter != retryAfter || !workloadlifecycle.NeedsLeave(f.its, f.its.FindInstanceStatus(name)) || len(lifecycleEntryPods(t, f.cli)) != 1 {
+					t.Fatalf("waiting lost the pending Leave, runtime, or retry: status=%#v result=%#v", f.its.Status, result)
+				}
+				return condition.Message
+			}
+			assertWarnings := func(want ...string) {
+				t.Helper()
+				var got []string
+				for len(recorder.Events) > 0 {
+					event := <-recorder.Events
+					if strings.HasPrefix(event, corev1.EventTypeWarning+" ") {
+						got = append(got, event)
+					}
+				}
+				if !reflect.DeepEqual(got, want) {
+					t.Fatalf("lifecycle Warnings = %q, want %q", got, want)
+				}
+			}
+			var result ctrl.Result
+			for round := 0; round < 6 && calls == 0; round++ {
+				result = f.step(t)
+			}
+			message := assertWait(result)
+			for round := 0; round < 3; round++ {
+				if got := assertWait(f.step(t)); got != message {
+					t.Fatalf("unchanged failure changed the wait message: %q, want %q", got, message)
+				}
+			}
+			if calls != 4 {
+				t.Fatalf("waiting stopped retrying MemberLeave: %d calls", calls)
+			}
+			assertWarnings(corev1.EventTypeWarning + " " + reason + " " + message)
+			failure = errors.New("member leave executor lost leadership")
+			message = assertWait(f.step(t))
+			assertWait(f.step(t))
+			assertWarnings(corev1.EventTypeWarning + " " + reason + " " + message)
+			failure = nil
+			result = f.step(t)
+			status := f.its.FindInstanceStatus(name)
+			if !result.Requeue || result.RequeueAfter != time.Second || status == nil || status.MemberJoined == nil || *status.MemberJoined || meta.FindStatusCondition(f.its.Status.Conditions, "InstanceLifecycle") != nil {
+				t.Fatalf("successful Leave did not commit completion, clear the condition, and retry: status=%#v result=%#v conditions=%#v", status, result, f.its.Status.Conditions)
+			}
+			assertWarnings()
+			for round := 0; round < 6; round++ {
+				f.stepWithChildren(t)
+			}
+			if calls != 7 || len(lifecycleEntryPods(t, f.cli)) != 0 || f.its.FindInstanceStatus(name) != nil {
+				t.Fatalf("completed Leave did not converge without repeating the action: calls=%d status=%#v pods=%#v", calls, f.its.Status, lifecycleEntryPods(t, f.cli))
+			}
+			assertWarnings()
+		})
 	}
 }
 

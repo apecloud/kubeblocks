@@ -33,7 +33,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -345,9 +344,9 @@ func TestLifecycleRuntimeDiscoversRetainedPVCIdentity(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				retained := tree.Context.Value(retainedResourcesKey{}).(sets.Set[string])
-				if retained.Has(name) != tc.want {
-					t.Fatalf("retained=%v want=%t", retained, tc.want)
+				claimsByInstance := tree.Context.Value(lifecyclePVCsKey{}).(map[string][]*corev1.PersistentVolumeClaim)
+				if (len(claimsByInstance[name]) > 0) != tc.want {
+					t.Fatalf("claims=%v want=%t", claimsByInstance, tc.want)
 				}
 				if len(tree.List(&corev1.PersistentVolumeClaim{})) != 0 {
 					t.Fatal("parent took mutable ownership of observed claims")

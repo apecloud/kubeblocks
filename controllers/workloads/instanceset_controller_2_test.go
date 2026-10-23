@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -46,6 +47,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -2962,6 +2964,12 @@ func TestITS2LifecycleResumesPendingExpansion(t *testing.T) {
 			}
 			var retainedPVC *corev1.PersistentVolumeClaim
 			if tc.loaded {
+				for round := 0; round < 12; round++ {
+					step()
+					if err := cli.Get(ctx, client.ObjectKey{Namespace: its.Namespace, Name: "lifecycle-1"}, &corev1.Pod{}); err == nil {
+						break
+					}
+				}
 				retainedPVC = &corev1.PersistentVolumeClaim{}
 				if err := cli.Get(ctx, client.ObjectKey{Namespace: its.Namespace, Name: "data-lifecycle-1"}, retainedPVC); err != nil {
 					t.Fatal(err)
@@ -3226,4 +3234,99 @@ func TestITS2LifecycleStopPublishesTargetBeforeChildObservation(t *testing.T) {
 		}
 	}
 	t.Fatalf("unobserved child prevented Stop target publication: %#v", f.its.Status)
+}
+
+func TestITS2LifecycleRecoversWithoutChildDataResultNotification(t *testing.T) {
+	for _, retain := range []bool{false, true} {
+		t.Run(fmt.Sprintf("retain=%t", retain), func(t *testing.T) {
+			ctx := context.Background()
+			f := newDataLifecycleEntry(t, true, 2, appsv1.ParallelPodManagement)
+			if retain {
+				f.its.Spec.PersistentVolumeClaimRetentionPolicy = &workloads.PersistentVolumeClaimRetentionPolicy{WhenScaled: kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType}
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+			}
+			f.bootstrap(t, 2)
+			name := f.its.Name + "-0"
+			key := client.ObjectKey{Namespace: f.its.Namespace, Name: name}
+			oldClaims := &corev1.PersistentVolumeClaimList{}
+			if err := f.cli.List(ctx, oldClaims, client.MatchingLabels{constant.KBAppPodNameLabelKey: name}); err != nil {
+				t.Fatal(err)
+			}
+			if len(oldClaims.Items) != 1 || len(oldClaims.Items[0].OwnerReferences) == 0 {
+				t.Fatal("fixture has no child-owned claim")
+			}
+			f.its.Spec.Replicas = ptr.To[int32](1)
+			f.its.Spec.OfflineInstances = []string{name}
+			f.its.Generation++
+			if err := f.cli.Update(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			for round := 0; round < 12; round++ {
+				f.step(t)
+				if !its2LifecycleInstance(t, f.cli, name).DeletionTimestamp.IsZero() {
+					break
+				}
+			}
+			if its2LifecycleInstance(t, f.cli, name).DeletionTimestamp.IsZero() {
+				t.Fatal("Offline did not request child deletion")
+			}
+			leaf := &InstanceReconciler{Client: f.cli, Scheme: f.cli.Scheme(), Recorder: record.NewFakeRecorder(100)}
+			for round := 0; round < 16; round++ {
+				if _, err := leaf.Reconcile(ctx, ctrl.Request{NamespacedName: key}); err != nil {
+					t.Fatal(err)
+				}
+				if apierrors.IsNotFound(f.cli.Get(ctx, key, &workloads.Instance{})) {
+					break
+				}
+			}
+			if !apierrors.IsNotFound(f.cli.Get(ctx, key, &workloads.Instance{})) || !ptr.Deref(f.its.FindInstanceStatus(name).DataLoaded, false) {
+				t.Fatal("fixture did not skip child result notification")
+			}
+			storage := f.cli.(*its2LifecycleClient).Client.(client.WithWatch)
+			stale := true
+			f.cli = interceptor.NewClient(storage, interceptor.Funcs{List: func(ctx context.Context, delegate client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+				if err := delegate.List(ctx, list, opts...); err != nil {
+					return err
+				}
+				if claims, ok := list.(*corev1.PersistentVolumeClaimList); ok && stale {
+					options := (&client.ListOptions{}).ApplyOptions(opts)
+					if options.LabelSelector != nil && options.LabelSelector.Matches(labels.Set(oldClaims.Items[0].Labels)) {
+						claims.Items = append([]corev1.PersistentVolumeClaim(nil), oldClaims.Items...)
+					}
+				}
+				return nil
+			}})
+			f.its.Spec.Replicas = ptr.To[int32](2)
+			f.its.Spec.OfflineInstances = nil
+			f.its.Generation++
+			if err := f.cli.Update(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			for round := 0; round < 6; round++ {
+				f.step(t)
+			}
+			status := f.its.FindInstanceStatus(name)
+			if status == nil || status.EffectiveDesiredState() != workloads.InstanceDesiredStateActive || !apierrors.IsNotFound(f.cli.Get(ctx, key, &workloads.Instance{})) {
+				t.Fatalf("old owner observation was reused or blocked target: %#v", status)
+			}
+			stale = false
+			for round := 0; round < 16; round++ {
+				f.stepWithChildren(t)
+				if err := f.cli.Get(ctx, key, &corev1.Pod{}); err == nil {
+					break
+				}
+			}
+			pod := &corev1.Pod{}
+			if err := f.cli.Get(ctx, key, pod); err != nil {
+				t.Fatal(err)
+			}
+			task, err := workloadlifecycle.DataTask(&pod.Spec, name)
+			status = f.its.FindInstanceStatus(name)
+			if err != nil || status == nil || ptr.Deref(status.DataLoaded, false) != retain || (task == nil) != retain {
+				t.Fatalf("skipped owner notification changed data reuse: status=%#v task=%#v err=%v", status, task, err)
+			}
+		})
+	}
 }

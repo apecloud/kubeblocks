@@ -106,7 +106,7 @@ func loadCompressedInstanceTemplates(ctx context.Context, reader client.Reader, 
 	return nil
 }
 
-type retainedResourcesKey struct{}
+type lifecyclePVCsKey struct{}
 
 func loadLifecycleRuntime(ctx context.Context, reader client.Reader, tree *kubebuilderx.ObjectTree) error {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
@@ -139,7 +139,7 @@ func loadLifecycleRuntime(ctx context.Context, reader client.Reader, tree *kubeb
 	for _, status := range its.Status.InstanceStatus {
 		names.Insert(status.PodName)
 	}
-	retained := sets.New[string]()
+	claimsByInstance := make(map[string][]*corev1.PersistentVolumeClaim)
 	for _, name := range sets.List(names) {
 		inst := instances[name]
 		if inst == nil {
@@ -163,8 +163,7 @@ func loadLifecycleRuntime(ctx context.Context, reader client.Reader, tree *kubeb
 			for i := range claims.Items {
 				pvc := &claims.Items[i]
 				if len(pvc.OwnerReferences) == 0 || model.IsOwnerOf(inst, pvc) {
-					retained.Insert(name)
-					break
+					claimsByInstance[name] = append(claimsByInstance[name], pvc)
 				}
 			}
 		}
@@ -179,6 +178,6 @@ func loadLifecycleRuntime(ctx context.Context, reader client.Reader, tree *kubeb
 			return err
 		}
 	}
-	tree.Context = context.WithValue(tree.Context, retainedResourcesKey{}, retained)
+	tree.Context = context.WithValue(tree.Context, lifecyclePVCsKey{}, claimsByInstance)
 	return nil
 }

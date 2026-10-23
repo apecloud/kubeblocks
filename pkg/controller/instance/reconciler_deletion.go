@@ -74,14 +74,18 @@ func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuild
 			return kubebuilderx.RetryAfter(time.Second), nil
 		}
 	}
-	if err := r.deleteUnreferencedSharedAssistantObjects(tree, inst); err != nil {
-		return kubebuilderx.Continue, err
-	}
-
 	pvcRetentionPolicy := inst.Spec.PersistentVolumeClaimRetentionPolicy
 	retainPVC := pvcRetentionPolicy != nil && pvcRetentionPolicy.WhenDeleted == appsv1.RetainPersistentVolumeClaimRetentionPolicyType
 	if ptr.Deref(inst.Spec.ScaledDown, false) {
 		retainPVC = pvcRetentionPolicy != nil && pvcRetentionPolicy.WhenScaled == appsv1.RetainPersistentVolumeClaimRetentionPolicyType
+	}
+
+	if !retainPVC && inst.Spec.LifecycleActions != nil && inst.Spec.LifecycleActions.DataLoad != nil && (inst.Status.DataLoaded == nil || *inst.Status.DataLoaded) {
+		inst.Status.DataLoaded = ptr.To(false)
+		return kubebuilderx.RetryAfter(time.Second), nil
+	}
+	if err := r.deleteUnreferencedSharedAssistantObjects(tree, inst); err != nil {
+		return kubebuilderx.Continue, err
 	}
 
 	// delete secondary objects first

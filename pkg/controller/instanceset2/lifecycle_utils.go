@@ -53,10 +53,6 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 		}
 		return kubebuilderx.Continue, err
 	}
-	desired := sets.New[string]()
-	for _, a := range assignments {
-		desired.Insert(a.InstanceName)
-	}
 	runtimeNames, resourceNames := sets.New[string](), sets.New[string]()
 	pods := lifecyclePods(tree)
 	for _, pod := range pods {
@@ -66,18 +62,16 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 	instances := []*workloads.Instance{}
 	for _, obj := range tree.List(&workloads.Instance{}) {
 		inst := obj.(*workloads.Instance)
-		status := instanceLifecycleStatus(its, inst.Name)
-		if workloadlifecycle.HasData(its) && desired.Has(inst.Name) && status != nil && status.EffectiveDesiredState() == workloads.InstanceDesiredStateReleased && !inst.DeletionTimestamp.IsZero() {
-			return lifecycleWait(tree, its, fmt.Errorf("waiting for released instance %s to be deleted", inst.Name))
-		}
 		instances = append(instances, inst)
 		resourceNames.Insert(inst.Name)
 		if inst.Status.CurrentState == workloads.InstanceCurrentStatePresent || inst.Status.CurrentState == workloads.InstanceCurrentStateTerminating {
 			runtimeNames.Insert(inst.Name)
 		}
 	}
-	if retained, ok := tree.Context.Value(retainedResourcesKey{}).(sets.Set[string]); ok {
-		resourceNames.Insert(retained.UnsortedList()...)
+	if claimsByInstance, ok := tree.Context.Value(lifecyclePVCsKey{}).(map[string][]*corev1.PersistentVolumeClaim); ok {
+		for name := range claimsByInstance {
+			resourceNames.Insert(name)
+		}
 	}
 	registered := workloadlifecycle.Register(its, assignments, runtimeNames, resourceNames)
 	previous := its.DeepCopy().Status.InstanceStatus
@@ -85,7 +79,7 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 	for _, inst := range instances {
 		if status := instanceLifecycleStatus(its, inst.Name); status != nil {
 			status.Provisioned = status.Provisioned || inst.Status.Provisioned || runtimeNames.Has(inst.Name)
-			if inst.Status.DataLoaded != nil && (!ptr.Deref(status.DataLoaded, false) || *inst.Status.DataLoaded) {
+			if inst.Status.DataLoaded != nil {
 				status.DataLoaded = ptr.To(*inst.Status.DataLoaded)
 			}
 			if its.Spec.LifecycleActions.MemberJoin != nil && ptr.Deref(status.MemberJoined, true) && inst.Status.MemberJoined == nil && runtimeNames.Has(inst.Name) {
@@ -253,7 +247,7 @@ func lifecycleCreateInstance(tree *kubebuilderx.ObjectTree, its *workloads.Insta
 		return err
 	} else if current != nil {
 		child := current.(*workloads.Instance)
-		completed = completed || ptr.Deref(child.Status.DataLoaded, false)
+		completed = ptr.Deref(child.Status.DataLoaded, completed)
 		currentSpec = &child.Spec.Template.Spec
 	}
 	if completed {

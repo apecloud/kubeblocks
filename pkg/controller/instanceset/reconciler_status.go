@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -226,8 +227,59 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if err = setInstanceStatus(tree, its, podList); err != nil {
 		return kubebuilderx.Continue, err
 	}
+	if workloadlifecycle.HasData(its) && !stopping {
+		present, storage, ownedStorage := sets.New[string](), sets.New[string](), sets.New[string]()
+		for _, pod := range podList {
+			present.Insert(pod.Name)
+		}
+		for _, pvc := range tree.List(&corev1.PersistentVolumeClaim{}) {
+			name := pvc.GetLabels()[constant.KBAppPodNameLabelKey]
+			storage.Insert(name)
+			if metav1.IsControlledBy(pvc, its) {
+				ownedStorage.Insert(name)
+			}
+		}
+		retention := its.Spec.PersistentVolumeClaimRetentionPolicy
+		deleteData := retention == nil || retention.WhenScaled != kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType
+		for i := range its.Status.InstanceStatus {
+			status := &its.Status.InstanceStatus[i]
+			if present.Has(status.PodName) {
+				continue
+			}
+			if status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive {
+				if !storage.Has(status.PodName) && (status.DataLoaded != nil || status.Provisioned) {
+					status.DataLoaded = ptr.To(false)
+				}
+				continue
+			}
+			if !deleteData || !ownedStorage.Has(status.PodName) {
+				continue
+			}
+			if status.EffectiveDesiredState() != workloads.InstanceDesiredStateOffline &&
+				(workloadlifecycle.RetirementBlocked(its, status) || workloadlifecycle.NeedsMemberRetirement(its, status)) {
+				continue
+			}
+			if status.DataLoaded == nil || *status.DataLoaded {
+				status.DataLoaded = ptr.To(false)
+			}
+		}
+	}
 	if lifecycleStatusEnabled(its) && workloadlifecycle.CriticalStatusChanged(previous, its.Status.InstanceStatus) {
 		return kubebuilderx.RetryAfter(time.Second), nil
+	}
+
+	if workloadlifecycle.HasData(its) && !stopping {
+		for _, pod := range podList {
+			if status := its.FindInstanceStatus(pod.Name); status != nil && status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive && !pod.DeletionTimestamp.IsZero() {
+				return lifecycleWait(tree, its, fmt.Errorf("waiting for runtime of instance %s to be deleted", pod.Name))
+			}
+		}
+		for _, pvc := range tree.List(&corev1.PersistentVolumeClaim{}) {
+			name := pvc.GetLabels()[constant.KBAppPodNameLabelKey]
+			if status := its.FindInstanceStatus(name); status != nil && status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive && !pvc.GetDeletionTimestamp().IsZero() {
+				return lifecycleWait(tree, its, fmt.Errorf("waiting for storage of instance %s to be deleted", name))
+			}
+		}
 	}
 
 	if !stopping && its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {

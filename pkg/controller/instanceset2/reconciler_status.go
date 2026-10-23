@@ -25,6 +25,7 @@ import (
 	"sort"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -202,8 +203,63 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if err := setInstanceStatus(tree, its, instanceList); err != nil {
 		return kubebuilderx.Continue, err
 	}
+	if workloadlifecycle.HasData(its) && !isStopRequested(its) {
+		children, runtimes := sets.New[string](), sets.New[string]()
+		for _, inst := range instanceList {
+			children.Insert(inst.Name)
+		}
+		for _, pod := range lifecyclePods(tree) {
+			runtimes.Insert(pod.Name)
+		}
+		claims, _ := tree.Context.Value(lifecyclePVCsKey{}).(map[string][]*corev1.PersistentVolumeClaim)
+		for i := range its.Status.InstanceStatus {
+			status := &its.Status.InstanceStatus[i]
+			if status.EffectiveDesiredState() != workloads.InstanceDesiredStateActive || children.Has(status.PodName) || runtimes.Has(status.PodName) {
+				continue
+			}
+			dataUnavailable := len(claims[status.PodName]) == 0
+			for _, pvc := range claims[status.PodName] {
+				dataUnavailable = dataUnavailable || !pvc.DeletionTimestamp.IsZero()
+			}
+			if dataUnavailable && (status.DataLoaded != nil || status.Provisioned) {
+				status.DataLoaded = ptr.To(false)
+			}
+		}
+	}
 	if lifecycleStatusEnabled(its) && workloadlifecycle.CriticalStatusChanged(previous, its.Status.InstanceStatus) {
 		return kubebuilderx.RetryAfter(time.Second), nil
+	}
+
+	if workloadlifecycle.HasData(its) && !isStopRequested(its) {
+		children := make(map[string]*workloads.Instance, len(instanceList))
+		for _, inst := range instanceList {
+			children[inst.Name] = inst
+		}
+		for _, status := range its.Status.InstanceStatus {
+			if status.EffectiveDesiredState() != workloads.InstanceDesiredStateActive {
+				continue
+			}
+			if child := children[status.PodName]; child != nil && !child.DeletionTimestamp.IsZero() {
+				return lifecycleWait(tree, its, fmt.Errorf("waiting for instance %s to be deleted", status.PodName))
+			}
+		}
+		for _, pod := range lifecyclePods(tree) {
+			if status := its.FindInstanceStatus(pod.Name); status != nil && status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive && (!pod.DeletionTimestamp.IsZero() || children[pod.Name] == nil) {
+				return lifecycleWait(tree, its, fmt.Errorf("waiting for runtime of instance %s to be deleted", pod.Name))
+			}
+		}
+		claims, _ := tree.Context.Value(lifecyclePVCsKey{}).(map[string][]*corev1.PersistentVolumeClaim)
+		for name, pvcs := range claims {
+			status := its.FindInstanceStatus(name)
+			if status == nil || status.EffectiveDesiredState() != workloads.InstanceDesiredStateActive {
+				continue
+			}
+			for _, pvc := range pvcs {
+				if !pvc.DeletionTimestamp.IsZero() || (children[name] == nil && len(pvc.OwnerReferences) != 0) {
+					return lifecycleWait(tree, its, fmt.Errorf("waiting for storage of instance %s to finish retirement", name))
+				}
+			}
+		}
 	}
 
 	pendingLifecycle := isStopRequested(its)
@@ -516,8 +572,8 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		resources = append(resources, instancestatus.ResourceObservation{InstanceName: pod.Name})
 	}
 	if tree.Context != nil {
-		if retained, ok := tree.Context.Value(retainedResourcesKey{}).(sets.Set[string]); ok {
-			for name := range retained {
+		if claimsByInstance, ok := tree.Context.Value(lifecyclePVCsKey{}).(map[string][]*corev1.PersistentVolumeClaim); ok {
+			for name := range claimsByInstance {
 				resources = append(resources, instancestatus.ResourceObservation{InstanceName: name})
 			}
 		}

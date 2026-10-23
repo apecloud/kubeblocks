@@ -7518,121 +7518,141 @@ func TestInstanceSetLifecycleCommitsAllReleasedDataBeforeDeletingClaims(t *testi
 
 func TestInstanceSetLifecycleReleasesUnobservedInitialData(t *testing.T) {
 	for _, instanceAPI := range []bool{false, true} {
-		t.Run(fmt.Sprintf("instanceAPI=%t", instanceAPI), func(t *testing.T) {
-			ctx := context.Background()
-			f := newDataLifecycleEntry(t, instanceAPI, 2, appsv1.OrderedReadyPodManagement)
-			name := f.its.Name + "-1"
-			key := client.ObjectKey{Namespace: f.its.Namespace, Name: name}
-			for round := 0; round < 24; round++ {
-				f.stepWithChildren(t)
-				if err := f.cli.Get(ctx, key, &corev1.Pod{}); err == nil {
-					break
+		for _, retain := range []bool{false, true} {
+			t.Run(fmt.Sprintf("instanceAPI=%t/retain=%t", instanceAPI, retain), func(t *testing.T) {
+				ctx := context.Background()
+				f := newDataLifecycleEntry(t, instanceAPI, 2, appsv1.OrderedReadyPodManagement)
+				if retain {
+					f.its.Spec.PersistentVolumeClaimRetentionPolicy = &workloads.PersistentVolumeClaimRetentionPolicy{WhenScaled: kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType}
+					if err := f.cli.Update(ctx, f.its); err != nil {
+						t.Fatal(err)
+					}
 				}
-				if len(lifecycleEntryPods(t, f.cli)) > 0 {
-					f.setReady(t, f.its.Name+"-0", true)
-				}
-			}
-			pod := &corev1.Pod{}
-			if err := f.cli.Get(ctx, key, pod); err != nil {
-				t.Fatal(err)
-			}
-			claimName, err := lifecycleTestDataPVCName(pod)
-			if err != nil {
-				t.Fatal(err)
-			}
-			claimKey := client.ObjectKey{Namespace: key.Namespace, Name: claimName}
-			if status := f.its.FindInstanceStatus(name); status == nil || status.DataLoaded != nil {
-				t.Fatalf("fixture already observed initial data: %#v", status)
-			}
-			if instanceAPI && its2LifecycleInstance(t, f.cli, name).Status.DataLoaded != nil {
-				t.Fatal("child already observed initial data")
-			}
-			f.its.Spec.Replicas = ptr.To[int32](1)
-			f.its.Spec.OfflineInstances = []string{name}
-			f.its.Generation++
-			if err := f.cli.Update(ctx, f.its); err != nil {
-				t.Fatal(err)
-			}
-			for round := 0; round < 16; round++ {
-				f.step(t)
-				if instanceAPI {
-					if !its2LifecycleInstance(t, f.cli, name).DeletionTimestamp.IsZero() {
+				name := f.its.Name + "-1"
+				key := client.ObjectKey{Namespace: f.its.Namespace, Name: name}
+				for round := 0; round < 24; round++ {
+					f.stepWithChildren(t)
+					if err := f.cli.Get(ctx, key, &corev1.Pod{}); err == nil {
 						break
 					}
-				} else if apierrors.IsNotFound(f.cli.Get(ctx, key, &corev1.Pod{})) {
-					break
+					if len(lifecycleEntryPods(t, f.cli)) > 0 {
+						f.setReady(t, f.its.Name+"-0", true)
+					}
 				}
-			}
-			leaf := &InstanceReconciler{Client: f.cli, Scheme: f.cli.Scheme(), Recorder: record.NewFakeRecorder(100)}
-			if instanceAPI {
-				if _, err := leaf.Reconcile(ctx, ctrl.Request{NamespacedName: key}); err != nil {
+				pod := &corev1.Pod{}
+				if err := f.cli.Get(ctx, key, pod); err != nil {
 					t.Fatal(err)
 				}
-				if its2LifecycleInstance(t, f.cli, name).Status.DataLoaded != nil {
-					t.Fatal("Pod deletion fabricated initial data satisfaction")
-				}
-			} else if f.its.FindInstanceStatus(name).DataLoaded != nil {
-				t.Fatal("release entry fabricated initial data satisfaction")
-			}
-			if !apierrors.IsNotFound(f.cli.Get(ctx, key, &corev1.Pod{})) {
-				t.Fatal("initial runtime did not disappear")
-			}
-			if err := f.cli.Get(ctx, claimKey, &corev1.PersistentVolumeClaim{}); err != nil {
-				t.Fatalf("storage disappeared before initial result invalidation: %v", err)
-			}
-			if instanceAPI {
-				if _, err := leaf.Reconcile(ctx, ctrl.Request{NamespacedName: key}); err != nil {
+				claimName, err := lifecycleTestDataPVCName(pod)
+				if err != nil {
 					t.Fatal(err)
 				}
-				if ptr.Deref(its2LifecycleInstance(t, f.cli, name).Status.DataLoaded, true) {
-					t.Fatal("deleting child did not register nil data as pending")
+				claimKey := client.ObjectKey{Namespace: key.Namespace, Name: claimName}
+				if status := f.its.FindInstanceStatus(name); status == nil || status.DataLoaded != nil {
+					t.Fatalf("fixture already observed initial data: %#v", status)
 				}
-			} else {
-				f.step(t)
-				if ptr.Deref(f.its.FindInstanceStatus(name).DataLoaded, true) {
-					t.Fatal("release did not register nil data as pending")
+				if instanceAPI && its2LifecycleInstance(t, f.cli, name).Status.DataLoaded != nil {
+					t.Fatal("child already observed initial data")
 				}
-			}
-			if err := f.cli.Get(ctx, claimKey, &corev1.PersistentVolumeClaim{}); err != nil {
-				t.Fatalf("initial false result shared storage deletion: %v", err)
-			}
-			for round := 0; round < 16; round++ {
+				f.its.Spec.Replicas = ptr.To[int32](1)
+				f.its.Spec.OfflineInstances = []string{name}
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				for round := 0; round < 16; round++ {
+					f.step(t)
+					if instanceAPI {
+						if !its2LifecycleInstance(t, f.cli, name).DeletionTimestamp.IsZero() {
+							break
+						}
+					} else if apierrors.IsNotFound(f.cli.Get(ctx, key, &corev1.Pod{})) {
+						break
+					}
+				}
+				leaf := &InstanceReconciler{Client: f.cli, Scheme: f.cli.Scheme(), Recorder: record.NewFakeRecorder(100)}
 				if instanceAPI {
 					if _, err := leaf.Reconcile(ctx, ctrl.Request{NamespacedName: key}); err != nil {
 						t.Fatal(err)
 					}
+					if its2LifecycleInstance(t, f.cli, name).Status.DataLoaded != nil {
+						t.Fatal("Pod deletion fabricated initial data satisfaction")
+					}
+				} else if f.its.FindInstanceStatus(name).DataLoaded != nil {
+					t.Fatal("release entry fabricated initial data satisfaction")
+				}
+				if !apierrors.IsNotFound(f.cli.Get(ctx, key, &corev1.Pod{})) {
+					t.Fatal("initial runtime did not disappear")
+				}
+				if err := f.cli.Get(ctx, claimKey, &corev1.PersistentVolumeClaim{}); err != nil {
+					t.Fatalf("storage disappeared before initial result invalidation: %v", err)
+				}
+				if instanceAPI {
+					if _, err := leaf.Reconcile(ctx, ctrl.Request{NamespacedName: key}); err != nil {
+						t.Fatal(err)
+					}
+					if !retain && ptr.Deref(its2LifecycleInstance(t, f.cli, name).Status.DataLoaded, true) {
+						t.Fatal("deleting child did not register nil data as pending")
+					}
 				} else {
 					f.step(t)
+					loaded := f.its.FindInstanceStatus(name).DataLoaded
+					if (retain && loaded != nil) || (!retain && ptr.Deref(loaded, true)) {
+						t.Fatalf("wrong initial data release result: retain=%t loaded=%v", retain, loaded)
+					}
 				}
-				if apierrors.IsNotFound(f.cli.Get(ctx, claimKey, &corev1.PersistentVolumeClaim{})) && (!instanceAPI || apierrors.IsNotFound(f.cli.Get(ctx, key, &workloads.Instance{}))) {
-					break
+				if err := f.cli.Get(ctx, claimKey, &corev1.PersistentVolumeClaim{}); err != nil {
+					t.Fatalf("initial false result shared storage deletion: %v", err)
 				}
-			}
-			if !apierrors.IsNotFound(f.cli.Get(ctx, claimKey, &corev1.PersistentVolumeClaim{})) {
-				t.Fatal("initial storage was not retired")
-			}
-			if instanceAPI && f.its.FindInstanceStatus(name).DataLoaded != nil {
-				t.Fatal("fixture did not miss initial child invalidation")
-			}
-			f.its.Spec.Replicas = ptr.To[int32](2)
-			f.its.Spec.OfflineInstances = nil
-			f.its.Generation++
-			if err := f.cli.Update(ctx, f.its); err != nil {
-				t.Fatal(err)
-			}
-			for round := 0; round < 24; round++ {
-				f.stepWithChildren(t)
-				if err := f.cli.Get(ctx, key, pod); err == nil {
-					break
+				for round := 0; round < 16; round++ {
+					if instanceAPI {
+						if _, err := leaf.Reconcile(ctx, ctrl.Request{NamespacedName: key}); err != nil {
+							t.Fatal(err)
+						}
+					} else {
+						f.step(t)
+					}
+					claimErr := f.cli.Get(ctx, claimKey, &corev1.PersistentVolumeClaim{})
+					if ((retain && claimErr == nil) || (!retain && apierrors.IsNotFound(claimErr))) && (!instanceAPI || apierrors.IsNotFound(f.cli.Get(ctx, key, &workloads.Instance{}))) {
+						break
+					}
 				}
-			}
-			if err := f.cli.Get(ctx, key, pod); err != nil {
-				t.Fatal(err)
-			}
-			task, err := workloadlifecycle.DataTask(&pod.Spec, name)
-			if err != nil || task == nil || ptr.Deref(f.its.FindInstanceStatus(name).DataLoaded, true) {
-				t.Fatalf("lost initial storage reused an untracked result: task=%#v status=%#v err=%v", task, f.its.FindInstanceStatus(name), err)
-			}
-		})
+				claimErr := f.cli.Get(ctx, claimKey, &corev1.PersistentVolumeClaim{})
+				if (retain && claimErr != nil) || (!retain && !apierrors.IsNotFound(claimErr)) {
+					t.Fatalf("initial storage did not follow retention: retain=%t err=%v", retain, claimErr)
+				}
+				if instanceAPI && f.its.FindInstanceStatus(name).DataLoaded != nil {
+					t.Fatal("fixture did not miss initial child invalidation")
+				}
+				f.its.Spec.Replicas = ptr.To[int32](2)
+				f.its.Spec.OfflineInstances = nil
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				for round := 0; round < 24; round++ {
+					f.stepWithChildren(t)
+					if err := f.cli.Get(ctx, key, pod); err == nil {
+						break
+					}
+				}
+				if err := f.cli.Get(ctx, key, pod); err != nil {
+					t.Fatal(err)
+				}
+				task, err := workloadlifecycle.DataTask(&pod.Spec, name)
+				status := f.its.FindInstanceStatus(name)
+				if err != nil || status == nil || ((task == nil) != retain) || (!retain && ptr.Deref(status.DataLoaded, true)) || (retain && status.DataLoaded != nil && !*status.DataLoaded) {
+					t.Fatalf("initial data did not follow actual storage: retain=%t task=%#v status=%#v err=%v", retain, task, status, err)
+				}
+				if !retain {
+					f.markDataLoaded(t, name)
+				}
+				f.setReady(t, name, true)
+				f.bootstrap(t, 2)
+				if !ptr.Deref(f.its.FindInstanceStatus(name).DataLoaded, false) {
+					t.Fatal("initial data recovery did not converge")
+				}
+			})
+		}
 	}
 }

@@ -65,6 +65,10 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		inst.Status.DataLoaded = ptr.To(false)
 	}
 	stopped := ptr.Deref(inst.Spec.Stop, false)
+	if !stopped && inst.Status.MemberJoined == nil && inst.Spec.LifecycleActions != nil && inst.Spec.LifecycleActions.MemberJoin != nil && ptr.Deref(inst.Spec.ScaledUp, false) {
+		inst.Status.MemberJoined = ptr.To(false)
+		return kubebuilderx.RetryAfter(time.Second), nil
+	}
 	r.reconcileRestoreCondition(tree, inst)
 
 	obj, err := tree.Get(podObj(inst))
@@ -100,6 +104,10 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		inst.Status.DataLoaded = result.DataLoaded
 	}
 	if !reflect.DeepEqual(previous.DataLoaded, inst.Status.DataLoaded) {
+		return kubebuilderx.RetryAfter(time.Second), nil
+	}
+	if !stopped && inst.Status.MemberJoined == nil && inst.Spec.LifecycleActions != nil && inst.Spec.LifecycleActions.MemberJoin != nil {
+		inst.Status.MemberJoined = ptr.To(true)
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	if isTerminating(pod) {

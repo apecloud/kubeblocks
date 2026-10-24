@@ -21,9 +21,11 @@ package instance
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"slices"
 	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -36,6 +38,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
@@ -453,9 +456,82 @@ var newLifecycleAction = func(inst *workloads.Instance, pods []*corev1.Pod, pod 
 		compName         = inst.Labels[constant.KBAppComponentLabelKey]
 		lifecycleActions = &kbappsv1.ComponentLifecycleActions{
 			Switchover:  inst.Spec.LifecycleActions.Switchover,
+			MemberJoin:  inst.Spec.LifecycleActions.MemberJoin,
+			MemberLeave: inst.Spec.LifecycleActions.MemberLeave,
 			Reconfigure: inst.Spec.LifecycleActions.Reconfigure,
 		}
 	)
 	return lifecycle.New(inst.Namespace, clusterName, compName,
 		lifecycleActions, inst.Spec.LifecycleActions.TemplateVars, pod, pods)
+}
+
+func memberActionsEnabled(inst *workloads.Instance) bool {
+	a := inst.Spec.LifecycleActions
+	return a != nil && (a.MemberJoin != nil || a.MemberLeave != nil)
+}
+
+func reconcileMember(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod, join bool, reader client.Reader) (kubebuilderx.Result, error) {
+	wait := func(err error) (kubebuilderx.Result, error) {
+		tree.Logger.Error(err, "Instance membership is waiting", "instance", inst.Name)
+		return kubebuilderx.RetryAfter(time.Second), nil
+	}
+	if pod == nil {
+		pod = podObj(inst)
+	}
+	// The public selector supplies action executors in this cluster. Peers are not owned resources.
+	selector, err := metav1.LabelSelectorAsSelector(inst.Spec.Selector)
+	if err != nil {
+		return wait(err)
+	}
+	list := &corev1.PodList{}
+	if err := reader.List(tree.Context, list, client.InNamespace(inst.Namespace), client.MatchingLabelsSelector{Selector: selector}); err != nil {
+		return wait(err)
+	}
+	pods := make([]*corev1.Pod, 0, len(list.Items))
+	for i := range list.Items {
+		pods = append(pods, &list.Items[i])
+	}
+	action := inst.Spec.LifecycleActions.MemberJoin
+	if !join {
+		action = inst.Spec.LifecycleActions.MemberLeave
+	}
+	executors := pods
+	anyReplica := action.TargetPodSelector == kbappsv1.AnyReplica || (action.TargetPodSelector == "" && action.Exec != nil && action.Exec.TargetPodSelector == kbappsv1.AnyReplica)
+	if anyReplica && slices.ContainsFunc(pods, func(candidate *corev1.Pod) bool { return candidate.Name == pod.Name }) {
+		if _, err := workloadlifecycle.ValidateExecution(action, pod, []*corev1.Pod{pod}); err == nil {
+			executors = []*corev1.Pod{pod}
+		}
+	}
+	opts, err := workloadlifecycle.ValidateExecution(action, pod, executors)
+	if err != nil {
+		return wait(err)
+	}
+	lfa, err := newLifecycleAction(inst, pods, pod)
+	if err != nil {
+		return wait(err)
+	}
+	if !join && inst.Spec.LifecycleActions.Switchover != nil {
+		for _, role := range inst.Spec.Roles {
+			if role.IsExclusive && role.Name == pod.Labels[constant.RoleLabelKey] {
+				opts, err := workloadlifecycle.ValidateExecution(inst.Spec.LifecycleActions.Switchover, pod, pods)
+				if err != nil {
+					return wait(err)
+				}
+				if err = lfa.Switchover(tree.Context, nil, opts, ""); err != nil {
+					return wait(err)
+				}
+				return wait(fmt.Errorf("waiting for %s to relinquish its exclusive role", pod.Name))
+			}
+		}
+	}
+	if join {
+		err = lfa.MemberJoin(tree.Context, nil, opts)
+	} else {
+		err = lfa.MemberLeave(tree.Context, nil, opts)
+	}
+	if err != nil {
+		return wait(err)
+	}
+	inst.Status.MemberJoined = ptr.To(join)
+	return kubebuilderx.RetryAfter(time.Second), nil
 }

@@ -28,8 +28,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -1709,6 +1711,10 @@ func TestInstanceSetStopWaitsForDeletionObservation(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		reconcileParent()
 	}
+	for _, name := range []string{"demo-0", "demo-1"} {
+		reconcileInstance(name)
+		reconcileInstance(name)
+	}
 	mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
 		its.Spec.Replicas = ptr.To(int32(1))
 		its.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
@@ -1724,8 +1730,8 @@ func TestInstanceSetStopWaitsForDeletionObservation(t *testing.T) {
 	if err := cli.Get(ctx, key, inst); err != nil {
 		t.Fatal(err)
 	}
-	if !ptr.Deref(inst.Spec.ScaledDown, false) || inst.Status.CurrentState != workloads.InstanceCurrentStateAbsent || inst.Status.ObservedGeneration != inst.Generation {
-		t.Fatalf("fixture did not produce current-generation Absent before deletion: %#v", inst)
+	if !ptr.Deref(inst.Spec.ScaledDown, false) || inst.Status.CurrentState != workloads.InstanceCurrentStatePresent || inst.Status.ObservedGeneration != inst.Generation {
+		t.Fatalf("fixture did not produce current-generation Present before deletion: %#v", inst)
 	}
 	generation := inst.Generation
 	pod := &corev1.Pod{}
@@ -1750,7 +1756,7 @@ func TestInstanceSetStopWaitsForDeletionObservation(t *testing.T) {
 	}
 	remaining := &workloads.Instance{}
 	if err := cli.Get(ctx, client.ObjectKey{Namespace: "default", Name: "demo-0"}, remaining); err != nil || ptr.Deref(remaining.Spec.Stop, false) {
-		t.Fatalf("pre-deletion Absent released the Stop slot while the Pod was Running: %v", err)
+		t.Fatalf("pre-deletion observation released the Stop slot while the Pod was Running: %v", err)
 	}
 	if readSetStop(t, cli).Status.Replicas != 2 {
 		t.Fatal("Stop excluded the deleting Instance before observing its runtime deletion")
@@ -2351,6 +2357,20 @@ type its2LifecycleClient struct {
 	dataResultFailures int
 }
 
+// The fake client does not implement API-server generation changes for custom resources.
+func (c *its2LifecycleClient) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+	if inst, ok := obj.(*workloads.Instance); ok {
+		old := &workloads.Instance{}
+		if err := c.Client.Get(ctx, client.ObjectKeyFromObject(inst), old); err != nil {
+			return err
+		}
+		if !reflect.DeepEqual(old.Spec, inst.Spec) {
+			inst.Generation = old.Generation + 1
+		}
+	}
+	return c.Client.Update(ctx, obj, opts...)
+}
+
 type its2LifecycleStatus struct {
 	client.SubResourceWriter
 	owner *its2LifecycleClient
@@ -2490,72 +2510,58 @@ func TestITS2LifecycleLeaveCommitAndSpecReversal(t *testing.T) {
 }
 
 func checkITS2LifecycleLeaveCommitAndSpecReversal(t *testing.T, storage client.Client) {
-	its, cli, r := its2LifecycleFixture(t, 1, storage)
-	its2LifecycleRound(t, r, its)
-	its2LifecycleRound(t, r, its)
-	its2LifecycleRound(t, r, its)
-	inst := its2LifecycleInstance(t, cli, "lifecycle-0")
-	inst.Status.CurrentState = workloads.InstanceCurrentStatePresent
-	inst.Status.Ready = true
-	inst.Status.Available = true
-	if err := cli.Status().Update(context.Background(), inst); err != nil {
-		t.Fatal(err)
-	}
-	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: inst.Name, Namespace: inst.Namespace}, Spec: inst.Spec.Template.Spec}
-	pod.Status = corev1.PodStatus{Phase: corev1.PodRunning, PodIP: "127.0.0.1", Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}}
-	savedStatus := pod.Status
-	if err := cli.Create(context.Background(), pod); err != nil {
-		t.Fatal(err)
-	}
-	pod.Status = savedStatus
-	if err := cli.Status().Update(context.Background(), pod); err != nil {
-		t.Fatal(err)
-	}
-	its2LifecycleRound(t, r, its)
-	stored := its2LifecycleRead(t, cli, its)
-	stored.Spec.Replicas = ptr.To[int32](0)
-	stored.Generation++
-	if err := cli.Update(context.Background(), stored); err != nil {
-		t.Fatal(err)
-	}
+	its, cli, _ := its2LifecycleFixture(t, 1, storage)
+	f := &lifecycleEntry{cli: cli, its: its, instanceAPI: true}
+	f.bootstrap(t, 1)
 	agent := &its2LifecycleAgent{}
 	kbacli.SetMockClient(agent, nil)
 	defer kbacli.UnsetMockClient()
-	its2LifecycleRound(t, r, its)
-	its2LifecycleRound(t, r, its)
-	cli.failStatus = true
-	its2LifecycleRound(t, r, its)
-	inst = its2LifecycleInstance(t, cli, "lifecycle-0")
-	if ptr.Deref(inst.Spec.ScaledDown, false) || !inst.DeletionTimestamp.IsZero() {
-		t.Fatal("Leave status conflict started Instance deletion")
+	name := its.Name + "-0"
+	child := its2LifecycleInstance(t, cli, name)
+	if ptr.Deref(child.Spec.ScaledUp, true) {
+		t.Fatal("bootstrap classified as expansion")
 	}
-	if len(agent.calls) != 1 || agent.calls[0] != "memberLeave" {
-		t.Fatalf("expected actual Leave call: %v", agent.calls)
-	}
-	its2LifecycleRound(t, r, its)
-	stored = its2LifecycleRead(t, cli, its)
-	if len(stored.Status.InstanceStatus) != 1 || stored.Status.InstanceStatus[0].MemberJoined == nil || *stored.Status.InstanceStatus[0].MemberJoined {
-		t.Fatalf("Leave result not committed: %#v", stored.Status.InstanceStatus)
-	}
-	inst = its2LifecycleInstance(t, cli, "lifecycle-0")
-	if ptr.Deref(inst.Spec.ScaledDown, false) {
-		t.Fatal("successful Leave round prematurely marked ScaledDown")
-	}
-	stored.Spec.Replicas = ptr.To[int32](1)
-	stored.Generation++
-	if err := cli.Update(context.Background(), stored); err != nil {
+	f.its.Spec.Replicas = ptr.To[int32](0)
+	f.its.Generation++
+	if err := cli.Update(context.Background(), f.its); err != nil {
 		t.Fatal(err)
 	}
-	its2LifecycleRound(t, r, its)
-	its2LifecycleRound(t, r, its)
-	its2LifecycleRound(t, r, its)
-	stored = its2LifecycleRead(t, cli, its)
-	inst = its2LifecycleInstance(t, cli, "lifecycle-0")
-	if !ptr.Deref(stored.Status.InstanceStatus[0].MemberJoined, false) || ptr.Deref(inst.Spec.ScaledDown, false) {
-		t.Fatalf("spec reversal did not rejoin retained member: %#v %#v", stored.Status, inst.Spec)
+	for i := 0; i < 8 && !ptr.Deref(its2LifecycleInstance(t, cli, name).Spec.ScaledDown, false); i++ {
+		f.step(t)
 	}
-	if len(agent.calls) != 2 || agent.calls[1] != "memberJoin" {
-		t.Fatalf("unexpected member calls %v", agent.calls)
+	child = its2LifecycleInstance(t, cli, name)
+	if !ptr.Deref(child.Spec.ScaledDown, false) || child.Status.ObservedGeneration == child.Generation {
+		t.Fatalf("retirement not handed off with new generation: %#v", child)
+	}
+	// A process restart resumes the persisted request in the child before parent deletion.
+	leaf := &InstanceReconciler{Client: cli, Scheme: cli.Scheme(), Recorder: record.NewFakeRecorder(100)}
+	if _, err := leaf.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(child)}); err != nil {
+		t.Fatal(err)
+	}
+	child = its2LifecycleInstance(t, cli, name)
+	if child.Status.ObservedGeneration != child.Generation || ptr.Deref(child.Status.MemberJoined, true) || len(agent.calls) != 1 {
+		t.Fatalf("child did not commit retirement: %#v %v", child.Status, agent.calls)
+	}
+	cli.failStatus = true
+	f.step(t)
+	if !its2LifecycleInstance(t, cli, name).DeletionTimestamp.IsZero() {
+		t.Fatal("failed aggregation deleted child")
+	}
+	f.step(t)
+	if !its2LifecycleInstance(t, cli, name).DeletionTimestamp.IsZero() || ptr.Deref(f.its.FindInstanceStatus(name).MemberJoined, true) {
+		t.Fatal("aggregation did not commit before deletion")
+	}
+	f.its.Spec.Replicas = ptr.To[int32](1)
+	f.its.Generation++
+	if err := cli.Update(context.Background(), f.its); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 12; i++ {
+		f.stepWithChildren(t)
+	}
+	child = its2LifecycleInstance(t, cli, name)
+	if ptr.Deref(child.Spec.ScaledDown, false) || ptr.Deref(child.Spec.ScaledUp, true) || !ptr.Deref(child.Status.MemberJoined, false) || len(agent.calls) != 2 || agent.calls[1] != "memberJoin" {
+		t.Fatalf("bootstrap did not rejoin after committed retirement: %#v %v", child, agent.calls)
 	}
 }
 
@@ -2592,46 +2598,24 @@ func TestITS2LifecycleAPIServer(t *testing.T) {
 	}
 }
 
-func TestITS2LifecycleOfflineDoesNotLeaveMember(t *testing.T) {
-	its, cli, r := its2LifecycleFixture(t, 1)
-	its2LifecycleRound(t, r, its)
-	its2LifecycleRound(t, r, its)
-	its2LifecycleRound(t, r, its)
-	stored := its2LifecycleRead(t, cli, its)
-	stored.Status.InstanceStatus[0].MemberJoined = ptr.To(true)
-	stored.Status.InstanceStatus[0].Provisioned = true
-	if err := cli.Status().Update(context.Background(), stored); err != nil {
-		t.Fatal(err)
-	}
-	stored.Spec.OfflineInstances = []string{"lifecycle-0"}
-	stored.Generation++
-	if err := cli.Update(context.Background(), stored); err != nil {
-		t.Fatal(err)
-	}
+func TestITS2LifecycleOfflineRetiresMember(t *testing.T) {
+	f := newMemberLifecycleEntry(t, true, 1, appsv1.ParallelPodManagement)
+	f.bootstrap(t, 1)
 	agent := &its2LifecycleAgent{}
 	kbacli.SetMockClient(agent, nil)
 	defer kbacli.UnsetMockClient()
-	for i := 0; i < 6; i++ {
-		its2LifecycleRound(t, r, its)
-		stored = its2LifecycleRead(t, cli, its)
-		if status := stored.FindInstanceStatus("lifecycle-0"); status != nil && status.EffectiveDesiredState() == workloads.InstanceDesiredStateOffline {
-			break
-		}
+	f.its.Spec.OfflineInstances = []string{f.its.Name + "-0"}
+	f.its.Spec.Replicas = ptr.To[int32](0)
+	f.its.Generation++
+	if err := f.cli.Update(context.Background(), f.its); err != nil {
+		t.Fatal(err)
 	}
-	if len(agent.calls) != 0 {
-		t.Fatalf("offline transition called member action: %v", agent.calls)
+	for i := 0; i < 20; i++ {
+		f.stepWithChildren(t)
 	}
-	var offline *workloads.InstanceStatus
-	for i := range stored.Status.InstanceStatus {
-		if stored.Status.InstanceStatus[i].PodName == "lifecycle-0" {
-			offline = &stored.Status.InstanceStatus[i]
-		}
-	}
-	if offline == nil || offline.EffectiveDesiredState() != workloads.InstanceDesiredStateOffline || !ptr.Deref(offline.MemberJoined, false) {
-		t.Fatalf("offline transition lost known membership: %#v", stored.Status.InstanceStatus)
-	}
-	if cond := meta.FindStatusCondition(stored.Status.Conditions, "InstanceLifecycle"); cond != nil && cond.Message != "waiting for runtime of member lifecycle-1" {
-		t.Fatalf("offline member was blocked on leave: %#v", cond)
+	status := f.its.FindInstanceStatus(f.its.Name + "-0")
+	if len(agent.calls) != 1 || agent.calls[0] != "memberLeave" || status == nil || status.EffectiveDesiredState() != workloads.InstanceDesiredStateOffline || ptr.Deref(status.MemberJoined, true) || len(lifecycleEntryPods(t, f.cli)) != 0 {
+		t.Fatalf("Offline did not scale in: calls=%v status=%#v", agent.calls, status)
 	}
 }
 
@@ -2657,8 +2641,8 @@ func TestITS2LifecycleAbsentBootstrapMemberStillNeedsLeave(t *testing.T) {
 		t.Fatalf("absent unknown bootstrap member was discarded: %#v", stored.Status.InstanceStatus)
 	}
 	inst := its2LifecycleInstance(t, cli, "lifecycle-0")
-	if ptr.Deref(inst.Spec.ScaledDown, false) || !inst.DeletionTimestamp.IsZero() {
-		t.Fatal("absent member was scaled down without Leave")
+	if !inst.DeletionTimestamp.IsZero() {
+		t.Fatal("absent member was not handed off or deleted before Leave")
 	}
 }
 
@@ -2706,9 +2690,14 @@ func TestITS2LifecycleBootstrapInstanceStatusPrecedesLeave(t *testing.T) {
 	if len(agent.calls) != 0 || !stored.FindInstanceStatus(inst.Name).Provisioned || ptr.Deref(its2LifecycleInstance(t, cli, inst.Name).Spec.ScaledDown, false) {
 		t.Fatalf("runtime observation was not committed before membership: calls=%v status=%#v", agent.calls, stored.Status.InstanceStatus)
 	}
-	its2LifecycleRound(t, r, its)
-	its2LifecycleRound(t, r, its)
-	its2LifecycleRound(t, r, its)
+	f := &lifecycleEntry{cli: cli, its: its, instanceAPI: true}
+	for i := 0; i < 8; i++ {
+		f.stepWithChildren(t)
+		if len(agent.calls) > 0 {
+			break
+		}
+	}
+	f.step(t)
 	stored = its2LifecycleRead(t, cli, its)
 	if len(agent.calls) != 1 || agent.calls[0] != "memberLeave" {
 		t.Fatalf("observed bootstrap Pod skipped Leave: %v %#v", agent.calls, stored.Status.InstanceStatus)
@@ -2717,8 +2706,8 @@ func TestITS2LifecycleBootstrapInstanceStatusPrecedesLeave(t *testing.T) {
 		t.Fatalf("observed bootstrap identity not retained: %#v", stored.Status.InstanceStatus)
 	}
 	inst = its2LifecycleInstance(t, cli, inst.Name)
-	if ptr.Deref(inst.Spec.ScaledDown, false) {
-		t.Fatal("ScaledDown before Leave status commit")
+	if !ptr.Deref(inst.Spec.ScaledDown, false) {
+		t.Fatal("Leave ran without ScaledDown handoff")
 	}
 }
 
@@ -3248,6 +3237,9 @@ func TestITS2LifecycleRecoversWithoutChildDataResultNotification(t *testing.T) {
 				}
 			}
 			f.bootstrap(t, 2)
+			agent := &its2LifecycleAgent{}
+			kbacli.SetMockClient(agent, nil)
+			defer kbacli.UnsetMockClient()
 			name := f.its.Name + "-0"
 			key := client.ObjectKey{Namespace: f.its.Namespace, Name: name}
 			oldClaims := &corev1.PersistentVolumeClaimList{}
@@ -3264,7 +3256,7 @@ func TestITS2LifecycleRecoversWithoutChildDataResultNotification(t *testing.T) {
 				t.Fatal(err)
 			}
 			for round := 0; round < 12; round++ {
-				f.step(t)
+				f.stepWithChildren(t)
 				if !its2LifecycleInstance(t, f.cli, name).DeletionTimestamp.IsZero() {
 					break
 				}
@@ -3328,5 +3320,176 @@ func TestITS2LifecycleRecoversWithoutChildDataResultNotification(t *testing.T) {
 				t.Fatalf("skipped owner notification changed data reuse: status=%#v task=%#v err=%v", status, task, err)
 			}
 		})
+	}
+}
+
+func TestITS2ScaledUpClassificationAndRuntimeRecovery(t *testing.T) {
+	for _, policy := range []appsv1.PodManagementPolicyType{appsv1.OrderedReadyPodManagement, appsv1.ParallelPodManagement} {
+		t.Run(string(policy), func(t *testing.T) {
+			f := newMemberLifecycleEntry(t, true, 3, policy)
+			f.bootstrap(t, 3)
+			for i := 0; i < 3; i++ {
+				inst := its2LifecycleInstance(t, f.cli, fmt.Sprintf("%s-%d", f.its.Name, i))
+				if ptr.Deref(inst.Spec.ScaledUp, true) || !ptr.Deref(inst.Status.MemberJoined, false) {
+					t.Fatalf("wrong initial classification: %#v", inst)
+				}
+			}
+			agent := &its2LifecycleAgent{}
+			kbacli.SetMockClient(agent, nil)
+			defer kbacli.UnsetMockClient()
+			f.its.Spec.Replicas = ptr.To[int32](4)
+			f.its.Generation++
+			if err := f.cli.Update(context.Background(), f.its); err != nil {
+				t.Fatal(err)
+			}
+			f.bootstrap(t, 4)
+			name := f.its.Name + "-3"
+			inst := its2LifecycleInstance(t, f.cli, name)
+			if !ptr.Deref(inst.Spec.ScaledUp, false) || len(agent.calls) != 1 || agent.calls[0] != "memberJoin" {
+				t.Fatalf("expansion did not join: %#v %v", inst.Spec, agent.calls)
+			}
+			pod := &corev1.Pod{}
+			if err := f.cli.Get(context.Background(), client.ObjectKeyFromObject(inst), pod); err != nil {
+				t.Fatal(err)
+			}
+			if err := f.cli.Delete(context.Background(), pod); err != nil {
+				t.Fatal(err)
+			}
+			f.bootstrap(t, 4)
+			f.its.Spec.Stop = ptr.To(true)
+			f.its.Generation++
+			if err := f.cli.Update(context.Background(), f.its); err != nil {
+				t.Fatal(err)
+			}
+			for i := 0; i < 24; i++ {
+				f.stepWithChildren(t)
+			}
+			f.its.Spec.Stop = ptr.To(false)
+			f.its.Spec.Template.Spec.Containers[0].Image = "database:v2"
+			f.its.Generation++
+			if err := f.cli.Update(context.Background(), f.its); err != nil {
+				t.Fatal(err)
+			}
+			f.bootstrap(t, 4)
+			for i := 0; i < 4; i++ {
+				inst = its2LifecycleInstance(t, f.cli, fmt.Sprintf("%s-%d", f.its.Name, i))
+				if ptr.Deref(inst.Spec.ScaledUp, false) != (i == 3) || !ptr.Deref(inst.Status.MemberJoined, false) {
+					t.Fatalf("runtime repair changed membership classification: %#v", inst)
+				}
+			}
+			if len(agent.calls) != 1 {
+				t.Fatalf("recovery repeated Join: %v", agent.calls)
+			}
+		})
+	}
+}
+
+func TestITS2ScaledDownWaitsForCurrentGeneration(t *testing.T) {
+	its, cli, _ := its2LifecycleFixture(t, 0)
+	f := &lifecycleEntry{cli: cli, its: its, instanceAPI: true}
+	f.step(t)
+	f.its.Spec.Replicas = ptr.To[int32](1)
+	f.its.Generation++
+	if err := cli.Update(context.Background(), f.its); err != nil {
+		t.Fatal(err)
+	}
+	name := its.Name + "-0"
+	for i := 0; i < 16 && len(lifecycleEntryPods(t, cli)) == 0; i++ {
+		f.stepWithChildren(t)
+	}
+	child := its2LifecycleInstance(t, cli, name)
+	if !ptr.Deref(child.Spec.ScaledUp, false) || ptr.Deref(child.Status.MemberJoined, true) {
+		t.Fatalf("expansion did not initialize pending Join: %#v", child)
+	}
+	f.its.Spec.Replicas = ptr.To[int32](0)
+	f.its.Generation++
+	if err := cli.Update(context.Background(), f.its); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 8 && !ptr.Deref(its2LifecycleInstance(t, cli, name).Spec.ScaledDown, false); i++ {
+		f.step(t)
+	}
+	child = its2LifecycleInstance(t, cli, name)
+	if child.Status.ObservedGeneration == child.Generation {
+		t.Fatal("ordinary revision acknowledged new retirement")
+	}
+	f.step(t)
+	if !its2LifecycleInstance(t, cli, name).DeletionTimestamp.IsZero() {
+		t.Fatal("old false acknowledged retirement")
+	}
+	leaf := &InstanceReconciler{Client: cli, Scheme: cli.Scheme(), Recorder: record.NewFakeRecorder(100)}
+	if _, err := leaf.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(child)}); err != nil {
+		t.Fatal(err)
+	}
+	child = its2LifecycleInstance(t, cli, name)
+	if child.Status.ObservedGeneration != child.Generation || ptr.Deref(child.Status.MemberJoined, true) {
+		t.Fatal("child did not acknowledge canceled expansion")
+	}
+	for i := 0; i < 16; i++ {
+		f.stepWithChildren(t)
+	}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(child), &workloads.Instance{}); !apierrors.IsNotFound(err) {
+		t.Fatalf("acknowledged canceled expansion did not retire: %v", err)
+	}
+}
+
+func TestITS2DeletionPreservesPendingScaledDownRetirement(t *testing.T) {
+	f := newMemberLifecycleEntry(t, true, 1, appsv1.ParallelPodManagement)
+	f.bootstrap(t, 1)
+	f.its.Spec.Replicas = ptr.To[int32](0)
+	f.its.Generation++
+	if err := f.cli.Update(context.Background(), f.its); err != nil {
+		t.Fatal(err)
+	}
+	name := f.its.Name + "-0"
+	for i := 0; i < 8 && !ptr.Deref(its2LifecycleInstance(t, f.cli, name).Spec.ScaledDown, false); i++ {
+		f.step(t)
+	}
+	if err := f.cli.Delete(context.Background(), f.its); err != nil {
+		t.Fatal(err)
+	}
+	// The parent deletion route can mark the child deleting before its retirement ran.
+	if _, err := (&InstanceSetReconciler2{Client: f.cli, Scheme: f.cli.Scheme(), Recorder: record.NewFakeRecorder(100)}).Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(f.its)}); err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	fail := true
+	agent := kbacli.NewMockClient(gomock.NewController(t))
+	agent.EXPECT().Action(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+		if req.Action != "memberLeave" {
+			t.Fatalf("unexpected action %s", req.Action)
+		}
+		calls++
+		if fail {
+			return proto.ActionResponse{}, fmt.Errorf("Leave unavailable")
+		}
+		return proto.ActionResponse{}, nil
+	}).AnyTimes()
+	kbacli.SetMockClient(agent, nil)
+	defer kbacli.UnsetMockClient()
+	key := client.ObjectKey{Namespace: f.its.Namespace, Name: name}
+	leaf := &InstanceReconciler{Client: f.cli, Scheme: f.cli.Scheme(), Recorder: record.NewFakeRecorder(100)}
+	if _, err := leaf.Reconcile(context.Background(), ctrl.Request{NamespacedName: key}); err != nil {
+		t.Fatal(err)
+	}
+	pod := &corev1.Pod{}
+	if err := f.cli.Get(context.Background(), key, pod); err != nil || !pod.DeletionTimestamp.IsZero() || calls != 1 {
+		t.Fatalf("whole-set deletion skipped pending Leave: %v calls=%d", err, calls)
+	}
+	fail = false
+	if _, err := leaf.Reconcile(context.Background(), ctrl.Request{NamespacedName: key}); err != nil {
+		t.Fatal(err)
+	}
+	child := its2LifecycleInstance(t, f.cli, name)
+	if child.Status.ObservedGeneration != child.Generation || ptr.Deref(child.Status.MemberJoined, true) {
+		t.Fatal("deleting child did not commit retirement before cleanup")
+	}
+	for i := 0; i < 8; i++ {
+		if _, err := leaf.Reconcile(context.Background(), ctrl.Request{NamespacedName: key}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := f.cli.Get(context.Background(), key, &corev1.Pod{}); !apierrors.IsNotFound(err) || calls != 2 {
+		t.Fatalf("cleanup repeated or skipped retirement: %v calls=%d", err, calls)
 	}
 }

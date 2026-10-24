@@ -53,7 +53,7 @@ func HasData(its *workloads.InstanceSet) bool {
 }
 
 func RetirementBlocked(its *workloads.InstanceSet, old *workloads.InstanceStatus) bool {
-	if !Enabled(its) || old == nil || old.EffectiveDesiredState() == workloads.InstanceDesiredStateOffline {
+	if !Enabled(its) || old == nil {
 		return false
 	}
 	established := ptr.Deref(old.MemberJoined, false) || (old.MemberJoined == nil && old.Provisioned)
@@ -226,10 +226,10 @@ func SourcePod(its *workloads.InstanceSet, pods []*corev1.Pod, target string, cu
 		}
 		if status := Status(its, pod.Name); status != nil {
 			state := status.EffectiveDesiredState()
-			if state == workloads.InstanceDesiredStateOffline || (status.DataLoaded != nil && !*status.DataLoaded) {
+			if status.DataLoaded != nil && !*status.DataLoaded {
 				continue
 			}
-			if state == workloads.InstanceDesiredStateReleased && status.MemberJoined != nil && !*status.MemberJoined {
+			if state != workloads.InstanceDesiredStateActive && status.MemberJoined != nil && !*status.MemberJoined {
 				continue
 			}
 		}

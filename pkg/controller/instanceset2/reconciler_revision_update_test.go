@@ -107,7 +107,7 @@ func TestFlatOrdinalReassignmentPublishesTargetsAndPreservesInstances(t *testing
 		t.Fatalf("incomplete revision targets: %#v", revisions)
 	}
 
-	res, err = NewAlignmentReconciler(nil).Reconcile(tree)
+	res, err = NewAlignmentReconciler().Reconcile(tree)
 	if err != nil || res != kubebuilderx.Continue {
 		t.Fatalf("alignment did not continue: result=%v err=%v", res, err)
 	}

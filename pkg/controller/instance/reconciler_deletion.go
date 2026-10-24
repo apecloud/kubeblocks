@@ -49,7 +49,7 @@ type deletionReconciler struct {
 var _ kubebuilderx.Reconciler = &deletionReconciler{}
 
 func (r *deletionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
-	if tree.GetRoot() == nil || !model.IsObjectDeleting(tree.GetRoot()) {
+	if tree.GetRoot() == nil || (!model.IsObjectDeleting(tree.GetRoot()) && !ptr.Deref(tree.GetRoot().(*workloads.Instance).Spec.ScaledDown, false)) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
 	if model.IsReconciliationPaused(tree.GetRoot()) {
@@ -60,8 +60,21 @@ func (r *deletionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebu
 
 func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	inst, _ := tree.GetRoot().(*workloads.Instance)
+	if ptr.Deref(inst.Spec.ScaledDown, false) && (!model.IsObjectDeleting(inst) || !scaledDownObserved(inst)) {
+		return r.reconcileScaledDown(tree, inst)
+	}
 	if err := r.reconcileDeletingRuntime(tree, inst); err != nil {
 		return kubebuilderx.Continue, err
+	}
+	pvcRetentionPolicy := inst.Spec.PersistentVolumeClaimRetentionPolicy
+	retainPVC := pvcRetentionPolicy != nil && pvcRetentionPolicy.WhenDeleted == appsv1.RetainPersistentVolumeClaimRetentionPolicyType
+	if ptr.Deref(inst.Spec.ScaledDown, false) {
+		retainPVC = pvcRetentionPolicy != nil && pvcRetentionPolicy.WhenScaled == appsv1.RetainPersistentVolumeClaimRetentionPolicyType
+	}
+
+	if !retainPVC && inst.Spec.LifecycleActions != nil && inst.Spec.LifecycleActions.DataLoad != nil && (inst.Status.DataLoaded == nil || *inst.Status.DataLoaded) {
+		inst.Status.DataLoaded = ptr.To(false)
+		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	if inst.Spec.LifecycleActions != nil && inst.Spec.LifecycleActions.DataLoad != nil {
 		pods := tree.List(&corev1.Pod{})
@@ -73,16 +86,6 @@ func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuild
 			}
 			return kubebuilderx.RetryAfter(time.Second), nil
 		}
-	}
-	pvcRetentionPolicy := inst.Spec.PersistentVolumeClaimRetentionPolicy
-	retainPVC := pvcRetentionPolicy != nil && pvcRetentionPolicy.WhenDeleted == appsv1.RetainPersistentVolumeClaimRetentionPolicyType
-	if ptr.Deref(inst.Spec.ScaledDown, false) {
-		retainPVC = pvcRetentionPolicy != nil && pvcRetentionPolicy.WhenScaled == appsv1.RetainPersistentVolumeClaimRetentionPolicyType
-	}
-
-	if !retainPVC && inst.Spec.LifecycleActions != nil && inst.Spec.LifecycleActions.DataLoad != nil && (inst.Status.DataLoaded == nil || *inst.Status.DataLoaded) {
-		inst.Status.DataLoaded = ptr.To(false)
-		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	if err := r.deleteUnreferencedSharedAssistantObjects(tree, inst); err != nil {
 		return kubebuilderx.Continue, err
@@ -258,4 +261,39 @@ func assistantObjectKey(assistantObj workloads.InstanceAssistantObject) (client.
 		return nil, nil, err
 	}
 	return obj, name, nil
+}
+
+func (r *deletionReconciler) reconcileScaledDown(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) (kubebuilderx.Result, error) {
+	if err := r.reconcileDeletingRuntime(tree, inst); err != nil {
+		return kubebuilderx.Continue, err
+	}
+	if scaledDownObserved(inst) {
+		return kubebuilderx.RetryAfter(time.Second), nil
+	}
+	obj, err := tree.Get(podObj(inst))
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	var pod *corev1.Pod
+	if obj != nil {
+		pod = obj.(*corev1.Pod)
+		inst.Status.Provisioned = true
+	}
+	if memberActionsEnabled(inst) {
+		needsLeave := inst.Spec.LifecycleActions.MemberLeave != nil && (ptr.Deref(inst.Status.MemberJoined, false) || (inst.Status.MemberJoined == nil && (inst.Status.Provisioned || pod != nil)))
+		if needsLeave {
+			result, err := reconcileMember(tree, inst, pod, false, r.reader)
+			if err != nil || inst.Status.MemberJoined == nil || *inst.Status.MemberJoined {
+				return result, err
+			}
+		}
+		inst.Status.MemberJoined = ptr.To(false)
+	}
+	// This generation acknowledges retirement only together with its membership result.
+	inst.Status.ObservedGeneration = inst.Generation
+	return kubebuilderx.RetryAfter(time.Second), nil
+}
+
+func scaledDownObserved(inst *workloads.Instance) bool {
+	return inst.Status.ObservedGeneration == inst.Generation && (!memberActionsEnabled(inst) || (inst.Status.MemberJoined != nil && !*inst.Status.MemberJoined))
 }

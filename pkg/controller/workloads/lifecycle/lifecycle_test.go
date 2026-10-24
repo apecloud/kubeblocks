@@ -328,7 +328,8 @@ func TestDataSourceRetirementUsesMembershipResult(t *testing.T) {
 		{name: "retiring bootstrap", status: workloads.InstanceStatus{DesiredState: workloads.InstanceDesiredStateReleased}, usable: true},
 		{name: "retiring member", status: workloads.InstanceStatus{DesiredState: workloads.InstanceDesiredStateReleased, MemberJoined: ptr.To(true)}, usable: true},
 		{name: "left member", status: workloads.InstanceStatus{DesiredState: workloads.InstanceDesiredStateReleased, MemberJoined: ptr.To(false)}},
-		{name: "offline member", status: workloads.InstanceStatus{DesiredState: workloads.InstanceDesiredStateOffline, MemberJoined: ptr.To(true)}},
+		{name: "offline member", status: workloads.InstanceStatus{DesiredState: workloads.InstanceDesiredStateOffline, MemberJoined: ptr.To(true)}, usable: true},
+		{name: "offline left member", status: workloads.InstanceStatus{DesiredState: workloads.InstanceDesiredStateOffline, MemberJoined: ptr.To(false)}},
 		{name: "loading member", status: workloads.InstanceStatus{DesiredState: workloads.InstanceDesiredStateActive, DataLoaded: ptr.To(false)}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

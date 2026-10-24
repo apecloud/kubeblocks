@@ -255,8 +255,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			if !deleteData || !ownedStorage.Has(status.PodName) {
 				continue
 			}
-			if status.EffectiveDesiredState() != workloads.InstanceDesiredStateOffline &&
-				(workloadlifecycle.RetirementBlocked(its, status) || workloadlifecycle.NeedsMemberRetirement(its, status)) {
+			if workloadlifecycle.RetirementBlocked(its, status) || workloadlifecycle.NeedsMemberRetirement(its, status) {
 				continue
 			}
 			if status.DataLoaded == nil || *status.DataLoaded {

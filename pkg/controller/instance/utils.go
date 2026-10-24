@@ -464,39 +464,39 @@ func memberActionsEnabled(inst *workloads.Instance) bool {
 	return a != nil && (a.MemberJoin != nil || a.MemberLeave != nil)
 }
 
-func reconcileMember(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod, join bool, reader client.Reader) (kubebuilderx.Result, error) {
+func needsMemberJoin(inst *workloads.Instance) bool {
+	actions := inst.Spec.LifecycleActions
+	if actions == nil || actions.MemberJoin == nil {
+		return false
+	}
+	return inst.Status.MemberJoined != nil && !*inst.Status.MemberJoined
+}
+
+func needsMemberLeave(inst *workloads.Instance) bool {
+	actions := inst.Spec.LifecycleActions
+	if actions == nil || actions.MemberLeave == nil {
+		return false
+	}
+	if inst.Status.MemberJoined != nil {
+		return *inst.Status.MemberJoined
+	}
+	return inst.Status.Provisioned
+}
+
+func reconcileMember(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod, join bool) (kubebuilderx.Result, error) {
 	wait := func(err error) (kubebuilderx.Result, error) {
 		tree.Logger.Error(err, "Instance membership is waiting", "instance", inst.Name)
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	if pod == nil {
-		pod = podObj(inst)
+		return wait(fmt.Errorf("waiting for Instance %s Pod", inst.Name))
 	}
-	// The public selector supplies action executors in this cluster. Peers are not owned resources.
-	selector, err := metav1.LabelSelectorAsSelector(inst.Spec.Selector)
-	if err != nil {
-		return wait(err)
-	}
-	list := &corev1.PodList{}
-	if err := reader.List(tree.Context, list, client.InNamespace(inst.Namespace), client.MatchingLabelsSelector{Selector: selector}); err != nil {
-		return wait(err)
-	}
-	pods := make([]*corev1.Pod, 0, len(list.Items))
-	for i := range list.Items {
-		pods = append(pods, &list.Items[i])
-	}
+	pods := []*corev1.Pod{pod}
 	action := inst.Spec.LifecycleActions.MemberJoin
 	if !join {
 		action = inst.Spec.LifecycleActions.MemberLeave
 	}
-	executors := pods
-	anyReplica := action.TargetPodSelector == kbappsv1.AnyReplica || (action.TargetPodSelector == "" && action.Exec != nil && action.Exec.TargetPodSelector == kbappsv1.AnyReplica)
-	if anyReplica && slices.ContainsFunc(pods, func(candidate *corev1.Pod) bool { return candidate.Name == pod.Name }) {
-		if _, err := workloadlifecycle.ValidateExecution(action, pod, []*corev1.Pod{pod}); err == nil {
-			executors = []*corev1.Pod{pod}
-		}
-	}
-	opts, err := workloadlifecycle.ValidateExecution(action, pod, executors)
+	opts, err := workloadlifecycle.ValidateExecution(action, pod, pods)
 	if err != nil {
 		return wait(err)
 	}

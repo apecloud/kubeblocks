@@ -55,7 +55,9 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	inst := tree.GetRoot().(*workloads.Instance)
 	stopped := ptr.Deref(inst.Spec.Stop, false)
-	if !stopped && inst.Status.MemberJoined == nil && inst.Spec.LifecycleActions != nil && inst.Spec.LifecycleActions.MemberJoin != nil && ptr.Deref(inst.Spec.ScaledUp, false) {
+	actions := inst.Spec.LifecycleActions
+	joinConfigured := actions != nil && actions.MemberJoin != nil
+	if !stopped && inst.Status.MemberJoined == nil && joinConfigured && ptr.Deref(inst.Spec.ScaledUp, false) {
 		inst.Status.MemberJoined = ptr.To(false)
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
@@ -71,7 +73,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 	pod := obj.(*corev1.Pod)
 	inst.Status.Provisioned = true
-	if !stopped && inst.Status.MemberJoined == nil && inst.Spec.LifecycleActions != nil && inst.Spec.LifecycleActions.MemberJoin != nil {
+	if !stopped && inst.Status.MemberJoined == nil && joinConfigured {
 		inst.Status.MemberJoined = ptr.To(true)
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}

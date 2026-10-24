@@ -49,10 +49,17 @@ type deletionReconciler struct {
 var _ kubebuilderx.Reconciler = &deletionReconciler{}
 
 func (r *deletionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
-	if tree.GetRoot() == nil || (!model.IsObjectDeleting(tree.GetRoot()) && !ptr.Deref(tree.GetRoot().(*workloads.Instance).Spec.ScaledDown, false)) {
+	root := tree.GetRoot()
+	if root == nil {
 		return kubebuilderx.ConditionUnsatisfied
 	}
-	if model.IsReconciliationPaused(tree.GetRoot()) {
+	inst := root.(*workloads.Instance)
+	deleting := model.IsObjectDeleting(inst)
+	scaledDown := ptr.Deref(inst.Spec.ScaledDown, false)
+	if !deleting && !scaledDown {
+		return kubebuilderx.ConditionUnsatisfied
+	}
+	if model.IsReconciliationPaused(inst) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
 	return kubebuilderx.ConditionSatisfied
@@ -60,7 +67,9 @@ func (r *deletionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebu
 
 func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	inst, _ := tree.GetRoot().(*workloads.Instance)
-	if ptr.Deref(inst.Spec.ScaledDown, false) && (!model.IsObjectDeleting(inst) || !scaledDownObserved(inst)) {
+	scaledDown := ptr.Deref(inst.Spec.ScaledDown, false)
+	deleting := model.IsObjectDeleting(inst)
+	if scaledDown && (!deleting || !scaledDownObserved(inst)) {
 		return r.reconcileScaledDown(tree, inst)
 	}
 	if err := r.reconcileDeletingRuntime(tree, inst); err != nil {
@@ -265,11 +274,13 @@ func (r *deletionReconciler) reconcileScaledDown(tree *kubebuilderx.ObjectTree, 
 		inst.Status.Provisioned = true
 	}
 	if memberActionsEnabled(inst) {
-		needsLeave := inst.Spec.LifecycleActions.MemberLeave != nil && (ptr.Deref(inst.Status.MemberJoined, false) || (inst.Status.MemberJoined == nil && (inst.Status.Provisioned || pod != nil)))
-		if needsLeave {
-			result, err := reconcileMember(tree, inst, pod, false, r.reader)
-			if err != nil || inst.Status.MemberJoined == nil || *inst.Status.MemberJoined {
+		if needsMemberLeave(inst) {
+			result, err := reconcileMember(tree, inst, pod, false)
+			if err != nil {
 				return result, err
+			}
+			if inst.Status.MemberJoined == nil || *inst.Status.MemberJoined {
+				return result, nil
 			}
 		}
 		inst.Status.MemberJoined = ptr.To(false)
@@ -280,5 +291,11 @@ func (r *deletionReconciler) reconcileScaledDown(tree *kubebuilderx.ObjectTree, 
 }
 
 func scaledDownObserved(inst *workloads.Instance) bool {
-	return inst.Status.ObservedGeneration == inst.Generation && (!memberActionsEnabled(inst) || (inst.Status.MemberJoined != nil && !*inst.Status.MemberJoined))
+	if inst.Status.ObservedGeneration != inst.Generation {
+		return false
+	}
+	if !memberActionsEnabled(inst) {
+		return true
+	}
+	return inst.Status.MemberJoined != nil && !*inst.Status.MemberJoined
 }

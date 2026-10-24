@@ -32,7 +32,6 @@ import (
 
 	apps "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	publiclifecycle "github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -110,15 +109,6 @@ func Register(its *workloads.InstanceSet, assignments []instancetemplate.Assignm
 	return changed
 }
 
-func Status(its *workloads.InstanceSet, name string) *workloads.InstanceStatus {
-	for i := range its.Status.InstanceStatus {
-		if its.Status.InstanceStatus[i].PodName == name {
-			return &its.Status.InstanceStatus[i]
-		}
-	}
-	return nil
-}
-
 func NeedsLeave(its *workloads.InstanceSet, status *workloads.InstanceStatus) bool {
 	if !Enabled(its) || its.Spec.LifecycleActions.MemberLeave == nil || status == nil {
 		return false
@@ -131,11 +121,6 @@ func NeedsMemberRetirement(its *workloads.InstanceSet, status *workloads.Instanc
 		return true
 	}
 	return Enabled(its) && its.Spec.LifecycleActions.MemberJoin != nil && status != nil && ptr.Deref(status.MemberJoined, false)
-}
-
-func NewLifecycle(its *workloads.InstanceSet, pod *corev1.Pod, pods []*corev1.Pod) (publiclifecycle.Lifecycle, error) {
-	a := its.Spec.LifecycleActions
-	return publiclifecycle.New(its.Namespace, its.Labels[constant.AppInstanceLabelKey], its.Labels[constant.KBAppComponentLabelKey], &apps.ComponentLifecycleActions{Switchover: a.Switchover, Reconfigure: a.Reconfigure, MemberJoin: a.MemberJoin, MemberLeave: a.MemberLeave}, a.TemplateVars, pod, pods)
 }
 
 // ConfigurePod merges member actions into the agent server supplied by the caller.

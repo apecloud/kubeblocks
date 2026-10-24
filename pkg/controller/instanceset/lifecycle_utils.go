@@ -68,7 +68,7 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 	registered := workloadlifecycle.Register(its, assignments, names, resources)
 	previous := its.DeepCopy().Status.InstanceStatus
 	for _, pod := range pods {
-		if status := workloadlifecycle.Status(its, pod.Name); status != nil {
+		if status := its.FindInstanceStatus(pod.Name); status != nil {
 			status.Provisioned = true
 			if its.Spec.LifecycleActions.MemberJoin != nil && status.MemberJoined == nil {
 				status.MemberJoined = ptr.To(true)
@@ -82,7 +82,7 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 }
 
 func reconcileMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod, join bool, reader client.Reader) (kubebuilderx.Result, error) {
-	status := workloadlifecycle.Status(its, pod.Name)
+	status := its.FindInstanceStatus(pod.Name)
 	if status == nil || !workloadlifecycle.Enabled(its) || isStopRequested(its) {
 		return kubebuilderx.Continue, nil
 	}

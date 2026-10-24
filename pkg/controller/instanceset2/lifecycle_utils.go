@@ -66,7 +66,7 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 	registered := workloadlifecycle.Register(its, assignments, runtimeNames, resourceNames)
 	previous := its.DeepCopy().Status.InstanceStatus
 	for _, inst := range instances {
-		if status := instanceLifecycleStatus(its, inst.Name); status != nil {
+		if status := its.FindInstanceStatus(inst.Name); status != nil {
 			status.Provisioned = status.Provisioned || inst.Status.Provisioned || runtimeNames.Has(inst.Name)
 			if inst.Status.MemberJoined != nil {
 				status.MemberJoined = ptr.To(*inst.Status.MemberJoined)
@@ -95,14 +95,6 @@ func lifecyclePods(tree *kubebuilderx.ObjectTree) []*corev1.Pod {
 	}
 	return pods
 }
-func instanceLifecycleStatus(its *workloads.InstanceSet, name string) *workloads.InstanceStatus {
-	for i := range its.Status.InstanceStatus {
-		if its.Status.InstanceStatus[i].PodName == name {
-			return &its.Status.InstanceStatus[i]
-		}
-	}
-	return nil
-}
 func configureInstance(its *workloads.InstanceSet, inst *workloads.Instance) error {
 	pod := &corev1.Pod{ObjectMeta: inst.ObjectMeta, Spec: inst.Spec.Template.Spec}
 	if err := workloadlifecycle.ConfigurePod(its, pod); err != nil {
@@ -110,4 +102,11 @@ func configureInstance(its *workloads.InstanceSet, inst *workloads.Instance) err
 	}
 	inst.Spec.Template.Spec = pod.Spec
 	return nil
+}
+
+func instanceRetirementObserved(inst *workloads.Instance) bool {
+	members := inst.Spec.LifecycleActions
+	return inst.Status.ObservedGeneration == inst.Generation &&
+		(members == nil || (members.MemberJoin == nil && members.MemberLeave == nil) ||
+			(inst.Status.MemberJoined != nil && !*inst.Status.MemberJoined))
 }

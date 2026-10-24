@@ -147,7 +147,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		for _, name := range candidates {
 			pod := oldInstanceMap[name]
 			absent := pod == nil
-			if absent && !workloadlifecycle.NeedsMemberRetirement(its, workloadlifecycle.Status(its, name)) {
+			if absent && !workloadlifecycle.NeedsMemberRetirement(its, its.FindInstanceStatus(name)) {
 				continue
 			}
 			if !isOrderedReady && concurrency <= 0 {
@@ -160,11 +160,11 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 					pod.Name)
 			}
 			if workloadlifecycle.Enabled(its) && !isStopRequested(its) {
-				if workloadlifecycle.RetirementBlocked(its, workloadlifecycle.Status(its, name)) {
+				if workloadlifecycle.RetirementBlocked(its, its.FindInstanceStatus(name)) {
 					waiting = true
 					continue
 				}
-				if workloadlifecycle.NeedsMemberRetirement(its, workloadlifecycle.Status(its, name)) {
+				if workloadlifecycle.NeedsMemberRetirement(its, its.FindInstanceStatus(name)) {
 					if absent {
 						pod = &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: its.Namespace}}
 					}
@@ -197,11 +197,11 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 				if name == "" || !names.Has(name) {
 					continue
 				}
-				if workloadlifecycle.Enabled(its) && workloadlifecycle.RetirementBlocked(its, workloadlifecycle.Status(its, name)) {
+				if workloadlifecycle.Enabled(its) && workloadlifecycle.RetirementBlocked(its, its.FindInstanceStatus(name)) {
 					waiting = true
 					continue
 				}
-				if workloadlifecycle.Enabled(its) && workloadlifecycle.NeedsMemberRetirement(its, workloadlifecycle.Status(its, name)) {
+				if workloadlifecycle.Enabled(its) && workloadlifecycle.NeedsMemberRetirement(its, its.FindInstanceStatus(name)) {
 					continue
 				}
 				if retiredNames.Has(name) || (!oldNameSet.Has(name) && metav1.IsControlledBy(obj, its)) {
@@ -220,7 +220,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	if workloadlifecycle.Enabled(its) && !isStopRequested(its) {
 		independentNames := sets.New[string]()
 		for name := range retirementNames {
-			status := workloadlifecycle.Status(its, name)
+			status := its.FindInstanceStatus(name)
 			if status != nil && !workloadlifecycle.NeedsLeave(its, status) && (status.MemberJoined != nil && !*status.MemberJoined) {
 				independentNames.Insert(name)
 			}

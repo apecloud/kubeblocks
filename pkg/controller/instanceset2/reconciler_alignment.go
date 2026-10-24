@@ -168,7 +168,7 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 					inst.Name)
 			}
 			if workloadlifecycle.Enabled(its) && !ptr.Deref(its.Spec.Stop, false) {
-				if workloadlifecycle.RetirementBlocked(its, workloadlifecycle.Status(its, inst.Name)) {
+				if workloadlifecycle.RetirementBlocked(its, its.FindInstanceStatus(inst.Name)) {
 					waiting = true
 					continue
 				}
@@ -178,7 +178,7 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 			}
 			if ptr.Deref(inst.Spec.ScaledDown, false) && equality.Semantic.DeepEqual(
 				inst.Spec.PersistentVolumeClaimRetentionPolicy, its.Spec.PersistentVolumeClaimRetentionPolicy) {
-				if inst.Status.ObservedGeneration != inst.Generation || (inst.Spec.LifecycleActions != nil && (inst.Spec.LifecycleActions.MemberJoin != nil || inst.Spec.LifecycleActions.MemberLeave != nil) && (inst.Status.MemberJoined == nil || *inst.Status.MemberJoined)) {
+				if !instanceRetirementObserved(inst) {
 					waiting = true
 					continue
 				}
@@ -212,7 +212,7 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 	if workloadlifecycle.Enabled(its) && !isStopRequested(its) {
 		independentNames := sets.New[string]()
 		for name := range retirementNames {
-			status := workloadlifecycle.Status(its, name)
+			status := its.FindInstanceStatus(name)
 			if status != nil && !workloadlifecycle.NeedsLeave(its, status) && ((status.MemberJoined != nil && !*status.MemberJoined) || (status.DataLoaded != nil && !*status.DataLoaded)) {
 				independentNames.Insert(name)
 			}
@@ -257,7 +257,7 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 				return kubebuilderx.Continue, err
 			}
 		} else {
-			if status := instanceLifecycleStatus(its, name); status != nil && its.Spec.LifecycleActions != nil && its.Spec.LifecycleActions.MemberJoin != nil {
+			if status := its.FindInstanceStatus(name); status != nil && its.Spec.LifecycleActions != nil && its.Spec.LifecycleActions.MemberJoin != nil {
 				newInst.Spec.ScaledUp = ptr.To(status.MemberJoined != nil && !*status.MemberJoined)
 			}
 			if err := tree.Add(newInst); err != nil {

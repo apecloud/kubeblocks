@@ -3491,23 +3491,11 @@ func TestInstanceSetLeaveWaitsForObservedRuntimeRetirement(t *testing.T) {
 				if pod.Name == "" {
 					t.Fatal("controllers did not create the runtime Pod")
 				}
-				if instanceAPI && its2LifecycleInstance(t, f.cli, key.Name).Status.Provisioned {
-					t.Fatal("child observed runtime before its creation reconcile completed")
-				}
 				pod.Status.PodIP = "10.0.0.1"
 				pod.Status.Phase = corev1.PodRunning
 				pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}
 				if err := f.cli.Status().Update(ctx, pod); err != nil {
 					t.Fatal(err)
-				}
-				if scenario == "child-observed" {
-					leaf := &InstanceReconciler{Client: f.cli, Scheme: f.cli.Scheme(), Recorder: record.NewFakeRecorder(100)}
-					if _, err := leaf.Reconcile(ctx, ctrl.Request{NamespacedName: key}); err != nil {
-						t.Fatal(err)
-					}
-					if !its2LifecycleInstance(t, f.cli, key.Name).Status.Provisioned {
-						t.Fatal("child did not observe its runtime")
-					}
 				}
 
 				calls, successes := 0, 0
@@ -3528,20 +3516,12 @@ func TestInstanceSetLeaveWaitsForObservedRuntimeRetirement(t *testing.T) {
 				conflicted := false
 				if scenario == "observation-conflict" || scenario == "result-conflict" {
 					storage := f.cli
-					if wrapped, ok := storage.(*its2LifecycleClient); ok {
-						storage = wrapped.Client
-					}
 					f.cli = interceptor.NewClient(storage.(client.WithWatch), interceptor.Funcs{SubResourceUpdate: func(ctx context.Context, delegate client.Client, subresource string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
 						var provisioned bool
 						var joined *bool
-						switch proposed := obj.(type) {
-						case *workloads.InstanceSet:
-							if status := proposed.FindInstanceStatus(key.Name); status != nil && (scenario == "observation-conflict" || !instanceAPI) {
+						if proposed, ok := obj.(*workloads.InstanceSet); ok {
+							if status := proposed.FindInstanceStatus(key.Name); status != nil {
 								provisioned, joined = status.Provisioned, status.MemberJoined
-							}
-						case *workloads.Instance:
-							if proposed.Name == key.Name && scenario == "result-conflict" {
-								joined = proposed.Status.MemberJoined
 							}
 						}
 						if subresource == "status" && !conflicted && ((scenario == "observation-conflict" && provisioned) || (scenario == "result-conflict" && joined != nil && !*joined)) {
@@ -3560,15 +3540,6 @@ func TestInstanceSetLeaveWaitsForObservedRuntimeRetirement(t *testing.T) {
 					t.Helper()
 					if err := f.cli.Get(ctx, key, pod); err != nil || !pod.DeletionTimestamp.IsZero() {
 						t.Fatalf("retirement removed runtime before committed Leave: pod=%#v err=%v", pod, err)
-					}
-					if instanceAPI {
-						child := its2LifecycleInstance(t, f.cli, key.Name)
-						if ptr.Deref(child.Spec.ScaledDown, false) || !child.DeletionTimestamp.IsZero() {
-							t.Fatalf("retirement advanced cleanup before committed Leave: %#v", child)
-						}
-						if scenario != "child-observed" && child.Status.Provisioned {
-							t.Fatal("parent observation changed child provisioning history")
-						}
 					}
 				}
 				result := f.step(t)
@@ -3609,9 +3580,6 @@ func TestInstanceSetLeaveWaitsForObservedRuntimeRetirement(t *testing.T) {
 				}
 				if status.MemberJoined == nil || *status.MemberJoined || calls != wantCalls || successes != wantSuccesses || (scenario == "result-conflict" && !conflicted) {
 					t.Fatalf("Leave result did not recover and commit before cleanup: status=%#v calls=%d successes=%d conflict=%t", status, calls, successes, conflicted)
-				}
-				if instanceAPI && ptr.Deref(its2LifecycleInstance(t, f.cli, key.Name).Status.MemberJoined, true) {
-					t.Fatal("Leave result was not committed to the child")
 				}
 				for round := 0; round < 24; round++ {
 					f.stepWithChildren(t)
@@ -3958,14 +3926,6 @@ func TestInstanceSetLifecycleAllocationSwitchSeparatesCreationAndMemberResult(t 
 			if len(agent.calls) != 0 {
 				t.Fatal("member action shared an uncommitted creation round")
 			}
-			if instanceAPI {
-				leaf := &InstanceReconciler{Client: f.cli, Scheme: f.cli.Scheme(), Recorder: record.NewFakeRecorder(100)}
-				for i := 0; i < 2; i++ {
-					if _, err := leaf.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-2"}}); err != nil {
-						t.Fatal(err)
-					}
-				}
-			}
 			f.setReady(t, f.its.Name+"-2", true)
 			for round := 0; round < 6; round++ {
 				f.step(t)
@@ -3983,15 +3943,9 @@ func TestInstanceSetLifecycleAllocationSwitchSeparatesCreationAndMemberResult(t 
 			if !result.Requeue || len(agent.calls) != 2 || agent.calls[1] != "memberLeave" || old == nil || !ptr.Deref(old.MemberJoined, false) || len(lifecycleEntryPods(t, f.cli)) != 3 {
 				t.Fatalf("member result conflict leaked runtime mutation: calls=%v status=%#v result=%#v", agent.calls, f.its.Status.InstanceStatus, result)
 			}
-			if instanceAPI && ptr.Deref(its2LifecycleInstance(t, f.cli, f.its.Name+"-1").Spec.ScaledDown, false) {
-				t.Fatal("member result conflict leaked ScaledDown")
-			}
 			f.step(t)
 			old = f.its.FindInstanceStatus(f.its.Name + "-1")
 			wantCalls := 3
-			if instanceAPI {
-				wantCalls = 2
-			}
 			if len(agent.calls) != wantCalls || old == nil || old.MemberJoined == nil || *old.MemberJoined || len(lifecycleEntryPods(t, f.cli)) != 3 {
 				t.Fatalf("member result retry did not commit alone: calls=%v status=%#v", agent.calls, f.its.Status.InstanceStatus)
 			}
@@ -4276,9 +4230,6 @@ func TestInstanceSetLifecycleWarningOnlyWhenWaitMessageChanges(t *testing.T) {
 			}
 
 			reason, retryAfter := "InstanceLifecycle", 2*time.Second
-			if instanceAPI {
-				reason, retryAfter = "LifecycleWaiting", time.Second
-			}
 			assertWait := func(result ctrl.Result) string {
 				t.Helper()
 				condition := meta.FindStatusCondition(f.its.Status.Conditions, "InstanceLifecycle")
@@ -8199,5 +8150,71 @@ func checkInstanceAllocationSwitch(t *testing.T) {
 	f.step(t)
 	if !its2LifecycleInstance(t, f.cli, child.Name).DeletionTimestamp.IsZero() || ptr.Deref(f.its.FindInstanceStatus(child.Name).MemberJoined, true) || len(agent.calls) != 2 {
 		t.Fatal("parent result did not commit alone")
+	}
+}
+
+func TestInstanceSetWholeDeletionSkipsMemberRetirement(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		t.Run(fmt.Sprintf("instanceAPI=%t", instanceAPI), func(t *testing.T) {
+			ctx := context.Background()
+			f := newMemberLifecycleEntry(t, instanceAPI, 2, appsv1.ParallelPodManagement)
+			f.its.Spec.VolumeClaimTemplates = newMemberLifecycleITS(2).Spec.VolumeClaimTemplates
+			f.its.Spec.PersistentVolumeClaimRetentionPolicy = &workloads.PersistentVolumeClaimRetentionPolicy{
+				WhenDeleted: kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+				WhenScaled:  kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+			}
+			if err := f.cli.Update(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			f.bootstrap(t, 2)
+			agent := &its2LifecycleAgent{}
+			kbacli.SetMockClient(agent, nil)
+			defer kbacli.UnsetMockClient()
+			if err := f.cli.Delete(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			for i := 0; i < 12; i++ {
+				req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(f.its)}
+				var err error
+				if instanceAPI {
+					_, err = (&InstanceSetReconciler2{Client: f.cli, Scheme: f.cli.Scheme(), Recorder: record.NewFakeRecorder(100)}).Reconcile(ctx, req)
+				} else {
+					_, err = (&InstanceSetReconciler{Client: f.cli, Scheme: f.cli.Scheme(), Recorder: record.NewFakeRecorder(100)}).Reconcile(ctx, req)
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				if instanceAPI {
+					children := &workloads.InstanceList{}
+					if err := f.cli.List(ctx, children); err != nil {
+						t.Fatal(err)
+					}
+					for _, inst := range children.Items {
+						if ptr.Deref(inst.Spec.ScaledDown, false) {
+							t.Fatal("whole deletion initiated per-member retirement")
+						}
+						leaf := &InstanceReconciler{Client: f.cli, Scheme: f.cli.Scheme(), Recorder: record.NewFakeRecorder(100)}
+						if _, err := leaf.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(&inst)}); err != nil {
+							t.Fatal(err)
+						}
+					}
+				}
+			}
+			if err := f.cli.Get(ctx, client.ObjectKeyFromObject(f.its), &workloads.InstanceSet{}); !apierrors.IsNotFound(err) {
+				t.Fatalf("whole deletion did not finish: %v", err)
+			}
+			if len(lifecycleEntryPods(t, f.cli)) != 0 || len(agent.calls) != 0 {
+				t.Fatalf("whole deletion kept runtime or executed member actions: %v", agent.calls)
+			}
+			claims := pvcLifecycleClaims(t, f.cli)
+			if len(claims) != 2 {
+				t.Fatalf("whole deletion did not use WhenDeleted=Retain: %#v", claims)
+			}
+			for _, claim := range claims {
+				if len(claim.OwnerReferences) != 0 {
+					t.Fatalf("retained claim kept an owner: %#v", claim.OwnerReferences)
+				}
+			}
+		})
 	}
 }

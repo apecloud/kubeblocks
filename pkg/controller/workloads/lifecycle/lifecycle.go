@@ -33,7 +33,6 @@ import (
 
 	apps "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	publiclifecycle "github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -123,15 +122,6 @@ func Register(its *workloads.InstanceSet, assignments []instancetemplate.Assignm
 		changed = true
 	}
 	return changed
-}
-
-func Status(its *workloads.InstanceSet, name string) *workloads.InstanceStatus {
-	for i := range its.Status.InstanceStatus {
-		if its.Status.InstanceStatus[i].PodName == name {
-			return &its.Status.InstanceStatus[i]
-		}
-	}
-	return nil
 }
 
 func NeedsLeave(its *workloads.InstanceSet, status *workloads.InstanceStatus) bool {
@@ -224,7 +214,7 @@ func SourcePod(its *workloads.InstanceSet, pods []*corev1.Pod, target string, cu
 		if pod.Name == target || pod.DeletionTimestamp != nil || !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
 			continue
 		}
-		if status := Status(its, pod.Name); status != nil {
+		if status := its.FindInstanceStatus(pod.Name); status != nil {
 			state := status.EffectiveDesiredState()
 			if status.DataLoaded != nil && !*status.DataLoaded {
 				continue
@@ -270,11 +260,6 @@ func SourcePod(its *workloads.InstanceSet, pods []*corev1.Pod, target string, cu
 		return available[0], nil
 	}
 	return nil, fmt.Errorf("instance %s is waiting for an available data source", target)
-}
-
-func NewLifecycle(its *workloads.InstanceSet, pod *corev1.Pod, pods []*corev1.Pod) (publiclifecycle.Lifecycle, error) {
-	a := its.Spec.LifecycleActions
-	return publiclifecycle.New(its.Namespace, its.Labels[constant.AppInstanceLabelKey], its.Labels[constant.KBAppComponentLabelKey], &apps.ComponentLifecycleActions{Switchover: a.Switchover, Reconfigure: a.Reconfigure, MemberJoin: a.MemberJoin, MemberLeave: a.MemberLeave}, a.TemplateVars, pod, pods)
 }
 
 // ConfigurePod merges actions into the agent runtime supplied by the caller.

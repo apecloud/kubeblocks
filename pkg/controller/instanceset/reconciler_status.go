@@ -638,7 +638,7 @@ func statusResourceObservations(tree *kubebuilderx.ObjectTree, its *workloads.In
 		pvc := object.(*corev1.PersistentVolumeClaim)
 		owner := metav1.GetControllerOf(pvc)
 		name := pvc.Labels[constant.KBAppPodNameLabelKey]
-		tracked := workloadlifecycle.Status(its, name)
+		tracked := its.FindInstanceStatus(name)
 		keepResult := tracked != nil && tracked.DataLoaded != nil
 		if owner == nil || owner.UID != its.UID || name == "" || (retain && pvc.DeletionTimestamp.IsZero() && !keepResult) {
 			continue

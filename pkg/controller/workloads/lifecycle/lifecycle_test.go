@@ -35,6 +35,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
+	publiclifecycle "github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
@@ -74,7 +75,7 @@ func TestRegistrationSeparatesBootstrapAndLaterAllocation(t *testing.T) {
 	if !Register(its, assignments, sets.New[string](), sets.New[string]()) {
 		t.Fatal("new identity not registered")
 	}
-	status := Status(its, "demo-2")
+	status := its.FindInstanceStatus("demo-2")
 	if status.MemberJoined == nil || *status.MemberJoined {
 		t.Fatalf("new empty allocation not tracked: %+v", status)
 	}
@@ -82,12 +83,12 @@ func TestRegistrationSeparatesBootstrapAndLaterAllocation(t *testing.T) {
 	if !Register(its, nil, sets.New[string](), sets.New[string]()) || its.Status.ObservedGeneration != 1 {
 		t.Fatal("zero bootstrap did not record processed generation")
 	}
-	if !Register(its, assignments[:1], sets.New[string](), sets.New[string]()) || Status(its, "demo-0").MemberJoined == nil {
+	if !Register(its, assignments[:1], sets.New[string](), sets.New[string]()) || its.FindInstanceStatus("demo-0").MemberJoined == nil {
 		t.Fatal("zero replica increase was treated as bootstrap")
 	}
 	its = memberWorkload()
 	Register(its, assignments, sets.New("demo-1"), sets.New("demo-0"))
-	if Status(its, "demo-1").MemberJoined != nil {
+	if its.FindInstanceStatus("demo-1").MemberJoined != nil {
 		t.Fatal("unobserved old resources were classified as empty")
 	}
 }
@@ -159,7 +160,7 @@ func TestValidatedExecutionPreservesActionSelection(t *testing.T) {
 			if tc.name == "single all" && opts != nil {
 				t.Fatal("AllReplicas lost its aggregate-error semantics")
 			}
-			lfa, err := NewLifecycle(its, pods[0], pods)
+			lfa, err := publiclifecycle.New(its.Namespace, "", "", &apps.ComponentLifecycleActions{MemberJoin: tc.action}, its.Spec.LifecycleActions.TemplateVars, pods[0], pods)
 			if err != nil {
 				t.Fatal(err)
 			}

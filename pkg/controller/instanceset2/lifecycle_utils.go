@@ -71,7 +71,7 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 	registered := workloadlifecycle.Register(its, assignments, runtimeNames, resourceNames)
 	previous := its.DeepCopy().Status.InstanceStatus
 	for _, inst := range instances {
-		if status := instanceLifecycleStatus(its, inst.Name); status != nil {
+		if status := its.FindInstanceStatus(inst.Name); status != nil {
 			status.Provisioned = status.Provisioned || inst.Status.Provisioned || runtimeNames.Has(inst.Name)
 			if inst.Status.DataLoaded != nil {
 				status.DataLoaded = ptr.To(*inst.Status.DataLoaded)
@@ -103,14 +103,6 @@ func lifecyclePods(tree *kubebuilderx.ObjectTree) []*corev1.Pod {
 	}
 	return pods
 }
-func instanceLifecycleStatus(its *workloads.InstanceSet, name string) *workloads.InstanceStatus {
-	for i := range its.Status.InstanceStatus {
-		if its.Status.InstanceStatus[i].PodName == name {
-			return &its.Status.InstanceStatus[i]
-		}
-	}
-	return nil
-}
 func refreshInstanceData(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, inst *workloads.Instance) error {
 	applied := its.DeepCopy()
 	applied.Spec.LifecycleActions = inst.Spec.LifecycleActions
@@ -133,7 +125,7 @@ func lifecycleCreateInstance(tree *kubebuilderx.ObjectTree, its *workloads.Insta
 	if !workloadlifecycle.HasData(its) {
 		return nil
 	}
-	status := instanceLifecycleStatus(its, inst.Name)
+	status := its.FindInstanceStatus(inst.Name)
 	completed := status == nil || status.DataLoaded == nil || *status.DataLoaded
 	currentSpec := &inst.Spec.Template.Spec
 	if current, err := tree.Get(inst); err != nil {
@@ -162,4 +154,11 @@ func lifecycleCreateInstance(tree *kubebuilderx.ObjectTree, its *workloads.Insta
 	}
 	inst.Spec.Template.Spec = pod.Spec
 	return nil
+}
+
+func instanceRetirementObserved(inst *workloads.Instance) bool {
+	members := inst.Spec.LifecycleActions
+	return inst.Status.ObservedGeneration == inst.Generation &&
+		(members == nil || (members.MemberJoin == nil && members.MemberLeave == nil) ||
+			(inst.Status.MemberJoined != nil && !*inst.Status.MemberJoined))
 }

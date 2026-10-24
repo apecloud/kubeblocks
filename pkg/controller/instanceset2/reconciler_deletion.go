@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
@@ -65,6 +66,27 @@ func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuild
 		updated = true
 	}
 	if updated {
+		return kubebuilderx.RetryAfter(time.Second), nil
+	}
+
+	waiting := false
+	for _, obj := range tree.List(&workloads.Instance{}) {
+		inst := obj.(*workloads.Instance)
+		if !ptr.Deref(inst.Spec.ScaledDown, false) {
+			continue
+		}
+		if !instanceRetirementObserved(inst) {
+			waiting = true
+			continue
+		}
+		if status := its.FindInstanceStatus(inst.Name); status != nil && inst.Status.MemberJoined != nil && !equality.Semantic.DeepEqual(status.MemberJoined, inst.Status.MemberJoined) {
+			status.MemberJoined = ptr.To(*inst.Status.MemberJoined)
+			updated = true
+		}
+	}
+	// Handed-off retirement may select any existing peer as its executor.
+	// Persist its result before releasing the group and its execution resources.
+	if waiting || updated {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 

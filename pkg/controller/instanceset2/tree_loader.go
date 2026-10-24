@@ -150,7 +150,7 @@ func loadLifecycleRuntime(ctx context.Context, reader client.Reader, tree *kubeb
 		}
 		_, ordinal := parseParentNameAndOrdinal(name)
 		inst = multicluster.Assign(ctx, inst.DeepCopy(), func() int { return max(0, ordinal) }).(*workloads.Instance)
-		if status := instanceLifecycleStatus(its, name); status != nil && (status.DataLoaded != nil || (workloadlifecycle.HasData(its) && status.Provisioned)) {
+		if status := its.FindInstanceStatus(name); status != nil && (status.DataLoaded != nil || (workloadlifecycle.HasData(its) && status.Provisioned)) {
 			claims := &corev1.PersistentVolumeClaimList{}
 			queryCtx := multicluster.IntoContext(ctx, inst.Annotations[constant.KBAppMultiClusterPlacementKey])
 			if err := reader.List(queryCtx, claims, client.InNamespace(its.Namespace), client.MatchingLabels{

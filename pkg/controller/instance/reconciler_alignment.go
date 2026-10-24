@@ -29,6 +29,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -130,6 +131,18 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 	pod := obj.(*corev1.Pod)
 	if !intctrlutil.IsPodAvailable(pod, inst.Spec.MinReadySeconds) {
 		return kubebuilderx.Continue, nil
+	}
+	if inst.Status.DataLoaded != nil && !*inst.Status.DataLoaded {
+		return kubebuilderx.RetryAfter(time.Second), nil
+	}
+	for _, spec := range []*corev1.PodSpec{&inst.Spec.Template.Spec, &pod.Spec} {
+		task, err := workloadlifecycle.DataTask(spec, inst.Name)
+		if err != nil {
+			return kubebuilderx.Continue, err
+		}
+		if task != nil && !ptr.Deref(inst.Status.DataLoaded, false) {
+			return kubebuilderx.RetryAfter(time.Second), nil
+		}
 	}
 	return reconcileMember(tree, inst, pod, true)
 }

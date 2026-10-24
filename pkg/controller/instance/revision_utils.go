@@ -177,7 +177,7 @@ func BuildPodRevision(inst *workloads.Instance) (string, error) {
 }
 
 func buildInstancePodRevision(template *corev1.PodTemplateSpec, parent *workloads.Instance) (string, error) {
-	podTemplate := filterInPlaceFields(template)
+	podTemplate := filterInPlaceFields(template, parent.Spec.LifecycleActions != nil && parent.Spec.LifecycleActions.DataLoad != nil)
 	inst := builder.NewInstanceBuilder(parent.Namespace, parent.Name).
 		SetUID(parent.UID).
 		AddAnnotationsInMap(parent.Annotations).

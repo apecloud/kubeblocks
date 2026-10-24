@@ -21,6 +21,7 @@ package instance
 
 import (
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -34,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -54,6 +56,14 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	inst := tree.GetRoot().(*workloads.Instance)
+	task, err := workloadlifecycle.DataTask(&inst.Spec.Template.Spec, inst.Name)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	previous := inst.Status.DeepCopy()
+	if task != nil && inst.Status.DataLoaded == nil {
+		inst.Status.DataLoaded = ptr.To(false)
+	}
 	stopped := ptr.Deref(inst.Spec.Stop, false)
 	actions := inst.Spec.LifecycleActions
 	joinConfigured := actions != nil && actions.MemberJoin != nil
@@ -69,10 +79,36 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 	if obj == nil {
 		setPodUnavailableStatus(inst, workloads.InstanceCurrentStateAbsent, inst.Name, "")
+		if !reflect.DeepEqual(previous.DataLoaded, inst.Status.DataLoaded) {
+			return kubebuilderx.RetryAfter(time.Second), nil
+		}
 		return kubebuilderx.Continue, nil
 	}
 	pod := obj.(*corev1.Pod)
 	inst.Status.Provisioned = true
+	inst.Status.CurrentState = workloads.InstanceCurrentStatePresent
+	if isTerminating(pod) {
+		inst.Status.CurrentState = workloads.InstanceCurrentStateTerminating
+	}
+	actual, err := workloadlifecycle.DataTask(&pod.Spec, inst.Name)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	dataActionsConfigured := actions != nil && actions.DataDump != nil && actions.DataLoad != nil
+	dataTaskAbsent := task == nil && actual == nil
+	if inst.Status.DataLoaded == nil && dataTaskAbsent && dataActionsConfigured {
+		inst.Status.DataLoaded = ptr.To(true)
+	}
+	if actual != nil {
+		result := workloads.InstanceStatus{DataLoaded: inst.Status.DataLoaded}
+		if _, err := workloadlifecycle.ObserveData(&result, pod); err != nil {
+			return kubebuilderx.Continue, err
+		}
+		inst.Status.DataLoaded = result.DataLoaded
+	}
+	if !reflect.DeepEqual(previous.DataLoaded, inst.Status.DataLoaded) {
+		return kubebuilderx.RetryAfter(time.Second), nil
+	}
 	if !stopped && inst.Status.MemberJoined == nil && joinConfigured {
 		inst.Status.MemberJoined = ptr.To(true)
 		return kubebuilderx.RetryAfter(time.Second), nil
@@ -137,7 +173,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 	inst.Status.Configs = configs
 
-	if !stopped && inst.Spec.MinReadySeconds > 0 && !available {
+	if !stopped && inst.Spec.MinReadySeconds > 0 && !available && (ready || inst.Status.DataLoaded == nil) {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	return kubebuilderx.Continue, nil

@@ -25,6 +25,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -35,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -56,8 +58,14 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 	return kubebuilderx.ConditionSatisfied
 }
 
-func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
+func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (result kubebuilderx.Result, reconcileErr error) {
 	inst := tree.GetRoot().(*workloads.Instance)
+	defer func() {
+		if reconcileErr == nil && result == kubebuilderx.Continue && !ptr.Deref(inst.Spec.Stop, false) &&
+			inst.Spec.MinReadySeconds > 0 && inst.Status.DataLoaded != nil && !*inst.Status.DataLoaded && !inst.Status.Available {
+			result = kubebuilderx.RetryAfter(time.Second)
+		}
+	}()
 
 	newNameSet := sets.New[string](podName(inst))
 	oldNameSet := sets.New[string]()
@@ -72,13 +80,24 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.Continue, nil
 	}
 
-	// do nothing if update strategy type is 'OnDelete'
+	for _, pod := range oldPodList {
+		if !isPodPending(pod) {
+			continue
+		}
+		regenerate, err := needsDataTaskPodReplacement(inst, pod)
+		if err != nil {
+			return kubebuilderx.Continue, err
+		}
+		if regenerate {
+			if err := tree.Delete(pod); err != nil {
+				return kubebuilderx.Continue, err
+			}
+			return kubebuilderx.RetryAfter(time.Second), nil
+		}
+	}
 	if inst.Spec.InstanceUpdateStrategyType != nil && *inst.Spec.InstanceUpdateStrategyType == kbappsv1.OnDeleteStrategyType {
 		return kubebuilderx.Continue, nil
 	}
-
-	// treat old and Pending pod as a special case, as they can be updated without a consequence
-	// podUpdatePolicy is ignored here since in-place update for a pending pod doesn't make much sense.
 	for _, pod := range oldPodList {
 		updatePolicy, _, err := getPodUpdatePolicy(inst, pod)
 		if err != nil {
@@ -277,4 +296,31 @@ func buildBlockedCondition(inst *workloads.Instance, message string) *metav1.Con
 		Reason:             workloads.ReasonInstanceUpdateRestricted,
 		Message:            message,
 	}
+}
+
+// A pending Pod cannot receive changed init task inputs in place.
+func needsDataTaskPodReplacement(inst *workloads.Instance, pod *corev1.Pod) (bool, error) {
+	if model.IsObjectDeleting(pod) {
+		return false, nil
+	}
+	if ptr.Deref(inst.Status.DataLoaded, false) {
+		if workloadlifecycle.DataWorkerSucceeded(pod) {
+			return false, nil
+		}
+		task, err := workloadlifecycle.DataTask(&pod.Spec, pod.Name)
+		return task != nil, err
+	}
+	desired, err := buildInstancePod(inst, "")
+	if err != nil {
+		return false, err
+	}
+	currentTask, err := workloadlifecycle.DataTask(&desired.Spec, pod.Name)
+	if err != nil {
+		return false, err
+	}
+	oldTask, err := workloadlifecycle.DataTask(&pod.Spec, pod.Name)
+	if err != nil {
+		return false, err
+	}
+	return currentTask != nil && !equality.Semantic.DeepEqual(currentTask, oldTask), nil
 }

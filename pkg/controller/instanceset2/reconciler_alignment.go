@@ -129,6 +129,7 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 	baseSort(newNameList, func(i int) (string, int) {
 		return parseParentNameAndOrdinal(newNameList[i])
 	}, nil, true)
+	workloadlifecycle.SortDataSourcesFirst(its, newNameList)
 	getPredecessor := func(i int) *workloads.Instance {
 		if i <= 0 {
 			return nil
@@ -213,7 +214,7 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 		independentNames := sets.New[string]()
 		for name := range retirementNames {
 			status := its.FindInstanceStatus(name)
-			if status != nil && !workloadlifecycle.NeedsLeave(its, status) && (status.MemberJoined != nil && !*status.MemberJoined) {
+			if status != nil && !workloadlifecycle.NeedsLeave(its, status) && ((status.MemberJoined != nil && !*status.MemberJoined) || (status.DataLoaded != nil && !*status.DataLoaded)) {
 				independentNames.Insert(name)
 			}
 		}
@@ -244,6 +245,9 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
+		if err := lifecycleCreateInstance(tree, its, newInst); err != nil {
+			return lifecycleWait(tree, its, err)
+		}
 		if current != nil {
 			merged := copyAndMergeInstance(current, newInst)
 			if merged == nil {
@@ -254,7 +258,7 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 				return kubebuilderx.Continue, err
 			}
 		} else {
-			if status := its.FindInstanceStatus(name); its.Spec.LifecycleActions != nil && its.Spec.LifecycleActions.MemberJoin != nil && status != nil {
+			if status := its.FindInstanceStatus(name); status != nil && its.Spec.LifecycleActions != nil && its.Spec.LifecycleActions.MemberJoin != nil {
 				newInst.Spec.ScaledUp = ptr.To(status.MemberJoined != nil && !*status.MemberJoined)
 			}
 			if err := tree.Add(newInst); err != nil {
@@ -271,6 +275,25 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 
 	if workloadlifecycle.Enabled(its) && runtimeChanged {
 		return kubebuilderx.RetryAfter(time.Second), nil
+	}
+	for _, name := range newNameList {
+		if createNameSet.Has(name) {
+			continue
+		}
+		inst := oldInstanceMap[name]
+		if !workloadlifecycle.Enabled(its) || model.IsObjectDeleting(inst) || ptr.Deref(inst.Spec.Stop, false) {
+			continue
+		}
+		desired := inst.DeepCopy()
+		if err := refreshInstanceData(tree, its, desired); err != nil {
+			return lifecycleWait(tree, its, err)
+		}
+		if !equality.Semantic.DeepEqual(inst.Spec.Template.Spec, desired.Spec.Template.Spec) {
+			if err := tree.Update(desired); err != nil {
+				return kubebuilderx.Continue, err
+			}
+			return kubebuilderx.RetryAfter(time.Second), nil
+		}
 	}
 
 	if result, err := retire(retirementNames); err != nil || result != kubebuilderx.Continue {

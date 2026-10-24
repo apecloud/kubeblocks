@@ -84,7 +84,6 @@ func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuild
 			updated = true
 		}
 	}
-	// Persist handed-off retirement results before releasing the group and its resources.
 	if waiting || updated {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}

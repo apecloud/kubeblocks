@@ -97,7 +97,7 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		Do(instance.NewStatusReconciler()).
 		// Do(instance.NewRevisionUpdateReconciler()).
 		Do(instance.NewAssistantObjectReconciler()).
-		Do(instance.NewAlignmentReconciler()).
+		Do(instance.NewAlignmentReconciler(r.Client)).
 		Do(instance.NewUpdateReconciler()).
 		Commit()
 }

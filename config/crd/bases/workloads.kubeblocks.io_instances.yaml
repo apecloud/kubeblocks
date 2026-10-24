@@ -4292,6 +4292,12 @@ spec:
               scaledDown:
                 description: Indicate whether the instance is scaled down.
                 type: boolean
+              scaledUp:
+                description: |-
+                  ScaledUp indicates that this Instance was created for a new scale-out allocation.
+                  It only determines initial membership handling while MemberJoined is unset.
+                  An unset value is treated as false. It remains stable for this Instance object.
+                type: boolean
               selector:
                 description: |-
                   Represents a label query over pods that should match the desired replica count indicated by the `replica` field.

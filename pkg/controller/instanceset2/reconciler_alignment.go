@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset2
 
 import (
-	"slices"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -39,11 +38,11 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-func NewAlignmentReconciler(reader client.Reader) kubebuilderx.Reconciler {
-	return &alignmentReconciler{reader: reader}
+func NewAlignmentReconciler() kubebuilderx.Reconciler {
+	return &alignmentReconciler{}
 }
 
-type alignmentReconciler struct{ reader client.Reader }
+type alignmentReconciler struct{}
 
 var _ kubebuilderx.Reconciler = &alignmentReconciler{}
 
@@ -167,17 +166,21 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 					its.Name,
 					inst.Name)
 			}
-			if workloadlifecycle.Enabled(its) && !ptr.Deref(its.Spec.Stop, false) && !slices.Contains(its.Spec.OfflineInstances, inst.Name) {
+			if workloadlifecycle.Enabled(its) && !ptr.Deref(its.Spec.Stop, false) {
 				if workloadlifecycle.RetirementBlocked(its, workloadlifecycle.Status(its, inst.Name)) {
 					waiting = true
 					continue
 				}
-				if status := instanceLifecycleStatus(its, inst.Name); workloadlifecycle.NeedsMemberRetirement(its, status) {
-					return reconcileMember(tree, its, inst, false, r.reader)
-				}
 			}
-			if model.IsObjectDeleting(inst) || (ptr.Deref(inst.Spec.ScaledDown, false) && equality.Semantic.DeepEqual(
-				inst.Spec.PersistentVolumeClaimRetentionPolicy, its.Spec.PersistentVolumeClaimRetentionPolicy)) {
+			if model.IsObjectDeleting(inst) {
+				continue
+			}
+			if ptr.Deref(inst.Spec.ScaledDown, false) && equality.Semantic.DeepEqual(
+				inst.Spec.PersistentVolumeClaimRetentionPolicy, its.Spec.PersistentVolumeClaimRetentionPolicy) {
+				if inst.Status.ObservedGeneration != inst.Generation || (inst.Spec.LifecycleActions != nil && (inst.Spec.LifecycleActions.MemberJoin != nil || inst.Spec.LifecycleActions.MemberLeave != nil) && (inst.Status.MemberJoined == nil || *inst.Status.MemberJoined)) {
+					waiting = true
+					continue
+				}
 				if err := tree.Delete(inst); err != nil {
 					return kubebuilderx.Continue, err
 				}
@@ -206,7 +209,7 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 		return kubebuilderx.Continue, nil
 	}
 	if workloadlifecycle.Enabled(its) && !isStopRequested(its) {
-		independentNames := retirementNames.Intersection(sets.New(its.Spec.OfflineInstances...))
+		independentNames := sets.New[string]()
 		for name := range retirementNames {
 			status := workloadlifecycle.Status(its, name)
 			if status != nil && !workloadlifecycle.NeedsLeave(its, status) && (status.MemberJoined != nil && !*status.MemberJoined) {
@@ -250,6 +253,9 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 				return kubebuilderx.Continue, err
 			}
 		} else {
+			if status := instanceLifecycleStatus(its, name); status != nil {
+				newInst.Spec.ScaledUp = ptr.To(status.MemberJoined != nil && !*status.MemberJoined)
+			}
 			if err := tree.Add(newInst); err != nil {
 				return kubebuilderx.Continue, err
 			}
@@ -264,18 +270,6 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 
 	if workloadlifecycle.Enabled(its) && runtimeChanged {
 		return kubebuilderx.RetryAfter(time.Second), nil
-	}
-	for _, name := range newNameList {
-		if createNameSet.Has(name) {
-			continue
-		}
-		inst := oldInstanceMap[name]
-		if !workloadlifecycle.Enabled(its) || model.IsObjectDeleting(inst) || ptr.Deref(inst.Spec.Stop, false) {
-			continue
-		}
-		if result, err := reconcileMember(tree, its, inst, true, r.reader); err != nil || result != kubebuilderx.Continue {
-			return result, err
-		}
 	}
 
 	if result, err := retire(retirementNames); err != nil || result != kubebuilderx.Continue {

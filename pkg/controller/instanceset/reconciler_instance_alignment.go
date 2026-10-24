@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
-	"slices"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -160,7 +159,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 					its.Name,
 					pod.Name)
 			}
-			if workloadlifecycle.Enabled(its) && !isStopRequested(its) && !slices.Contains(its.Spec.OfflineInstances, name) {
+			if workloadlifecycle.Enabled(its) && !isStopRequested(its) {
 				if workloadlifecycle.RetirementBlocked(its, workloadlifecycle.Status(its, name)) {
 					waiting = true
 					continue
@@ -198,11 +197,11 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 				if name == "" || !names.Has(name) {
 					continue
 				}
-				if workloadlifecycle.Enabled(its) && !slices.Contains(its.Spec.OfflineInstances, name) && workloadlifecycle.RetirementBlocked(its, workloadlifecycle.Status(its, name)) {
+				if workloadlifecycle.Enabled(its) && workloadlifecycle.RetirementBlocked(its, workloadlifecycle.Status(its, name)) {
 					waiting = true
 					continue
 				}
-				if workloadlifecycle.Enabled(its) && !slices.Contains(its.Spec.OfflineInstances, name) && workloadlifecycle.NeedsMemberRetirement(its, workloadlifecycle.Status(its, name)) {
+				if workloadlifecycle.Enabled(its) && workloadlifecycle.NeedsMemberRetirement(its, workloadlifecycle.Status(its, name)) {
 					continue
 				}
 				if retiredNames.Has(name) || (!oldNameSet.Has(name) && metav1.IsControlledBy(obj, its)) {
@@ -219,7 +218,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		return kubebuilderx.Continue, nil
 	}
 	if workloadlifecycle.Enabled(its) && !isStopRequested(its) {
-		independentNames := retirementNames.Intersection(sets.New(its.Spec.OfflineInstances...))
+		independentNames := sets.New[string]()
 		for name := range retirementNames {
 			status := workloadlifecycle.Status(its, name)
 			if status != nil && !workloadlifecycle.NeedsLeave(its, status) && (status.MemberJoined != nil && !*status.MemberJoined) {

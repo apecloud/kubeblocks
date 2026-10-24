@@ -18824,6 +18824,20 @@ If set, all the computing resources will be released.</p>
 </tr>
 <tr>
 <td>
+<code>scaledUp</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ScaledUp indicates that this Instance was created for a new scale-out allocation.
+It only determines initial membership handling while MemberJoined is unset.
+An unset value is treated as false. It remains stable for this Instance object.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>scaledDown</code><br/>
 <em>
 bool
@@ -20514,6 +20528,20 @@ If set, all the computing resources will be released.</p>
 <td>
 <em>(Optional)</em>
 <p>Assistant objects that are necessary to run the instance.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scaledUp</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ScaledUp indicates that this Instance was created for a new scale-out allocation.
+It only determines initial membership handling while MemberJoined is unset.
+An unset value is treated as false. It remains stable for this Instance object.</p>
 </td>
 </tr>
 <tr>

@@ -46,7 +46,7 @@ func Enabled(its *workloads.InstanceSet) bool {
 }
 
 func RetirementBlocked(its *workloads.InstanceSet, old *workloads.InstanceStatus) bool {
-	if !Enabled(its) || old == nil || old.EffectiveDesiredState() == workloads.InstanceDesiredStateOffline {
+	if !Enabled(its) || old == nil {
 		return false
 	}
 	established := ptr.Deref(old.MemberJoined, false) || (old.MemberJoined == nil && old.Provisioned)

@@ -25,17 +25,19 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-func NewAlignmentReconciler() kubebuilderx.Reconciler {
-	return &alignmentReconciler{}
+func NewAlignmentReconciler(reader client.Reader) kubebuilderx.Reconciler {
+	return &alignmentReconciler{reader: reader}
 }
 
-type alignmentReconciler struct{}
+type alignmentReconciler struct{ reader client.Reader }
 
 var _ kubebuilderx.Reconciler = &alignmentReconciler{}
 
@@ -123,5 +125,8 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 		}
 	}
 
+	if obj != nil && inst.Spec.LifecycleActions != nil && inst.Spec.LifecycleActions.MemberJoin != nil && inst.Status.MemberJoined != nil && !*inst.Status.MemberJoined && intctrlutil.IsPodAvailable(obj.(*corev1.Pod), inst.Spec.MinReadySeconds) {
+		return reconcileMember(tree, inst, obj.(*corev1.Pod), true, r.reader)
+	}
 	return kubebuilderx.Continue, nil
 }

@@ -144,6 +144,13 @@ type InstanceSpec struct {
 	// +optional
 	InstanceAssistantObjects []InstanceAssistantObject `json:"instanceAssistantObjects,omitempty"`
 
+	// ScaledUp indicates that this Instance was created for a new scale-out allocation.
+	// It only determines initial membership handling while MemberJoined is unset.
+	// An unset value is treated as false. It remains stable for this Instance object.
+	//
+	// +optional
+	ScaledUp *bool `json:"scaledUp,omitempty"`
+
 	// Indicate whether the instance is scaled down.
 	//
 	// +optional

@@ -220,3 +220,8 @@ func (builder *InstanceBuilder) SetInstanceAssistantObjects(objs []workloads.Ins
 	builder.get().Spec.InstanceAssistantObjects = objs
 	return builder
 }
+
+func (builder *InstanceBuilder) SetScaledUp(scaledUp *bool) *InstanceBuilder {
+	builder.get().Spec.ScaledUp = scaledUp
+	return builder
+}

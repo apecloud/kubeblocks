@@ -157,8 +157,12 @@ func lifecycleCreateInstance(tree *kubebuilderx.ObjectTree, its *workloads.Insta
 }
 
 func instanceRetirementObserved(inst *workloads.Instance) bool {
+	if inst.Status.ObservedGeneration != inst.Generation {
+		return false
+	}
 	members := inst.Spec.LifecycleActions
-	return inst.Status.ObservedGeneration == inst.Generation &&
-		(members == nil || (members.MemberJoin == nil && members.MemberLeave == nil) ||
-			(inst.Status.MemberJoined != nil && !*inst.Status.MemberJoined))
+	if members == nil || (members.MemberJoin == nil && members.MemberLeave == nil) {
+		return true
+	}
+	return inst.Status.MemberJoined != nil && !*inst.Status.MemberJoined
 }

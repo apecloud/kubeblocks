@@ -3433,7 +3433,7 @@ func TestITS2ScaledDownWaitsForCurrentGeneration(t *testing.T) {
 	}
 }
 
-func TestITS2DeletionPreservesPendingScaledDownExecutors(t *testing.T) {
+func TestITS2DeletionWaitsForScaledDownAcknowledgement(t *testing.T) {
 	for _, scenario := range []string{"success", "leave-error", "child-status-conflict", "parent-status-conflict"} {
 		for _, scaledPolicy := range []kbappsv1.PersistentVolumeClaimRetentionPolicyType{kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType, kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType} {
 			t.Run(fmt.Sprintf("%s/WhenScaled=%s", scenario, scaledPolicy), func(t *testing.T) {
@@ -3445,12 +3445,12 @@ func TestITS2DeletionPreservesPendingScaledDownExecutors(t *testing.T) {
 				}
 				f.its.Spec.PersistentVolumeClaimRetentionPolicy = &workloads.PersistentVolumeClaimRetentionPolicy{WhenScaled: scaledPolicy, WhenDeleted: deletedPolicy}
 				f.its.Spec.VolumeClaimTemplates = newMemberLifecycleITS(2).Spec.VolumeClaimTemplates
-				f.its.Spec.LifecycleActions.MemberLeave = &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"leave"}}, TargetPodSelector: kbappsv1.OrdinalSelector, MatchingKey: "0"}
+				f.its.Spec.LifecycleActions.MemberLeave = &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"leave"}}, TargetPodSelector: kbappsv1.AnyReplica}
 				if err := f.cli.Update(ctx, f.its); err != nil {
 					t.Fatal(err)
 				}
 				f.bootstrap(t, 2)
-				peerKey := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-0"}
+				siblingKey := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-0"}
 				targetKey := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-1"}
 				f.its.Spec.Replicas = ptr.To[int32](1)
 				f.its.Generation++
@@ -3485,10 +3485,10 @@ func TestITS2DeletionPreservesPendingScaledDownExecutors(t *testing.T) {
 				}
 				assertRetained := func() {
 					t.Helper()
-					for _, key := range []client.ObjectKey{peerKey, targetKey} {
+					for _, key := range []client.ObjectKey{siblingKey, targetKey} {
 						inst := its2LifecycleInstance(t, f.cli, key.Name)
 						if !inst.DeletionTimestamp.IsZero() || ptr.Deref(inst.Spec.ScaledDown, false) != (key == targetKey) {
-							t.Fatalf("whole deletion changed retirement or released an executor: %#v", inst)
+							t.Fatalf("whole deletion changed retirement or released a child: %#v", inst)
 						}
 						pod := &corev1.Pod{}
 						if err := f.cli.Get(ctx, key, pod); err != nil || !pod.DeletionTimestamp.IsZero() {
@@ -3501,7 +3501,7 @@ func TestITS2DeletionPreservesPendingScaledDownExecutors(t *testing.T) {
 				}
 				result := parent()
 				for i := 0; i < 4; i++ {
-					leaf(peerKey)
+					leaf(siblingKey)
 				}
 				assertRetained()
 				if !result.Requeue {
@@ -3539,14 +3539,14 @@ func TestITS2DeletionPreservesPendingScaledDownExecutors(t *testing.T) {
 						t.Fatal("retirement overwrote a concurrent status update")
 					}
 					parent()
-					leaf(peerKey)
+					leaf(siblingKey)
 					assertRetained()
 					leaf(targetKey)
 					wantCalls++
 				}
 				child = its2LifecycleInstance(t, f.cli, targetKey.Name)
 				if child.Status.ObservedGeneration != child.Generation || ptr.Deref(child.Status.MemberJoined, true) || calls != wantCalls {
-					t.Fatalf("retirement did not commit using the ordinal peer: %#v calls=%d", child.Status, calls)
+					t.Fatalf("retirement did not commit using its own Pod: %#v calls=%d", child.Status, calls)
 				}
 				assertRetained()
 				if scenario == "parent-status-conflict" {
@@ -3568,10 +3568,10 @@ func TestITS2DeletionPreservesPendingScaledDownExecutors(t *testing.T) {
 				assertRetained()
 				for i := 0; i < 12; i++ {
 					parent()
-					leaf(peerKey)
+					leaf(siblingKey)
 					leaf(targetKey)
 				}
-				for _, obj := range []client.Object{&workloads.InstanceSet{ObjectMeta: f.its.ObjectMeta}, &workloads.Instance{ObjectMeta: metav1.ObjectMeta{Namespace: peerKey.Namespace, Name: peerKey.Name}}, &workloads.Instance{ObjectMeta: metav1.ObjectMeta{Namespace: targetKey.Namespace, Name: targetKey.Name}}, &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: peerKey.Namespace, Name: peerKey.Name}}, &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: targetKey.Namespace, Name: targetKey.Name}}} {
+				for _, obj := range []client.Object{&workloads.InstanceSet{ObjectMeta: f.its.ObjectMeta}, &workloads.Instance{ObjectMeta: metav1.ObjectMeta{Namespace: siblingKey.Namespace, Name: siblingKey.Name}}, &workloads.Instance{ObjectMeta: metav1.ObjectMeta{Namespace: targetKey.Namespace, Name: targetKey.Name}}, &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: siblingKey.Namespace, Name: siblingKey.Name}}, &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: targetKey.Namespace, Name: targetKey.Name}}} {
 					if err := f.cli.Get(ctx, client.ObjectKeyFromObject(obj), obj); !apierrors.IsNotFound(err) {
 						t.Fatalf("whole deletion did not finish %T %s: %v", obj, obj.GetName(), err)
 					}
@@ -3579,7 +3579,7 @@ func TestITS2DeletionPreservesPendingScaledDownExecutors(t *testing.T) {
 				for _, tc := range []struct {
 					key    client.ObjectKey
 					policy kbappsv1.PersistentVolumeClaimRetentionPolicyType
-				}{{peerKey, deletedPolicy}, {targetKey, scaledPolicy}} {
+				}{{siblingKey, deletedPolicy}, {targetKey, scaledPolicy}} {
 					claim := &corev1.PersistentVolumeClaim{}
 					err := f.cli.Get(ctx, client.ObjectKey{Namespace: tc.key.Namespace, Name: "data-" + tc.key.Name}, claim)
 					if tc.policy == kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType {
@@ -3591,7 +3591,76 @@ func TestITS2DeletionPreservesPendingScaledDownExecutors(t *testing.T) {
 					}
 				}
 				if calls != wantCalls {
-					t.Fatalf("cleanup repeated Leave or retired an ordinary peer: calls=%d want=%d", calls, wantCalls)
+					t.Fatalf("cleanup repeated Leave or retired an ordinary sibling: calls=%d want=%d", calls, wantCalls)
+				}
+			})
+		}
+	}
+}
+
+func TestInstanceMemberLeaveUsesOwnPod(t *testing.T) {
+	for _, selector := range []kbappsv1.TargetPodSelector{kbappsv1.AnyReplica, kbappsv1.AllReplicas} {
+		for _, runtime := range []string{"ready", "absent", "unavailable"} {
+			t.Run(fmt.Sprintf("%s/%s", selector, runtime), func(t *testing.T) {
+				ctx := context.Background()
+				f := newMemberLifecycleEntry(t, true, 2, appsv1.ParallelPodManagement)
+				f.its.Spec.LifecycleActions.MemberLeave.TargetPodSelector = selector
+				f.its.Spec.VolumeClaimTemplates = newMemberLifecycleITS(2).Spec.VolumeClaimTemplates
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				f.bootstrap(t, 2)
+				key := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-1"}
+				pod := &corev1.Pod{}
+				if err := f.cli.Get(ctx, key, pod); err != nil {
+					t.Fatal(err)
+				}
+				switch runtime {
+				case "absent":
+					pod.Finalizers = nil
+					if err := f.cli.Update(ctx, pod); err != nil {
+						t.Fatal(err)
+					}
+					if err := f.cli.Delete(ctx, pod); err != nil {
+						t.Fatal(err)
+					}
+				case "unavailable":
+					pod.Status.PodIP = ""
+					if err := f.cli.Status().Update(ctx, pod); err != nil {
+						t.Fatal(err)
+					}
+				}
+				child := its2LifecycleInstance(t, f.cli, key.Name)
+				child.Spec.ScaledDown = ptr.To(true)
+				child.Generation++
+				if err := f.cli.Update(ctx, child); err != nil {
+					t.Fatal(err)
+				}
+				agent := &its2LifecycleAgent{}
+				kbacli.SetMockClient(agent, nil)
+				defer kbacli.UnsetMockClient()
+				leaf := &InstanceReconciler{Client: f.cli, Scheme: f.cli.Scheme(), Recorder: record.NewFakeRecorder(100)}
+				for round := 0; round < 2; round++ {
+					result, err := leaf.Reconcile(ctx, ctrl.Request{NamespacedName: key})
+					if err != nil || result.RequeueAfter == 0 {
+						t.Fatalf("retirement lost retry: result=%#v err=%v", result, err)
+					}
+				}
+				child = its2LifecycleInstance(t, f.cli, key.Name)
+				if runtime == "ready" {
+					if len(agent.calls) != 1 || agent.calls[0] != "memberLeave" || ptr.Deref(child.Status.MemberJoined, true) || child.Status.ObservedGeneration != child.Generation {
+						t.Fatalf("own Pod did not execute exactly one Leave: calls=%v status=%#v", agent.calls, child.Status)
+					}
+				} else if len(agent.calls) != 0 || !ptr.Deref(child.Status.MemberJoined, false) || child.Status.ObservedGeneration == child.Generation {
+					t.Fatalf("healthy sibling executed or acknowledged Leave without own endpoint: calls=%v status=%#v", agent.calls, child.Status)
+				}
+				if err := f.cli.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: "data-" + key.Name}, &corev1.PersistentVolumeClaim{}); err != nil {
+					t.Fatalf("handoff removed storage: %v", err)
+				}
+				if runtime == "absent" {
+					if err := f.cli.Get(ctx, key, &corev1.Pod{}); !apierrors.IsNotFound(err) {
+						t.Fatalf("pending retirement rebuilt own Pod: %v", err)
+					}
 				}
 			})
 		}

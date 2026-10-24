@@ -84,8 +84,7 @@ func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuild
 			updated = true
 		}
 	}
-	// Handed-off retirement may select any existing peer as its executor.
-	// Persist its result before releasing the group and its execution resources.
+	// Persist handed-off retirement results before releasing the group and its resources.
 	if waiting || updated {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}

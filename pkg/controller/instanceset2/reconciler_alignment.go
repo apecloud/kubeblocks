@@ -176,8 +176,9 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 			if model.IsObjectDeleting(inst) {
 				continue
 			}
-			if ptr.Deref(inst.Spec.ScaledDown, false) && equality.Semantic.DeepEqual(
-				inst.Spec.PersistentVolumeClaimRetentionPolicy, its.Spec.PersistentVolumeClaimRetentionPolicy) {
+			scaledDown := ptr.Deref(inst.Spec.ScaledDown, false)
+			retentionMatches := equality.Semantic.DeepEqual(inst.Spec.PersistentVolumeClaimRetentionPolicy, its.Spec.PersistentVolumeClaimRetentionPolicy)
+			if scaledDown && retentionMatches {
 				if !instanceRetirementObserved(inst) {
 					waiting = true
 					continue

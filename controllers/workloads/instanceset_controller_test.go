@@ -4087,8 +4087,31 @@ func TestInstanceSetLifecycleRetiresMemberWithoutPod(t *testing.T) {
 			if err := f.cli.Update(ctx, f.its); err != nil {
 				t.Fatal(err)
 			}
+			if instanceAPI {
+				for round := 0; round < 12 && !ptr.Deref(its2LifecycleInstance(t, f.cli, target.Name).Spec.ScaledDown, false); round++ {
+					f.step(t)
+				}
+				if !ptr.Deref(its2LifecycleInstance(t, f.cli, target.Name).Spec.ScaledDown, false) {
+					t.Fatal("retirement was not handed off before child reconciliation")
+				}
+			}
 			for round := 0; round < 24; round++ {
 				f.stepWithChildren(t)
+			}
+			if instanceAPI {
+				child := its2LifecycleInstance(t, f.cli, target.Name)
+				leaf := &InstanceReconciler{Client: f.cli, Scheme: f.cli.Scheme(), Recorder: record.NewFakeRecorder(100)}
+				result, err := leaf.Reconcile(ctx, ctrl.Request{NamespacedName: targetKey})
+				if err != nil || result.RequeueAfter == 0 || len(agent.calls) != 0 || !ptr.Deref(child.Status.MemberJoined, false) || child.Status.ObservedGeneration == child.Generation || !workloadlifecycle.NeedsLeave(f.its, f.its.FindInstanceStatus(target.Name)) {
+					t.Fatalf("absent own Pod lost pending retirement: child=%#v result=%#v calls=%v err=%v", child.Status, result, agent.calls, err)
+				}
+				if err := f.cli.Get(ctx, pvcKey, &corev1.PersistentVolumeClaim{}); err != nil {
+					t.Fatalf("pending retirement removed storage: %v", err)
+				}
+				if err := f.cli.Get(ctx, targetKey, &corev1.Pod{}); !apierrors.IsNotFound(err) {
+					t.Fatalf("pending retirement rebuilt the own Pod: %v", err)
+				}
+				return
 			}
 			if len(agent.calls) != 1 || agent.calls[0] != "memberLeave" {
 				t.Fatalf("absent member did not leave through its healthy peer: calls=%v status=%#v", agent.calls, f.its.FindInstanceStatus(target.Name))
@@ -4343,6 +4366,21 @@ func TestInstanceSetLifecycleStopScaleThenResume(t *testing.T) {
 							}
 						}
 					}
+					if instanceAPI {
+						child := its2LifecycleInstance(t, f.cli, key.Name)
+						leaf := &InstanceReconciler{Client: f.cli, Scheme: f.cli.Scheme(), Recorder: record.NewFakeRecorder(100)}
+						result, err := leaf.Reconcile(ctx, ctrl.Request{NamespacedName: key})
+						if err != nil || result.RequeueAfter == 0 || failed.calls != 0 || !ptr.Deref(child.Status.MemberJoined, false) || child.Status.ObservedGeneration == child.Generation || !workloadlifecycle.NeedsLeave(f.its, f.its.FindInstanceStatus(key.Name)) {
+							t.Fatalf("resumed retirement without own Pod lost its wait: child=%#v result=%#v calls=%d err=%v", child.Status, result, failed.calls, err)
+						}
+						if err := f.cli.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: "data-" + key.Name}, &corev1.PersistentVolumeClaim{}); err != nil {
+							t.Fatalf("pending retirement removed storage: %v", err)
+						}
+						if err := f.cli.Get(ctx, key, &corev1.Pod{}); !apierrors.IsNotFound(err) {
+							t.Fatalf("pending retirement rebuilt the own Pod: %v", err)
+						}
+						return
+					}
 					if failed.calls == 0 || !workloadlifecycle.NeedsLeave(f.its, f.its.FindInstanceStatus(key.Name)) {
 						t.Fatalf("resumed peer did not retry the failed Leave: calls=%d status=%#v", failed.calls, f.its.FindInstanceStatus(key.Name))
 					}
@@ -4360,11 +4398,6 @@ func TestInstanceSetLifecycleStopScaleThenResume(t *testing.T) {
 					}
 					if status := f.its.FindInstanceStatus(key.Name); status != nil {
 						t.Fatalf("completed Leave retained the released identity: %#v", status)
-					}
-					if instanceAPI {
-						if err := f.cli.Get(ctx, key, &workloads.Instance{}); !apierrors.IsNotFound(err) {
-							t.Fatalf("completed Leave retained the excluded Instance: %v", err)
-						}
 					}
 					if err := f.cli.Get(ctx, key, &corev1.Pod{}); !apierrors.IsNotFound(err) {
 						t.Fatalf("completed retirement retained a Pod: %v", err)

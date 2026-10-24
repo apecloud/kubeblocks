@@ -65,7 +65,9 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		inst.Status.DataLoaded = ptr.To(false)
 	}
 	stopped := ptr.Deref(inst.Spec.Stop, false)
-	if !stopped && inst.Status.MemberJoined == nil && inst.Spec.LifecycleActions != nil && inst.Spec.LifecycleActions.MemberJoin != nil && ptr.Deref(inst.Spec.ScaledUp, false) {
+	actions := inst.Spec.LifecycleActions
+	joinConfigured := actions != nil && actions.MemberJoin != nil
+	if !stopped && inst.Status.MemberJoined == nil && joinConfigured && ptr.Deref(inst.Spec.ScaledUp, false) {
 		inst.Status.MemberJoined = ptr.To(false)
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
@@ -92,8 +94,9 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
-	if inst.Status.DataLoaded == nil && task == nil && actual == nil &&
-		inst.Spec.LifecycleActions != nil && inst.Spec.LifecycleActions.DataDump != nil && inst.Spec.LifecycleActions.DataLoad != nil {
+	dataActionsConfigured := actions != nil && actions.DataDump != nil && actions.DataLoad != nil
+	dataTaskAbsent := task == nil && actual == nil
+	if inst.Status.DataLoaded == nil && dataTaskAbsent && dataActionsConfigured {
 		inst.Status.DataLoaded = ptr.To(true)
 	}
 	if actual != nil {
@@ -106,7 +109,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if !reflect.DeepEqual(previous.DataLoaded, inst.Status.DataLoaded) {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
-	if !stopped && inst.Status.MemberJoined == nil && inst.Spec.LifecycleActions != nil && inst.Spec.LifecycleActions.MemberJoin != nil {
+	if !stopped && inst.Status.MemberJoined == nil && joinConfigured {
 		inst.Status.MemberJoined = ptr.To(true)
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}

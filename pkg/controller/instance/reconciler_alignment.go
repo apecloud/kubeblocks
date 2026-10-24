@@ -29,6 +29,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 func NewAlignmentReconciler() kubebuilderx.Reconciler {
@@ -123,5 +124,12 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 		}
 	}
 
-	return kubebuilderx.Continue, nil
+	if obj == nil || !needsMemberJoin(inst) {
+		return kubebuilderx.Continue, nil
+	}
+	pod := obj.(*corev1.Pod)
+	if !intctrlutil.IsPodAvailable(pod, inst.Spec.MinReadySeconds) {
+		return kubebuilderx.Continue, nil
+	}
+	return reconcileMember(tree, inst, pod, true)
 }

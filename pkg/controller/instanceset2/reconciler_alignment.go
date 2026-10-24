@@ -25,6 +25,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,6 +34,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -88,6 +90,7 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 	}
 	createNameSet := newNameSet.Difference(oldNameSet)
 	deleteNameSet := oldNameSet.Difference(newNameSet)
+	runtimeChanged := false
 	for name, inst := range oldInstanceMap {
 		if !newNameSet.Has(name) || model.IsObjectDeleting(inst) || !ptr.Deref(inst.Spec.ScaledDown, false) {
 			continue
@@ -97,6 +100,7 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 		if err := tree.Update(instCopy); err != nil {
 			return kubebuilderx.Continue, err
 		}
+		runtimeChanged = true
 		oldInstanceMap[name] = instCopy
 	}
 	oldInstanceList = tree.List(&workloads.Instance{})
@@ -121,7 +125,6 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 	}
 
 	// 3. handle alignment (create new instances and delete useless instances)
-	// create new instances
 	newNameList := sets.List(newNameSet)
 	baseSort(newNameList, func(i int) (string, int) {
 		return parseParentNameAndOrdinal(newNameList[i])
@@ -143,6 +146,82 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 			}
 		}
 	}
+	retirementNames := deleteNameSet.Clone()
+	retire := func(names sets.Set[string]) (kubebuilderx.Result, error) {
+		waiting := false
+		priorities := make(map[string]int)
+		sortObjects(oldInstanceList, priorities, false)
+		for _, object := range oldInstanceList {
+			inst, _ := object.(*workloads.Instance)
+			if !names.Has(inst.Name) {
+				continue
+			}
+			absentRetirement := hasObservedStoppedRuntime(inst)
+			if !absentRetirement && !isOrderedReady && concurrency <= 0 {
+				continue
+			}
+			if isOrderedReady && !intctrlutil.IsInstanceReady(inst) {
+				tree.EventRecorder.Eventf(its, corev1.EventTypeWarning, "InstanceSet %s/%s is waiting for Instance %s to be Ready",
+					its.Namespace,
+					its.Name,
+					inst.Name)
+			}
+			if workloadlifecycle.Enabled(its) && !ptr.Deref(its.Spec.Stop, false) {
+				if workloadlifecycle.RetirementBlocked(its, its.FindInstanceStatus(inst.Name)) {
+					waiting = true
+					continue
+				}
+			}
+			if model.IsObjectDeleting(inst) {
+				continue
+			}
+			scaledDown := ptr.Deref(inst.Spec.ScaledDown, false)
+			retentionMatches := equality.Semantic.DeepEqual(inst.Spec.PersistentVolumeClaimRetentionPolicy, its.Spec.PersistentVolumeClaimRetentionPolicy)
+			if scaledDown && retentionMatches {
+				if !instanceRetirementObserved(inst) {
+					waiting = true
+					continue
+				}
+				if err := tree.Delete(inst); err != nil {
+					return kubebuilderx.Continue, err
+				}
+			} else {
+				instCopy := inst.DeepCopy()
+				instCopy.Spec.ScaledDown = ptr.To(true)
+				instCopy.Spec.PersistentVolumeClaimRetentionPolicy = its.Spec.PersistentVolumeClaimRetentionPolicy.DeepCopy()
+				if err := tree.Update(instCopy); err != nil {
+					return kubebuilderx.Continue, err
+				}
+			}
+			if workloadlifecycle.Enabled(its) {
+				return kubebuilderx.RetryAfter(time.Second), nil
+			}
+			if isOrderedReady && !absentRetirement {
+				break
+			}
+			if !absentRetirement {
+				concurrency--
+			}
+		}
+
+		if waiting {
+			return kubebuilderx.RetryAfter(time.Second), nil
+		}
+		return kubebuilderx.Continue, nil
+	}
+	if workloadlifecycle.Enabled(its) && !isStopRequested(its) {
+		independentNames := sets.New[string]()
+		for name := range retirementNames {
+			status := its.FindInstanceStatus(name)
+			if status != nil && !workloadlifecycle.NeedsLeave(its, status) && (status.MemberJoined != nil && !*status.MemberJoined) {
+				independentNames.Insert(name)
+			}
+		}
+		if result, err := retire(independentNames); err != nil || result != kubebuilderx.Continue {
+			return result, err
+		}
+	}
+
 	for i, name := range newNameList {
 		if _, ok := createNameSet[name]; !ok {
 			continue
@@ -175,56 +254,32 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 				return kubebuilderx.Continue, err
 			}
 		} else {
+			if status := its.FindInstanceStatus(name); its.Spec.LifecycleActions != nil && its.Spec.LifecycleActions.MemberJoin != nil && status != nil {
+				newInst.Spec.ScaledUp = ptr.To(status.MemberJoined != nil && !*status.MemberJoined)
+			}
 			if err := tree.Add(newInst); err != nil {
 				return kubebuilderx.Continue, err
 			}
 		}
 
+		runtimeChanged = true
 		if isOrderedReady {
 			break
 		}
 		concurrency--
 	}
 
-	// delete useless instances
-	priorities := make(map[string]int)
-	sortObjects(oldInstanceList, priorities, false)
-	for _, object := range oldInstanceList {
-		inst, _ := object.(*workloads.Instance)
-		if _, ok := deleteNameSet[inst.Name]; !ok {
-			continue
-		}
-		absentRetirement := hasObservedStoppedRuntime(inst)
-		if !absentRetirement && !isOrderedReady && concurrency <= 0 {
-			continue
-		}
-		if isOrderedReady && !intctrlutil.IsInstanceReady(inst) {
-			tree.EventRecorder.Eventf(its, corev1.EventTypeWarning, "InstanceSet %s/%s is waiting for Instance %s to be Ready",
-				its.Namespace,
-				its.Name,
-				inst.Name)
-		}
-		if model.IsObjectDeleting(inst) || (ptr.Deref(inst.Spec.ScaledDown, false) && equality.Semantic.DeepEqual(
-			inst.Spec.PersistentVolumeClaimRetentionPolicy, its.Spec.PersistentVolumeClaimRetentionPolicy)) {
-			if err := tree.Delete(inst); err != nil {
-				return kubebuilderx.Continue, err
-			}
-		} else {
-			instCopy := inst.DeepCopy()
-			instCopy.Spec.ScaledDown = ptr.To(true)
-			instCopy.Spec.PersistentVolumeClaimRetentionPolicy = its.Spec.PersistentVolumeClaimRetentionPolicy.DeepCopy()
-			if err := tree.Update(instCopy); err != nil {
-				return kubebuilderx.Continue, err
-			}
-		}
-		if isOrderedReady && !absentRetirement {
-			break
-		}
-		if !absentRetirement {
-			concurrency--
-		}
+	if workloadlifecycle.Enabled(its) && runtimeChanged {
+		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 
+	if result, err := retire(retirementNames); err != nil || result != kubebuilderx.Continue {
+		return result, err
+	}
+
+	if workloadlifecycle.Enabled(its) {
+		meta.RemoveStatusCondition(&its.Status.Conditions, "InstanceLifecycle")
+	}
 	return kubebuilderx.Continue, nil
 }
 

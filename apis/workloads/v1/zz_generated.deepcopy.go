@@ -478,6 +478,11 @@ func (in *InstanceSpec) DeepCopyInto(out *InstanceSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.ScaledUp != nil {
+		in, out := &in.ScaledUp, &out.ScaledUp
+		*out = new(bool)
+		**out = **in
+	}
 	if in.ScaledDown != nil {
 		in, out := &in.ScaledDown, &out.ScaledDown
 		*out = new(bool)

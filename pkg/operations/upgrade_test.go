@@ -999,7 +999,7 @@ func TestUpgradeInstanceTemplateOwnerConvergence(t *testing.T) {
 			its.Generation = 2
 			tree := kubebuilderx.NewObjectTree()
 			tree.SetRoot(its)
-			for _, reconciler := range []kubebuilderx.Reconciler{instanceset.NewRevisionUpdateReconciler(), instanceset.NewReplicasAlignmentReconciler()} {
+			for _, reconciler := range []kubebuilderx.Reconciler{instanceset.NewRevisionUpdateReconciler(), instanceset.NewReplicasAlignmentReconciler(nil)} {
 				if _, err := reconciler.Reconcile(tree); err != nil {
 					t.Fatal(err)
 				}

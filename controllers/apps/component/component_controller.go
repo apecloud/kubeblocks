@@ -22,6 +22,7 @@ package component
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -215,6 +216,7 @@ func (r *ComponentReconciler) setupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).
+		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.filterOracleRecoveryPods)).
 		Watches(&dpv1alpha1.Restore{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
 		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources))
 
@@ -237,7 +239,8 @@ func (r *ComponentReconciler) setupWithMultiClusterManager(mgr ctrl.Manager, mul
 		Watches(&dpv1alpha1.Restore{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources))
 
 	eventHandler := handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)
-	multiClusterMgr.Watch(b, &corev1.Service{}, eventHandler).
+	multiClusterMgr.Watch(b, &corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.filterOracleRecoveryPods)).
+		Watch(b, &corev1.Service{}, eventHandler).
 		Watch(b, &corev1.Secret{}, eventHandler).
 		Watch(b, &corev1.ConfigMap{}, eventHandler).
 		Watch(b, &corev1.PersistentVolumeClaim{}, eventHandler).
@@ -267,4 +270,25 @@ func (r *ComponentReconciler) filterComponentResources(ctx context.Context, obj 
 			},
 		},
 	}
+}
+
+// A terminated database container may not change aggregate InstanceSet status.
+// This is only a wakeup hint; the restore plan validates owner UIDs and the full
+// failure contract before changing any recovery state.
+func (r *ComponentReconciler) filterOracleRecoveryPods(ctx context.Context, obj client.Object) []reconcile.Request {
+	pod, ok := obj.(*corev1.Pod)
+	if !ok || !pod.DeletionTimestamp.IsZero() {
+		return nil
+	}
+	for _, c := range pod.Status.ContainerStatuses {
+		if c.Name != "oracle" || c.Ready {
+			continue
+		}
+		for _, term := range []*corev1.ContainerStateTerminated{c.State.Terminated, c.LastTerminationState.Terminated} {
+			if term != nil && term.ExitCode != 0 && strings.Contains(term.Message, "kubeblocks.io/oracle-restore-failure/v1") {
+				return r.filterComponentResources(ctx, obj)
+			}
+		}
+	}
+	return nil
 }

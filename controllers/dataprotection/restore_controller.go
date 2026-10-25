@@ -58,6 +58,8 @@ type RestoreReconciler struct {
 	Recorder record.EventRecorder
 }
 
+// +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=instancesets,verbs=get;list;watch
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components;clusters,verbs=get;list;watch
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restores,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restores/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restores/finalizers,verbs=update
@@ -87,6 +89,14 @@ func (r *RestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return *res, err
 	}
 
+	if restore.Spec.ReadyConfig != nil && (restore.Status.Phase == "" || restore.Status.Phase == dpv1alpha1.RestorePhaseRunning) {
+		if result, err := r.checkEngineRecovery(reqCtx, restore); result != nil || err != nil {
+			if result == nil {
+				result = &ctrl.Result{}
+			}
+			return *result, err
+		}
+	}
 	switch restore.Status.Phase {
 	case "":
 		return r.newAction(reqCtx, restore)
@@ -98,6 +108,35 @@ func (r *RestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 	return intctrlutil.Reconciled()
+}
+
+// checkEngineRecovery never runs ordinary postReady actions. If evidence has
+// disappeared, wait for a fresh signal rather than inventing a permanent error.
+func (r *RestoreReconciler) checkEngineRecovery(reqCtx intctrlutil.RequestCtx, restore *dpv1alpha1.Restore) (*ctrl.Result, error) {
+	message, err := dprestore.OracleEngineFailure(reqCtx.Ctx, r.Client, restore)
+	if err != nil {
+		return &ctrl.Result{}, err
+	}
+	if message == "" {
+		if restore.Annotations[dprestore.EngineRecoveryCheckAnnotation] == "true" {
+			return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		}
+		return nil, nil
+	}
+	patch := client.MergeFromWithOptions(restore.DeepCopy(), client.MergeFromWithOptimisticLock{})
+	now := metav1.Now()
+	if restore.Status.StartTimestamp == nil {
+		restore.Status.StartTimestamp = &now
+	}
+	restore.Status.Phase = dpv1alpha1.RestorePhaseFailed
+	restore.Status.CompletionTimestamp = &now
+	restore.Status.Duration = dprestore.GetRestoreDuration(restore.Status)
+	dprestore.SetRestoreStageCondition(restore, dpv1alpha1.PostReady, dprestore.ReasonFailed, message)
+	if err := r.Status().Patch(reqCtx.Ctx, restore, patch); err != nil {
+		return &ctrl.Result{}, err
+	}
+	r.Recorder.Event(restore, corev1.EventTypeWarning, "OracleRecoveryFailed", message)
+	return &ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

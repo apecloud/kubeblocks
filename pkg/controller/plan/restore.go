@@ -40,6 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 )
 
@@ -100,6 +101,11 @@ func (r *RestoreManager) DoRestore(comp *component.SynthesizedComponent, compObj
 		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRestoreFailed, `status.backupMethod of backup "%s" can not be empty`, backupObj.Name)
 	}
 	if err = r.DoPrepareData(comp, compObj, backupObj); err != nil {
+		return err
+	}
+	// Engine recovery runs before readiness. Surface a verified fatal failure
+	// without waiting for a component that can never become Running.
+	if handled, err := r.checkEngineRecovery(comp, compObj, backupObj); handled || err != nil {
 		return err
 	}
 	if compObj.Status.Phase != appsv1.RunningComponentPhase {
@@ -264,6 +270,10 @@ func (r *RestoreManager) getConnectionCredential(comp *component.SynthesizedComp
 func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 	compObj *appsv1.Component,
 	backupObj *dpv1alpha1.Backup) error {
+	return r.createRestoreAndWait(compObj, r.buildPostReadyRestore(comp, compObj, backupObj))
+}
+
+func (r *RestoreManager) buildPostReadyRestore(comp *component.SynthesizedComponent, compObj *appsv1.Component, backupObj *dpv1alpha1.Backup) *dpv1alpha1.Restore {
 	jobActionLabels := constant.GetCompLabels(r.Cluster.Name, comp.Name)
 	if len(comp.Roles) > 0 {
 		// HACK: assume the role with highest priority to be writable
@@ -321,7 +331,36 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 	if backupMethod.TargetVolumes != nil {
 		restore.Spec.ReadyConfig.JobAction.Target.VolumeMounts = backupMethod.TargetVolumes.VolumeMounts
 	}
-	return r.createRestoreAndWait(compObj, restore)
+	return restore
+}
+
+func (r *RestoreManager) checkEngineRecovery(comp *component.SynthesizedComponent, compObj *appsv1.Component, backup *dpv1alpha1.Backup) (bool, error) {
+	candidate := r.buildPostReadyRestore(comp, compObj, backup)
+	existing := &dpv1alpha1.Restore{}
+	if err := r.Client.Get(r.Ctx, client.ObjectKeyFromObject(candidate), existing); err == nil {
+		if existing.Annotations[dprestore.EngineRecoveryCheckAnnotation] == "true" {
+			owner := metav1.GetControllerOf(existing)
+			if owner == nil || owner.UID != compObj.UID {
+				return false, nil
+			}
+			return true, r.createRestoreAndWait(compObj, candidate)
+		}
+		return false, nil
+	} else if !apierrors.IsNotFound(err) {
+		return false, err
+	}
+	if r.Scheme == nil {
+		return false, nil
+	}
+	if err := controllerutil.SetControllerReference(compObj, candidate, r.Scheme); err != nil {
+		return false, err
+	}
+	message, err := dprestore.OracleEngineFailure(r.Ctx, r.Client, candidate)
+	if err != nil || message == "" {
+		return false, err
+	}
+	candidate.Annotations = map[string]string{dprestore.EngineRecoveryCheckAnnotation: "true"}
+	return true, r.createRestoreAndWait(compObj, candidate)
 }
 
 func (r *RestoreManager) buildRequiredPolicy(sourceTarget *dpv1alpha1.BackupStatusTarget) *dpv1alpha1.RequiredPolicyForAllPodSelection {

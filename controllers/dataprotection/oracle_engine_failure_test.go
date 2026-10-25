@@ -22,14 +22,15 @@ package dataprotection
 import (
 	"context"
 	"errors"
-	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
-	batchv1 "k8s.io/api/batch/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
+	batchv1 "k8s.io/api/batch/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dp "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"

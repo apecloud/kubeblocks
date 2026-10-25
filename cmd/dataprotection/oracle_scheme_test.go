@@ -20,8 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package main
 
 import (
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"testing"
+
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
 func TestOracleFailureWorkloadScheme(t *testing.T) {

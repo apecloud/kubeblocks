@@ -21,10 +21,11 @@ package component
 
 import (
 	"context"
+	"testing"
+
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
 )
 
 func TestOracleRecoveryPodWakeup(t *testing.T) {

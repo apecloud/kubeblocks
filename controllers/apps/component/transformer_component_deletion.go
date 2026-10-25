@@ -25,12 +25,14 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -101,6 +103,21 @@ func (t *componentDeletionTransformer) handleCompDeleteWhenClusterDelete(transCt
 
 func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTransformContext, graphCli model.GraphClient,
 	dag *graph.DAG, comp *appsv1.Component, matchLabels map[string]string, kinds []client.ObjectList) error {
+
+	// Restore Jobs can still reference workload PVCs after failing. Waiting for
+	// InstanceSet/PVC deletion before deleting their Restore owner creates a
+	// cycle. Request ordinary Restore deletion first so DP cleans up its Jobs;
+	// do not bypass finalizers or touch backups retained by the user.
+	restores := &dpv1alpha1.RestoreList{}
+	if err := transCtx.Client.List(transCtx.Context, restores, client.InNamespace(comp.Namespace)); err != nil {
+		return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
+	}
+	for i := range restores.Items {
+		restore := &restores.Items[i]
+		if metav1.IsControlledBy(restore, comp) {
+			graphCli.Delete(dag, restore)
+		}
+	}
 
 	// firstly, delete the workloads owned by the component
 	workloads, err := model.ReadCacheSnapshot(transCtx, comp, matchLabels, compOwnedWorkloadKinds()...)

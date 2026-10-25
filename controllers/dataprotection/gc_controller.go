@@ -86,10 +86,7 @@ func (r *GCReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 
 	backup := &dpv1alpha1.Backup{}
 	if err := r.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, backup); err != nil {
-		if apierrors.IsNotFound(err) {
-			reqCtx.Log.Error(err, "backup ont found")
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		}
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to read backup")
 	}
 
 	// backup is being deleted, skip
@@ -108,11 +105,11 @@ func (r *GCReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 		return intctrlutil.Reconciled()
 	}
 
-	if deletable, err := r.isBackupDeletable(reqCtx, backup); !deletable {
-		return intctrlutil.Reconciled()
-	} else if err != nil {
+	if deletable, err := r.isBackupDeletable(reqCtx, backup); err != nil {
 		reqCtx.Log.Error(err, "failed to check backup deletability")
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+	} else if !deletable {
+		return intctrlutil.Reconciled()
 	}
 
 	reqCtx.Log.Info("backup has expired, delete it", "backup", req.String())
@@ -135,6 +132,15 @@ func getGCFrequency() time.Duration {
 
 // isBackupDeletable returns true if the backup can be deleted.
 func (r *GCReconciler) isBackupDeletable(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) (bool, error) {
+	// Deleting a parent cascades to its incremental descendants. A descendant's
+	// retention therefore protects all of its ancestors, including expired
+	// intermediate backups and roots whose policy has already been removed.
+	if protected, err := r.hasRetainedDescendant(reqCtx.Ctx, backup); err != nil {
+		return false, err
+	} else if protected {
+		reqCtx.Log.V(1).Info("retaining expired backup required by an unexpired descendant")
+		return false, nil
+	}
 	if backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
 		return true, nil
 	}
@@ -185,6 +191,43 @@ func (r *GCReconciler) isBackupDeletable(reqCtx intctrlutil.RequestCtx, backup *
 		}
 	}
 	return true, nil
+}
+
+// hasRetainedDescendant examines namespaced backup references rather than method
+// or cluster labels: full and incremental methods differ, and labels can be
+// absent on a newly created backup. A pending explicit parent is a dependency too.
+func (r *GCReconciler) hasRetainedDescendant(ctx context.Context, backup *dpv1alpha1.Backup) (bool, error) {
+	backups := &dpv1alpha1.BackupList{}
+	if err := r.List(ctx, backups, client.InNamespace(backup.Namespace)); err != nil {
+		return false, err
+	}
+	children := make(map[string][]*dpv1alpha1.Backup)
+	for i := range backups.Items {
+		b := &backups.Items[i]
+		for _, parent := range []string{b.Spec.ParentBackupName, b.Status.ParentBackupName, b.Status.BaseBackupName} {
+			if parent != "" && parent != b.Name {
+				children[parent] = append(children[parent], b)
+			}
+		}
+	}
+	visited := map[string]bool{backup.Name: true}
+	pending := []string{backup.Name}
+	now := r.clock.Now()
+	for len(pending) > 0 {
+		parent := pending[0]
+		pending = pending[1:]
+		for _, child := range children[parent] {
+			if visited[child.Name] {
+				continue
+			}
+			visited[child.Name] = true
+			if child.DeletionTimestamp.IsZero() && (child.Status.Expiration == nil || child.Status.Expiration.After(now)) {
+				return true, nil
+			}
+			pending = append(pending, child.Name)
+		}
+	}
+	return false, nil
 }
 
 // isLatestCompletedBackup returns true if the backup is the latest completed backup.

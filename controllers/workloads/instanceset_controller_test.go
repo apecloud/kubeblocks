@@ -5046,6 +5046,66 @@ func lifecycleTestDataPVCName(pod *corev1.Pod) (string, error) {
 	return "", fmt.Errorf("fixture has no data PVC")
 }
 
+func TestInstanceSetPendingJoinKeepsDataLoading(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		t.Run(fmt.Sprintf("instanceAPI=%t", instanceAPI), func(t *testing.T) {
+			ctx := context.Background()
+			f := newDataLifecycleEntry(t, instanceAPI, 1, appsv1.OrderedReadyPodManagement)
+			f.bootstrap(t, 1)
+			failJoin := true
+			calls := map[string]int{}
+			agent := kbacli.NewMockClient(gomock.NewController(t))
+			agent.EXPECT().Action(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, req kbaproto.ActionRequest) (kbaproto.ActionResponse, error) {
+				if req.Action != "memberJoin" {
+					t.Fatalf("unexpected action %s", req.Action)
+				}
+				calls[req.Parameters["KB_JOIN_MEMBER_POD_NAME"]]++
+				if failJoin {
+					return kbaproto.ActionResponse{}, fmt.Errorf("injected Join failure")
+				}
+				return kbaproto.ActionResponse{}, nil
+			}).AnyTimes()
+			kbacli.SetMockClient(agent, nil)
+			defer kbacli.UnsetMockClient()
+			f.its.Spec.Replicas = ptr.To[int32](3)
+			f.its.Generation++
+			if err := f.cli.Update(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			first, second := f.its.Name+"-1", f.its.Name+"-2"
+			for round := 0; round < 20; round++ {
+				f.stepWithChildren(t)
+			}
+			f.markDataLoaded(t, first)
+			f.setReady(t, first, true)
+			for round := 0; round < 24; round++ {
+				f.stepWithChildren(t)
+			}
+			pod := &corev1.Pod{}
+			if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: second}, pod); err != nil {
+				t.Fatalf("failed Join blocked the next data-loading replica: %v", err)
+			}
+			task, err := workloadlifecycle.DataTask(&pod.Spec, second)
+			status := f.its.FindInstanceStatus(second)
+			if err != nil || task == nil || status == nil || status.DataLoaded == nil || *status.DataLoaded || calls[first] == 0 || calls[second] != 0 {
+				t.Fatalf("later replica bypassed its data task: task=%+v status=%+v calls=%v err=%v", task, status, calls, err)
+			}
+			f.markDataLoaded(t, second)
+			f.setReady(t, second, true)
+			failJoin = false
+			for round := 0; round < 24; round++ {
+				f.stepWithChildren(t)
+			}
+			for _, name := range []string{first, second} {
+				status := f.its.FindInstanceStatus(name)
+				if status == nil || !ptr.Deref(status.DataLoaded, false) || !ptr.Deref(status.MemberJoined, false) || calls[name] == 0 {
+					t.Fatalf("data and membership did not recover: name=%s status=%+v calls=%v", name, status, calls)
+				}
+			}
+		})
+	}
+}
+
 func TestInstanceSetLifecycleZeroToOneWaitsForDataSource(t *testing.T) {
 	its := newDataLifecycleITS(0)
 	cli := newLifecycleEntryClient(t, its, interceptor.Funcs{})

@@ -5337,14 +5337,25 @@ func TestInstanceSetPendingJoinAllowsImageRecovery(t *testing.T) {
 	intctrlutil.SupportResizeSubResource = func() (bool, error) { return false, nil }
 	defer func() { intctrlutil.SupportResizeSubResource = oldResize }()
 	for _, instanceAPI := range []bool{false, true} {
-		for _, onDelete := range []bool{false, true} {
-			t.Run(fmt.Sprintf("instanceAPI=%t/OnDelete=%t", instanceAPI, onDelete), func(t *testing.T) {
+		for _, tc := range []struct {
+			replicas int32
+			policy   appsv1.PodManagementPolicyType
+			onDelete bool
+		}{
+			{2, appsv1.OrderedReadyPodManagement, false},
+			{2, appsv1.OrderedReadyPodManagement, true},
+			{2, appsv1.ParallelPodManagement, false},
+			{3, appsv1.OrderedReadyPodManagement, false},
+			{3, appsv1.OrderedReadyPodManagement, true},
+			{3, appsv1.ParallelPodManagement, false},
+		} {
+			t.Run(fmt.Sprintf("instanceAPI=%t/replicas=%d/%s/OnDelete=%t", instanceAPI, tc.replicas, tc.policy, tc.onDelete), func(t *testing.T) {
 				ctx := context.Background()
-				f := newMemberLifecycleEntry(t, instanceAPI, 1, appsv1.OrderedReadyPodManagement)
+				f := newMemberLifecycleEntry(t, instanceAPI, 1, tc.policy)
 				f.its.Spec.Template.Spec.Containers[0].Image = "database:v1"
 				f.its.Spec.PodUpdatePolicy = kbappsv1.PreferInPlacePodUpdatePolicyType
 				f.its.Spec.PodUpgradePolicy = kbappsv1.PreferInPlacePodUpdatePolicyType
-				if onDelete {
+				if tc.onDelete {
 					f.its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{Type: kbappsv1.OnDeleteStrategyType}
 				}
 				if err := f.cli.Update(ctx, f.its); err != nil {
@@ -5365,10 +5376,18 @@ func TestInstanceSetPendingJoinAllowsImageRecovery(t *testing.T) {
 				kbacli.SetMockClient(agent, nil)
 				defer kbacli.UnsetMockClient()
 				f.bootstrap(t, 1)
-				f.its.Spec.Replicas = ptr.To[int32](2)
+				f.its.Spec.Replicas = ptr.To(tc.replicas)
 				f.its.Generation++
 				if err := f.cli.Update(ctx, f.its); err != nil {
 					t.Fatal(err)
+				}
+				if tc.replicas == 3 {
+					for round := 0; round < 12; round++ {
+						f.stepWithChildren(t)
+					}
+					if pods := lifecycleEntryPods(t, f.cli); len(pods) != 2 {
+						t.Fatalf("unready expansion predecessor did not limit admission: pods=%d want=2", len(pods))
+					}
 				}
 				for round := 0; round < 18; round++ {
 					f.stepWithChildren(t)
@@ -5392,10 +5411,14 @@ func TestInstanceSetPendingJoinAllowsImageRecovery(t *testing.T) {
 					}
 				}
 				wantImage := "database:v2"
-				if onDelete {
+				if tc.onDelete {
 					wantImage = "database:v1"
 				}
-				for _, pod := range lifecycleEntryPods(t, f.cli) {
+				pods := lifecycleEntryPods(t, f.cli)
+				if len(pods) != int(tc.replicas) {
+					t.Fatalf("pending Join blocked runtime admission: pods=%d want=%d", len(pods), tc.replicas)
+				}
+				for _, pod := range pods {
 					if pod.Spec.Containers[0].Image != wantImage {
 						t.Fatalf("pending Join blocked permitted image recovery: pod=%s image=%s want=%s", pod.Name, pod.Spec.Containers[0].Image, wantImage)
 					}
@@ -5416,7 +5439,10 @@ func TestInstanceSetPendingJoinAllowsImageRecovery(t *testing.T) {
 				if calls <= before {
 					t.Fatal("Join stopped retrying after update settled")
 				}
-				if !onDelete {
+				if !instanceAPI && calls != before+1 {
+					t.Fatalf("native reconciliation attempted multiple pending Joins: calls=%d before=%d", calls, before)
+				}
+				if !tc.onDelete {
 					f.its.Spec.Template.Spec.Containers[0].Image = "database:v3"
 					f.its.Generation++
 					if err := f.cli.Update(ctx, f.its); err != nil {
@@ -5452,7 +5478,7 @@ func TestInstanceSetPendingJoinAllowsImageRecovery(t *testing.T) {
 				if status := f.its.FindInstanceStatus(target); status == nil || !ptr.Deref(status.MemberJoined, false) {
 					t.Fatalf("Join did not recover: %+v", status)
 				}
-				if !onDelete {
+				if !tc.onDelete {
 					for _, runtime := range lifecycleEntryPods(t, f.cli) {
 						if runtime.Spec.Containers[0].Image != "database:v3" {
 							t.Fatalf("committed Join did not release the image update: pod=%s image=%s", runtime.Name, runtime.Spec.Containers[0].Image)

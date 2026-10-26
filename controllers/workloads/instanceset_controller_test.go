@@ -8118,20 +8118,28 @@ func TestInstanceSetLifecycleReleasesUnobservedInitialData(t *testing.T) {
 					t.Fatal(err)
 				}
 				if instanceAPI {
+					leaf := &InstanceReconciler{Client: f.cli, Scheme: f.cli.Scheme(), Recorder: record.NewFakeRecorder(100)}
 					for i := 0; i < 16; i++ {
 						f.step(t)
 						child := its2LifecycleInstance(t, f.cli, name)
 						if ptr.Deref(child.Spec.ScaledDown, false) {
 							break
 						}
+						if _, err := leaf.Reconcile(ctx, ctrl.Request{NamespacedName: key}); err != nil {
+							t.Fatal(err)
+						}
 					}
-					leaf := &InstanceReconciler{Client: f.cli, Scheme: f.cli.Scheme(), Recorder: record.NewFakeRecorder(100)}
+					child := its2LifecycleInstance(t, f.cli, name)
+					if !ptr.Deref(child.Spec.ScaledDown, false) || !child.Status.Provisioned || !ptr.Deref(child.Status.DataLoaded, false) {
+						t.Fatalf("retirement did not wait for initial runtime observation: ScaledDown=%v Provisioned=%t DataLoaded=%v", child.Spec.ScaledDown, child.Status.Provisioned, child.Status.DataLoaded)
+					}
+					observedDataLoaded := child.Status.DataLoaded
 					if _, err := leaf.Reconcile(ctx, ctrl.Request{NamespacedName: key}); err != nil {
 						t.Fatal(err)
 					}
-					child := its2LifecycleInstance(t, f.cli, name)
-					if child.Status.DataLoaded != nil || ptr.Deref(child.Status.MemberJoined, true) {
-						t.Fatal("retirement fabricated initial data or failed Leave")
+					child = its2LifecycleInstance(t, f.cli, name)
+					if !reflect.DeepEqual(child.Status.DataLoaded, observedDataLoaded) || ptr.Deref(child.Status.MemberJoined, true) {
+						t.Fatal("retirement changed the observed initial data result or failed Leave")
 					}
 					for i := 0; i < 8; i++ {
 						f.step(t)
@@ -8143,7 +8151,7 @@ func TestInstanceSetLifecycleReleasesUnobservedInitialData(t *testing.T) {
 						t.Fatal(err)
 					}
 					child = its2LifecycleInstance(t, f.cli, name)
-					if (retain && child.Status.DataLoaded != nil) || (!retain && ptr.Deref(child.Status.DataLoaded, true)) {
+					if (retain && !reflect.DeepEqual(child.Status.DataLoaded, observedDataLoaded)) || (!retain && ptr.Deref(child.Status.DataLoaded, true)) {
 						t.Fatalf("wrong initial data invalidation: %#v", child.Status)
 					}
 					if err := f.cli.Get(ctx, claimKey, &corev1.PersistentVolumeClaim{}); err != nil {

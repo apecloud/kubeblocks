@@ -2895,6 +2895,17 @@ func TestITS2DeletionWaitsForScaledDownAcknowledgement(t *testing.T) {
 					t.Fatalf("scale-in was not handed off before Leave: %#v", child)
 				}
 				if scenario == "child-status-conflict" {
+					f.its.Spec.Stop = ptr.To(true)
+					f.its.Generation++
+					if err := f.cli.Update(ctx, f.its); err != nil {
+						t.Fatal(err)
+					}
+					for round := 0; round < 12 && !ptr.Deref(its2LifecycleInstance(t, f.cli, targetKey.Name).Spec.Stop, false); round++ {
+						f.step(t)
+					}
+					if !ptr.Deref(its2LifecycleInstance(t, f.cli, targetKey.Name).Spec.Stop, false) {
+						t.Fatal("parent did not stop pending retirement")
+					}
 					pod := &corev1.Pod{}
 					if err := f.cli.Get(ctx, targetKey, pod); err != nil {
 						t.Fatal(err)
@@ -3100,6 +3111,12 @@ func TestITS2StopAfterScaledDownHandoff(t *testing.T) {
 				if err := f.cli.Update(ctx, f.its); err != nil {
 					t.Fatal(err)
 				}
+				for round := 0; round < 12 && !ptr.Deref(its2LifecycleInstance(t, f.cli, key.Name).Spec.Stop, false); round++ {
+					f.step(t)
+				}
+				if !ptr.Deref(its2LifecycleInstance(t, f.cli, key.Name).Spec.Stop, false) {
+					t.Fatal("parent did not publish Stop to retiring child")
+				}
 				for round := 0; round < 24; round++ {
 					f.stepWithChildren(t)
 				}
@@ -3110,8 +3127,25 @@ func TestITS2StopAfterScaledDownHandoff(t *testing.T) {
 				if !ptr.Deref(child.Spec.Stop, false) || child.Status.CurrentState != workloads.InstanceCurrentStateAbsent {
 					t.Fatalf("retiring child did not observe Stop: %#v", child)
 				}
-				if hooks && len(agent.calls) > 1 {
-					t.Fatalf("Stop repeated membership retirement: %v", agent.calls)
+				if len(agent.calls) != 0 || (hooks && !ptr.Deref(child.Status.MemberJoined, false)) {
+					t.Fatalf("Stop changed membership: calls=%v status=%#v", agent.calls, child.Status)
+				}
+				f.its.Spec.Stop = ptr.To(false)
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				for round := 0; round < 24; round++ {
+					f.stepWithChildren(t)
+					for _, pod := range lifecycleEntryPods(t, f.cli) {
+						f.setReady(t, pod.Name, true)
+					}
+				}
+				if err := f.cli.Get(ctx, key, &workloads.Instance{}); !apierrors.IsNotFound(err) {
+					t.Fatalf("Resume did not finish pending retirement: %v", err)
+				}
+				if hooks && (len(agent.calls) != 1 || agent.calls[0] != "memberLeave") {
+					t.Fatalf("Resume did not complete one Leave: %v", agent.calls)
 				}
 			})
 		}

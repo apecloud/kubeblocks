@@ -119,6 +119,23 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 		return r.stopInstances(tree, oldInstanceList, isOrderedReady, concurrency)
 	}
 	for name, inst := range oldInstanceMap {
+		if newNameSet.Has(name) || model.IsObjectDeleting(inst) {
+			continue
+		}
+		if !ptr.Deref(inst.Spec.ScaledDown, false) || !ptr.Deref(inst.Spec.Stop, false) {
+			continue
+		}
+		if !instanceMemberActionsEnabled(inst) || instanceRetirementObserved(inst) {
+			continue
+		}
+		instCopy := inst.DeepCopy()
+		instCopy.Spec.Stop = ptr.To(false)
+		if err := tree.Update(instCopy); err != nil {
+			return kubebuilderx.Continue, err
+		}
+		return kubebuilderx.RetryAfter(time.Second), nil
+	}
+	for name, inst := range oldInstanceMap {
 		if newNameSet.Has(name) && ptr.Deref(inst.Spec.Stop, false) && !model.IsObjectDeleting(inst) {
 			createNameSet.Insert(name)
 		}
@@ -188,6 +205,9 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 			} else {
 				instCopy := inst.DeepCopy()
 				instCopy.Spec.ScaledDown = ptr.To(true)
+				if ptr.Deref(instCopy.Spec.Stop, false) && instanceMemberActionsEnabled(instCopy) {
+					instCopy.Spec.Stop = ptr.To(false)
+				}
 				instCopy.Spec.PersistentVolumeClaimRetentionPolicy = its.Spec.PersistentVolumeClaimRetentionPolicy.DeepCopy()
 				if err := tree.Update(instCopy); err != nil {
 					return kubebuilderx.Continue, err

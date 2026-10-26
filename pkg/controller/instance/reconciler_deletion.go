@@ -261,6 +261,14 @@ func (r *deletionReconciler) reconcileScaledDown(tree *kubebuilderx.ObjectTree, 
 	if err := r.reconcileDeletingRuntime(tree, inst); err != nil {
 		return kubebuilderx.Continue, err
 	}
+	if ptr.Deref(inst.Spec.Stop, false) && !model.IsObjectDeleting(inst) {
+		_, result, err := reconcilePod(tree, inst)
+		inst.Status.ObservedGeneration = inst.Generation
+		if err != nil || result != kubebuilderx.Continue {
+			return result, err
+		}
+		return kubebuilderx.RetryAfter(time.Second), nil
+	}
 	if scaledDownObserved(inst) {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
@@ -275,6 +283,15 @@ func (r *deletionReconciler) reconcileScaledDown(tree *kubebuilderx.ObjectTree, 
 	}
 	if memberActionsEnabled(inst) {
 		if needsMemberLeave(inst) {
+			if pod == nil || isTerminating(pod) {
+				if model.IsObjectDeleting(inst) {
+					return kubebuilderx.RetryAfter(time.Second), nil
+				}
+				if _, _, err := reconcilePod(tree, inst); err != nil {
+					return kubebuilderx.Continue, err
+				}
+				return kubebuilderx.RetryAfter(time.Second), nil
+			}
 			result, err := reconcileMember(tree, inst, pod, false)
 			if err != nil {
 				return result, err

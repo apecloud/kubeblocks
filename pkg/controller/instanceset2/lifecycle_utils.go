@@ -108,9 +108,13 @@ func instanceRetirementObserved(inst *workloads.Instance) bool {
 	if inst.Status.ObservedGeneration != inst.Generation {
 		return false
 	}
-	members := inst.Spec.LifecycleActions
-	if members == nil || (members.MemberJoin == nil && members.MemberLeave == nil) {
+	if !instanceMemberActionsEnabled(inst) {
 		return true
 	}
 	return inst.Status.MemberJoined != nil && !*inst.Status.MemberJoined
+}
+
+func instanceMemberActionsEnabled(inst *workloads.Instance) bool {
+	members := inst.Spec.LifecycleActions
+	return members != nil && (members.MemberJoin != nil || members.MemberLeave != nil)
 }

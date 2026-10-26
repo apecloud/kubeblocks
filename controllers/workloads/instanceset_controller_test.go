@@ -4167,6 +4167,14 @@ func TestInstanceSetLifecycleLeaveWaitsWithoutExecutor(t *testing.T) {
 				if err := f.cli.Update(ctx, f.its); err != nil {
 					t.Fatal(err)
 				}
+				if instanceAPI {
+					for round := 0; round < 12 && ptr.Deref(its2LifecycleInstance(t, f.cli, key.Name).Spec.ScaledDown, false); round++ {
+						f.step(t)
+					}
+					if ptr.Deref(its2LifecycleInstance(t, f.cli, key.Name).Spec.ScaledDown, false) {
+						t.Fatal("parent did not withdraw retirement before runtime recovery")
+					}
+				}
 				f.bootstrap(t, 1)
 				f.its.Spec.Replicas = ptr.To[int32](0)
 				f.its.Generation++

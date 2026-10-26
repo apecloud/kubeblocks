@@ -20,12 +20,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset2
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -256,5 +267,94 @@ func TestGetInstanceTemplateMap(t *testing.T) {
 func TestGetHeadlessSvcName(t *testing.T) {
 	if got := getHeadlessSvcName("mysql"); got != "mysql-headless" {
 		t.Fatalf("getHeadlessSvcName() = %q, want mysql-headless", got)
+	}
+}
+
+func TestLifecycleRuntimeDiscoversRetainedPVCIdentity(t *testing.T) {
+	for _, loaded := range []bool{false, true} {
+		for _, tc := range []struct {
+			name          string
+			mutate        func(*corev1.PersistentVolumeClaim)
+			missing, fail bool
+			want          bool
+		}{
+			{name: "ownerless retained", want: true},
+			{name: "different namespace", mutate: func(p *corev1.PersistentVolumeClaim) { p.Namespace = "other" }},
+			{name: "different identity", mutate: func(p *corev1.PersistentVolumeClaim) { p.Labels[constant.KBAppInstanceNameLabelKey] = "foreign" }},
+			{name: "different pod", mutate: func(p *corev1.PersistentVolumeClaim) { p.Labels[constant.KBAppPodNameLabelKey] = "foreign" }},
+			{name: "foreign owner", mutate: func(p *corev1.PersistentVolumeClaim) {
+				p.OwnerReferences = []metav1.OwnerReference{{APIVersion: workloads.GroupVersion.String(), Kind: "Instance", Name: "foreign", UID: "foreign"}}
+			}},
+			{name: "missing claim", missing: true},
+			{name: "lookup failure", fail: true},
+		} {
+			t.Run(fmt.Sprintf("loaded=%t/%s", loaded, tc.name), func(t *testing.T) {
+				ctx := context.Background()
+				name := "demo-named-1"
+				its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", Annotations: map[string]string{constant.KBAppMultiClusterPlacementKey: "data-a,data-b"}}, Spec: workloads.InstanceSetSpec{Replicas: ptr.To[int32](0), Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "demo"}}, LifecycleActions: &workloads.LifecycleActions{DataDump: &kbappsv1.Action{}, DataLoad: &kbappsv1.Action{}}}, Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{PodName: name, TemplateName: ptr.To("removed"), DataLoaded: ptr.To(loaded)}}}}
+				claim := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "old-template-claim", Namespace: its.Namespace, UID: "retained", Labels: map[string]string{constant.AppManagedByLabelKey: constant.AppName, constant.KBAppInstanceNameLabelKey: name, constant.KBAppPodNameLabelKey: name}}}
+				if tc.mutate != nil {
+					tc.mutate(claim)
+				}
+				builder := fake.NewClientBuilder().WithScheme(model.GetScheme())
+				if !tc.missing {
+					builder.WithObjects(claim)
+				}
+				failure := errors.New("claim lookup unavailable")
+				queries := 0
+				reader := builder.WithInterceptorFuncs(interceptor.Funcs{List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+					if _, ok := list.(*corev1.PersistentVolumeClaimList); ok {
+						queries++
+						placement, err := multicluster.FromContext(ctx)
+						if err != nil || placement != "data-b" {
+							t.Fatalf("wrong retained data placement %q %v", placement, err)
+						}
+						options := (&client.ListOptions{}).ApplyOptions(opts)
+						if options.Namespace != its.Namespace {
+							t.Fatalf("wrong namespace %q", options.Namespace)
+						}
+						dataContext := false
+						for _, opt := range opts {
+							if reflect.DeepEqual(opt, multicluster.InDataContext()) {
+								dataContext = true
+							}
+						}
+						if !dataContext {
+							t.Fatal("retained PVC lookup omitted data-context routing")
+						}
+						if tc.fail {
+							return failure
+						}
+					}
+					return c.List(ctx, list, opts...)
+				}}).Build()
+				tree := kubebuilderx.NewObjectTree()
+				tree.SetRoot(its)
+				tree.Context = ctx
+				err := loadLifecycleRuntime(ctx, reader, tree)
+				if queries != 1 {
+					t.Fatalf("retained identity lookup count %d", queries)
+				}
+				if tc.fail {
+					if !errors.Is(err, failure) {
+						t.Fatalf("lookup error lost: %v", err)
+					}
+					return
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				claimsByInstance := tree.Context.Value(lifecyclePVCsKey{}).(map[string][]*corev1.PersistentVolumeClaim)
+				if (len(claimsByInstance[name]) > 0) != tc.want {
+					t.Fatalf("claims=%v want=%t", claimsByInstance, tc.want)
+				}
+				if len(tree.List(&corev1.PersistentVolumeClaim{})) != 0 {
+					t.Fatal("parent took mutable ownership of observed claims")
+				}
+				if *its.FindInstanceStatus(name).DataLoaded != loaded {
+					t.Fatal("resource presence changed recorded result")
+				}
+			})
+		}
 	}
 }

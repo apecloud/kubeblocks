@@ -215,6 +215,12 @@ func buildInstancePod(inst *workloads.Instance, revision string) (*corev1.Pod, e
 		SetPodSpec(*inst.Spec.Template.Spec.DeepCopy()).
 		GetObject()
 
+	if ptr.Deref(inst.Status.DataLoaded, false) {
+		if _, err := workloadlifecycle.CleanTask(&pod.Spec, inst.Name); err != nil {
+			return nil, err
+		}
+	}
+
 	// 2. build pvcs from template
 	pvcNameMap := make(map[string]string)
 	for _, claimTemplate := range inst.Spec.VolumeClaimTemplates {

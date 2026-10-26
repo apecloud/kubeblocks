@@ -75,6 +75,12 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		return kubebuilderx.Continue, err
 	}
 
+	if changed, err := restoreRequiredDataSources(tree, its, itsExt); err != nil {
+		return lifecycleWait(tree, its, err)
+	} else if changed {
+		return kubebuilderx.RetryAfter(time.Second), nil
+	}
+
 	// 2. find the create and delete set
 	newNameSet := sets.New[string]()
 	if !isStopRequested(its) {

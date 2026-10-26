@@ -193,3 +193,50 @@ func lifecycleCreatePod(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSe
 	}
 	return workloadlifecycle.ConfigureDataTask(its, pod, source)
 }
+
+// restoreRequiredDataSources recreates only runtimes backed by retained donor claims.
+func restoreRequiredDataSources(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, itsExt *instancetemplate.InstanceSetExt) (bool, error) {
+	if isStopRequested(its) {
+		return false, nil
+	}
+	for _, status := range its.Status.InstanceStatus {
+		if status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive || status.TemplateName == nil || !workloadlifecycle.DataSourceRequired(its, &status) {
+			continue
+		}
+		podKey := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: its.Namespace, Name: status.PodName}}
+		if existing, err := tree.Get(podKey); err != nil {
+			return false, err
+		} else if existing != nil {
+			continue
+		}
+		template, found := instancetemplate.ResolveTemplateByName(itsExt, *status.TemplateName)
+		if !found {
+			continue
+		}
+		pod, err := buildInstancePodByTemplate(status.PodName, template, its, "")
+		if err != nil {
+			return false, err
+		}
+		claimsPresent := true
+		for _, volume := range pod.Spec.Volumes {
+			if volume.PersistentVolumeClaim == nil {
+				continue
+			}
+			claim := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Namespace: its.Namespace, Name: volume.PersistentVolumeClaim.ClaimName}}
+			if existing, err := tree.Get(claim); err != nil {
+				return false, err
+			} else if existing == nil || model.IsObjectDeleting(existing) {
+				claimsPresent = false
+				break
+			}
+		}
+		if !claimsPresent {
+			continue
+		}
+		if err := lifecycleCreatePod(tree, its, pod); err != nil {
+			return false, err
+		}
+		return true, tree.Add(pod)
+	}
+	return false, nil
+}

@@ -31,6 +31,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 )
 
@@ -165,4 +166,28 @@ func instanceRetirementObserved(inst *workloads.Instance) bool {
 		return true
 	}
 	return inst.Status.MemberJoined != nil && !*inst.Status.MemberJoined
+}
+
+func restoreRequiredDataSources(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) (bool, error) {
+	for _, status := range its.Status.InstanceStatus {
+		if status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive || !workloadlifecycle.DataSourceRequired(its, &status) {
+			continue
+		}
+		key := &workloads.Instance{ObjectMeta: metav1.ObjectMeta{Namespace: its.Namespace, Name: status.PodName}}
+		obj, err := tree.Get(key)
+		if err != nil {
+			return false, err
+		}
+		if obj == nil || model.IsObjectDeleting(obj) {
+			continue
+		}
+		inst := obj.(*workloads.Instance)
+		if !ptr.Deref(inst.Spec.Stop, false) || !ptr.Deref(inst.Status.DataLoaded, true) || !ptr.Deref(inst.Status.MemberJoined, true) {
+			continue
+		}
+		instCopy := inst.DeepCopy()
+		instCopy.Spec.Stop = ptr.To(false)
+		return true, tree.Update(instCopy)
+	}
+	return false, nil
 }

@@ -51,19 +51,30 @@ func HasData(its *workloads.InstanceSet) bool {
 	return its.Spec.LifecycleActions != nil && (its.Spec.LifecycleActions.DataDump != nil || its.Spec.LifecycleActions.DataLoad != nil)
 }
 
+// DataSourceRequired reports whether retained data is still needed by an active copy.
+func DataSourceRequired(its *workloads.InstanceSet, old *workloads.InstanceStatus) bool {
+	if !HasData(its) || old == nil {
+		return false
+	}
+	established := ptr.Deref(old.MemberJoined, false) || (old.MemberJoined == nil && old.Provisioned)
+	if !established || (old.DataLoaded != nil && !*old.DataLoaded) {
+		return false
+	}
+	return slices.ContainsFunc(its.Status.InstanceStatus, func(status workloads.InstanceStatus) bool {
+		return status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive && status.DataLoaded != nil && !*status.DataLoaded
+	})
+}
+
 func RetirementBlocked(its *workloads.InstanceSet, old *workloads.InstanceStatus) bool {
 	if !Enabled(its) || old == nil {
 		return false
 	}
+	if DataSourceRequired(its, old) {
+		return true
+	}
 	established := ptr.Deref(old.MemberJoined, false) || (old.MemberJoined == nil && old.Provisioned)
-	donor := established && (old.DataLoaded == nil || *old.DataLoaded)
-	return slices.ContainsFunc(its.Status.InstanceStatus, func(status workloads.InstanceStatus) bool {
-		if status.EffectiveDesiredState() != workloads.InstanceDesiredStateActive {
-			return false
-		}
-		pendingData := donor && HasData(its) && status.DataLoaded != nil && !*status.DataLoaded
-		pendingJoin := established && its.Spec.LifecycleActions.MemberJoin != nil && status.MemberJoined != nil && !*status.MemberJoined
-		return pendingData || pendingJoin
+	return established && its.Spec.LifecycleActions.MemberJoin != nil && slices.ContainsFunc(its.Status.InstanceStatus, func(status workloads.InstanceStatus) bool {
+		return status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive && status.MemberJoined != nil && !*status.MemberJoined
 	})
 }
 

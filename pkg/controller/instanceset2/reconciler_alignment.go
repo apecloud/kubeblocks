@@ -118,6 +118,11 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 	if isStopRequested(its) {
 		return r.stopInstances(tree, oldInstanceList, isOrderedReady, concurrency)
 	}
+	if changed, err := restoreRequiredDataSources(tree, its); err != nil {
+		return lifecycleWait(tree, its, err)
+	} else if changed {
+		return kubebuilderx.RetryAfter(time.Second), nil
+	}
 	for name, inst := range oldInstanceMap {
 		if newNameSet.Has(name) && ptr.Deref(inst.Spec.Stop, false) && !model.IsObjectDeleting(inst) {
 			createNameSet.Insert(name)

@@ -47,6 +47,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -2379,6 +2380,142 @@ func (s *its2LifecycleStatus) Update(ctx context.Context, obj client.Object, opt
 		return apierrors.NewConflict(schema.GroupResource{Group: workloads.SchemeGroupVersion.Group, Resource: "instancesets"}, obj.GetName(), fmt.Errorf("injected status conflict"))
 	}
 	return s.SubResourceWriter.Update(ctx, obj, opts...)
+}
+
+func TestInstanceSetRetirementPreservesParentRuntimeHistory(t *testing.T) {
+	for _, instanceAPI := range []bool{false, true} {
+		for _, join := range []bool{false, true} {
+			for _, scenario := range []string{"ordinary-delete", "stopped", "status-conflict"} {
+				if !instanceAPI && scenario != "ordinary-delete" {
+					continue
+				}
+				t.Run(fmt.Sprintf("instanceAPI=%t/join=%t/%s", instanceAPI, join, scenario), func(t *testing.T) {
+					ctx := context.Background()
+					f := newMemberLifecycleEntry(t, instanceAPI, 1, appsv1.OrderedReadyPodManagement)
+					if !join {
+						f.its.Spec.LifecycleActions.MemberJoin = nil
+						if err := f.cli.Update(ctx, f.its); err != nil {
+							t.Fatal(err)
+						}
+					}
+					for round := 0; round < 16 && len(lifecycleEntryPods(t, f.cli)) == 0; round++ {
+						f.stepWithChildren(t)
+					}
+					key := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-0"}
+					pod := &corev1.Pod{}
+					if err := f.cli.Get(ctx, key, pod); err != nil {
+						t.Fatal(err)
+					}
+					if instanceAPI {
+						child := its2LifecycleInstance(t, f.cli, key.Name)
+						if child.Status.Provisioned || child.Status.MemberJoined != nil {
+							t.Fatalf("bootstrap leaf already observed runtime: %+v", child.Status)
+						}
+					}
+					f.setReady(t, key.Name, false)
+					for round := 0; round < 4; round++ {
+						f.step(t)
+					}
+					if status := f.its.FindInstanceStatus(key.Name); status == nil || !status.Provisioned {
+						t.Fatalf("parent did not observe unready runtime: %+v", status)
+					}
+					if scenario == "stopped" {
+						f.its.Spec.Stop = ptr.To(true)
+						f.its.Generation++
+						if err := f.cli.Update(ctx, f.its); err != nil {
+							t.Fatal(err)
+						}
+						for round := 0; round < 6; round++ {
+							f.step(t)
+						}
+						if !ptr.Deref(its2LifecycleInstance(t, f.cli, key.Name).Spec.Stop, false) {
+							t.Fatal("Stop did not reach the unobserved child")
+						}
+					}
+					if err := f.cli.Get(ctx, key, pod); err != nil {
+						t.Fatal(err)
+					}
+					if err := f.cli.Delete(ctx, pod); err != nil {
+						t.Fatal(err)
+					}
+					if err := f.cli.Get(ctx, key, &corev1.Pod{}); !apierrors.IsNotFound(err) {
+						t.Fatalf("ordinary Pod deletion did not complete: %v", err)
+					}
+					f.its.Spec.Stop = ptr.To(false)
+					f.its.Spec.Replicas = ptr.To[int32](0)
+					f.its.Generation++
+					if err := f.cli.Update(ctx, f.its); err != nil {
+						t.Fatal(err)
+					}
+					agent := &its2LifecycleAgent{}
+					kbacli.SetMockClient(agent, nil)
+					defer kbacli.UnsetMockClient()
+					for round := 0; round < 8; round++ {
+						f.step(t)
+					}
+					if status := f.its.FindInstanceStatus(key.Name); status == nil || !status.Provisioned || (status.MemberJoined != nil && !*status.MemberJoined) {
+						t.Fatalf("parent discarded its Leave obligation: %+v", status)
+					}
+					if !instanceAPI {
+						if len(agent.calls) != 0 {
+							t.Fatalf("native had no executor but claimed Leave: %v", agent.calls)
+						}
+						return
+					}
+					child := its2LifecycleInstance(t, f.cli, key.Name)
+					if ptr.Deref(child.Spec.ScaledDown, false) || ptr.Deref(child.Spec.Stop, false) || child.Status.Provisioned {
+						t.Fatalf("retirement handed off before child observation: spec=%+v status=%+v", child.Spec, child.Status)
+					}
+					conflicted := false
+					if scenario == "status-conflict" {
+						cli := f.cli.(*its2LifecycleClient)
+						cli.Client = interceptor.NewClient(cli.Client.(client.WithWatch), interceptor.Funcs{SubResourceUpdate: func(ctx context.Context, delegate client.Client, subresource string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+							if next, ok := obj.(*workloads.Instance); ok && subresource == "status" && next.Status.Provisioned && !conflicted {
+								conflicted = true
+								return apierrors.NewConflict(schema.GroupResource{Group: workloads.GroupVersion.Group, Resource: "instances"}, next.Name, fmt.Errorf("injected observation conflict"))
+							}
+							return delegate.SubResource(subresource).Update(ctx, obj, opts...)
+						}})
+					}
+					leaf := &InstanceReconciler{Client: f.cli, Scheme: f.cli.Scheme(), Recorder: record.NewFakeRecorder(100)}
+					for round := 0; round < 6; round++ {
+						if _, err := leaf.Reconcile(ctx, ctrl.Request{NamespacedName: key}); err != nil {
+							t.Fatal(err)
+						}
+						f.step(t)
+						child = its2LifecycleInstance(t, f.cli, key.Name)
+						if ptr.Deref(child.Spec.ScaledDown, false) {
+							if !child.Status.Provisioned {
+								t.Fatal("handoff preceded persisted child observation")
+							}
+							break
+						}
+					}
+					if !child.Status.Provisioned || !ptr.Deref(child.Spec.ScaledDown, false) || (scenario == "status-conflict" && !conflicted) {
+						t.Fatalf("child history did not recover: conflict=%t child=%+v", conflicted, child)
+					}
+					if err := f.cli.Get(ctx, key, pod); err != nil {
+						t.Fatal(err)
+					}
+					if err := f.cli.Delete(ctx, pod); err != nil {
+						t.Fatal(err)
+					}
+					for round := 0; round < 32; round++ {
+						f.stepWithChildren(t)
+						for _, runtime := range lifecycleEntryPods(t, f.cli) {
+							f.setReady(t, runtime.Name, true)
+						}
+					}
+					if len(agent.calls) != 1 || agent.calls[0] != "memberLeave" || f.its.FindInstanceStatus(key.Name) != nil {
+						t.Fatalf("second runtime loss skipped Leave or cleanup: calls=%v history=%+v", agent.calls, f.its.FindInstanceStatus(key.Name))
+					}
+					if err := f.cli.Get(ctx, key, &workloads.Instance{}); !apierrors.IsNotFound(err) {
+						t.Fatalf("acknowledged retirement retained child: %v", err)
+					}
+				})
+			}
+		}
+	}
 }
 
 type its2LifecycleAgent struct{ calls []string }

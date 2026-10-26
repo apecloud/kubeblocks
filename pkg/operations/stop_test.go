@@ -276,7 +276,7 @@ func TestStopReconcilesCurrentInstanceStatus(t *testing.T) {
 	check("2/2", 2, opsv1alpha1.OpsSucceedPhase)
 }
 
-func TestStopWaitsForAppsResult(t *testing.T) {
+func TestStopWaitsForRecoveryAndAppsResult(t *testing.T) {
 	for _, replicas := range []int32{0, 1} {
 		t.Run(fmt.Sprintf("replicas=%d", replicas), func(t *testing.T) {
 			scheme := runtime.NewScheme()
@@ -289,7 +289,7 @@ func TestStopWaitsForAppsResult(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "cluster", Namespace: "default", Generation: 1},
 				Spec:       appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "mysql", Replicas: replicas, Stop: ptr.To(true)}}},
 				Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{
-					"mysql": {Phase: appsv1.StoppedComponentPhase, ObservedGeneration: 1, UpToDate: true},
+					"mysql": {Phase: appsv1.FailedComponentPhase, ObservedGeneration: 1, UpToDate: true},
 				}},
 			}
 			ops := &opsv1alpha1.OpsRequest{
@@ -336,7 +336,7 @@ func TestStopWaitsForAppsResult(t *testing.T) {
 				t.Fatal(err)
 			}
 			check(opsv1alpha1.OpsRunningPhase, fmt.Sprintf("%d/%d", replicas, replicas))
-			cluster.Status.Components["mysql"] = appsv1.ClusterComponentStatus{Phase: appsv1.StoppingComponentPhase, ObservedGeneration: 1, UpToDate: true}
+			cluster.Status.Components["mysql"] = appsv1.ClusterComponentStatus{Phase: appsv1.FailedComponentPhase, ObservedGeneration: 1, UpToDate: true}
 			if err := cli.Status().Update(ctx, cluster); err != nil {
 				t.Fatal(err)
 			}

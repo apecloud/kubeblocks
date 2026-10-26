@@ -89,7 +89,7 @@ func TestStartTargetsStarted(t *testing.T) {
 	}
 }
 
-func TestStartReconcilesCurrentInstanceStatus(t *testing.T) {
+func TestStartRecoversFromCurrentComponentFailure(t *testing.T) {
 	scheme := runtime.NewScheme()
 	for _, add := range []func(*runtime.Scheme) error{appsv1.AddToScheme, opsv1alpha1.AddToScheme, workloads.AddToScheme} {
 		if err := add(scheme); err != nil {
@@ -103,7 +103,7 @@ func TestStartReconcilesCurrentInstanceStatus(t *testing.T) {
 			Name: "mysql", Replicas: replicas,
 		}}},
 		Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{
-			"mysql": {Phase: appsv1.RunningComponentPhase, ObservedGeneration: 2, UpToDate: true},
+			"mysql": {Phase: appsv1.FailedComponentPhase, ObservedGeneration: 2, UpToDate: true},
 		}},
 	}
 	opsRequest := &opsv1alpha1.OpsRequest{
@@ -193,6 +193,15 @@ func TestStartReconcilesCurrentInstanceStatus(t *testing.T) {
 
 	its.Status.InstanceStatus[0].UpToDate = true
 	if err := cli.Update(reqCtx.Ctx, its); err != nil {
+		t.Fatal(err)
+	}
+	reconcile(opsv1alpha1.OpsRunningPhase, "1/1", opsv1alpha1.SucceedProgressStatus)
+
+	currentCluster := load().Cluster
+	status := currentCluster.Status.Components["mysql"]
+	status.Phase = appsv1.RunningComponentPhase
+	currentCluster.Status.Components["mysql"] = status
+	if err := cli.Status().Update(reqCtx.Ctx, currentCluster); err != nil {
 		t.Fatal(err)
 	}
 	failProgressPatch = true

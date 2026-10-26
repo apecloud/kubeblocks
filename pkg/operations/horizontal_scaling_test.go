@@ -2255,35 +2255,72 @@ func TestHorizontalScalingProgressPatchFailureRetries(t *testing.T) {
 	f.reconcile(t, opsv1alpha1.OpsSucceedPhase)
 }
 
-func TestHorizontalScalingFailureWaitsForOtherAcceptedTargets(t *testing.T) {
-	f := newHorizontalScalingFixture(t, scaleOutRequest("db", false), scaleOutRequest("other", false))
-	if err := (horizontalScalingOpsHandler{}).Action(f.req, f.cli, f.res); err != nil {
-		t.Fatal(err)
-	}
-	publishHorizontalScalingResult(t, f)
-	status := f.res.Cluster.Status.Components["db"]
-	status.Phase = appsv1.FailedComponentPhase
-	f.res.Cluster.Status.Components["db"] = status
-	if err := f.cli.Delete(f.req.Ctx, &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "demo-db", Namespace: "default"}}); err != nil {
-		t.Fatal(err)
-	}
-	other := f.res.Cluster.Status.Components["other"]
-	other.UpToDate = false
-	f.res.Cluster.Status.Components["other"] = other
-	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
-	status.Phase = appsv1.RunningComponentPhase
-	f.res.Cluster.Status.Components["db"] = status
-	other.UpToDate = true
-	f.res.Cluster.Status.Components["other"] = other
-	if _, err := GetOpsManager().Reconcile(f.req, f.cli, f.res); err != nil {
-		t.Fatal(err)
-	}
-	if f.res.OpsRequest.Status.Phase != opsv1alpha1.OpsFailedPhase {
-		t.Fatalf("terminal branch failure was lost: %s", f.res.OpsRequest.Status.Phase)
+func TestHorizontalScalingRecoversFromCurrentComponentFailure(t *testing.T) {
+	for _, multiple := range []bool{false, true} {
+		t.Run(fmt.Sprintf("multiple-targets=%t", multiple), func(t *testing.T) {
+			requests := []opsv1alpha1.HorizontalScaling{scaleOutRequest("db", false)}
+			if multiple {
+				requests = append(requests, scaleOutRequest("other", false))
+			}
+			f := newHorizontalScalingFixture(t, requests...)
+			if err := (horizontalScalingOpsHandler{}).Action(f.req, f.cli, f.res); err != nil {
+				t.Fatal(err)
+			}
+			publishHorizontalScalingResult(t, f)
+			status := f.res.Cluster.Status.Components["db"]
+			status.Phase = appsv1.FailedComponentPhase
+			f.res.Cluster.Status.Components["db"] = status
+			its := &workloads.InstanceSet{}
+			if err := f.cli.Get(f.req.Ctx, client.ObjectKey{Namespace: "default", Name: "demo-db"}, its); err != nil {
+				t.Fatal(err)
+			}
+			its.Status.InstanceStatus[0].Ready = false
+			if err := f.cli.Update(f.req.Ctx, its); err != nil {
+				t.Fatal(err)
+			}
+			if multiple {
+				other := f.res.Cluster.Status.Components["other"]
+				other.UpToDate = false
+				f.res.Cluster.Status.Components["other"] = other
+			}
+			if delay, err := GetOpsManager().Reconcile(f.req, f.cli, f.res); err != nil || delay <= 0 {
+				t.Fatalf("recoverable failure did not request retry: delay=%s err=%v", delay, err)
+			}
+			resumed := &opsv1alpha1.OpsRequest{}
+			if err := f.cli.Get(f.req.Ctx, client.ObjectKeyFromObject(f.res.OpsRequest), resumed); err != nil {
+				t.Fatal(err)
+			}
+			f.res.OpsRequest = resumed
+			db := resumed.Status.Components["db"]
+			if resumed.Status.Phase != opsv1alpha1.OpsRunningPhase || db.Reason != "" || db.Phase != appsv1.FailedComponentPhase {
+				t.Fatalf("recoverable health was persisted as terminal failure: %+v", resumed.Status)
+			}
+			if len(db.ProgressDetails) != 2 || !slices.ContainsFunc(db.ProgressDetails, func(d opsv1alpha1.ProgressStatusDetail) bool {
+				return d.Status == opsv1alpha1.ProcessingProgressStatus
+			}) {
+				t.Fatalf("incomplete scaling progress was lost: %+v", db)
+			}
+			publishHorizontalScalingResult(t, f)
+			f.res.Cluster.Status.Components["db"] = status
+			f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+			if f.res.OpsRequest.Status.Progress != fmt.Sprintf("%d/%d", len(requests)*2, len(requests)*2) {
+				t.Fatalf("complete progress was lost while component recovers: %+v", f.res.OpsRequest.Status)
+			}
+			publishHorizontalScalingResult(t, f)
+			if _, err := GetOpsManager().Reconcile(f.req, f.cli, f.res); err != nil {
+				t.Fatal(err)
+			}
+			if err := f.cli.Get(f.req.Ctx, client.ObjectKeyFromObject(f.res.OpsRequest), resumed); err != nil {
+				t.Fatal(err)
+			}
+			if resumed.Status.Phase != opsv1alpha1.OpsSucceedPhase || resumed.Status.Components["db"].Phase != appsv1.RunningComponentPhase {
+				t.Fatalf("recovered operation did not succeed: %+v", resumed.Status)
+			}
+		})
 	}
 }
 
-func TestHorizontalScalingCancellationReobservesFailedBranch(t *testing.T) {
+func TestHorizontalScalingCancellationReobservesRecoverableFailure(t *testing.T) {
 	f := newHorizontalScalingFixture(t, scaleOutRequest("db", false), scaleOutRequest("other", false))
 	hs := horizontalScalingOpsHandler{}
 	if err := hs.Action(f.req, f.cli, f.res); err != nil {
@@ -2299,8 +2336,8 @@ func TestHorizontalScalingCancellationReobservesFailedBranch(t *testing.T) {
 	if _, err := GetOpsManager().Reconcile(f.req, f.cli, f.res); err != nil {
 		t.Fatal(err)
 	}
-	if f.res.OpsRequest.Status.Phase != opsv1alpha1.OpsRunningPhase || f.res.OpsRequest.Status.Components["db"].Reason != horizontalScalingFailedReason {
-		t.Fatalf("expected a recorded branch failure: %+v", f.res.OpsRequest.Status)
+	if f.res.OpsRequest.Status.Phase != opsv1alpha1.OpsRunningPhase || f.res.OpsRequest.Status.Components["db"].Reason != "" {
+		t.Fatalf("expected recoverable component health: %+v", f.res.OpsRequest.Status)
 	}
 	previous := f.res.OpsRequest.DeepCopy()
 	if err := hs.Cancel(f.req, f.cli, f.res); err != nil {

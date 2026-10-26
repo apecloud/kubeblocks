@@ -79,8 +79,8 @@ func TestComponentActionPhase(t *testing.T) {
 	status.UpToDate = true
 	cluster.Status.Components["mysql"] = status
 	phase = helper.componentActionPhase(opsRes, appsv1.RunningComponentPhase)
-	if phase != opsv1alpha1.OpsFailedPhase {
-		t.Fatalf("current failure phase=%s, want Failed", phase)
+	if phase != opsv1alpha1.OpsRunningPhase {
+		t.Fatalf("current component failure phase=%s, want Running until recovery or operation termination", phase)
 	}
 
 	status.Phase = appsv1.RunningComponentPhase

@@ -145,7 +145,7 @@ func TestRestartReplacedTrigger(t *testing.T) {
 	}
 }
 
-func TestRestartUsesClusterStatusForTerminalPhase(t *testing.T) {
+func TestRestartUsesClusterStatusForSuccess(t *testing.T) {
 	testScheme := runtime.NewScheme()
 	for name, addToScheme := range map[string]func(*runtime.Scheme) error{
 		"apps":       appsv1.AddToScheme,
@@ -181,11 +181,11 @@ func TestRestartUsesClusterStatusForTerminalPhase(t *testing.T) {
 			wantDetailStatus: opsv1alpha1.SucceedProgressStatus,
 		},
 		{
-			name:             "failed component is authoritative failure",
+			name:             "failed component health remains recoverable",
 			componentPhase:   appsv1.FailedComponentPhase,
 			upToDate:         true,
 			instanceFailed:   true,
-			wantPhase:        opsv1alpha1.OpsFailedPhase,
+			wantPhase:        opsv1alpha1.OpsRunningPhase,
 			wantDetailStatus: opsv1alpha1.FailedProgressStatus,
 		},
 	}

@@ -402,8 +402,8 @@ func TestVerticalScalingResultAndProgressConvergeIndependently(t *testing.T) {
 			instances: ready, wantPhase: opsv1alpha1.OpsRunningPhase, progress: "2/2"},
 		{name: "apps target is not up to date", phase: appsv1.RunningComponentPhase, generation: 7, upToDate: false,
 			instances: ready, wantPhase: opsv1alpha1.OpsRunningPhase, progress: "2/2"},
-		{name: "apps result failed", phase: appsv1.FailedComponentPhase, generation: 7, upToDate: true,
-			instances: ready, wantPhase: opsv1alpha1.OpsFailedPhase, progress: "2/2"},
+		{name: "apps health failed with complete progress remains recoverable", phase: appsv1.FailedComponentPhase, generation: 7, upToDate: true,
+			instances: ready, wantPhase: opsv1alpha1.OpsRunningPhase, progress: "2/2"},
 		{name: "workload observation is stale", phase: appsv1.RunningComponentPhase, generation: 7, upToDate: true,
 			instances: ready, staleITS: true, wantPhase: opsv1alpha1.OpsRunningPhase, progress: "2/2"},
 		{name: "current progress is incomplete", phase: appsv1.RunningComponentPhase, generation: 7, upToDate: true,
@@ -426,6 +426,20 @@ func TestVerticalScalingResultAndProgressConvergeIndependently(t *testing.T) {
 			}
 			if phase != tc.wantPhase || ops.Status.Progress != tc.progress {
 				t.Fatalf("got phase=%s progress=%s, want phase=%s progress=%s", phase, ops.Status.Progress, tc.wantPhase, tc.progress)
+			}
+			if tc.phase == appsv1.FailedComponentPhase {
+				resumed := &opsv1alpha1.OpsRequest{}
+				if err := cli.Get(context.Background(), client.ObjectKeyFromObject(ops), resumed); err != nil {
+					t.Fatal(err)
+				}
+				status := cluster.Status.Components["db"]
+				status.Phase = appsv1.RunningComponentPhase
+				cluster.Status.Components["db"] = status
+				phase, _, err = (verticalScalingHandler{}).ReconcileAction(
+					intctrlutil.RequestCtx{Ctx: context.Background()}, cli, verticalScalingTestResourcesBundle(cluster, resumed))
+				if err != nil || phase != opsv1alpha1.OpsSucceedPhase || resumed.Status.Progress != "2/2" {
+					t.Fatalf("recovered scaling phase=%s progress=%s err=%v", phase, resumed.Status.Progress, err)
+				}
 			}
 		})
 	}

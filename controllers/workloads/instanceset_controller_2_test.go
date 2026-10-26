@@ -2464,7 +2464,7 @@ func TestInstanceSetRetirementPreservesParentRuntimeHistory(t *testing.T) {
 					}
 					child := its2LifecycleInstance(t, f.cli, key.Name)
 					if ptr.Deref(child.Spec.ScaledDown, false) || ptr.Deref(child.Spec.Stop, false) || child.Status.Provisioned {
-						t.Fatalf("retirement handed off before child observation: spec=%+v status=%+v", child.Spec, child.Status)
+						t.Fatalf("retirement handed off before child observation: Stop=%v ScaledDown=%v Provisioned=%t MemberJoined=%v", child.Spec.Stop, child.Spec.ScaledDown, child.Status.Provisioned, child.Status.MemberJoined)
 					}
 					conflicted := false
 					if scenario == "status-conflict" {
@@ -2492,7 +2492,7 @@ func TestInstanceSetRetirementPreservesParentRuntimeHistory(t *testing.T) {
 						}
 					}
 					if !child.Status.Provisioned || !ptr.Deref(child.Spec.ScaledDown, false) || (scenario == "status-conflict" && !conflicted) {
-						t.Fatalf("child history did not recover: conflict=%t child=%+v", conflicted, child)
+						t.Fatalf("child history did not recover: conflict=%t ScaledDown=%v Provisioned=%t MemberJoined=%v", conflicted, child.Spec.ScaledDown, child.Status.Provisioned, child.Status.MemberJoined)
 					}
 					if err := f.cli.Get(ctx, key, pod); err != nil {
 						t.Fatal(err)

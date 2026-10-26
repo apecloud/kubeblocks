@@ -152,7 +152,17 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 		}
 		return oldInstanceMap[newNameList[i-1]]
 	}
+	pendingRetirements := sets.New[string]()
+	for name, inst := range oldInstanceMap {
+		if newNameSet.Has(name) {
+			continue
+		}
+		if ptr.Deref(inst.Spec.ScaledDown, false) && instanceMemberActionsEnabled(inst) && !instanceRetirementObserved(inst) {
+			pendingRetirements.Insert(name)
+		}
+	}
 	if !isOrderedReady {
+		concurrency -= pendingRetirements.Len()
 		for _, name := range newNameList {
 			if _, ok := createNameSet[name]; !ok {
 				if !intctrlutil.IsInstanceAvailable(oldInstanceMap[name]) {
@@ -173,8 +183,17 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 			if !names.Has(inst.Name) {
 				continue
 			}
+			if pendingRetirements.Has(inst.Name) {
+				if isOrderedReady {
+					return kubebuilderx.RetryAfter(time.Second), nil
+				}
+				waiting = true
+				continue
+			}
 			absentRetirement := hasObservedStoppedRuntime(inst)
-			if !absentRetirement && !isOrderedReady && concurrency <= 0 {
+			scaledDown := ptr.Deref(inst.Spec.ScaledDown, false)
+			completedRetirement := scaledDown && instanceMemberActionsEnabled(inst) && instanceRetirementObserved(inst)
+			if !absentRetirement && !completedRetirement && !isOrderedReady && concurrency <= 0 {
 				continue
 			}
 			if isOrderedReady && !intctrlutil.IsInstanceReady(inst) {
@@ -192,7 +211,6 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 			if model.IsObjectDeleting(inst) {
 				continue
 			}
-			scaledDown := ptr.Deref(inst.Spec.ScaledDown, false)
 			retentionMatches := equality.Semantic.DeepEqual(inst.Spec.PersistentVolumeClaimRetentionPolicy, its.Spec.PersistentVolumeClaimRetentionPolicy)
 			if scaledDown && retentionMatches {
 				if !instanceRetirementObserved(inst) {
@@ -204,6 +222,15 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 				}
 			} else {
 				instCopy := inst.DeepCopy()
+				if !scaledDown && needsRetirementObservation(its, inst) {
+					if ptr.Deref(instCopy.Spec.Stop, false) {
+						instCopy.Spec.Stop = ptr.To(false)
+						if err := tree.Update(instCopy); err != nil {
+							return kubebuilderx.Continue, err
+						}
+					}
+					return kubebuilderx.RetryAfter(time.Second), nil
+				}
 				instCopy.Spec.ScaledDown = ptr.To(true)
 				if ptr.Deref(instCopy.Spec.Stop, false) && instanceMemberActionsEnabled(instCopy) {
 					instCopy.Spec.Stop = ptr.To(false)

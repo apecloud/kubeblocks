@@ -5158,13 +5158,20 @@ func checkInstanceRetirementEntry(t *testing.T, scenario string) {
 	}
 	for i := 0; i < 12; i++ {
 		f.step(t)
-		if ptr.Deref(its2LifecycleInstance(t, f.cli, name).Spec.ScaledDown, false) {
+		child := its2LifecycleInstance(t, f.cli, name)
+		if ptr.Deref(child.Spec.ScaledDown, false) {
 			break
+		}
+		if !child.Status.Provisioned {
+			leaf := &InstanceReconciler{Client: f.cli, Scheme: f.cli.Scheme(), Recorder: record.NewFakeRecorder(100)}
+			if _, err := leaf.Reconcile(ctx, ctrl.Request{NamespacedName: key}); err != nil {
+				t.Fatal(err)
+			}
 		}
 	}
 	child := its2LifecycleInstance(t, f.cli, name)
 	if !ptr.Deref(child.Spec.ScaledDown, false) || child.Status.ObservedGeneration == child.Generation || calls != 0 {
-		t.Fatalf("invalid handoff: child=%#v calls=%d", child, calls)
+		t.Fatalf("invalid handoff: ScaledDown=%v Provisioned=%t generation=%d observed=%d calls=%d", child.Spec.ScaledDown, child.Status.Provisioned, child.Generation, child.Status.ObservedGeneration, calls)
 	}
 	for i := 0; i < 12; i++ {
 		leaf := &InstanceReconciler{Client: f.cli, Scheme: f.cli.Scheme(), Recorder: record.NewFakeRecorder(100)}
@@ -5272,8 +5279,8 @@ func TestInstanceSetPendingRetirementOccupiesAdmission(t *testing.T) {
 	} {
 		t.Run(fmt.Sprintf("instanceAPI=%t/%s/limit=%d/paused=%t", tc.instanceAPI, tc.policy, tc.limit, tc.paused), func(t *testing.T) {
 			ctx := context.Background()
-			f := newMemberLifecycleEntry(t, tc.instanceAPI, 4, tc.policy)
-			f.bootstrap(t, 4)
+			f := newMemberLifecycleEntry(t, tc.instanceAPI, 5, tc.policy)
+			f.bootstrap(t, 5)
 			held := true
 			targets := map[string]int{}
 			agent := kbacli.NewMockClient(gomock.NewController(t))
@@ -5289,7 +5296,7 @@ func TestInstanceSetPendingRetirementOccupiesAdmission(t *testing.T) {
 			}).AnyTimes()
 			kbacli.SetMockClient(agent, nil)
 			defer kbacli.UnsetMockClient()
-			f.its.Spec.Replicas = ptr.To[int32](1)
+			f.its.Spec.Replicas = ptr.To[int32](2)
 			f.its.Spec.ParallelPodManagementConcurrency = ptr.To(intstr.FromInt(tc.limit))
 			f.its.Generation++
 			if err := f.cli.Update(ctx, f.its); err != nil {
@@ -5303,9 +5310,9 @@ func TestInstanceSetPendingRetirementOccupiesAdmission(t *testing.T) {
 				}
 			}
 			if tc.instanceAPI {
-				for ordinal := 1; ordinal <= 3; ordinal++ {
+				for ordinal := 2; ordinal <= 4; ordinal++ {
 					child := its2LifecycleInstance(t, f.cli, fmt.Sprintf("%s-%d", f.its.Name, ordinal))
-					want := ordinal > 3-tc.limit
+					want := ordinal > 4-tc.limit
 					if ptr.Deref(child.Spec.ScaledDown, false) != want {
 						t.Fatalf("pending retirement bypassed admission: limit=%d child=%s ScaledDown=%v", tc.limit, child.Name, child.Spec.ScaledDown)
 					}
@@ -5318,7 +5325,7 @@ func TestInstanceSetPendingRetirementOccupiesAdmission(t *testing.T) {
 			for round := 0; round < 48; round++ {
 				f.stepWithChildren(t)
 			}
-			if len(targets) != 3 || len(lifecycleEntryPods(t, f.cli)) != 1 || len(f.its.Status.InstanceStatus) != 1 {
+			if len(targets) != 3 || len(lifecycleEntryPods(t, f.cli)) != 2 || len(f.its.Status.InstanceStatus) != 2 {
 				t.Fatalf("retirement did not resume after acknowledgment: targets=%v pods=%d status=%+v", targets, len(lifecycleEntryPods(t, f.cli)), f.its.Status.InstanceStatus)
 			}
 		})
@@ -5409,12 +5416,48 @@ func TestInstanceSetPendingJoinAllowsImageRecovery(t *testing.T) {
 				if calls <= before {
 					t.Fatal("Join stopped retrying after update settled")
 				}
+				if !onDelete {
+					f.its.Spec.Template.Spec.Containers[0].Image = "database:v3"
+					f.its.Generation++
+					if err := f.cli.Update(ctx, f.its); err != nil {
+						t.Fatal(err)
+					}
+					if instanceAPI {
+						for round := 0; round < 8; round++ {
+							f.step(t)
+							if its2LifecycleInstance(t, f.cli, target).Spec.Template.Spec.Containers[0].Image == "database:v3" {
+								break
+							}
+						}
+					}
+				}
 				failJoin = false
+				before = calls
+				for round := 0; round < 8 && calls == before; round++ {
+					f.stepWithChildren(t)
+				}
+				pod := &corev1.Pod{}
+				if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: target}, pod); err != nil {
+					t.Fatal(err)
+				}
+				if calls == before || pod.Spec.Containers[0].Image != wantImage {
+					t.Fatalf("successful Join did not commit before update: calls=%d before=%d image=%s want=%s", calls, before, pod.Spec.Containers[0].Image, wantImage)
+				}
 				for round := 0; round < 12; round++ {
 					f.stepWithChildren(t)
+					for _, runtime := range lifecycleEntryPods(t, f.cli) {
+						f.setReady(t, runtime.Name, true)
+					}
 				}
 				if status := f.its.FindInstanceStatus(target); status == nil || !ptr.Deref(status.MemberJoined, false) {
 					t.Fatalf("Join did not recover: %+v", status)
+				}
+				if !onDelete {
+					for _, runtime := range lifecycleEntryPods(t, f.cli) {
+						if runtime.Spec.Containers[0].Image != "database:v3" {
+							t.Fatalf("committed Join did not release the image update: pod=%s image=%s", runtime.Name, runtime.Spec.Containers[0].Image)
+						}
+					}
 				}
 			})
 		}

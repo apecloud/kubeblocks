@@ -238,6 +238,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	}
 
 	runtimeChanged := false
+	memberWaiting := false
 	var currentAlignedNameList []string
 	for i, name := range newNameList {
 		if _, ok := createNameSet[name]; !ok {
@@ -247,12 +248,13 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 			} else if changed {
 				return kubebuilderx.RetryAfter(time.Second), nil
 			}
-			if !runtimeChanged {
+			if !runtimeChanged && !memberWaiting {
 				if result, err := reconcileMember(tree, its, pod, true, r.reader); err != nil || result != kubebuilderx.Continue {
 					if status := its.FindInstanceStatus(name); err == nil && status != nil && status.MemberJoined != nil && !*status.MemberJoined {
-						return kubebuilderx.Continue, nil
+						memberWaiting = true
+					} else {
+						return result, err
 					}
-					return result, err
 				}
 			}
 			currentAlignedNameList = append(currentAlignedNameList, name)
@@ -320,6 +322,9 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 
 	if workloadlifecycle.Enabled(its) && runtimeChanged {
 		return kubebuilderx.RetryAfter(time.Second), nil
+	}
+	if memberWaiting {
+		return kubebuilderx.Continue, nil
 	}
 	if result, err := retire(retirementNames); err != nil || result != kubebuilderx.Continue {
 		return result, err

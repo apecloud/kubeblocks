@@ -76,6 +76,13 @@ func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuild
 			continue
 		}
 		if !instanceRetirementObserved(inst) {
+			if ptr.Deref(inst.Spec.Stop, false) && instanceMemberActionsEnabled(inst) && !model.IsObjectDeleting(inst) {
+				instCopy := inst.DeepCopy()
+				instCopy.Spec.Stop = ptr.To(false)
+				if err := tree.Update(instCopy); err != nil {
+					return kubebuilderx.Continue, err
+				}
+			}
 			waiting = true
 			continue
 		}

@@ -194,7 +194,6 @@ func lifecycleCreatePod(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSe
 	return workloadlifecycle.ConfigureDataTask(its, pod, source)
 }
 
-// restoreRequiredDataSources recreates only runtimes backed by retained donor claims.
 func restoreRequiredDataSources(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, itsExt *instancetemplate.InstanceSetExt) (bool, error) {
 	if isStopRequested(its) {
 		return false, nil

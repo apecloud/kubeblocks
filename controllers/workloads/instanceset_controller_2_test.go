@@ -3464,6 +3464,27 @@ func TestITS2DeletionWaitsForScaledDownAcknowledgement(t *testing.T) {
 				if !ptr.Deref(child.Spec.ScaledDown, false) || !ptr.Deref(child.Status.MemberJoined, false) || child.Status.ObservedGeneration == child.Generation {
 					t.Fatalf("scale-in was not handed off before Leave: %#v", child)
 				}
+				if scenario == "child-status-conflict" {
+					f.its.Spec.Stop = ptr.To(true)
+					f.its.Generation++
+					if err := f.cli.Update(ctx, f.its); err != nil {
+						t.Fatal(err)
+					}
+					for round := 0; round < 12 && !ptr.Deref(its2LifecycleInstance(t, f.cli, targetKey.Name).Spec.Stop, false); round++ {
+						f.step(t)
+					}
+					if !ptr.Deref(its2LifecycleInstance(t, f.cli, targetKey.Name).Spec.Stop, false) {
+						t.Fatal("parent did not stop pending retirement")
+					}
+					pod := &corev1.Pod{}
+					if err := f.cli.Get(ctx, targetKey, pod); err != nil {
+						t.Fatal(err)
+					}
+					if err := f.cli.Delete(ctx, pod); err != nil {
+						t.Fatal(err)
+					}
+				}
+
 				if err := f.cli.Delete(ctx, f.its); err != nil {
 					t.Fatal(err)
 				}
@@ -3503,6 +3524,27 @@ func TestITS2DeletionWaitsForScaledDownAcknowledgement(t *testing.T) {
 				for i := 0; i < 4; i++ {
 					leaf(siblingKey)
 				}
+				if scenario == "child-status-conflict" {
+					for round := 0; round < 8; round++ {
+						leaf(targetKey)
+						pod := &corev1.Pod{}
+						if err := f.cli.Get(ctx, targetKey, pod); err == nil && pod.DeletionTimestamp.IsZero() {
+							break
+						} else if err != nil && !apierrors.IsNotFound(err) {
+							t.Fatal(err)
+						}
+					}
+					child = its2LifecycleInstance(t, f.cli, targetKey.Name)
+					if child.Status.ObservedGeneration == child.Generation || !ptr.Deref(child.Status.MemberJoined, false) {
+						t.Fatalf("runtime recovery acknowledged Leave without an endpoint: %#v", child.Status)
+					}
+					pod := &corev1.Pod{}
+					if err := f.cli.Get(ctx, targetKey, pod); err != nil || !pod.DeletionTimestamp.IsZero() {
+						t.Fatalf("group deletion could not recover retiring own Pod: %v", err)
+					}
+					f.setReady(t, targetKey.Name, true)
+				}
+
 				assertRetained()
 				if !result.Requeue {
 					t.Fatalf("pending retirement has no retry: %#v", result)
@@ -3598,6 +3640,88 @@ func TestITS2DeletionWaitsForScaledDownAcknowledgement(t *testing.T) {
 	}
 }
 
+func TestITS2StopAfterScaledDownHandoff(t *testing.T) {
+	for _, policy := range []appsv1.PodManagementPolicyType{appsv1.OrderedReadyPodManagement, appsv1.ParallelPodManagement} {
+		for _, hooks := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/hooks=%t", policy, hooks), func(t *testing.T) {
+				ctx := context.Background()
+				f := newMemberLifecycleEntry(t, true, 2, policy)
+				if !hooks {
+					f.its.Spec.LifecycleActions = nil
+					if err := f.cli.Update(ctx, f.its); err != nil {
+						t.Fatal(err)
+					}
+				}
+				for round := 0; round < 24; round++ {
+					f.stepWithChildren(t)
+					for _, pod := range lifecycleEntryPods(t, f.cli) {
+						f.setReady(t, pod.Name, true)
+					}
+				}
+				if f.its.Status.ReadyReplicas != 2 {
+					t.Fatal("bootstrap did not create two ready members")
+				}
+				agent := &its2LifecycleAgent{}
+				kbacli.SetMockClient(agent, nil)
+				defer kbacli.UnsetMockClient()
+				key := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-1"}
+				f.its.Spec.Replicas = ptr.To[int32](1)
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				for round := 0; round < 12 && !ptr.Deref(its2LifecycleInstance(t, f.cli, key.Name).Spec.ScaledDown, false); round++ {
+					f.step(t)
+				}
+				if !ptr.Deref(its2LifecycleInstance(t, f.cli, key.Name).Spec.ScaledDown, false) {
+					t.Fatal("parent did not hand off retirement")
+				}
+				f.its.Spec.Stop = ptr.To(true)
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				for round := 0; round < 12 && !ptr.Deref(its2LifecycleInstance(t, f.cli, key.Name).Spec.Stop, false); round++ {
+					f.step(t)
+				}
+				if !ptr.Deref(its2LifecycleInstance(t, f.cli, key.Name).Spec.Stop, false) {
+					t.Fatal("parent did not publish Stop to retiring child")
+				}
+				for round := 0; round < 24; round++ {
+					f.stepWithChildren(t)
+				}
+				if pods := lifecycleEntryPods(t, f.cli); len(pods) != 0 {
+					t.Fatalf("Stop after ScaledDown handoff retained %d Pods", len(pods))
+				}
+				child := its2LifecycleInstance(t, f.cli, key.Name)
+				if !ptr.Deref(child.Spec.Stop, false) || child.Status.CurrentState != workloads.InstanceCurrentStateAbsent {
+					t.Fatalf("retiring child did not observe Stop: %#v", child)
+				}
+				if len(agent.calls) != 0 || (hooks && !ptr.Deref(child.Status.MemberJoined, false)) {
+					t.Fatalf("Stop changed membership: calls=%v status=%#v", agent.calls, child.Status)
+				}
+				f.its.Spec.Stop = ptr.To(false)
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				for round := 0; round < 24; round++ {
+					f.stepWithChildren(t)
+					for _, pod := range lifecycleEntryPods(t, f.cli) {
+						f.setReady(t, pod.Name, true)
+					}
+				}
+				if err := f.cli.Get(ctx, key, &workloads.Instance{}); !apierrors.IsNotFound(err) {
+					t.Fatalf("Resume did not finish pending retirement: %v", err)
+				}
+				if hooks && (len(agent.calls) != 1 || agent.calls[0] != "memberLeave") {
+					t.Fatalf("Resume did not complete one Leave: %v", agent.calls)
+				}
+			})
+		}
+	}
+}
+
 func TestInstanceMemberLeaveUsesOwnPod(t *testing.T) {
 	for _, selector := range []kbappsv1.TargetPodSelector{kbappsv1.AnyReplica, kbappsv1.AllReplicas} {
 		for _, runtime := range []string{"ready", "absent", "unavailable"} {
@@ -3611,16 +3735,24 @@ func TestInstanceMemberLeaveUsesOwnPod(t *testing.T) {
 				}
 				f.bootstrap(t, 2)
 				key := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-1"}
+				f.its.Spec.Replicas = ptr.To[int32](1)
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				for round := 0; round < 12 && !ptr.Deref(its2LifecycleInstance(t, f.cli, key.Name).Spec.ScaledDown, false); round++ {
+					f.step(t)
+				}
+				if !ptr.Deref(its2LifecycleInstance(t, f.cli, key.Name).Spec.ScaledDown, false) {
+					t.Fatal("parent did not hand off retirement")
+				}
+
 				pod := &corev1.Pod{}
 				if err := f.cli.Get(ctx, key, pod); err != nil {
 					t.Fatal(err)
 				}
 				switch runtime {
 				case "absent":
-					pod.Finalizers = nil
-					if err := f.cli.Update(ctx, pod); err != nil {
-						t.Fatal(err)
-					}
 					if err := f.cli.Delete(ctx, pod); err != nil {
 						t.Fatal(err)
 					}
@@ -3629,12 +3761,6 @@ func TestInstanceMemberLeaveUsesOwnPod(t *testing.T) {
 					if err := f.cli.Status().Update(ctx, pod); err != nil {
 						t.Fatal(err)
 					}
-				}
-				child := its2LifecycleInstance(t, f.cli, key.Name)
-				child.Spec.ScaledDown = ptr.To(true)
-				child.Generation++
-				if err := f.cli.Update(ctx, child); err != nil {
-					t.Fatal(err)
 				}
 				agent := &its2LifecycleAgent{}
 				kbacli.SetMockClient(agent, nil)
@@ -3646,7 +3772,7 @@ func TestInstanceMemberLeaveUsesOwnPod(t *testing.T) {
 						t.Fatalf("retirement lost retry: result=%#v err=%v", result, err)
 					}
 				}
-				child = its2LifecycleInstance(t, f.cli, key.Name)
+				child := its2LifecycleInstance(t, f.cli, key.Name)
 				if runtime == "ready" {
 					if len(agent.calls) != 1 || agent.calls[0] != "memberLeave" || ptr.Deref(child.Status.MemberJoined, true) || child.Status.ObservedGeneration != child.Generation {
 						t.Fatalf("own Pod did not execute exactly one Leave: calls=%v status=%#v", agent.calls, child.Status)
@@ -3657,11 +3783,19 @@ func TestInstanceMemberLeaveUsesOwnPod(t *testing.T) {
 				if err := f.cli.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: "data-" + key.Name}, &corev1.PersistentVolumeClaim{}); err != nil {
 					t.Fatalf("handoff removed storage: %v", err)
 				}
-				if runtime == "absent" {
-					if err := f.cli.Get(ctx, key, &corev1.Pod{}); !apierrors.IsNotFound(err) {
-						t.Fatalf("pending retirement rebuilt own Pod: %v", err)
+				for round := 0; round < 24; round++ {
+					f.stepWithChildren(t)
+					for _, current := range lifecycleEntryPods(t, f.cli) {
+						f.setReady(t, current.Name, true)
 					}
 				}
+				if len(agent.calls) != 1 || agent.calls[0] != "memberLeave" {
+					t.Fatalf("own runtime did not recover and complete Leave: %v", agent.calls)
+				}
+				if err := f.cli.Get(ctx, key, &workloads.Instance{}); !apierrors.IsNotFound(err) {
+					t.Fatalf("completed Leave did not retire Instance: %v", err)
+				}
+
 			})
 		}
 	}

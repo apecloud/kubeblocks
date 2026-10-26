@@ -61,8 +61,11 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (result kubebuilderx.Result, reconcileErr error) {
 	inst := tree.GetRoot().(*workloads.Instance)
 	defer func() {
-		if reconcileErr == nil && result == kubebuilderx.Continue && !ptr.Deref(inst.Spec.Stop, false) &&
-			inst.Spec.MinReadySeconds > 0 && inst.Status.DataLoaded != nil && !*inst.Status.DataLoaded && !inst.Status.Available {
+		if reconcileErr != nil || result != kubebuilderx.Continue || ptr.Deref(inst.Spec.Stop, false) {
+			return
+		}
+		waitingForData := inst.Spec.MinReadySeconds > 0 && inst.Status.DataLoaded != nil && !*inst.Status.DataLoaded && !inst.Status.Available
+		if needsMemberJoin(inst) || waitingForData {
 			result = kubebuilderx.RetryAfter(time.Second)
 		}
 	}()

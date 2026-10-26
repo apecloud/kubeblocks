@@ -123,7 +123,11 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 			return kubebuilderx.RetryAfter(time.Second), nil
 		}
 	}
-	return reconcileMember(tree, inst, pod, true)
+	result, err = reconcileMember(tree, inst, pod, true)
+	if err == nil && needsMemberJoin(inst) {
+		return kubebuilderx.Continue, nil
+	}
+	return result, err
 }
 
 func reconcilePod(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) (*corev1.Pod, kubebuilderx.Result, error) {

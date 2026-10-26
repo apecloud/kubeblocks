@@ -40,6 +40,9 @@ import (
 const configFilesUpdated = "KB_CONFIG_FILES_UPDATED"
 
 func init() {
+	registerPolicy(NonePolicy, func(ctx Context) (Status, error) {
+		return submit(ctx, nil, false)
+	})
 	registerPolicy(SyncDynamicReloadPolicy, syncPolicy)
 	registerPolicy(DynamicReloadAndRestartPolicy, syncNRestartPolicy)
 }

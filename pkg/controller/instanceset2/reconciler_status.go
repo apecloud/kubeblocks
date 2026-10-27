@@ -156,13 +156,13 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 	}
 
-	readyCondition, err := buildReadyCondition(its, replicas > 0 && readyReplicas >= replicas, notReadyNames)
+	readyCondition, err := buildReadyCondition(its, (replicas > 0 || totalReplicas == 0) && readyReplicas >= replicas, notReadyNames)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
 	meta.SetStatusCondition(&its.Status.Conditions, *readyCondition)
 
-	availableCondition, err := buildAvailableCondition(its, replicas > 0 && availableReplicas >= replicas, notAvailableNames)
+	availableCondition, err := buildAvailableCondition(its, (replicas > 0 || totalReplicas == 0) && availableReplicas >= replicas, notAvailableNames)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}

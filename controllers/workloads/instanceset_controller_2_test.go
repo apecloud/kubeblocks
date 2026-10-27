@@ -614,13 +614,18 @@ var _ = Describe("InstanceSet Controller 2", func() {
 			Expect(meta.FindStatusCondition(conditions, string(workloads.InstanceReady)).LastTransitionTime.After(before.Time)).Should(BeTrue())
 		})
 
-		It("reports neither Ready nor Available with zero replicas", func() {
+		It("reports Ready and Available for an explicit zero-replica target", func() {
 			t := GinkgoT()
 			its := setStopFixture()
 			its.Spec.Replicas = ptr.To[int32](0)
 			cli := newSetStopClient(t, its)
 			reconcileSetStop(t, cli, 5)
-			expectInstanceSetNoRuntime(readSetStop(t, cli))
+			its = readSetStop(t, cli)
+			Expect(its.Status.Replicas).Should(BeZero())
+			Expect(its.Status.ReadyReplicas).Should(BeZero())
+			Expect(its.Status.AvailableReplicas).Should(BeZero())
+			Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceReady))).Should(BeTrue())
+			Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable))).Should(BeTrue())
 		})
 
 		It("reports Ready before MinReadySeconds makes instances Available", func() {

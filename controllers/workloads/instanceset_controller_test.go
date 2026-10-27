@@ -1334,10 +1334,15 @@ var _ = Describe("InstanceSet Controller", func() {
 			Expect(meta.FindStatusCondition(conditions, string(workloads.InstanceReady)).LastTransitionTime.After(before.Time)).Should(BeTrue())
 		})
 
-		It("reports neither Ready nor Available with zero replicas", func() {
+		It("reports Ready and Available for an explicit zero-replica target", func() {
 			t := GinkgoT()
 			cli := legacyStopRecoveryFixture(t, 0, 0)
-			expectInstanceSetNoRuntime(legacyStopRecoverySet(t, cli))
+			its := legacyStopRecoverySet(t, cli)
+			Expect(its.Status.Replicas).Should(BeZero())
+			Expect(its.Status.ReadyReplicas).Should(BeZero())
+			Expect(its.Status.AvailableReplicas).Should(BeZero())
+			Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceReady))).Should(BeTrue())
+			Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable))).Should(BeTrue())
 		})
 
 		It("reports Ready before MinReadySeconds makes pods Available", func() {

@@ -396,12 +396,18 @@ var _ = Describe("Reconfigure Controller", func() {
 			recover        bool
 			conflict       bool
 			newRevision    bool
+			finished       bool
+			stopped        bool
+			noRuntime      bool
 		}{
 			{name: "restored content", restored: "enabled=ON\n", recover: true},
 			{name: "restored semantics", restored: "# restored\nenabled=ON\n", recover: true},
 			{name: "stable formatting change", restored: "# reformatted\nenabled=ON\n"},
 			{name: "cluster conflict", restored: "enabled=ON\n", recover: true, conflict: true},
 			{name: "newer revision", restored: "# restored\nenabled=ON\n", recover: true, newRevision: true},
+			{name: "completed stopped configuration", restored: "enabled=ON\n", finished: true, stopped: true, noRuntime: true},
+			{name: "completed unavailable configuration", restored: "enabled=ON\n", finished: true, noRuntime: true},
+			{name: "completed stale configuration", restored: "enabled=ON\n", finished: true, recover: true},
 		} {
 			It(tc.name, func() {
 				ctx := context.Background()
@@ -473,10 +479,27 @@ var _ = Describe("Reconfigure Controller", func() {
 				}
 				its := &workloads.InstanceSet{
 					ObjectMeta: metav1.ObjectMeta{Name: constant.GenerateWorkloadNamePattern(clusterName, componentName), Namespace: namespace},
-					Spec:       workloads.InstanceSetSpec{Configs: []workloads.ConfigTemplate{{Name: configName, ConfigHash: targetHash}}},
+					Spec:       workloads.InstanceSetSpec{Replicas: ptr.To(int32(1)), Configs: []workloads.ConfigTemplate{{Name: configName, ConfigHash: targetHash}}},
 					Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{
 						Configs: []workloads.InstanceConfigStatus{{Name: configName, ConfigHash: appliedHash}},
 					}}},
+				}
+				if tc.stopped {
+					cluster.Spec.ComponentSpecs[0].Stop = ptr.To(true)
+					its.Spec.Stop = ptr.To(true)
+				}
+				if tc.noRuntime {
+					its.Status.InstanceStatus = nil
+				}
+				if tc.finished {
+					finished := unReconciled(parametersv1alpha1.CFinishedPhase, "", "already applied")
+					finished.Revision = "3"
+					data, err := json.Marshal(finished)
+					Expect(err).Should(Succeed())
+					cm.Annotations[parameterscore.GenerateRevisionPhaseKey("3")] = string(data)
+					cp.Status.Phase = parametersv1alpha1.CFinishedPhase
+					cp.Status.ObservedGeneration = cp.Generation
+					cp.Status.ConfigurationItemStatus[0].Phase = parametersv1alpha1.CFinishedPhase
 				}
 				ops := &opsv1alpha1.OpsRequest{
 					ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: namespace},
@@ -488,6 +511,27 @@ var _ = Describe("Reconfigure Controller", func() {
 				cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(cp, ops, its).
 					WithObjects(cm, cluster, cp, component, definition, pd, its, ops, tpl).Build()
 				reconciler := &ReconfigureReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+				if tc.noRuntime {
+					originalSpec := cluster.DeepCopy().Spec
+					for range 2 {
+						result, err := reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cm)})
+						Expect(err).Should(Succeed())
+						Expect(cli.Get(ctx, client.ObjectKeyFromObject(cm), cm)).Should(Succeed())
+						status := parametersv1alpha1.ConfigTemplateItemDetailStatus{UpdateRevision: "3"}
+						Expect(syncStatus(cm, &status)).Should(Succeed())
+						Expect(status.Phase).Should(Equal(parametersv1alpha1.CFinishedPhase))
+						Expect(result.RequeueAfter).Should(BeZero())
+						cpReconciler := &ComponentParameterReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+						_, err = cpReconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cp)})
+						Expect(err).Should(Succeed())
+						Expect(cli.Get(ctx, client.ObjectKeyFromObject(cp), cp)).Should(Succeed())
+						Expect(cp.Status.Phase).Should(Equal(parametersv1alpha1.CFinishedPhase))
+						Expect(cli.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
+						Expect(cluster.Spec).Should(Equal(originalSpec))
+						Expect(cm.Annotations).Should(HaveKeyWithValue(constant.LastAppliedConfigAnnotationKey, string(applied)))
+					}
+					return
+				}
 				if tc.conflict {
 					conflicted := false
 					reconciler.Client = interceptor.NewClient(cli, interceptor.Funcs{

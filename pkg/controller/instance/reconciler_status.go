@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -126,9 +125,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 	inst.Status.Configs = configs
 
-	if !stopped && inst.Spec.MinReadySeconds > 0 && !available {
-		return kubebuilderx.RetryAfter(time.Second), nil
-	}
 	return kubebuilderx.Continue, nil
 }
 

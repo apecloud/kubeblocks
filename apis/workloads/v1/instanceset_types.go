@@ -309,7 +309,10 @@ type InstanceSetStatus struct {
 	UpdateRevision string `json:"updateRevision,omitempty"`
 
 	// Represents the latest available observations of an instanceset's current state.
-	// Known .status.conditions.type are: "InstanceFailure", "InstanceReady", "Restore"
+	// Known .status.conditions.type are: "InstanceFailure", "InstanceReady", "InstanceAvailable", "Restore".
+	// InstanceReady and InstanceAvailable assess the configured replica identities, independent of Stop.
+	// Their observedGeneration identifies the spec evaluated. Each lastTransitionTime changes only when
+	// that condition's status changes, including across generations.
 	//
 	// +optional
 	// +patchMergeKey=type
@@ -772,13 +775,16 @@ type InstanceTemplateStatus struct {
 type ConditionType string
 
 const (
-	// InstanceReady is added in an instance set when at least one of its instances(pods) is in a Ready condition.
-	// ConditionStatus will be True if all its instances(pods) are in a Ready condition.
-	// Or, a NotReady reason with not ready instances encoded in the Message filed will be set.
+	// InstanceReady reports observed runtime health. For an InstanceSet, it is True when every identity
+	// assigned to spec.replicas exists and is healthy. The replica target defaults to 1 and Stop preserves it.
+	// An explicit zero target is ready even while extra instances await cleanup. Extra instances cannot
+	// replace missing assigned identities and do not independently block readiness. Incomplete allocation
+	// is Unknown. Readiness does not require roles, revision convergence, or operation completion.
 	InstanceReady ConditionType = "InstanceReady"
 
-	// InstanceAvailable ConditionStatus will be True if all instances(pods) are in the ready condition
-	// and continue for "MinReadySeconds" seconds. Otherwise, it will be set to False.
+	// InstanceAvailable requires InstanceReady and each required runtime to have remained ready for
+	// the current MinReadySeconds, measured from that runtime's Ready transition rather than the aggregate
+	// condition. With MinReadySeconds zero, its status matches InstanceReady, but transition times can differ.
 	InstanceAvailable ConditionType = "InstanceAvailable"
 
 	// InstanceFailure is added in an instance set when at least one of its instances(pods) is in a `Failed` phase.

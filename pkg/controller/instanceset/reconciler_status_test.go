@@ -127,6 +127,12 @@ var _ = Describe("status reconciler test", func() {
 	})
 
 	Context("PreCondition & Reconcile", func() {
+		reconcileStatus := func(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
+			if _, err := reconcileReadiness(tree); err != nil {
+				return kubebuilderx.Continue, err
+			}
+			return reconciler.Reconcile(tree)
+		}
 		reconcilePods := func(tree *kubebuilderx.ObjectTree) {
 			By("fix meta")
 			reconciler = NewFixMetaReconciler()
@@ -208,7 +214,7 @@ var _ = Describe("status reconciler test", func() {
 			By("all pods are not ready")
 			reconciler = NewStatusReconciler()
 			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ConditionSatisfied))
-			res, err := reconciler.Reconcile(tree)
+			res, err := reconcileStatus(tree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 			Expect(its.Status.Replicas).Should(BeEquivalentTo(0))
@@ -234,9 +240,9 @@ var _ = Describe("status reconciler test", func() {
 				makePodAvailableWithRevision(pod, oldRevision, false)
 				currentRevisionMap[pod.Name] = oldRevision
 			}
-			res, err = reconciler.Reconcile(tree)
+			res, err = reconcileStatus(tree)
 			Expect(err).Should(BeNil())
-			Expect(res).Should(Equal(kubebuilderx.RetryAfter(time.Second)))
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 			Expect(its.Status.Replicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.ReadyReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(0))
@@ -269,7 +275,7 @@ var _ = Describe("status reconciler test", func() {
 				Expect(ok).Should(BeTrue())
 				makePodAvailableWithRevision(pod, updateRevisions[pod.Name], true)
 			}
-			res, err = reconciler.Reconcile(tree)
+			res, err = reconcileStatus(tree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 			Expect(its.Status.Replicas).Should(BeEquivalentTo(replicas))
@@ -306,7 +312,7 @@ var _ = Describe("status reconciler test", func() {
 				Expect(condition).ShouldNot(BeNil())
 				condition.Status = corev1.ConditionFalse
 			}
-			res, err = reconciler.Reconcile(tree)
+			res, err = reconcileStatus(tree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 			Expect(its.Status.Replicas).Should(BeEquivalentTo(replicas))
@@ -336,7 +342,7 @@ var _ = Describe("status reconciler test", func() {
 				Expect(ok).Should(BeTrue())
 				pod.Status.Phase = corev1.PodFailed
 			}
-			res, err = reconciler.Reconcile(tree)
+			res, err = reconcileStatus(tree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 			Expect(its.Status.Conditions).Should(HaveLen(3))
@@ -369,7 +375,7 @@ var _ = Describe("status reconciler test", func() {
 				Expect(ok).Should(BeTrue())
 				makePodAvailableWithRevision(pod, updateRevisions[pod.Name], true)
 			}
-			res, err := reconciler.Reconcile(tree)
+			res, err := reconcileStatus(tree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 			replicas := *its.Spec.Replicas
@@ -387,7 +393,7 @@ var _ = Describe("status reconciler test", func() {
 				Expect(ok).Should(BeTrue())
 				pod.Spec.Containers[0].Image = newImage
 			}
-			res, err = reconciler.Reconcile(tree)
+			res, err = reconcileStatus(tree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 			Expect(its.Status.Replicas).Should(BeEquivalentTo(replicas))
@@ -405,7 +411,7 @@ var _ = Describe("status reconciler test", func() {
 				Expect(ok).Should(BeTrue())
 				makePodAvailableWithRevision(pod, updateRevisions[pod.Name], true)
 			}
-			res, err = reconciler.Reconcile(tree)
+			res, err = reconcileStatus(tree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 			Expect(its.Status.Replicas).Should(BeEquivalentTo(replicas))
@@ -437,7 +443,7 @@ var _ = Describe("status reconciler test", func() {
 				break
 			}
 			reconciler = NewStatusReconciler()
-			res, err := reconciler.Reconcile(tree)
+			res, err := reconcileStatus(tree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 			Expect(its.Annotations[constant.NodeSelectorOnceAnnotationKey]).To(BeEmpty())

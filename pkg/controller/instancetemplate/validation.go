@@ -19,6 +19,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
@@ -46,8 +47,9 @@ func ValidateInstanceTemplates(its *workloads.InstanceSet, tree *kubebuilderx.Ob
 		templateNames.Insert(template.Name)
 	}
 	// sum of spec.templates[*].replicas should not be greater than spec.replicas
-	if replicasInTemplates > *its.Spec.Replicas {
-		err = fmt.Errorf("total replicas in instances(%d) should not be greater than replicas in spec(%d)", replicasInTemplates, *its.Spec.Replicas)
+	totalReplicas := ptr.Deref(its.Spec.Replicas, int32(1))
+	if replicasInTemplates > totalReplicas {
+		err = fmt.Errorf("total replicas in instances(%d) should not be greater than replicas in spec(%d)", replicasInTemplates, totalReplicas)
 		return err
 	}
 

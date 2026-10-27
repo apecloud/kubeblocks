@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -36,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancereadiness"
 	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancestatus"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -66,8 +66,8 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		pod, _ := object.(*corev1.Pod)
 		podList = append(podList, pod)
 	}
-	// Flat-ordinal reassignment can temporarily expose fewer authoritative names than spec.replicas.
-	// Validate before mutating any status fields so a partial view cannot replace the last complete status.
+	// Keep the previous full projection until flat allocation is complete.
+	// The readiness step independently reports incomplete allocation as Unknown.
 	if its.Spec.FlatInstanceOrdinal {
 		if _, _, err := instancetemplate.BuildAssignments(tree, its); err != nil {
 			if instancetemplate.IsAssignmentIncomplete(err) {
@@ -84,8 +84,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	replicas := int32(0)
 	currentReplicas, updatedReplicas := int32(0), int32(0)
 	readyReplicas, availableReplicas := int32(0), int32(0)
-	notReadyNames := sets.New[string]()
-	notAvailableNames := sets.New[string]()
 	currentRevisions := map[string]string{}
 
 	template2TemplatesStatus := map[string]*workloads.InstanceTemplateStatus{}
@@ -112,19 +110,16 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 		currentRevisions[pod.Name] = getPodRevision(pod)
 		if isCreated(pod) {
-			notReadyNames.Insert(pod.Name)
 			replicas++
 			template2TemplatesStatus[templateName].Replicas++
 		}
-		if isImageMatched(pod) && intctrlutil.IsPodReady(pod) {
+		health := instancereadiness.Pod(pod, its.Spec.MinReadySeconds)
+		if health.Ready {
 			readyReplicas++
 			template2TemplatesStatus[templateName].ReadyReplicas++
-			notReadyNames.Delete(pod.Name)
-			if intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
+			if health.Available {
 				availableReplicas++
 				template2TemplatesStatus[templateName].AvailableReplicas++
-			} else {
-				notAvailableNames.Insert(pod.Name)
 			}
 		}
 		if isCreated(pod) && !isTerminating(pod) {
@@ -178,18 +173,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 	}
 
-	readyCondition, err := buildReadyCondition(its, (replicas > 0 || totalReplicas == 0) && readyReplicas >= replicas, notReadyNames)
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
-	meta.SetStatusCondition(&its.Status.Conditions, *readyCondition)
-
-	availableCondition, err := buildAvailableCondition(its, (replicas > 0 || totalReplicas == 0) && availableReplicas >= replicas, notAvailableNames)
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
-	meta.SetStatusCondition(&its.Status.Conditions, *availableCondition)
-
 	// 3. set InstanceFailure condition
 	failureCondition, err := buildFailureCondition(its, podList)
 	if err != nil {
@@ -208,10 +191,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	// 4. set instance status
 	if err = setInstanceStatus(tree, its, podList); err != nil {
 		return kubebuilderx.Continue, err
-	}
-
-	if !stopping && its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
-		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 
 	// serviceaccount name migration process
@@ -378,44 +357,6 @@ func buildTemplatesStatus(template2TemplatesStatus map[string]*workloads.Instanc
 	return templatesStatus
 }
 
-func buildReadyCondition(its *workloads.InstanceSet, ready bool, notReadyNames sets.Set[string]) (*metav1.Condition, error) {
-	condition := &metav1.Condition{
-		Type:               string(workloads.InstanceReady),
-		Status:             metav1.ConditionTrue,
-		ObservedGeneration: its.Generation,
-		Reason:             workloads.ReasonReady,
-	}
-	if !ready {
-		condition.Status = metav1.ConditionFalse
-		condition.Reason = workloads.ReasonNotReady
-		message, err := buildConditionMessageWithNames(notReadyNames.UnsortedList())
-		if err != nil {
-			return nil, err
-		}
-		condition.Message = string(message)
-	}
-	return condition, nil
-}
-
-func buildAvailableCondition(its *workloads.InstanceSet, available bool, notAvailableNames sets.Set[string]) (*metav1.Condition, error) {
-	condition := &metav1.Condition{
-		Type:               string(workloads.InstanceAvailable),
-		Status:             metav1.ConditionTrue,
-		ObservedGeneration: its.Generation,
-		Reason:             workloads.ReasonAvailable,
-	}
-	if !available {
-		condition.Status = metav1.ConditionFalse
-		condition.Reason = workloads.ReasonNotAvailable
-		message, err := buildConditionMessageWithNames(notAvailableNames.UnsortedList())
-		if err != nil {
-			return nil, err
-		}
-		condition.Message = string(message)
-	}
-	return condition, nil
-}
-
 func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*metav1.Condition, error) {
 	var failureNames []string
 	for _, pod := range pods {
@@ -564,8 +505,9 @@ func observePodRuntime(its *workloads.InstanceSet, pod *corev1.Pod, roles map[st
 		return observation, nil
 	}
 
-	observation.Ready = isImageMatched(pod) && intctrlutil.IsPodReady(pod)
-	observation.Available = observation.Ready && intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds)
+	health := instancereadiness.Pod(pod, its.Spec.MinReadySeconds)
+	observation.Ready = health.Ready
+	observation.Available = health.Available
 	observation.Failed = instancePodFailed(pod)
 	if intctrlutil.PodIsReadyWithLabel(*pod) {
 		if role, ok := roles[getRoleName(pod)]; ok {

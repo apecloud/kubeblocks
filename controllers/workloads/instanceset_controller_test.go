@@ -36,6 +36,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1312,6 +1313,74 @@ var _ = Describe("InstanceSet Controller", func() {
 			})).Should(Succeed())
 		})
 	})
+
+	Context("readiness", func() {
+		It("reports a fresh Ready transition after stop and resume", func() {
+			t := GinkgoT()
+			cli := legacyStopRecoveryFixture(t, 2, 0)
+			legacyStopRecoveryReady(t, cli)
+			before := ageInstanceSetReadyCondition(cli, legacyStopRecoverySet(t, cli))
+
+			legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(true) })
+			legacyStopRecoveryReconcile(t, cli, 6)
+			expectInstanceSetNoRuntime(legacyStopRecoverySet(t, cli))
+
+			legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(false) })
+			legacyStopRecoveryReconcile(t, cli, 1)
+			expectInstanceSetNotReady(legacyStopRecoverySet(t, cli))
+			legacyStopRecoveryReady(t, cli)
+			conditions := legacyStopRecoverySet(t, cli).Status.Conditions
+			Expect(meta.IsStatusConditionTrue(conditions, string(workloads.InstanceReady))).Should(BeTrue())
+			Expect(meta.FindStatusCondition(conditions, string(workloads.InstanceReady)).LastTransitionTime.After(before.Time)).Should(BeTrue())
+		})
+
+		It("reports neither Ready nor Available with zero replicas", func() {
+			t := GinkgoT()
+			cli := legacyStopRecoveryFixture(t, 0, 0)
+			expectInstanceSetNoRuntime(legacyStopRecoverySet(t, cli))
+		})
+
+		It("reports Ready before MinReadySeconds makes pods Available", func() {
+			t := GinkgoT()
+			cli := legacyStopRecoveryFixture(t, 2, 3600)
+			legacyStopRecoveryReady(t, cli)
+			conditions := legacyStopRecoverySet(t, cli).Status.Conditions
+			Expect(meta.IsStatusConditionTrue(conditions, string(workloads.InstanceReady))).Should(BeTrue())
+			Expect(meta.IsStatusConditionFalse(conditions, string(workloads.InstanceAvailable))).Should(BeTrue())
+		})
+
+		It("reports present pod health separately from replica convergence", func() {
+			t := GinkgoT()
+			cli := legacyStopRecoveryFixture(t, 2, 0)
+			legacyStopRecoveryReady(t, cli)
+			pod := &legacyStopRecoveryPods(t, cli)[0]
+			pod.Finalizers = nil
+			Expect(cli.Update(context.Background(), pod)).Should(Succeed())
+			Expect(cli.Delete(context.Background(), pod)).Should(Succeed())
+			legacyStopRecoveryReconcile(t, cli, 1)
+
+			its := legacyStopRecoverySet(t, cli)
+			Expect(its.Status.Replicas).Should(Equal(int32(1)))
+			Expect(its.Status.ReadyReplicas).Should(Equal(int32(1)))
+			Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceReady))).Should(BeTrue())
+			Expect(its.IsInstancesReady()).Should(BeFalse())
+		})
+
+		It("preserves the Ready transition across unrelated generation changes", func() {
+			t := GinkgoT()
+			cli := legacyStopRecoveryFixture(t, 2, 0)
+			legacyStopRecoveryReady(t, cli)
+			before := ageInstanceSetReadyCondition(cli, legacyStopRecoverySet(t, cli))
+			legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) {
+				its.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
+			})
+			legacyStopRecoveryReconcile(t, cli, 2)
+
+			conditions := legacyStopRecoverySet(t, cli).Status.Conditions
+			Expect(meta.IsStatusConditionTrue(conditions, string(workloads.InstanceReady))).Should(BeTrue())
+			Expect(meta.FindStatusCondition(conditions, string(workloads.InstanceReady)).LastTransitionTime.Equal(&before)).Should(BeTrue())
+		})
+	})
 })
 
 func instanceStatusWithoutRevisionAndHealth(status workloads.InstanceStatus) workloads.InstanceStatus {
@@ -2001,7 +2070,30 @@ func TestInstanceAPITransferredIdentityCleanup(t *testing.T) {
 	}
 }
 
-func legacyStopRecoveryFixture(t *testing.T, replicas int32, minReadySeconds int32) client.WithWatch {
+func ageInstanceSetReadyCondition(cli client.Client, its *workloads.InstanceSet) metav1.Time {
+	GinkgoHelper()
+	Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceReady))).Should(BeTrue())
+	ready := meta.FindStatusCondition(its.Status.Conditions, string(workloads.InstanceReady))
+	ready.LastTransitionTime = metav1.NewTime(time.Now().Truncate(time.Second).Add(-2 * time.Minute))
+	Expect(cli.Status().Update(context.Background(), its)).Should(Succeed())
+	return ready.LastTransitionTime
+}
+
+func expectInstanceSetNoRuntime(its *workloads.InstanceSet) {
+	GinkgoHelper()
+	Expect(its.Status.Replicas).Should(BeZero())
+	Expect(its.Status.ReadyReplicas).Should(BeZero())
+	Expect(its.Status.AvailableReplicas).Should(BeZero())
+	expectInstanceSetNotReady(its)
+	Expect(meta.IsStatusConditionFalse(its.Status.Conditions, string(workloads.InstanceAvailable))).Should(BeTrue())
+}
+
+func expectInstanceSetNotReady(its *workloads.InstanceSet) {
+	GinkgoHelper()
+	Expect(meta.IsStatusConditionFalse(its.Status.Conditions, string(workloads.InstanceReady))).Should(BeTrue())
+}
+
+func legacyStopRecoveryFixture(t GinkgoTInterface, replicas int32, minReadySeconds int32) client.WithWatch {
 	t.Helper()
 	scheme := runtime.NewScheme()
 	if err := clientgoscheme.AddToScheme(scheme); err != nil {
@@ -2010,7 +2102,6 @@ func legacyStopRecoveryFixture(t *testing.T, replicas int32, minReadySeconds int
 	if err := workloads.AddToScheme(scheme); err != nil {
 		t.Fatal(err)
 	}
-	model.AddScheme(workloads.AddToScheme)
 	its := &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "legacy-stop", Namespace: "default", UID: "its-uid", Generation: 1},
 		Spec: workloads.InstanceSetSpec{
@@ -2030,7 +2121,7 @@ func legacyStopRecoveryFixture(t *testing.T, replicas int32, minReadySeconds int
 	return cli
 }
 
-func legacyStopRecoveryReconcile(t *testing.T, cli client.Client, count int) ctrl.Result {
+func legacyStopRecoveryReconcile(t GinkgoTInterface, cli client.Client, count int) ctrl.Result {
 	t.Helper()
 	var result ctrl.Result
 	for i := 0; i < count; i++ {
@@ -2044,7 +2135,7 @@ func legacyStopRecoveryReconcile(t *testing.T, cli client.Client, count int) ctr
 	return result
 }
 
-func legacyStopRecoverySet(t *testing.T, cli client.Client) *workloads.InstanceSet {
+func legacyStopRecoverySet(t GinkgoTInterface, cli client.Client) *workloads.InstanceSet {
 	t.Helper()
 	its := &workloads.InstanceSet{}
 	if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "legacy-stop"}, its); err != nil {
@@ -2053,7 +2144,7 @@ func legacyStopRecoverySet(t *testing.T, cli client.Client) *workloads.InstanceS
 	return its
 }
 
-func legacyStopRecoveryChange(t *testing.T, cli client.Client, change func(*workloads.InstanceSet)) {
+func legacyStopRecoveryChange(t GinkgoTInterface, cli client.Client, change func(*workloads.InstanceSet)) {
 	t.Helper()
 	its := legacyStopRecoverySet(t, cli)
 	change(its)
@@ -2063,7 +2154,7 @@ func legacyStopRecoveryChange(t *testing.T, cli client.Client, change func(*work
 	}
 }
 
-func legacyStopRecoveryPods(t *testing.T, cli client.Client) []corev1.Pod {
+func legacyStopRecoveryPods(t GinkgoTInterface, cli client.Client) []corev1.Pod {
 	t.Helper()
 	pods := &corev1.PodList{}
 	if err := cli.List(context.Background(), pods); err != nil {
@@ -2072,7 +2163,7 @@ func legacyStopRecoveryPods(t *testing.T, cli client.Client) []corev1.Pod {
 	return pods.Items
 }
 
-func legacyStopRecoveryClaims(t *testing.T, cli client.Client) []corev1.PersistentVolumeClaim {
+func legacyStopRecoveryClaims(t GinkgoTInterface, cli client.Client) []corev1.PersistentVolumeClaim {
 	t.Helper()
 	claims := &corev1.PersistentVolumeClaimList{}
 	if err := cli.List(context.Background(), claims); err != nil {
@@ -2081,7 +2172,7 @@ func legacyStopRecoveryClaims(t *testing.T, cli client.Client) []corev1.Persiste
 	return claims.Items
 }
 
-func legacyStopRecoveryReady(t *testing.T, cli client.Client) {
+func legacyStopRecoveryReady(t GinkgoTInterface, cli client.Client) {
 	t.Helper()
 	for _, claim := range legacyStopRecoveryClaims(t, cli) {
 		claim.Status.Capacity = claim.Spec.Resources.Requests.DeepCopy()

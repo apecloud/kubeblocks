@@ -32,6 +32,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -48,7 +49,6 @@ import (
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -587,6 +587,98 @@ var _ = Describe("InstanceSet Controller 2", func() {
 			})).Should(Succeed())
 		})
 	})
+
+	Context("readiness", func() {
+		It("reports a fresh Ready transition after stop and resume", func() {
+			t := GinkgoT()
+			cli := newSetStopClient(t, setStopFixture())
+			reconcileSetStop(t, cli, 5)
+			bindSetStopClaims(t, cli)
+			markSetStopPodsReady(t, cli)
+			reconcileSetStop(t, cli, 5)
+			before := ageInstanceSetReadyCondition(cli, readSetStop(t, cli))
+
+			mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(true) })
+			reconcileSetStop(t, cli, 10)
+			expectInstanceSetNoRuntime(readSetStop(t, cli))
+
+			mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(false) })
+			_, err := reconcileSetStopParent(cli)
+			Expect(err).ShouldNot(HaveOccurred())
+			expectInstanceSetNotReady(readSetStop(t, cli))
+			reconcileSetStop(t, cli, 3)
+			markSetStopPodsReady(t, cli)
+			reconcileSetStop(t, cli, 3)
+			conditions := readSetStop(t, cli).Status.Conditions
+			Expect(meta.IsStatusConditionTrue(conditions, string(workloads.InstanceReady))).Should(BeTrue())
+			Expect(meta.FindStatusCondition(conditions, string(workloads.InstanceReady)).LastTransitionTime.After(before.Time)).Should(BeTrue())
+		})
+
+		It("reports neither Ready nor Available with zero replicas", func() {
+			t := GinkgoT()
+			its := setStopFixture()
+			its.Spec.Replicas = ptr.To[int32](0)
+			cli := newSetStopClient(t, its)
+			reconcileSetStop(t, cli, 5)
+			expectInstanceSetNoRuntime(readSetStop(t, cli))
+		})
+
+		It("reports Ready before MinReadySeconds makes instances Available", func() {
+			t := GinkgoT()
+			its := setStopFixture()
+			its.Spec.MinReadySeconds = 86400
+			cli := newSetStopClient(t, its)
+			reconcileSetStop(t, cli, 5)
+			bindSetStopClaims(t, cli)
+			markSetStopPodsReady(t, cli)
+			reconcileSetStop(t, cli, 5)
+			conditions := readSetStop(t, cli).Status.Conditions
+			Expect(meta.IsStatusConditionTrue(conditions, string(workloads.InstanceReady))).Should(BeTrue())
+			Expect(meta.IsStatusConditionFalse(conditions, string(workloads.InstanceAvailable))).Should(BeTrue())
+		})
+
+		It("reports present instance health separately from replica convergence", func() {
+			t := GinkgoT()
+			cli := newSetStopClient(t, setStopFixture())
+			reconcileSetStop(t, cli, 5)
+			bindSetStopClaims(t, cli)
+			markSetStopPodsReady(t, cli)
+			reconcileSetStop(t, cli, 5)
+			inst := &listSetStopChildren(t, cli)[0]
+			inst.Finalizers = nil
+			Expect(cli.Update(context.Background(), inst)).Should(Succeed())
+			Expect(cli.Delete(context.Background(), inst)).Should(Succeed())
+			_, err := reconcileSetStopParent(cli)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			its := readSetStop(t, cli)
+			Expect(its.Status.Replicas).Should(Equal(int32(1)))
+			Expect(its.Status.ReadyReplicas).Should(Equal(int32(1)))
+			Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceReady))).Should(BeTrue())
+			Expect(its.IsInstancesReady()).Should(BeFalse())
+		})
+
+		It("preserves the Ready transition across unrelated generation changes", func() {
+			t := GinkgoT()
+			cli := newSetStopClient(t, setStopFixture())
+			reconcileSetStop(t, cli, 5)
+			bindSetStopClaims(t, cli)
+			markSetStopPodsReady(t, cli)
+			reconcileSetStop(t, cli, 5)
+			before := ageInstanceSetReadyCondition(cli, readSetStop(t, cli))
+			mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
+				its.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
+			})
+			for i := 0; i < 2; i++ {
+				_, err := reconcileSetStopParent(cli)
+				Expect(err).ShouldNot(HaveOccurred())
+			}
+
+			conditions := readSetStop(t, cli).Status.Conditions
+			Expect(meta.IsStatusConditionTrue(conditions, string(workloads.InstanceReady))).Should(BeTrue())
+			Expect(meta.FindStatusCondition(conditions, string(workloads.InstanceReady)).LastTransitionTime.Equal(&before)).Should(BeTrue())
+		})
+	})
 })
 
 type setStopClient struct {
@@ -932,7 +1024,7 @@ func reconcileSetStopParent(cli client.Client) (ctrl.Result, error) {
 	return (&InstanceSetReconciler2{Client: cli, Scheme: cli.Scheme(), Recorder: recorder}).Reconcile(ctx, req)
 }
 
-func readSetStop(t *testing.T, cli client.Client) *workloads.InstanceSet {
+func readSetStop(t GinkgoTInterface, cli client.Client) *workloads.InstanceSet {
 	t.Helper()
 	its := &workloads.InstanceSet{}
 	if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "demo"}, its); err != nil {
@@ -941,7 +1033,7 @@ func readSetStop(t *testing.T, cli client.Client) *workloads.InstanceSet {
 	return its
 }
 
-func mutateSetStop(t *testing.T, cli client.Client, change func(*workloads.InstanceSet)) {
+func mutateSetStop(t GinkgoTInterface, cli client.Client, change func(*workloads.InstanceSet)) {
 	t.Helper()
 	its := readSetStop(t, cli)
 	change(its)
@@ -951,7 +1043,7 @@ func mutateSetStop(t *testing.T, cli client.Client, change func(*workloads.Insta
 	}
 }
 
-func listSetStopPods(t *testing.T, cli client.Client) []corev1.Pod {
+func listSetStopPods(t GinkgoTInterface, cli client.Client) []corev1.Pod {
 	t.Helper()
 	list := &corev1.PodList{}
 	if err := cli.List(context.Background(), list); err != nil {
@@ -960,7 +1052,7 @@ func listSetStopPods(t *testing.T, cli client.Client) []corev1.Pod {
 	return list.Items
 }
 
-func bindSetStopClaims(t *testing.T, cli client.Client) []corev1.PersistentVolumeClaim {
+func bindSetStopClaims(t GinkgoTInterface, cli client.Client) []corev1.PersistentVolumeClaim {
 	t.Helper()
 	claims := &corev1.PersistentVolumeClaimList{}
 	if err := cli.List(context.Background(), claims); err != nil {
@@ -983,7 +1075,7 @@ func bindSetStopClaims(t *testing.T, cli client.Client) []corev1.PersistentVolum
 	return claims.Items
 }
 
-func markSetStopPodsReady(t *testing.T, cli client.Client) {
+func markSetStopPodsReady(t GinkgoTInterface, cli client.Client) {
 	t.Helper()
 	for _, pod := range listSetStopPods(t, cli) {
 		pod.Status.Phase = corev1.PodRunning
@@ -995,7 +1087,7 @@ func markSetStopPodsReady(t *testing.T, cli client.Client) {
 	}
 }
 
-func listSetStopChildren(t *testing.T, cli client.Client) []workloads.Instance {
+func listSetStopChildren(t GinkgoTInterface, cli client.Client) []workloads.Instance {
 	t.Helper()
 	list := &workloads.InstanceList{}
 	if err := cli.List(context.Background(), list); err != nil {
@@ -1450,7 +1542,7 @@ func TestInstanceSetStopParallelPartialWriteKeepsBudget(t *testing.T) {
 	assertClaimsUnchanged()
 }
 
-func newSetStopClient(t *testing.T, its *workloads.InstanceSet) client.Client {
+func newSetStopClient(t GinkgoTInterface, its *workloads.InstanceSet) client.Client {
 	t.Helper()
 	s := runtime.NewScheme()
 	if err := clientgoscheme.AddToScheme(s); err != nil {
@@ -1459,7 +1551,6 @@ func newSetStopClient(t *testing.T, its *workloads.InstanceSet) client.Client {
 	if err := workloads.AddToScheme(s); err != nil {
 		t.Fatal(err)
 	}
-	model.AddScheme(workloads.AddToScheme)
 	return &setStopClient{Client: fake.NewClientBuilder().WithScheme(s).WithStatusSubresource(&workloads.InstanceSet{}, &workloads.Instance{}, &corev1.Pod{}, &corev1.PersistentVolumeClaim{}).WithObjects(its).Build()}
 }
 
@@ -1471,7 +1562,7 @@ func setStopFixture() *workloads.InstanceSet {
 	}}
 }
 
-func reconcileSetStop(t *testing.T, cli client.Client, count int) {
+func reconcileSetStop(t GinkgoTInterface, cli client.Client, count int) {
 	t.Helper()
 	ctx := context.Background()
 	for i := 0; i < count; i++ {

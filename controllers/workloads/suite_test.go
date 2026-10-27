@@ -42,6 +42,7 @@ import (
 	// +kubebuilder:scaffold:imports
 
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
 )
 
@@ -56,6 +57,7 @@ var cancel context.CancelFunc
 var testCtx testutil.TestContext
 
 func init() {
+	model.AddScheme(workloadsv1.AddToScheme)
 	// viper.Set("ENABLE_DEBUG_LOG", "true")
 }
 

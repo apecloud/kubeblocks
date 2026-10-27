@@ -145,18 +145,7 @@ func TestRestartReplacedTrigger(t *testing.T) {
 	}
 }
 
-func TestRestartUsesClusterStatusForSuccess(t *testing.T) {
-	testScheme := runtime.NewScheme()
-	for name, addToScheme := range map[string]func(*runtime.Scheme) error{
-		"apps":       appsv1.AddToScheme,
-		"operations": opsv1alpha1.AddToScheme,
-		"workloads":  workloads.AddToScheme,
-	} {
-		if err := addToScheme(testScheme); err != nil {
-			t.Fatalf("add %s scheme: %v", name, err)
-		}
-	}
-
+var _ = Describe("Restart component health", func() {
 	tests := []struct {
 		name             string
 		componentPhase   appsv1.ComponentPhase
@@ -191,7 +180,16 @@ func TestRestartUsesClusterStatusForSuccess(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		It(test.name, func() {
+			testScheme := runtime.NewScheme()
+			for _, addToScheme := range []func(*runtime.Scheme) error{
+				appsv1.AddToScheme,
+				opsv1alpha1.AddToScheme,
+				workloads.AddToScheme,
+			} {
+				Expect(addToScheme(testScheme)).To(Succeed())
+			}
+
 			const (
 				namespace    = "default"
 				clusterName  = "cluster"
@@ -250,28 +248,19 @@ func TestRestartUsesClusterStatusForSuccess(t *testing.T) {
 			}
 			var err error
 			opsRes.Runtimes, err = buildOpsRuntimes(context.Background(), cli, opsRes)
-			if err != nil {
-				t.Fatalf("build runtimes: %v", err)
-			}
+			Expect(err).NotTo(HaveOccurred())
 
 			phase, _, err := (restartOpsHandler{}).ReconcileAction(
 				intctrlutil.RequestCtx{Ctx: context.Background()}, cli, opsRes)
-			if err != nil {
-				t.Fatalf("reconcile restart: %v", err)
-			}
-			if phase != test.wantPhase {
-				t.Fatalf("phase=%s, want %s", phase, test.wantPhase)
-			}
-			if opsRequest.Status.Progress != "1/1" {
-				t.Fatalf("progress=%s, want 1/1", opsRequest.Status.Progress)
-			}
+			Expect(err).NotTo(HaveOccurred())
+			Expect(phase).To(Equal(test.wantPhase))
+			Expect(opsRequest.Status.Progress).To(Equal("1/1"))
 			details := opsRequest.Status.Components[component].ProgressDetails
-			if len(details) != 1 || details[0].Status != test.wantDetailStatus {
-				t.Fatalf("details=%v, want one %s detail", details, test.wantDetailStatus)
-			}
+			Expect(details).To(HaveLen(1))
+			Expect(details[0].Status).To(Equal(test.wantDetailStatus))
 		})
 	}
-}
+})
 
 var _ = Describe("Restart OpsRequest", func() {
 

@@ -266,6 +266,15 @@ func (r *ReconfigureReconciler) reconcileUnchangedConfig(rctx *reconcileContext,
 					ExpectedCount: rctx.ClusterComObj.Replicas, SucceedCount: 0,
 				}, nil)
 			}
+			lastConfig, err := getLastVersionConfig(rctx.configMap)
+			if err != nil {
+				return intctrlutil.RequeueWithErrorAndRecordEvent(rctx.configMap, r.Recorder, err, rctx.Log)
+			}
+			revision := rctx.configMap.Annotations[constant.ConfigurationRevision]
+			result := parseResult(rctx.configMap.Annotations[core.GenerateRevisionPhaseKey(revision)], revision)
+			if reflect.DeepEqual(rctx.configMap.Data, lastConfig) && result.Phase == parametersv1alpha1.CFinishedPhase {
+				return intctrlutil.Reconciled()
+			}
 		}
 		return r.performUpgrade(rctx, []reconfigure.Task{task})
 	}

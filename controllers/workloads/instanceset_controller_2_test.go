@@ -891,12 +891,32 @@ func (w *failSetStopStatusWriter) Update(ctx context.Context, obj client.Object,
 }
 
 func TestInstanceSetStopRecoversAfterParentStatusFailure(t *testing.T) {
-	for _, stopping := range []bool{true, false} {
-		t.Run(fmt.Sprintf("stop=%t", stopping), func(t *testing.T) {
+	for _, scenario := range []struct {
+		name         string
+		stopping     bool
+		afterHandoff bool
+	}{
+		{name: "stop=true", stopping: true},
+		{name: "stop=false"},
+		{name: "stop=true/after-handoff", stopping: true, afterHandoff: true},
+		{name: "stop=false/after-handoff", afterHandoff: true},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			stopping := scenario.stopping
 			its := setStopFixture()
 			cli := newSetStopClient(t, its)
 			reconcileSetStop(t, cli, 5)
 			claims := bindSetStopClaims(t, cli)
+			assertStorageUnchanged := func() {
+				t.Helper()
+				currentClaims := &corev1.PersistentVolumeClaimList{}
+				if err := cli.List(context.Background(), currentClaims); err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(currentClaims.Items, claims) {
+					t.Fatal("parent status failure/recovery changed storage")
+				}
+			}
 			markSetStopPodsReady(t, cli)
 			reconcileSetStop(t, cli, 3)
 			if !stopping {
@@ -920,11 +940,14 @@ func TestInstanceSetStopRecoversAfterParentStatusFailure(t *testing.T) {
 			}
 			beforeStatus := readSetStop(t, cli).Status
 			faulty := &failSetStopStatusClient{Client: cli, fail: true}
-			if _, err := reconcileSetStopParent(faulty); !errors.Is(err, errSetStopStatusWrite) || faulty.fail {
-				t.Fatalf("expected parent condition publication fault before child handoff, got %v", err)
-			}
-			if !reflect.DeepEqual(readSetStop(t, cli).Status, beforeStatus) {
-				t.Fatal("failed parent status write changed the persisted status")
+			if !scenario.afterHandoff {
+				if _, err := reconcileSetStopParent(faulty); !errors.Is(err, errSetStopStatusWrite) || faulty.fail {
+					t.Fatalf("expected parent condition publication fault before child handoff, got %v", err)
+				}
+				if !reflect.DeepEqual(readSetStop(t, cli).Status, beforeStatus) {
+					t.Fatal("failed parent status write changed the persisted status")
+				}
+				assertStorageUnchanged()
 			}
 			assertHandoffs := func(want int) {
 				t.Helper()
@@ -947,14 +970,26 @@ func TestInstanceSetStopRecoversAfterParentStatusFailure(t *testing.T) {
 			assertHandoffs(0)
 			publishSetStopConditions(t, cli)
 			assertHandoffs(0)
-			if _, err := reconcileSetStopParent(cli); err != nil {
+			if scenario.afterHandoff {
+				beforeStatus = readSetStop(t, cli).Status
+				if _, err := reconcileSetStopParent(faulty); !errors.Is(err, errSetStopStatusWrite) || faulty.fail {
+					t.Fatalf("expected parent status fault after child handoff, got %v", err)
+				}
+				if !reflect.DeepEqual(readSetStop(t, cli).Status, beforeStatus) {
+					t.Fatal("failed post-handoff write changed the persisted parent status")
+				}
+			} else if _, err := reconcileSetStopParent(cli); err != nil {
 				t.Fatal(err)
 			}
 			assertHandoffs(1)
-			if _, err := reconcileSetStopParent(cli); err != nil {
-				t.Fatal(err)
+			assertStorageUnchanged()
+			for i := 0; i < 2; i++ {
+				if _, err := reconcileSetStopParent(cli); err != nil {
+					t.Fatal(err)
+				}
+				assertHandoffs(1)
+				assertStorageUnchanged()
 			}
-			assertHandoffs(1)
 			if stopping {
 				reconcileSetStop(t, cli, 10)
 				if len(listSetStopPods(t, cli)) != 0 || readSetStop(t, cli).Status.Replicas != 0 {
@@ -987,13 +1022,7 @@ func TestInstanceSetStopRecoversAfterParentStatusFailure(t *testing.T) {
 					}
 				}
 			}
-			currentClaims := &corev1.PersistentVolumeClaimList{}
-			if err := cli.List(context.Background(), currentClaims); err != nil {
-				t.Fatal(err)
-			}
-			if !reflect.DeepEqual(currentClaims.Items, claims) {
-				t.Fatal("parent status failure/recovery changed storage")
-			}
+			assertStorageUnchanged()
 		})
 	}
 }

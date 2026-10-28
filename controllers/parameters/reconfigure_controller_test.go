@@ -856,9 +856,10 @@ var _ = Describe("Reconfigure Controller", func() {
 					cluster.Spec.ComponentSpecs[0].Configs = append(cluster.Spec.ComponentSpecs[0].Configs,
 						appsv1.ClusterComponentConfig{Name: ptr.To("mysql-config")})
 				}
-				original := cluster.DeepCopy()
 				labels := cm.DeepCopy().Labels
 				cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cm, cluster).Build()
+				Expect(cli.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
+				original := cluster.DeepCopy()
 				r := &ReconfigureReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
 				result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cm)})
 				Expect(err).Should(Succeed())

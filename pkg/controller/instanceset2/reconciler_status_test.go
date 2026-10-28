@@ -760,7 +760,7 @@ func TestStatusReconcilerReadsCurrentRevisionFromInstanceStatus(t *testing.T) {
 	if err := tree.Add(inst); err != nil {
 		t.Fatalf("add instance: %v", err)
 	}
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+	if _, err := (&statusReconciler{}).reconcileStatus(tree); err != nil {
 		t.Fatalf("reconcile status: %v", err)
 	}
 
@@ -793,7 +793,7 @@ func TestStatusReconcilerReadsCurrentRevisionFromInstanceStatus(t *testing.T) {
 	// Dynamic config and PVC convergence are represented by UpToDate, but do not make a
 	// healthy runtime unready or unavailable.
 	inst.Status.UpToDate = false
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+	if _, err := (&statusReconciler{}).reconcileStatus(tree); err != nil {
 		t.Fatalf("reconcile non-converged runtime status: %v", err)
 	}
 	got = tree.GetRoot().(*workloads.InstanceSet)
@@ -867,7 +867,7 @@ func TestStatusReconcilerDoesNotDependOnRevisionAnnotationForCurrentRevision(t *
 	if err := tree.Add(inst); err != nil {
 		t.Fatalf("add instance: %v", err)
 	}
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+	if _, err := (&statusReconciler{}).reconcileStatus(tree); err != nil {
 		t.Fatalf("reconcile status: %v", err)
 	}
 
@@ -920,7 +920,7 @@ func TestStatusReconcilerPublishesTransferredFlatAllocation(t *testing.T) {
 	tree := kubebuilderx.NewObjectTree()
 	tree.SetRoot(its)
 
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+	if _, err := (&statusReconciler{}).reconcileStatus(tree); err != nil {
 		t.Fatal(err)
 	}
 	if its.Status.ReadyReplicas != 0 || len(its.Status.InstanceStatus) != 2 {
@@ -981,7 +981,7 @@ func TestITS2AllocationChangesStayInDesiredAndCurrentState(t *testing.T) {
 	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+	if _, err := (&statusReconciler{}).reconcileStatus(tree); err != nil {
 		t.Fatal(err)
 	}
 	added := its.FindInstanceStatus("demo-2")
@@ -994,7 +994,7 @@ func TestITS2AllocationChangesStayInDesiredAndCurrentState(t *testing.T) {
 	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+	if _, err := (&statusReconciler{}).reconcileStatus(tree); err != nil {
 		t.Fatal(err)
 	}
 	released := its.FindInstanceStatus("demo-1")
@@ -1007,7 +1007,7 @@ func TestITS2AllocationChangesStayInDesiredAndCurrentState(t *testing.T) {
 	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+	if _, err := (&statusReconciler{}).reconcileStatus(tree); err != nil {
 		t.Fatal(err)
 	}
 	offline := its.FindInstanceStatus("demo-0")
@@ -1053,7 +1053,7 @@ func newITS2InstanceStatusFixtureFromSet(t *testing.T, its *workloads.InstanceSe
 		}
 		instances[name] = inst
 	}
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+	if _, err := (&statusReconciler{}).reconcileStatus(tree); err != nil {
 		t.Fatal(err)
 	}
 	assertITS2UpToDate(t, its, "demo-0", true)

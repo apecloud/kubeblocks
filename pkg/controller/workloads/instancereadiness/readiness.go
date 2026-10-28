@@ -59,7 +59,7 @@ func Pod(pod *corev1.Pod, minReadySeconds int32) Health {
 	return Health{Ready: true, Available: intctrlutil.IsPodAvailable(pod, minReadySeconds)}
 }
 
-// Publish evaluates configured identities independently of Stop and extra runtime objects.
+// Publish evaluates configured identities independently of extra runtime objects.
 func Publish(its *workloads.InstanceSet, assignments []instancetemplate.Assignment, health map[string]Health, assignmentErr error) (bool, error) {
 	if assignmentErr != nil {
 		if !instancetemplate.IsAssignmentIncomplete(assignmentErr) {
@@ -109,4 +109,16 @@ func Publish(its *workloads.InstanceSet, assignments []instancetemplate.Assignme
 		meta.SetStatusCondition(&its.Status.Conditions, condition)
 	}
 	return pending, nil
+}
+
+// PublicationChanged identifies observations that must persist before child changes.
+func PublicationChanged(previous, current []metav1.Condition) bool {
+	for _, kind := range []string{string(workloads.InstanceReady), string(workloads.InstanceAvailable)} {
+		condition := meta.FindStatusCondition(current, kind)
+		old := meta.FindStatusCondition(previous, kind)
+		if condition != nil && (old == nil || old.Status != condition.Status || old.ObservedGeneration != condition.ObservedGeneration) {
+			return true
+		}
+	}
+	return false
 }

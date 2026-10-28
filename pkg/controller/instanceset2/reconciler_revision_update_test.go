@@ -21,6 +21,7 @@ package instanceset2
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -38,9 +39,7 @@ func TestStatusPreconditionWaitsForRevisionUpdate(t *testing.T) {
 	its.Status.ObservedGeneration = its.Generation - 1
 	tree := kubebuilderx.NewObjectTree()
 	tree.SetRoot(its)
-	if result := NewStatusReconciler().PreCondition(tree); result != kubebuilderx.ConditionUnsatisfied {
-		t.Fatalf("status reconciler ran before revisions were published: %#v", result)
-	}
+	assertStatusWaitsForRevision(t, tree)
 	if result := NewRevisionUpdateReconciler().PreCondition(tree); result != kubebuilderx.ConditionSatisfied {
 		t.Fatalf("revision reconciler did not accept the pending generation: %#v", result)
 	}
@@ -116,7 +115,7 @@ func TestFlatOrdinalReassignmentPublishesTargetsAndPreservesInstances(t *testing
 	if scaledDown != 0 || len(tree.List(&workloads.Instance{})) != 2 {
 		t.Fatalf("alignment retired a transferred instance: %d", scaledDown)
 	}
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+	if _, err := (&statusReconciler{}).reconcileStatus(tree); err != nil {
 		t.Fatal(err)
 	}
 	for name, template := range map[string]string{"demo-0": "b", "demo-1": "a"} {
@@ -196,9 +195,7 @@ func TestRevisionUpdateInvalidatesOnlyAffectedITS2Instances(t *testing.T) {
 			its.Generation++
 			tt.mutate(its)
 
-			if NewStatusReconciler().PreCondition(tree) != kubebuilderx.ConditionUnsatisfied {
-				t.Fatal("status reconciler must remain before revision update and wait for the new generation target")
-			}
+			assertStatusWaitsForRevision(t, tree)
 			if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 				t.Fatal(err)
 			}
@@ -214,7 +211,7 @@ func TestRevisionUpdateInvalidatesOnlyAffectedITS2Instances(t *testing.T) {
 
 			// The second pass uses the new Instance-spec revisions and keeps only the affected
 			// current Instance stale until its own controller applies the desired spec.
-			if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+			if _, err := (&statusReconciler{}).reconcileStatus(tree); err != nil {
 				t.Fatal(err)
 			}
 			assertITS2UpToDate(t, its, "demo-0", false)
@@ -236,9 +233,7 @@ func TestRevisionUpdateInvalidatesMissingITS2Instance(t *testing.T) {
 	its.Spec.Instances[0].Resources = &corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")},
 	}
-	if NewStatusReconciler().PreCondition(tree) != kubebuilderx.ConditionUnsatisfied {
-		t.Fatal("status reconciler must wait for revision publication")
-	}
+	assertStatusWaitsForRevision(t, tree)
 	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)
 	}
@@ -274,9 +269,7 @@ func TestRevisionUpdateInvalidatesUnobservedITS2InstanceHandoff(t *testing.T) {
 	if err := tree.Update(handedOff); err != nil {
 		t.Fatal(err)
 	}
-	if NewStatusReconciler().PreCondition(tree) != kubebuilderx.ConditionUnsatisfied {
-		t.Fatal("status reconciler must wait for the parent generation handoff")
-	}
+	assertStatusWaitsForRevision(t, tree)
 
 	// The next parent pass sees the desired child spec already handed off, while the
 	// child status and the previous parent InstanceStatus still describe the old spec.
@@ -285,4 +278,24 @@ func TestRevisionUpdateInvalidatesUnobservedITS2InstanceHandoff(t *testing.T) {
 	}
 	assertITS2UpToDate(t, its, "demo-0", false)
 	assertITS2UpToDate(t, its, "demo-1", true)
+}
+
+func assertStatusWaitsForRevision(t *testing.T, tree *kubebuilderx.ObjectTree) {
+	t.Helper()
+	its := tree.GetRoot().(*workloads.InstanceSet)
+	before := its.Status.DeepCopy()
+	r := NewStatusReconciler()
+	if r.PreCondition(tree) != kubebuilderx.ConditionSatisfied {
+		t.Fatal("readiness must assess the pending generation")
+	}
+	for i := 0; i < 2; i++ {
+		if _, err := r.Reconcile(tree); err != nil {
+			t.Fatal(err)
+		}
+	}
+	after := its.Status.DeepCopy()
+	after.Conditions = before.Conditions
+	if !reflect.DeepEqual(before, after) {
+		t.Fatalf("full status changed before revision publication: before=%#v after=%#v", before, after)
+	}
 }

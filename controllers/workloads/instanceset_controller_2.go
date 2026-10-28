@@ -53,20 +53,17 @@ type InstanceSetReconciler2 struct {
 
 func (r *InstanceSetReconciler2) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithValues("InstanceSet2", req.NamespacedName)
-	readiness, availability := instanceset2.NewReadinessReconcilers()
 	return kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
 		Prepare(instanceset2.NewTreeLoader()).
 		Do(instanceset2.NewAPIVersionReconciler()).
 		Do(instanceset2.NewFixMetaReconciler()).
 		Do(instanceset2.NewDeletionReconciler()).
 		Do(instanceset2.NewValidationReconciler()).
-		Do(readiness).
 		Do(instanceset2.NewStatusReconciler()).
 		Do(instanceset2.NewRevisionUpdateReconciler()).
 		Do(instanceset2.NewAssistantObjectReconciler()).
 		Do(instanceset2.NewAlignmentReconciler()).
 		Do(instanceset2.NewUpdateReconciler()).
-		Do(availability).
 		Commit()
 }
 

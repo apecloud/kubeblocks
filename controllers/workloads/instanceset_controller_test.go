@@ -100,14 +100,14 @@ var _ = Describe("InstanceSet configured readiness", func() {
 			}
 			reconcile := func(tree *kubebuilderx.ObjectTree) {
 				r := instanceset.NewStatusReconciler()
-				readiness, _ := instanceset.NewReadinessReconcilers()
 				if instanceAPI {
 					r = instanceset2.NewStatusReconciler()
-					readiness, _ = instanceset2.NewReadinessReconcilers()
 				}
-				_, err := readiness.Reconcile(tree)
+				result, err := r.Reconcile(tree)
 				Expect(err).ShouldNot(HaveOccurred())
-				_, err = r.Reconcile(tree)
+				if result == kubebuilderx.RetryAfter(time.Millisecond) {
+					_, err = r.Reconcile(tree)
+				}
 				Expect(err).ShouldNot(HaveOccurred())
 			}
 			DescribeTable("uses the configured identities", func(replicas *int32, names []string, unhealthyExtra bool, stop bool, ready bool) {
@@ -3598,32 +3598,18 @@ var _ = Describe("InstanceSet readiness publication", func() {
 		Expect(meta.IsStatusConditionFalse(its.Status.Conditions, string(workloads.InstanceReady))).Should(BeTrue())
 	}, Entry("legacy", false), Entry("Instance API", true))
 
-	It("lets stable Unknown observations progress and keeps their pre-repair wakeup", func() {
+	It("does not require a publication barrier for stable Unknown observations", func() {
 		its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Generation: 2}}
 		for _, kind := range []string{string(workloads.InstanceReady), string(workloads.InstanceAvailable)} {
 			meta.SetStatusCondition(&its.Status.Conditions, metav1.Condition{Type: kind, Status: metav1.ConditionUnknown, ObservedGeneration: 2, Reason: "PendingAssignment", Message: "previous allocation"})
 		}
-		tree := kubebuilderx.NewObjectTree()
-		tree.SetRoot(its)
 		previous := append([]metav1.Condition(nil), its.Status.Conditions...)
-		evaluations := 0
-		readiness, availability := instancereadiness.NewReconcilers(func(observed *kubebuilderx.ObjectTree) (bool, error) {
-			evaluations++
-			for _, kind := range []string{string(workloads.InstanceReady), string(workloads.InstanceAvailable)} {
-				meta.SetStatusCondition(&observed.GetRoot().(*workloads.InstanceSet).Status.Conditions, metav1.Condition{Type: kind, Status: metav1.ConditionUnknown, ObservedGeneration: 2, Reason: "AssignmentPending", Message: "current allocation"})
-			}
-			return true, nil
-		})
-		result, err := readiness.Reconcile(tree)
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(result).Should(Equal(kubebuilderx.Continue))
+		for _, kind := range []string{string(workloads.InstanceReady), string(workloads.InstanceAvailable)} {
+			meta.SetStatusCondition(&its.Status.Conditions, metav1.Condition{Type: kind, Status: metav1.ConditionUnknown, ObservedGeneration: 2, Reason: "AssignmentPending", Message: "current allocation"})
+		}
+		Expect(instancereadiness.PublicationChanged(previous, its.Status.Conditions)).Should(BeFalse())
 		for _, condition := range previous {
 			Expect(meta.FindStatusCondition(its.Status.Conditions, condition.Type).LastTransitionTime.Equal(&condition.LastTransitionTime)).Should(BeTrue())
 		}
-		its.Status.Conditions = nil
-		result, err = availability.Reconcile(tree)
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(result).Should(Equal(kubebuilderx.RetryAfter(time.Second)))
-		Expect(evaluations).Should(Equal(1))
 	})
 })

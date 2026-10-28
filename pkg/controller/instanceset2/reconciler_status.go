@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
+	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancereadiness"
 	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancestatus"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -49,13 +51,34 @@ type statusReconciler struct{}
 var _ kubebuilderx.Reconciler = &statusReconciler{}
 
 func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
-	if tree.GetRoot() == nil || !model.IsObjectStatusUpdating(tree.GetRoot()) {
+	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
 	return kubebuilderx.ConditionSatisfied
 }
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
+	its := tree.GetRoot().(*workloads.InstanceSet)
+	previous := append([]metav1.Condition(nil), its.Status.Conditions...)
+	pending, err := reconcileReadiness(tree)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	if instancereadiness.PublicationChanged(previous, its.Status.Conditions) {
+		return kubebuilderx.RetryAfter(time.Millisecond), nil
+	}
+	result := kubebuilderx.Continue
+	if pending {
+		result.RetryAfter = time.Second
+	}
+	if !model.IsObjectStatusUpdating(its) {
+		return result, nil
+	}
+	_, err = r.reconcileStatus(tree)
+	return result, err
+}
+
+func (r *statusReconciler) reconcileStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 
 	instances := tree.List(&workloads.Instance{})
@@ -65,7 +88,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		instanceList = append(instanceList, inst)
 	}
 	// Keep the previous full projection until flat allocation is complete.
-	// The readiness step independently reports incomplete allocation as Unknown.
+	// Readiness has already reported incomplete allocation as Unknown.
 	if its.Spec.FlatInstanceOrdinal {
 		if _, _, err := instancetemplate.BuildAssignments(tree, its); err != nil {
 			if instancetemplate.IsAssignmentIncomplete(err) {

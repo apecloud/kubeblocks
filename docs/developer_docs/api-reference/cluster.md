@@ -19345,7 +19345,7 @@ condition. With MinReadySeconds zero, its status matches InstanceReady, but tran
 </td>
 </tr><tr><td><p>&#34;InstanceReady&#34;</p></td>
 <td><p>InstanceReady reports observed runtime health. For an InstanceSet, it is True when every identity
-assigned to spec.replicas exists and is healthy. The replica target defaults to 1 and Stop preserves it.
+assigned to spec.replicas exists and is healthy. The replica target defaults to 1.
 An explicit zero target is ready even while extra instances await cleanup. Extra instances cannot
 replace missing assigned identities and do not independently block readiness. Incomplete allocation
 is Unknown. Readiness does not require roles, revision convergence, or operation completion.</p>
@@ -20163,7 +20163,7 @@ string
 <em>(Optional)</em>
 <p>Represents the latest available observations of an instanceset&rsquo;s current state.
 Known .status.conditions.type are: &ldquo;InstanceFailure&rdquo;, &ldquo;InstanceReady&rdquo;, &ldquo;InstanceAvailable&rdquo;, &ldquo;Restore&rdquo;.
-InstanceReady and InstanceAvailable assess the configured replica identities, independent of Stop.
+InstanceReady and InstanceAvailable assess the configured replica identities.
 Their observedGeneration identifies the spec evaluated. Each lastTransitionTime changes only when
 that condition&rsquo;s status changes, including across generations.</p>
 </td>

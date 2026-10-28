@@ -376,8 +376,7 @@ type RolloutComponentStatus struct {
 	// +optional
 	CanaryReplicas int32 `json:"canaryReplicas"`
 
-	// The instances selected for scale-down. Recorded before updating the Cluster
-	// so retries can remove their offline entries during teardown.
+	// The instances that are scaled down.
 	//
 	// +optional
 	ScaleDownInstances []string `json:"scaleDownInstances,omitempty"`
@@ -434,8 +433,7 @@ type RolloutShardingStatus struct {
 	// +optional
 	CanaryReplicas int32 `json:"canaryReplicas"`
 
-	// The instances selected for scale-down. Recorded before updating the Cluster
-	// so retries can remove their offline entries during teardown.
+	// The instances that are scaled down.
 	//
 	// +optional
 	ScaleDownInstances []string `json:"scaleDownInstances,omitempty"`

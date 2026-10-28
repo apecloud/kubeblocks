@@ -16245,8 +16245,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>The instances selected for scale-down. Recorded before updating the Cluster
-so retries can remove their offline entries during teardown.</p>
+<p>The instances that are scaled down.</p>
 </td>
 </tr>
 <tr>
@@ -16646,8 +16645,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>The instances selected for scale-down. Recorded before updating the Cluster
-so retries can remove their offline entries during teardown.</p>
+<p>The instances that are scaled down.</p>
 </td>
 </tr>
 <tr>

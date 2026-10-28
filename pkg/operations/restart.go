@@ -21,7 +21,6 @@ package operations
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -106,13 +105,7 @@ func (r restartOpsHandler) targetsMatch(opsRes *OpsResource) bool {
 	for i := range opsRes.OpsRequest.Spec.RestartList {
 		componentName := opsRes.OpsRequest.Spec.RestartList[i].ComponentName
 		component := getComponentSpecOrShardingTemplate(opsRes.Cluster, componentName)
-		if component == nil {
-			return false
-		}
-		trigger := component.Annotations[constant.RestartAnnotationKey]
-		// Requests already running when the operator is upgraded retain their
-		// timestamp-only trigger. New actions always include the request UID.
-		if trigger != restartTrigger(opsRes.OpsRequest) && trigger != opsRes.OpsRequest.Status.StartTimestamp.Format(time.RFC3339) {
+		if component == nil || component.Annotations[constant.RestartAnnotationKey] != opsRes.OpsRequest.Status.StartTimestamp.Format(time.RFC3339) {
 			return false
 		}
 	}
@@ -127,14 +120,8 @@ func (r restartOpsHandler) doRestart(opsRes *OpsResource, compSpec *appsv1.Clust
 		compSpec.Annotations = map[string]string{}
 	}
 	startTimestamp := opsRes.OpsRequest.Status.StartTimestamp
-	workloadRestartTimeStamp, _, _ := strings.Cut(compSpec.Annotations[constant.RestartAnnotationKey], "/")
-	if res, _ := time.Parse(time.RFC3339, workloadRestartTimeStamp); !startTimestamp.Time.Before(res) {
-		compSpec.Annotations[constant.RestartAnnotationKey] = restartTrigger(opsRes.OpsRequest)
+	workloadRestartTimeStamp := compSpec.Annotations[constant.RestartAnnotationKey]
+	if res, _ := time.Parse(time.RFC3339, workloadRestartTimeStamp); startTimestamp.After(res) {
+		compSpec.Annotations[constant.RestartAnnotationKey] = startTimestamp.Format(time.RFC3339)
 	}
-}
-
-func restartTrigger(ops *opsv1alpha1.OpsRequest) string {
-	// StartTimestamp is persisted with second precision. The API server's UID
-	// distinguishes requests starting in the same second and survives retries.
-	return ops.Status.StartTimestamp.Format(time.RFC3339) + "/" + string(ops.UID)
 }

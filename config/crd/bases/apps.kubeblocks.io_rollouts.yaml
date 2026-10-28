@@ -6906,9 +6906,7 @@ spec:
                       format: int32
                       type: integer
                     scaleDownInstances:
-                      description: |-
-                        The instances selected for scale-down. Recorded before updating the Cluster
-                        so retries can remove their offline entries during teardown.
+                      description: The instances that are scaled down.
                       items:
                         type: string
                       type: array
@@ -7028,9 +7026,7 @@ spec:
                       format: int32
                       type: integer
                     scaleDownInstances:
-                      description: |-
-                        The instances selected for scale-down. Recorded before updating the Cluster
-                        so retries can remove their offline entries during teardown.
+                      description: The instances that are scaled down.
                       items:
                         type: string
                       type: array

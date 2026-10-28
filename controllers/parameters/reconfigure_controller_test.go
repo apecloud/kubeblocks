@@ -681,6 +681,7 @@ var _ = Describe("Reconfigure Controller", func() {
 						Configs: []appsv1.ClusterComponentConfig{
 							{Name: ptr.To(configName), ConfigHash: sharedHash, Restart: ptr.To(false),
 								Reconfigure: ptr.To(true), ReconfigureArgs: [][]string{{"enabled", "ON"}},
+								Variables:         map[string]string{"user-variable": "kept", "KB_CONFIG_FILES_UPDATED": "/config/my.cnf:checksum"},
 								ReconfigureAction: &appsv1.Action{Exec: &appsv1.ExecAction{Command: []string{"reload"}}}},
 							{Name: ptr.To("other"), ConfigHash: ptr.To("other-hash"), Restart: ptr.To(true)},
 						}},
@@ -754,7 +755,27 @@ var _ = Describe("Reconfigure Controller", func() {
 		It("finishes alternating semantic no-ops without replacing the shared sharding target", func() {
 			original := cluster.DeepCopy()
 			Expect(computeTargetConfigHash(nil, configMaps[0].Data)).ShouldNot(Equal(computeTargetConfigHash(nil, configMaps[1].Data)))
+			reconcileFinished(0, original)
+			reconcileFinished(1, original)
 			for _, index := range []int{0, 1, 0, 1, 0, 1} {
+				reconcileFinished(index, original)
+			}
+		})
+
+		It("preserves shards with different applied parameter values", func() {
+			for index, value := range []string{"1", "2"} {
+				cm := configMaps[index]
+				baseline := map[string]string{"my.cnf": "server_id=" + value + "\nenabled=ON\n"}
+				applied, err := json.Marshal(baseline)
+				Expect(err).Should(Succeed())
+				cm.Annotations[constant.LastAppliedConfigAnnotationKey] = string(applied)
+				cm.Data["my.cnf"] = baseline["my.cnf"] + "# shard-specific formatting\n"
+				Expect(cli.Update(ctx, cm)).Should(Succeed())
+			}
+			original := cluster.DeepCopy()
+			reconcileFinished(0, original)
+			reconcileFinished(1, original)
+			for _, index := range []int{1, 0, 1, 0, 1, 0} {
 				reconcileFinished(index, original)
 			}
 		})
@@ -803,29 +824,34 @@ var _ = Describe("Reconfigure Controller", func() {
 			Expect(status.Phase).Should(Equal(parametersv1alpha1.CUpgradingPhase))
 		})
 
-		It("keeps applied shard configurations finished when related resources are unavailable", func() {
-			for _, cm := range configMaps {
-				applied, err := json.Marshal(cm.Data)
-				Expect(err).Should(Succeed())
-				cm.Annotations[constant.LastAppliedConfigAnnotationKey] = string(applied)
-				setPhase(cm, parametersv1alpha1.CFinishedPhase)
-				Expect(cli.Update(ctx, cm)).Should(Succeed())
-			}
-			original := cluster.DeepCopy()
-			Expect(cli.Delete(ctx, sets[0])).Should(Succeed())
-			reconcileFinished(0, original)
-			cp := &parametersv1alpha1.ComponentParameter{ObjectMeta: metav1.ObjectMeta{
-				Name: parameterscore.GenerateComponentConfigurationName(clusterName, "db-bbb"), Namespace: namespace}}
-			Expect(cli.Delete(ctx, cp)).Should(Succeed())
-			reconcileFinished(1, original)
-			definition := &appsv1.ComponentDefinition{}
-			Expect(cli.Get(ctx, client.ObjectKey{Name: "mysql"}, definition)).Should(Succeed())
-			definition.Status.Phase = appsv1.UnavailablePhase
-			Expect(cli.Update(ctx, definition)).Should(Succeed())
-			for _, index := range []int{0, 1, 0, 1} {
-				reconcileFinished(index, original)
-			}
-		})
+		for _, unavailable := range []string{"InstanceSet", "ComponentParameter", "ComponentDefinition"} {
+			It("keeps applied shard configurations finished without "+unavailable, func() {
+				for _, cm := range configMaps {
+					applied, err := json.Marshal(cm.Data)
+					Expect(err).Should(Succeed())
+					cm.Annotations[constant.LastAppliedConfigAnnotationKey] = string(applied)
+					setPhase(cm, parametersv1alpha1.CFinishedPhase)
+					Expect(cli.Update(ctx, cm)).Should(Succeed())
+				}
+				original := cluster.DeepCopy()
+				switch unavailable {
+				case "InstanceSet":
+					Expect(cli.Delete(ctx, sets[0])).Should(Succeed())
+				case "ComponentParameter":
+					cp := &parametersv1alpha1.ComponentParameter{ObjectMeta: metav1.ObjectMeta{
+						Name: parameterscore.GenerateComponentConfigurationName(clusterName, "db-aaa"), Namespace: namespace}}
+					Expect(cli.Delete(ctx, cp)).Should(Succeed())
+				case "ComponentDefinition":
+					definition := &appsv1.ComponentDefinition{}
+					Expect(cli.Get(ctx, client.ObjectKey{Name: "mysql"}, definition)).Should(Succeed())
+					definition.Status.Phase = appsv1.UnavailablePhase
+					Expect(cli.Update(ctx, definition)).Should(Succeed())
+				}
+				for _, index := range []int{0, 1, 0, 1} {
+					reconcileFinished(index, original)
+				}
+			})
+		}
 	})
 
 	Context("applied configurations without an independent target", func() {

@@ -117,17 +117,22 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,
 			errors.Wrap(err, "failed to check last-applied-configuration").Error())
 	}
+	rctx := newReconcileContext(reqCtx, &render.ResourceCtx{
+		Context:       reqCtx.Ctx,
+		Client:        r.Client,
+		Namespace:     config.Namespace,
+		ClusterName:   config.Labels[constant.AppInstanceLabelKey],
+		ComponentName: config.Labels[constant.KBAppComponentLabelKey],
+	}, config)
 	if isAppliedConfigs {
 		if !initialized {
 			return updateConfigPhase(r.Client, reqCtx, config, parametersv1alpha1.CFinishedPhase, configurationNoChangedMessage)
 		}
-		cluster := &appsv1.Cluster{}
-		key := client.ObjectKey{Namespace: config.Namespace, Name: config.Labels[constant.AppInstanceLabelKey]}
-		if err := r.Client.Get(reqCtx.Ctx, key, cluster); err != nil {
+		if err := rctx.Cluster().Complete(); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,
 				errors.Wrap(err, "failed to fetch related resources").Error())
 		}
-		if independentConfigurationTarget(cluster, config.Labels[constant.KBAppComponentLabelKey],
+		if independentConfigurationTarget(rctx.ClusterObj, config.Labels[constant.KBAppComponentLabelKey],
 			config.Labels[constant.CMConfigurationSpecProviderLabelKey]) == nil {
 			return updateConfigPhase(r.Client, reqCtx, config, parametersv1alpha1.CFinishedPhase, configurationNoChangedMessage)
 		}
@@ -148,7 +153,12 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return updateConfigPhase(r.Client, reqCtx, config, parametersv1alpha1.CFinishedPhase, configurationNotRelatedComponentMessage)
 	}
 
-	return r.sync(reqCtx, config, configSpec, isAppliedConfigs)
+	if !isAppliedConfigs {
+		if err := rctx.Cluster().Complete(); err != nil {
+			return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
+		}
+	}
+	return r.sync(rctx, configSpec, isAppliedConfigs)
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -204,14 +214,9 @@ func (r *ReconfigureReconciler) getConfigSpec(reqCtx intctrlutil.RequestCtx, cm 
 	return configSpec.ConfigSpec, nil
 }
 
-func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *corev1.ConfigMap, configSpec *appsv1.ComponentFileTemplate, applied bool) (ctrl.Result, error) {
-	rctx := newReconcileContext(reqCtx, &render.ResourceCtx{
-		Context:       reqCtx.Ctx,
-		Client:        r.Client,
-		Namespace:     configMap.Namespace,
-		ClusterName:   configMap.Labels[constant.AppInstanceLabelKey],
-		ComponentName: configMap.Labels[constant.KBAppComponentLabelKey],
-	}, configMap, nil)
+func (r *ReconfigureReconciler) sync(rctx *reconcileContext, configSpec *appsv1.ComponentFileTemplate, applied bool) (ctrl.Result, error) {
+	reqCtx := rctx.RequestCtx
+	configMap := rctx.configMap
 	if err := rctx.objects(); err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(configMap, r.Recorder, err, reqCtx.Log)
 	}

@@ -41,10 +41,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -147,6 +149,148 @@ func TestInstanceSetPodEventMapping(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestInstanceSetWorkerPodOwnerLookupRetry(t *testing.T) {
+	ctx := context.Background()
+	its := setStopFixture()
+	its.Spec.MinReadySeconds = 3600
+	cli := newSetStopClient(t, its)
+	reconcileSetStop(t, cli, 5)
+	bindSetStopClaims(t, cli)
+	for _, child := range listSetStopChildren(t, cli) {
+		if child.Annotations == nil {
+			child.Annotations = map[string]string{}
+		}
+		child.Annotations[constant.KBAppMultiClusterPlacementKey] = "worker"
+		if err := cli.Update(ctx, &child); err != nil {
+			t.Fatal(err)
+		}
+	}
+	markSetStopPodsReady(t, cli)
+	for _, p := range listSetStopPods(t, cli) {
+		p.Status.Conditions[0].LastTransitionTime = metav1.NewTime(time.Now().Add(-time.Minute))
+		if err := cli.Status().Update(ctx, &p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	reconcileSetStop(t, cli, 4)
+	mutateSetStop(t, cli, func(s *workloads.InstanceSet) {
+		s.Spec.Paused = true
+		s.Spec.MinReadySeconds = 30
+		if s.Annotations == nil {
+			s.Annotations = map[string]string{}
+		}
+		s.Annotations[constant.KBAppMultiClusterPlacementKey] = "worker"
+	})
+	reconcileSetStop(t, cli, 4)
+	result, err := reconcileSetStopParent(cli)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Requeue || result.RequeueAfter != 0 || !meta.IsStatusConditionTrue(readSetStop(t, cli).Status.Conditions, string(workloads.InstanceAvailable)) {
+		t.Fatalf("parent must be Available without a pending timer: %#v", result)
+	}
+	oldPod := listSetStopPods(t, cli)[0].DeepCopy()
+	owner := metav1.GetControllerOf(oldPod)
+	inst := &workloads.Instance{}
+	key := client.ObjectKey{Namespace: oldPod.Namespace, Name: owner.Name}
+	if err := cli.Get(ctx, key, inst); err != nil {
+		t.Fatal(err)
+	}
+	if inst.Spec.MinReadySeconds != 3600 || !inst.Status.Ready || inst.Status.Available {
+		t.Fatalf("child does not have lagging availability policy: %#v", inst.Status)
+	}
+	beforeChild := inst.Status.DeepCopy()
+	newPod := oldPod.DeepCopy()
+	newPod.Status.Conditions[0].LastTransitionTime = metav1.Now()
+	if err := cli.Status().Update(ctx, newPod); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (&InstanceReconciler{Client: cli, Scheme: cli.Scheme(), Recorder: record.NewFakeRecorder(1000)}).Reconcile(ctx, ctrl.Request{NamespacedName: key}); err != nil {
+		t.Fatal(err)
+	}
+	if err := cli.Get(ctx, key, inst); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(*beforeChild, inst.Status) {
+		t.Fatal("Pod Ready clock change unexpectedly changed child status")
+	}
+	before := readSetStop(t, cli).Status.DeepCopy()
+	failure := apierrors.NewServiceUnavailable("temporary worker owner read failure")
+	worker := &podOwnerReadErrorClient{Client: cli, err: failure}
+	control := &podOwnerReadErrorClient{Client: cli, err: apierrors.NewNotFound(workloads.Resource("instances"), inst.Name)}
+	r := &InstanceSetReconciler2{Client: multicluster.NewClient(control, map[string]client.Client{"worker": worker}), Scheme: cli.Scheme(), Recorder: record.NewFakeRecorder(1000), dataContexts: []string{"worker"}}
+	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	defer queue.ShutDown()
+	r.podEventHandler().Update(ctx, event.UpdateEvent{ObjectOld: oldPod, ObjectNew: newPod}, queue)
+	if queue.Len() != 1 {
+		t.Fatalf("owner lookup failure queued %d requests, want one retry", queue.Len())
+	}
+	if !reflect.DeepEqual(*before, readSetStop(t, cli).Status) {
+		t.Fatal("failed event mapping changed parent status")
+	}
+	item, _ := queue.Get()
+	defer queue.Done(item)
+	request := item.(ctrl.Request)
+	for i := 0; i < 2; i++ {
+		if _, err := r.Reconcile(ctx, request); !errors.Is(err, failure) {
+			t.Fatalf("owner lookup retry must return the read error, got %v", err)
+		}
+		if !reflect.DeepEqual(*before, readSetStop(t, cli).Status) {
+			t.Fatal("failed owner lookup retry changed parent status")
+		}
+	}
+	worker.err = nil
+	if _, err := r.Reconcile(ctx, request); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(*before, readSetStop(t, cli).Status) {
+		t.Fatal("owner resolution changed parent status before the normal parent request")
+	}
+	parentRequest := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(readSetStop(t, cli))}
+	queue.Add(parentRequest)
+	if queue.Len() != 1 {
+		t.Fatalf("recovered owner must enqueue the normal, deduplicated parent request, got %d", queue.Len())
+	}
+	parentItem, _ := queue.Get()
+	if parentItem != parentRequest {
+		t.Fatalf("recovered owner enqueued %v, want %v", parentItem, parentRequest)
+	}
+	_, err = r.Reconcile(ctx, parentRequest)
+	queue.Done(parentItem)
+	if err != nil {
+		t.Fatal(err)
+	}
+	after := readSetStop(t, cli)
+	if !meta.IsStatusConditionTrue(after.Status.Conditions, string(workloads.InstanceReady)) || !meta.IsStatusConditionFalse(after.Status.Conditions, string(workloads.InstanceAvailable)) {
+		t.Fatalf("recovered owner lookup did not refresh readiness: %#v", after.Status.Conditions)
+	}
+	if !meta.FindStatusCondition(after.Status.Conditions, string(workloads.InstanceReady)).LastTransitionTime.Equal(&meta.FindStatusCondition(before.Conditions, string(workloads.InstanceReady)).LastTransitionTime) {
+		t.Fatal("availability refresh changed Ready transition time")
+	}
+	inst.UID = "replacement-owner"
+	if err := cli.Update(ctx, inst); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Reconcile(ctx, request); err != nil {
+		t.Fatal(err)
+	}
+	if queue.Len() != 0 {
+		t.Fatal("stale owner retry enqueued a replacement Instance's parent")
+	}
+}
+
+type podOwnerReadErrorClient struct {
+	client.Client
+	err error
+}
+
+func (c *podOwnerReadErrorClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	if _, ok := obj.(*workloads.Instance); ok && c.err != nil {
+		return c.err
+	}
+	return c.Client.Get(ctx, key, obj, opts...)
 }
 
 var _ = Describe("InstanceSet Controller 2", func() {

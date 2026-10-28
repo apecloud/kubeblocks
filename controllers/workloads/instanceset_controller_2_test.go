@@ -245,6 +245,9 @@ func TestInstanceSetWorkerPodOwnerLookupRetry(t *testing.T) {
 	if _, err := r.Reconcile(ctx, request); err != nil {
 		t.Fatal(err)
 	}
+	if queue.Len() != 1 {
+		t.Fatalf("recovered owner lookup queued %d requests, want an automatic parent wakeup", queue.Len())
+	}
 	if !reflect.DeepEqual(*before, readSetStop(t, cli).Status) {
 		t.Fatal("owner resolution changed parent status before the normal parent request")
 	}

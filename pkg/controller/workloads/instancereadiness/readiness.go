@@ -75,6 +75,9 @@ func Publish(its *workloads.InstanceSet, assignments []instancetemplate.Assignme
 	}
 	var notReady, notAvailable []string
 	pending := false
+	for _, member := range health {
+		pending = pending || member.Pending || member.Ready && !member.Available
+	}
 	for _, assignment := range assignments {
 		member := health[assignment.InstanceName]
 		if !member.Ready {
@@ -83,7 +86,6 @@ func Publish(its *workloads.InstanceSet, assignments []instancetemplate.Assignme
 		if !member.Ready || !member.Available {
 			notAvailable = append(notAvailable, assignment.InstanceName)
 		}
-		pending = pending || member.Pending || member.Ready && !member.Available
 	}
 	for _, result := range []struct {
 		kind          workloads.ConditionType

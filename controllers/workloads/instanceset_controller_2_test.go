@@ -49,10 +49,105 @@ import (
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
+
+func TestInstanceSetUnannotatedWorkerPodEvent(t *testing.T) {
+	inst := stopTestInstance()
+	inst.Spec.InstanceSetName = "standalone-set"
+	inst.Annotations = map[string]string{constant.KBAppMultiClusterPlacementKey: "worker"}
+	worker := stopTestClient(t, inst)
+	reconcileStopEntry(t, worker, 3)
+	pod := readStopPod(t, worker)
+	if pod.Annotations[constant.KBAppMultiClusterPlacementKey] != "" {
+		t.Fatal("native Instance controller unexpectedly copied Instance placement to its Pod")
+	}
+	controlInst := inst.DeepCopy()
+	controlInst.UID = "control-instance-uid"
+	controlInst.Spec.InstanceSetName = "wrong-control-set"
+	control := fake.NewClientBuilder().WithScheme(worker.Scheme()).WithObjects(controlInst).Build()
+	r := &InstanceSetReconciler2{
+		Client:       multicluster.NewClient(control, map[string]client.Client{"worker": worker}),
+		dataContexts: []string{"worker"},
+	}
+	requests := r.podFilter(context.Background(), pod)
+	if len(requests) != 1 || requests[0].NamespacedName != (types.NamespacedName{Namespace: inst.Namespace, Name: inst.Spec.InstanceSetName}) {
+		t.Fatalf("native worker Pod mapped to %v, want owning standalone InstanceSet", requests)
+	}
+}
+
+func TestInstanceSetPodEventMapping(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := workloads.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	inst := &workloads.Instance{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "arbitrary-child", UID: "child-uid"},
+		Spec:       workloads.InstanceSpec{InstanceSetName: "standalone-set"},
+	}
+	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+		Namespace: inst.Namespace,
+		Name:      "arbitrary-pod",
+		OwnerReferences: []metav1.OwnerReference{{
+			APIVersion: workloads.GroupVersion.String(), Kind: "Instance", Name: inst.Name, UID: inst.UID, Controller: ptr.To(true),
+		}},
+	}}
+	for _, placement := range []string{"", "worker"} {
+		t.Run("placement="+placement, func(t *testing.T) {
+			controlInst := inst.DeepCopy()
+			if placement != "" {
+				controlInst.UID = "control-instance-uid"
+				controlInst.Spec.InstanceSetName = "wrong-control-set"
+			}
+			control := fake.NewClientBuilder().WithScheme(scheme).WithObjects(controlInst).Build()
+			cli := client.Client(control)
+			if placement != "" {
+				worker := fake.NewClientBuilder().WithScheme(scheme).WithObjects(inst.DeepCopy()).Build()
+				cli = multicluster.NewClient(control, map[string]client.Client{placement: worker})
+			}
+			r := &InstanceSetReconciler2{Client: cli}
+			if placement != "" {
+				r.dataContexts = []string{placement}
+			}
+			for _, scenario := range []struct {
+				name   string
+				change func(*corev1.Pod)
+				want   bool
+			}{
+				{name: "standalone owner without component labels", want: true},
+				{name: "old owner UID", change: func(p *corev1.Pod) { p.OwnerReferences[0].UID = "old-child-uid" }},
+				{name: "unrelated owner kind", change: func(p *corev1.Pod) { p.OwnerReferences[0].Kind = "StatefulSet" }},
+				{name: "unrelated owner group", change: func(p *corev1.Pod) { p.OwnerReferences[0].APIVersion = "other.example/v1" }},
+				{name: "noncontroller owner", change: func(p *corev1.Pod) { p.OwnerReferences[0].Controller = ptr.To(false) }},
+				{name: "missing owner Instance", change: func(p *corev1.Pod) { p.OwnerReferences[0].Name = "missing" }},
+				{name: "different namespace", change: func(p *corev1.Pod) { p.Namespace = "other" }},
+			} {
+				t.Run(scenario.name, func(t *testing.T) {
+					p := pod.DeepCopy()
+					if placement != "" {
+						p.Annotations = map[string]string{constant.KBAppMultiClusterPlacementKey: placement}
+					}
+					if scenario.change != nil {
+						scenario.change(p)
+					}
+					requests := r.podFilter(context.Background(), p)
+					if !scenario.want {
+						if len(requests) != 0 {
+							t.Fatalf("unrelated Pod enqueued %v", requests)
+						}
+						return
+					}
+					if len(requests) != 1 || requests[0].NamespacedName != (types.NamespacedName{Namespace: inst.Namespace, Name: inst.Spec.InstanceSetName}) {
+						t.Fatalf("Pod mapped to %v, want owning standalone InstanceSet", requests)
+					}
+				})
+			}
+		})
+	}
+}
 
 var _ = Describe("InstanceSet Controller 2", func() {
 	var (
@@ -589,6 +684,47 @@ var _ = Describe("InstanceSet Controller 2", func() {
 	})
 
 	Context("readiness", func() {
+		It("retracts availability on a Pod Ready clock change without an Instance status change", func() {
+			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
+				f.SetReplicas(1)
+				f.Get().Spec.MinReadySeconds = 3600
+			})
+			childKey := client.ObjectKey{Namespace: itsKey.Namespace, Name: podName(0)}
+			mockPodStatusReady(itsKey.Namespace, childKey.Name, metav1.NewTime(time.Now().Add(-time.Minute)))
+			Eventually(func(g Gomega) {
+				inst := &workloads.Instance{}
+				g.Expect(k8sClient.Get(ctx, childKey, inst)).Should(Succeed())
+				g.Expect(intctrlutil.IsInstanceReady(inst)).Should(BeTrue())
+				g.Expect(inst.Status.Available).Should(BeFalse())
+			}).Should(Succeed())
+
+			By("pause policy propagation while the parent uses its shorter readiness window")
+			Eventually(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Paused = true
+				its.Spec.MinReadySeconds = 30
+			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable))).Should(BeTrue())
+			})).Should(Succeed())
+			inst := &workloads.Instance{}
+			Expect(k8sClient.Get(ctx, childKey, inst)).Should(Succeed())
+			Expect(inst.Spec.MinReadySeconds).Should(Equal(int32(3600)))
+			before := inst.Status.DeepCopy()
+			Consistently(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, childKey, inst)).Should(Succeed())
+				g.Expect(inst.Status).Should(Equal(*before))
+			}, time.Second).Should(Succeed())
+
+			By("observe a new Pod Ready interval whose final child conditions have not changed")
+			mockPodStatusReady(itsKey.Namespace, childKey.Name, metav1.Now())
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceReady))).Should(BeTrue())
+				g.Expect(meta.IsStatusConditionFalse(its.Status.Conditions, string(workloads.InstanceAvailable))).Should(BeTrue())
+			}), 5*time.Second).Should(Succeed())
+			Expect(k8sClient.Get(ctx, childKey, inst)).Should(Succeed())
+			Expect(inst.Status).Should(Equal(*before))
+		})
+
 		It("reports a fresh Ready transition after stop and resume", func() {
 			t := GinkgoT()
 			cli := newSetStopClient(t, setStopFixture())

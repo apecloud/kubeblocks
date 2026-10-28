@@ -311,6 +311,66 @@ var _ = Describe("InstanceSet configured readiness", func() {
 				}
 				Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable))).Should(BeTrue())
 			})
+
+			DescribeTable("keeps availability wakeups for extra runtime while paused", func(target int32) {
+				var cli client.Client
+				var read func() *workloads.InstanceSet
+				var mutate func(func(*workloads.InstanceSet))
+				var parent func() (ctrl.Result, error)
+				var pods []corev1.Pod
+				if instanceAPI {
+					cli = newSetStopClient(GinkgoT(), setStopFixture())
+					reconcileSetStop(GinkgoT(), cli, 5)
+					bindSetStopClaims(GinkgoT(), cli)
+					markSetStopPodsReady(GinkgoT(), cli)
+					reconcileSetStop(GinkgoT(), cli, 5)
+					read = func() *workloads.InstanceSet { return readSetStop(GinkgoT(), cli) }
+					mutate = func(change func(*workloads.InstanceSet)) { mutateSetStop(GinkgoT(), cli, change) }
+					parent = func() (ctrl.Result, error) { return reconcileSetStopParent(cli) }
+					pods = listSetStopPods(GinkgoT(), cli)
+				} else {
+					cli = legacyStopRecoveryFixture(GinkgoT(), 2, 0)
+					legacyStopRecoveryReady(GinkgoT(), cli)
+					read = func() *workloads.InstanceSet { return legacyStopRecoverySet(GinkgoT(), cli) }
+					mutate = func(change func(*workloads.InstanceSet)) { legacyStopRecoveryChange(GinkgoT(), cli, change) }
+					parent = func() (ctrl.Result, error) {
+						r := &InstanceSetReconciler{Client: cli, Scheme: cli.Scheme(), Recorder: record.NewFakeRecorder(100)}
+						return r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(read())})
+					}
+					pods = legacyStopRecoveryPods(GinkgoT(), cli)
+				}
+				Expect(read().Status.AvailableReplicas).Should(Equal(int32(2)))
+				mutate(func(its *workloads.InstanceSet) {
+					its.Spec.Paused = true
+					its.Spec.Replicas = ptr.To(target)
+					its.Spec.MinReadySeconds = 3600
+				})
+				var extraName string
+				for i := range pods {
+					pod := &pods[i]
+					pod.Status.Conditions[0].LastTransitionTime = metav1.NewTime(time.Now().Add(-2 * time.Hour))
+					if strings.HasSuffix(pod.Name, "-1") {
+						pod.Status.Conditions[0].LastTransitionTime = metav1.Now()
+						extraName = pod.Name
+					}
+					Expect(cli.Status().Update(context.Background(), pod)).Should(Succeed())
+				}
+				Expect(extraName).ShouldNot(BeEmpty())
+				var result ctrl.Result
+				for i := 0; i < 5; i++ {
+					var err error
+					result, err = parent()
+					Expect(err).ShouldNot(HaveOccurred())
+				}
+				its := read()
+				Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceReady))).Should(BeTrue())
+				Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable))).Should(BeTrue())
+				Expect(its.Status.Replicas).Should(Equal(int32(2)))
+				Expect(its.Status.ReadyReplicas).Should(Equal(int32(2)))
+				Expect(its.Status.AvailableReplicas).Should(Equal(int32(1)))
+				Expect(its.FindInstanceStatus(extraName).Available).Should(BeFalse())
+				Expect(result.RequeueAfter).Should(Equal(time.Second))
+			}, Entry("positive target with an extra", int32(1)), Entry("zero target with extras", int32(0)))
 		})
 	}
 })

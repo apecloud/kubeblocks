@@ -41,12 +41,18 @@ type reconcileContext struct {
 	parametersDefs map[string]*parametersv1alpha1.ParametersDefinition
 }
 
-func newReconcileContext(reqCtx intctrlutil.RequestCtx, resource *render.ResourceCtx, cm *corev1.ConfigMap) *reconcileContext {
+func newReconcileContext(reqCtx intctrlutil.RequestCtx, cli client.Client, cm *corev1.ConfigMap) *reconcileContext {
 	rctx := reconcileContext{
 		RequestCtx: reqCtx,
 		configMap:  cm,
 	}
-	return rctx.Init(resource, &rctx)
+	return rctx.Init(&render.ResourceCtx{
+		Context:       reqCtx.Ctx,
+		Client:        cli,
+		Namespace:     cm.Namespace,
+		ClusterName:   cm.Labels[constant.AppInstanceLabelKey],
+		ComponentName: cm.Labels[constant.KBAppComponentLabelKey],
+	}, &rctx)
 }
 
 func (c *reconcileContext) objects() error {

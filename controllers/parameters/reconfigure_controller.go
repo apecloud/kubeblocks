@@ -43,7 +43,6 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/parameters/reconfigure"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
@@ -117,25 +116,17 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,
 			errors.Wrap(err, "failed to check last-applied-configuration").Error())
 	}
-	rctx := newReconcileContext(reqCtx, &render.ResourceCtx{
-		Context:       reqCtx.Ctx,
-		Client:        r.Client,
-		Namespace:     config.Namespace,
-		ClusterName:   config.Labels[constant.AppInstanceLabelKey],
-		ComponentName: config.Labels[constant.KBAppComponentLabelKey],
-	}, config)
-	if isAppliedConfigs {
-		if !initialized {
-			return updateConfigPhase(r.Client, reqCtx, config, parametersv1alpha1.CFinishedPhase, configurationNoChangedMessage)
-		}
-		if err := rctx.Cluster().Complete(); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,
-				errors.Wrap(err, "failed to fetch related resources").Error())
-		}
-		if independentConfigurationTarget(rctx.ClusterObj, config.Labels[constant.KBAppComponentLabelKey],
-			config.Labels[constant.CMConfigurationSpecProviderLabelKey]) == nil {
-			return updateConfigPhase(r.Client, reqCtx, config, parametersv1alpha1.CFinishedPhase, configurationNoChangedMessage)
-		}
+	if isAppliedConfigs && !initialized {
+		return updateConfigPhase(r.Client, reqCtx, config, parametersv1alpha1.CFinishedPhase, configurationNoChangedMessage)
+	}
+	rctx := newReconcileContext(reqCtx, r.Client, config)
+	if err := rctx.Cluster().Complete(); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,
+			errors.Wrap(err, "failed to fetch related resources").Error())
+	}
+	if isAppliedConfigs && independentConfigurationTarget(rctx.ClusterObj, config.Labels[constant.KBAppComponentLabelKey],
+		config.Labels[constant.CMConfigurationSpecProviderLabelKey]) == nil {
+		return updateConfigPhase(r.Client, reqCtx, config, parametersv1alpha1.CFinishedPhase, configurationNoChangedMessage)
 	}
 
 	configSpec, err := r.getConfigSpec(reqCtx, config)
@@ -153,11 +144,6 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return updateConfigPhase(r.Client, reqCtx, config, parametersv1alpha1.CFinishedPhase, configurationNotRelatedComponentMessage)
 	}
 
-	if !isAppliedConfigs {
-		if err := rctx.Cluster().Complete(); err != nil {
-			return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
-		}
-	}
 	return r.sync(rctx, configSpec, isAppliedConfigs)
 }
 

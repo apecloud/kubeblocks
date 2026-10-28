@@ -2304,7 +2304,7 @@ var _ = Describe("HorizontalScaling component recovery", func() {
 })
 
 var _ = Describe("HorizontalScaling cancellation after component failure", func() {
-	It("waits for rollback observations and completes cancellation", func() {
+	DescribeTable("waits for rollback observations and completes cancellation", func(persistedFailure bool) {
 		f := newHorizontalScalingFixture(GinkgoT(), scaleOutRequest("db", false), scaleOutRequest("other", false))
 		hs := horizontalScalingOpsHandler{}
 		Expect(hs.Action(f.req, f.cli, f.res)).To(Succeed())
@@ -2319,6 +2319,16 @@ var _ = Describe("HorizontalScaling cancellation after component failure", func(
 		Expect(err).NotTo(HaveOccurred())
 		Expect(f.res.OpsRequest.Status.Phase).To(Equal(opsv1alpha1.OpsRunningPhase))
 		Expect(f.res.OpsRequest.Status.Components["db"].Reason).To(BeEmpty())
+		if persistedFailure {
+			failed := f.res.OpsRequest.Status.Components["db"]
+			failed.Reason = horizontalScalingFailedReason
+			failed.Message = "previously recorded component failure"
+			f.res.OpsRequest.Status.Components["db"] = failed
+			Expect(f.cli.Status().Update(f.req.Ctx, f.res.OpsRequest)).To(Succeed())
+			Expect(f.cli.Get(f.req.Ctx, client.ObjectKeyFromObject(f.res.OpsRequest), f.res.OpsRequest)).To(Succeed())
+			Expect(f.res.OpsRequest.Status.Components["db"].Reason).To(Equal(horizontalScalingFailedReason))
+			Expect(f.res.OpsRequest.Status.Components["db"].Message).To(Equal(failed.Message))
+		}
 		previous := f.res.OpsRequest.DeepCopy()
 		Expect(hs.Cancel(f.req, f.cli, f.res)).To(Succeed())
 		Expect(PatchOpsStatusWithOpsDeepCopy(f.req.Ctx, f.cli, f.res, previous,
@@ -2326,6 +2336,9 @@ var _ = Describe("HorizontalScaling cancellation after component failure", func(
 		resumed := &opsv1alpha1.OpsRequest{}
 		Expect(f.cli.Get(f.req.Ctx, client.ObjectKeyFromObject(f.res.OpsRequest), resumed)).To(Succeed())
 		f.res.OpsRequest = resumed
+		Expect(resumed.Status.Phase).To(Equal(opsv1alpha1.OpsCancellingPhase))
+		Expect(resumed.Status.Components["db"].Reason).To(BeEmpty())
+		Expect(resumed.Status.Components["db"].Message).To(BeEmpty())
 		publishHorizontalScalingResult(GinkgoT(), f)
 		its := &workloads.InstanceSet{}
 		Expect(f.cli.Get(f.req.Ctx, client.ObjectKey{Namespace: "default", Name: "demo-db"}, its)).To(Succeed())
@@ -2333,16 +2346,21 @@ var _ = Describe("HorizontalScaling cancellation after component failure", func(
 		Expect(f.cli.Update(f.req.Ctx, its)).To(Succeed())
 		_, err = GetOpsManager().Reconcile(f.req, f.cli, f.res)
 		Expect(err).NotTo(HaveOccurred())
+		Expect(f.cli.Get(f.req.Ctx, client.ObjectKeyFromObject(f.res.OpsRequest), f.res.OpsRequest)).To(Succeed())
 		Expect(f.res.OpsRequest.Status.Phase).To(Equal(opsv1alpha1.OpsCancellingPhase))
 		publishHorizontalScalingResult(GinkgoT(), f)
 		_, err = GetOpsManager().Reconcile(f.req, f.cli, f.res)
 		Expect(err).NotTo(HaveOccurred())
+		Expect(f.cli.Get(f.req.Ctx, client.ObjectKeyFromObject(f.res.OpsRequest), f.res.OpsRequest)).To(Succeed())
 		Expect(f.res.OpsRequest.Status.Phase).To(Equal(opsv1alpha1.OpsCancelledPhase))
 		Expect(f.res.OpsRequest.Status.Conditions).To(ContainElement(SatisfyAll(
 			HaveField("Type", opsv1alpha1.ConditionTypeCancelled),
 			HaveField("Reason", opsv1alpha1.ReasonOpsCancelSucceed),
 		)))
-	})
+	},
+		Entry("without a recorded failure", false),
+		Entry("with a persisted failure", true),
+	)
 })
 
 func TestHorizontalScalingEmptyShardingRequiresObservedResult(t *testing.T) {

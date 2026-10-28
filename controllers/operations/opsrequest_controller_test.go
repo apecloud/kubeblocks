@@ -694,6 +694,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			// mock currentRevisions and updateRevisions
 			testapps.MockInstanceSetStatus(testCtx, clusterObj, mysqlCompName)
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(its), its)).Should(Succeed())
 			Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
 				testk8s.MockInstanceSetReady(its, mockPods...)
 				for i := range its.Status.InstanceStatus {
@@ -1099,7 +1100,6 @@ var _ = Describe("OpsRequest Controller", func() {
 			mockCompRunning(replicas, false)
 
 			By("create first restart ops")
-			time.Sleep(time.Second)
 			restartOps1 := createRestartOps(clusterObj.Name, 0)
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(restartOps1))).Should(Equal(opsv1alpha1.OpsRunningPhase))
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1.UpdatingClusterPhase))
@@ -1152,8 +1152,16 @@ var _ = Describe("OpsRequest Controller", func() {
 			})).Should(Succeed())
 
 			By("mock component to running and expect restartOps1 phase to Succeed")
+			firstRestartCluster := &appsv1.Cluster{}
+			Expect(k8sClient.Get(ctx, clusterKey, firstRestartCluster)).Should(Succeed())
+			firstRestartTrigger := firstRestartCluster.Spec.ComponentSpecs[0].Annotations[constant.RestartAnnotationKey]
 			mockCompRunning(replicas, true)
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(restartOps1))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
+			firstRestartPods := &corev1.PodList{}
+			Expect(k8sClient.List(ctx, firstRestartPods, client.InNamespace(clusterKey.Namespace), client.MatchingLabels{
+				constant.AppInstanceLabelKey: clusterKey.Name, constant.KBAppComponentLabelKey: mysqlCompName,
+			})).Should(Succeed())
+			Expect(firstRestartPods.Items).Should(HaveLen(int(replicas)))
 
 			By("mock loadBalance service is ready")
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKey{Name: fmt.Sprintf("%s-%s-svc1", clusterObj.Name, mysqlCompName), Namespace: testCtx.DefaultNamespace}, func(svc *corev1.Service) {
@@ -1164,6 +1172,34 @@ var _ = Describe("OpsRequest Controller", func() {
 			By("expect restartOps2 to Running and exposeOps2 to Succeed")
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(restartOps2))).Should(Equal(opsv1alpha1.OpsRunningPhase))
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(exposeOps2))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
+			var secondRestartTrigger string
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+				g.Expect(cluster.Generation).Should(BeNumerically(">", firstRestartCluster.Generation))
+				g.Expect(cluster.Spec.ComponentSpecs[0].Annotations[constant.RestartAnnotationKey]).ShouldNot(Equal(firstRestartTrigger))
+				secondRestartTrigger = cluster.Spec.ComponentSpecs[0].Annotations[constant.RestartAnnotationKey]
+			})).Should(Succeed())
+			for i := range firstRestartPods.Items {
+				old := &firstRestartPods.Items[i]
+				stored := &corev1.Pod{}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(old), stored)).Should(Succeed())
+				Expect(stored.UID).Should(Equal(old.UID))
+			}
+
+			By("completing the second restart only after replacing the first restart's Pods")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{
+				Namespace: clusterKey.Namespace,
+				Name:      component.FullName(clusterKey.Name, mysqlCompName),
+			}, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Spec.Template.Annotations[constant.RestartAnnotationKey]).Should(Equal(secondRestartTrigger))
+			})).Should(Succeed())
+			mockCompRunning(replicas, true)
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(restartOps2))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
+			for i := range firstRestartPods.Items {
+				old := &firstRestartPods.Items[i]
+				stored := &corev1.Pod{}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(old), stored)).Should(Succeed())
+				Expect(stored.UID).ShouldNot(Equal(old.UID))
+			}
 		})
 
 		It("test opsRequest timeout", func() {

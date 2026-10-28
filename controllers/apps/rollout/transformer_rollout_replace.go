@@ -134,6 +134,16 @@ func (t *rolloutReplaceTransformer) compDown(rollout *appsv1alpha1.Rollout, comp
 	if err := t.checkCompDelaySeconds(rollout, comp, newReplicas, true); err != nil {
 		return err
 	}
+	// Persist cleanup ownership before changing the Cluster. If the later Cluster
+	// write or status update fails, retries retain every offline entry we own.
+	if len(instance) > 0 {
+		for i, status := range rollout.Status.Components {
+			if status.Name == spec.Name && !slices.Contains(status.ScaleDownInstances, instance) {
+				rollout.Status.Components[i].ScaleDownInstances = append(rollout.Status.Components[i].ScaleDownInstances, instance)
+				return controllerutil.NewDelayedRequeueError(time.Second, "persist scale-down instance before updating cluster")
+			}
+		}
+	}
 
 	spec.Replicas -= 1
 	if instTpl != nil {
@@ -144,16 +154,6 @@ func (t *rolloutReplaceTransformer) compDown(rollout *appsv1alpha1.Rollout, comp
 	}
 	if len(instance) > 0 {
 		spec.OfflineInstances = append(spec.OfflineInstances, instance)
-	}
-
-	// add the scale down instance to the rollout status
-	if len(instance) > 0 {
-		for i, status := range rollout.Status.Components {
-			if status.Name == spec.Name {
-				rollout.Status.Components[i].ScaleDownInstances = append(rollout.Status.Components[i].ScaleDownInstances, instance)
-				break
-			}
-		}
 	}
 
 	return nil
@@ -224,7 +224,7 @@ func (t *rolloutReplaceTransformer) pickCompInstanceToRollout(transCtx *rolloutT
 
 	var targetPod *corev1.Pod
 	for i, pod := range pods.Items {
-		if pod.DeletionTimestamp == nil && !isRolloutManagedInstanceTemplateName(transCtx.Rollout, pod.Labels[constant.KBAppInstanceTemplateLabelKey]) {
+		if pod.DeletionTimestamp == nil && !slices.Contains(spec.OfflineInstances, pod.Name) && !isRolloutManagedInstanceTemplateName(transCtx.Rollout, pod.Labels[constant.KBAppInstanceTemplateLabelKey]) {
 			targetPod = &pods.Items[i]
 			break
 		}
@@ -317,6 +317,14 @@ func (t *rolloutReplaceTransformer) shardingDown(rollout *appsv1alpha1.Rollout, 
 	if err := t.checkShardingDelaySeconds(rollout, sharding, newReplicas, true); err != nil {
 		return err
 	}
+	if len(instance) > 0 {
+		for i, status := range rollout.Status.Shardings {
+			if status.Name == spec.Name && !slices.Contains(status.ScaleDownInstances, instance) {
+				rollout.Status.Shardings[i].ScaleDownInstances = append(rollout.Status.Shardings[i].ScaleDownInstances, instance)
+				return controllerutil.NewDelayedRequeueError(time.Second, "persist scale-down instance before updating cluster")
+			}
+		}
+	}
 
 	spec.Template.Replicas -= 1
 	if instTpl != nil {
@@ -327,16 +335,6 @@ func (t *rolloutReplaceTransformer) shardingDown(rollout *appsv1alpha1.Rollout, 
 	}
 	if len(instance) > 0 {
 		spec.Template.OfflineInstances = append(spec.Template.OfflineInstances, instance)
-	}
-
-	// add the scale down instances to the rollout status
-	if len(instance) > 0 {
-		for i, status := range rollout.Status.Shardings {
-			if status.Name == spec.Name {
-				rollout.Status.Shardings[i].ScaleDownInstances = append(rollout.Status.Shardings[i].ScaleDownInstances, instance)
-				break
-			}
-		}
 	}
 
 	return nil
@@ -409,7 +407,7 @@ func (t *rolloutReplaceTransformer) pickShardingInstancesToRollout(transCtx *rol
 
 	var targetPod *corev1.Pod
 	for i, pod := range pods.Items {
-		if pod.DeletionTimestamp == nil && !isRolloutManagedInstanceTemplateName(transCtx.Rollout, pod.Labels[constant.KBAppInstanceTemplateLabelKey]) {
+		if pod.DeletionTimestamp == nil && !slices.Contains(spec.Template.OfflineInstances, pod.Name) && !isRolloutManagedInstanceTemplateName(transCtx.Rollout, pod.Labels[constant.KBAppInstanceTemplateLabelKey]) {
 			targetPod = &pods.Items[i]
 			break
 		}

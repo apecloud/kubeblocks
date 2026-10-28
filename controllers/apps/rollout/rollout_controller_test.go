@@ -20,9 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rollout
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -32,6 +34,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -41,6 +44,120 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
+
+type rolloutRetryFault struct {
+	sync.Mutex
+	stage      string
+	rolloutKey client.ObjectKey
+	applied    bool
+	conflicted bool
+	history    []string
+}
+
+var rolloutRetryFaults sync.Map
+
+type rolloutRetryClient struct{ client.Client }
+
+func (c *rolloutRetryClient) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+	cluster, ok := obj.(*appsv1.Cluster)
+	if !ok {
+		return c.Client.Update(ctx, obj, opts...)
+	}
+	value, ok := rolloutRetryFaults.Load(client.ObjectKeyFromObject(cluster))
+	if !ok {
+		return c.Client.Update(ctx, obj, opts...)
+	}
+	fault := value.(*rolloutRetryFault)
+	fault.Lock()
+	defer fault.Unlock()
+	var offline []string
+	if len(cluster.Spec.ComponentSpecs) > 0 {
+		offline = cluster.Spec.ComponentSpecs[0].OfflineInstances
+	} else {
+		offline = cluster.Spec.Shardings[0].Template.OfflineInstances
+	}
+	if fault.applied || len(offline) != 2 {
+		return c.Client.Update(ctx, obj, opts...)
+	}
+	rollout := &appsv1alpha1.Rollout{}
+	fault.rolloutKey = client.ObjectKey{Namespace: cluster.Namespace, Name: cluster.Labels[rolloutNameClusterLabel]}
+	if err := k8sClient.Get(ctx, fault.rolloutKey, rollout); err != nil {
+		return err
+	}
+	if len(rollout.Status.Components) > 0 {
+		fault.history = slices.Clone(rollout.Status.Components[0].ScaleDownInstances)
+	} else {
+		fault.history = slices.Clone(rollout.Status.Shardings[0].ScaleDownInstances)
+	}
+	if fault.stage != "after cluster write" {
+		current := &appsv1.Cluster{}
+		if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), current); err != nil {
+			return err
+		}
+		if current.Annotations == nil {
+			current.Annotations = map[string]string{}
+		}
+		current.Annotations["test-rollout-conflict"] = "yes"
+		if err := k8sClient.Update(ctx, current); err != nil {
+			return err
+		}
+		if fault.stage == "delete before cluster write" {
+			if err := k8sClient.Delete(ctx, rollout); err != nil {
+				return err
+			}
+			// Establish the deletion observation before retrying the interrupted
+			// write. Deletion intentionally does not roll back an earlier plan.
+			if err := wait.PollUntilContextTimeout(ctx, time.Millisecond, time.Second, true, func(ctx context.Context) (bool, error) {
+				observed := &appsv1alpha1.Rollout{}
+				err := c.Client.Get(ctx, fault.rolloutKey, observed)
+				if apierrors.IsNotFound(err) {
+					return true, nil
+				}
+				return err == nil && observed.DeletionTimestamp != nil, err
+			}); err != nil {
+				return err
+			}
+		}
+		fault.applied = true
+		err := c.Client.Update(ctx, obj, opts...)
+		fault.conflicted = apierrors.IsConflict(err)
+		return err
+	}
+	if err := c.Client.Update(ctx, obj, opts...); err != nil {
+		return err
+	}
+	if rollout.Annotations == nil {
+		rollout.Annotations = map[string]string{}
+	}
+	rollout.Annotations["test-rollout-conflict"] = "yes"
+	if err := k8sClient.Update(ctx, rollout); err != nil {
+		return err
+	}
+	fault.applied = true
+	return nil
+}
+
+func (c *rolloutRetryClient) Status() client.SubResourceWriter {
+	return &rolloutRetryStatusWriter{SubResourceWriter: c.Client.Status()}
+}
+
+type rolloutRetryStatusWriter struct{ client.SubResourceWriter }
+
+func (w *rolloutRetryStatusWriter) Update(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+	err := w.SubResourceWriter.Update(ctx, obj, opts...)
+	if apierrors.IsConflict(err) {
+		rolloutRetryFaults.Range(func(_, value any) bool {
+			fault := value.(*rolloutRetryFault)
+			fault.Lock()
+			defer fault.Unlock()
+			if fault.applied && fault.rolloutKey == client.ObjectKeyFromObject(obj) {
+				fault.conflicted = true
+			}
+			return true
+		})
+	}
+	return err
+}
 
 var _ = Describe("rollout controller", func() {
 	const (
@@ -928,7 +1045,19 @@ var _ = Describe("rollout controller", func() {
 			})).Should(Succeed())
 		})
 
-		It("tear down", func() {
+		DescribeTable("tear down", func(conflictStage string) {
+			var fault *rolloutRetryFault
+			var preexisting []string
+			if conflictStage != "" {
+				preexisting = []string{compKey.Name + "-99"}
+				Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1.Cluster) {
+					cluster.Spec.ComponentSpecs[0].OfflineInstances = slices.Clone(preexisting)
+				})()).Should(Succeed())
+				fault = &rolloutRetryFault{stage: conflictStage}
+				rolloutRetryFaults.Store(clusterKey, fault)
+				DeferCleanup(func() { rolloutRetryFaults.Delete(clusterKey) })
+			}
+
 			By("creating pods for the component")
 			pods := mockCreatePods([]int32{0, 1, 2}, "")
 
@@ -954,13 +1083,29 @@ var _ = Describe("rollout controller", func() {
 
 				mockClusterNCompRunning() // to down
 
+				if conflictStage == "delete before cluster write" {
+					By("deleting the rollout after intent persistence, before the Cluster write")
+					Eventually(func() error { return k8sClient.Get(ctx, rolloutKey, &appsv1alpha1.Rollout{}) }).Should(Satisfy(apierrors.IsNotFound))
+					Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+						g.Expect(cluster.Labels).NotTo(HaveKey(rolloutNameClusterLabel))
+						g.Expect(cluster.Spec.ComponentSpecs[0].Replicas).To(Equal(replicas + 1))
+						g.Expect(cluster.Spec.ComponentSpecs[0].OfflineInstances).To(Equal(preexisting))
+					})).Should(Succeed())
+					fault.Lock()
+					defer fault.Unlock()
+					Expect(fault.applied).To(BeTrue())
+					Expect(fault.conflicted).To(BeTrue())
+					Expect(fault.history).To(Equal([]string{pods[0].Name}))
+					return
+				}
+
 				By("checking the cluster spec after scale down")
 				Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
 					spec := cluster.Spec.ComponentSpecs[0]
 					g.Expect(spec.Replicas).Should(Equal(replicas))
-					g.Expect(spec.OfflineInstances).Should(HaveLen(int(i + 1)))
+					g.Expect(spec.OfflineInstances).Should(HaveLen(len(preexisting) + int(i+1)))
 					for j := int32(0); j < i+1; j++ {
-						g.Expect(spec.OfflineInstances[j]).Should(Equal(pods[j].Name))
+						g.Expect(spec.OfflineInstances[len(preexisting)+int(j)]).Should(Equal(pods[j].Name))
 					}
 				})).Should(Succeed())
 
@@ -974,7 +1119,7 @@ var _ = Describe("rollout controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
 				spec := cluster.Spec.ComponentSpecs[0]
 				g.Expect(spec.ServiceVersion).Should(Equal(serviceVersion2))
-				g.Expect(spec.OfflineInstances).Should(BeEmpty())
+				g.Expect(spec.OfflineInstances).Should(ConsistOf(preexisting))
 			})).Should(Succeed())
 
 			mockClusterNCompRunning() // tear down will update the cluster spec
@@ -983,7 +1128,19 @@ var _ = Describe("rollout controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
 				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.SucceedRolloutState))
 			})).Should(Succeed())
-		})
+			if fault != nil {
+				fault.Lock()
+				defer fault.Unlock()
+				Expect(fault.applied).To(BeTrue())
+				Expect(fault.conflicted).To(BeTrue())
+				Expect(fault.history).To(Equal([]string{pods[0].Name}))
+			}
+		},
+			Entry("without a write conflict", ""),
+			Entry("after a status conflict", "after cluster write"),
+			Entry("after an intent-only interruption", "before cluster write"),
+			Entry("when deleted with only a persisted intent", "delete before cluster write"),
+		)
 	})
 
 	Context("replace - instance template", func() {
@@ -1784,7 +1941,19 @@ var _ = Describe("rollout controller", func() {
 			})).Should(Succeed())
 		})
 
-		It("tear down", func() {
+		DescribeTable("tear down", func(conflictStage string) {
+			var fault *rolloutRetryFault
+			var preexisting []string
+			if conflictStage != "" {
+				preexisting = []string{compKey.Name + "-99"}
+				Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1.Cluster) {
+					cluster.Spec.Shardings[0].Template.OfflineInstances = slices.Clone(preexisting)
+				})()).Should(Succeed())
+				fault = &rolloutRetryFault{stage: conflictStage}
+				rolloutRetryFaults.Store(clusterKey, fault)
+				DeferCleanup(func() { rolloutRetryFaults.Delete(clusterKey) })
+			}
+
 			By("creating pods for the component")
 			pods := mockCreatePods4Sharding([]int32{0, 1}, "")
 			pods = append(mockCreatePods4Sharding([]int32{2}, instanceTemplateName), pods...) // pod 2 is the instance template pod
@@ -1829,14 +1998,30 @@ var _ = Describe("rollout controller", func() {
 
 				mockClusterNShardingRunning() // to down
 
+				if conflictStage == "delete before cluster write" {
+					By("deleting the rollout after intent persistence, before the Cluster write")
+					Eventually(func() error { return k8sClient.Get(ctx, rolloutKey, &appsv1alpha1.Rollout{}) }).Should(Satisfy(apierrors.IsNotFound))
+					Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+						g.Expect(cluster.Labels).NotTo(HaveKey(rolloutNameClusterLabel))
+						g.Expect(cluster.Spec.Shardings[0].Template.Replicas).To(Equal(replicas + 1))
+						g.Expect(cluster.Spec.Shardings[0].Template.OfflineInstances).To(Equal(preexisting))
+					})).Should(Succeed())
+					fault.Lock()
+					defer fault.Unlock()
+					Expect(fault.applied).To(BeTrue())
+					Expect(fault.conflicted).To(BeTrue())
+					Expect(fault.history).To(Equal([]string{pods[0].Name}))
+					return
+				}
+
 				By("checking the cluster spec after scale down")
 				Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
 					spec := cluster.Spec.Shardings[0]
 					g.Expect(spec.Template.Replicas).Should(Equal(replicas))
 					g.Expect(*spec.Template.Instances[0].Replicas).Should(Equal(int32(0)))
-					g.Expect(spec.Template.OfflineInstances).Should(HaveLen(int(i + 1)))
+					g.Expect(spec.Template.OfflineInstances).Should(HaveLen(len(preexisting) + int(i+1)))
 					for j := int32(0); j < i+1; j++ {
-						g.Expect(spec.Template.OfflineInstances[j]).Should(Equal(pods[j].Name))
+						g.Expect(spec.Template.OfflineInstances[len(preexisting)+int(j)]).Should(Equal(pods[j].Name))
 					}
 				})).Should(Succeed())
 
@@ -1850,7 +2035,7 @@ var _ = Describe("rollout controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
 				spec := cluster.Spec.Shardings[0]
 				g.Expect(spec.Template.ServiceVersion).Should(Equal(serviceVersion2))
-				g.Expect(spec.Template.OfflineInstances).Should(BeEmpty())
+				g.Expect(spec.Template.OfflineInstances).Should(ConsistOf(preexisting))
 			})).Should(Succeed())
 
 			mockClusterNShardingRunning() // tear down will update the cluster spec
@@ -1859,7 +2044,19 @@ var _ = Describe("rollout controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
 				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.SucceedRolloutState))
 			})).Should(Succeed())
-		})
+			if fault != nil {
+				fault.Lock()
+				defer fault.Unlock()
+				Expect(fault.applied).To(BeTrue())
+				Expect(fault.conflicted).To(BeTrue())
+				Expect(fault.history).To(Equal([]string{pods[0].Name}))
+			}
+		},
+			Entry("without a write conflict", ""),
+			Entry("after a status conflict", "after cluster write"),
+			Entry("after an intent-only interruption", "before cluster write"),
+			Entry("when deleted with only a persisted intent", "delete before cluster write"),
+		)
 	})
 
 	Context("create", func() {

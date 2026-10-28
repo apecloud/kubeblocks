@@ -310,9 +310,6 @@ type InstanceSetStatus struct {
 
 	// Represents the latest available observations of an instanceset's current state.
 	// Known .status.conditions.type are: "InstanceFailure", "InstanceReady", "InstanceAvailable", "Restore".
-	// InstanceReady and InstanceAvailable assess the configured replica identities.
-	// Their observedGeneration identifies the spec evaluated. Each lastTransitionTime changes only when
-	// that condition's status changes, including across generations.
 	//
 	// +optional
 	// +patchMergeKey=type
@@ -780,11 +777,15 @@ const (
 	// An explicit zero target is ready even while extra instances await cleanup. Extra instances cannot
 	// replace missing assigned identities and do not independently block readiness. Incomplete allocation
 	// is Unknown. Readiness does not require roles, revision convergence, or operation completion.
+	// Its observedGeneration identifies the spec evaluated. Its lastTransitionTime changes only when
+	// this condition's status changes, including across generations.
 	InstanceReady ConditionType = "InstanceReady"
 
 	// InstanceAvailable requires InstanceReady and each required runtime to have remained ready for
 	// the current MinReadySeconds, measured from that runtime's Ready transition rather than the aggregate
 	// condition. With MinReadySeconds zero, its status matches InstanceReady, but transition times can differ.
+	// Its observedGeneration identifies the spec evaluated. Its lastTransitionTime changes only when
+	// this condition's status changes, including across generations.
 	InstanceAvailable ConditionType = "InstanceAvailable"
 
 	// InstanceFailure is added in an instance set when at least one of its instances(pods) is in a `Failed` phase.

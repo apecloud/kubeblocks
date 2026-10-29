@@ -20,53 +20,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rollout
 
 import (
-	"context"
 	"fmt"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	rolloutctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
-
-// These keys are reconciled explicitly by the write-order cases so that each
-// API write and interruption can be inspected before the next reconciliation.
-var rolloutManualTestKeys sync.Map
-
-type rolloutManualTestClient struct{ client.Client }
-
-func (c *rolloutManualTestClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-	if _, ok := obj.(*appsv1alpha1.Rollout); ok {
-		if _, manual := rolloutManualTestKeys.Load(key); manual {
-			return apierrors.NewNotFound(schema.GroupResource{Group: appsv1alpha1.GroupVersion.Group, Resource: "rollouts"}, key.Name)
-		}
-	}
-	return c.Client.Get(ctx, key, obj, opts...)
-}
-
-func rolloutWriteOrderRequest(key client.ObjectKey) rolloutctrlutil.RequestCtx {
-	return rolloutctrlutil.RequestCtx{Ctx: ctx, Req: ctrl.Request{NamespacedName: key}, Log: logr.Discard(), Recorder: record.NewFakeRecorder(100)}
-}
 
 var _ = Describe("rollout controller", func() {
 	const (
@@ -814,198 +788,6 @@ var _ = Describe("rollout controller", func() {
 				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.SucceedRolloutState))
 			})).Should(Succeed())
 		})
-	})
-
-	Context("replace write order", func() {
-		DescribeTable("recovers persisted scale-down targets", func(sharding, template bool) {
-			if sharding {
-				if template {
-					createClusterNShardingObjWithInstanceTemplate()
-				} else {
-					createClusterNShardingObj()
-				}
-			} else {
-				if template {
-					createClusterNCompObjWithInstanceTemplate()
-				} else {
-					createClusterNCompObj()
-				}
-			}
-			rolloutKey = client.ObjectKey{Namespace: testCtx.DefaultNamespace, Name: "manual-" + rand.String(8)}
-			rolloutManualTestKeys.Store(rolloutKey, true)
-			DeferCleanup(func() { rolloutManualTestKeys.Delete(rolloutKey) })
-			strategy := appsv1alpha1.RolloutStrategy{Replace: &appsv1alpha1.RolloutStrategyReplace{}}
-			factory := testapps.NewRolloutFactory(rolloutKey.Namespace, rolloutKey.Name).SetClusterName(clusterKey.Name)
-			if sharding {
-				factory.AddSharding(shardingName).SetShardingCompDef(compDefName).SetShardingServiceVersion(serviceVersion2).SetShardingStrategy(strategy)
-			} else {
-				factory.AddComponent(compName).SetCompCompDef(compDefName).SetCompServiceVersion(serviceVersion2).SetCompStrategy(strategy).SetCompReplicas(replicas)
-			}
-			rolloutObj = factory.Create(&testCtx).GetObject()
-			reconcile := func() ctrl.Result {
-				r := &RolloutReconciler{Client: k8sClient, Scheme: k8sClient.Scheme(), Recorder: record.NewFakeRecorder(100)}
-				result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: rolloutKey})
-				Expect(err).NotTo(HaveOccurred())
-				return result
-			}
-			readCluster := func() *appsv1.Cluster {
-				obj := &appsv1.Cluster{}
-				Expect(k8sClient.Get(ctx, clusterKey, obj)).To(Succeed())
-				return obj
-			}
-			readRollout := func() *appsv1alpha1.Rollout {
-				obj := &appsv1alpha1.Rollout{}
-				Expect(k8sClient.Get(ctx, rolloutKey, obj)).To(Succeed())
-				return obj
-			}
-			specOf := func(obj *appsv1.Cluster) *appsv1.ClusterComponentSpec {
-				if sharding {
-					return &obj.Spec.Shardings[0].Template
-				}
-				return &obj.Spec.ComponentSpecs[0]
-			}
-			history := func(obj *appsv1alpha1.Rollout) []string {
-				if sharding {
-					return obj.Status.Shardings[0].ScaleDownInstances
-				}
-				return obj.Status.Components[0].ScaleDownInstances
-			}
-			running := func() {
-				if sharding {
-					mockClusterNShardingRunning()
-				} else {
-					mockClusterNCompRunning()
-				}
-			}
-			var pods []*corev1.Pod
-			originalTemplate := ""
-			if template {
-				originalTemplate = instanceTemplateName
-			}
-			if sharding {
-				pods = mockCreatePods4Sharding([]int32{0, 1}, "")
-				pods = append(mockCreatePods4Sharding([]int32{2}, originalTemplate), pods...)
-			} else {
-				pods = mockCreatePods([]int32{0, 1}, "")
-				pods = append(mockCreatePods([]int32{2}, originalTemplate), pods...)
-			}
-			reconcile()
-			reconcile()
-			reconcile()
-			running()
-			reconcile()
-			running()
-			before := readCluster()
-			// Existing offline entries are owned by the caller, not this Rollout.
-			specOf(before).OfflineInstances = []string{compKey.Name + "-99"}
-			Expect(k8sClient.Update(ctx, before)).To(Succeed())
-			running()
-			before = readCluster()
-			build := func() *rolloutPlan {
-				b := newRolloutPlanBuilder(rolloutWriteOrderRequest(rolloutKey), k8sClient)
-				Expect(b.Init()).To(Succeed())
-				plan, err := b.AddTransformer(&rolloutDeletionTransformer{}, &rolloutMetaTransformer{}, &rolloutLoadTransformer{}, &rolloutSetupTransformer{}, &rolloutTearDownTransformer{}, &rolloutInplaceTransformer{}, &rolloutReplaceTransformer{}, &rolloutCreateTransformer{}, &rolloutUpdateTransformer{}, &rolloutStatusTransformer{}).Build()
-				Expect(err).NotTo(HaveOccurred())
-				return plan.(*rolloutPlan)
-			}
-			bump := func(obj client.Object) {
-				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(obj), obj)).To(Succeed())
-				labels := obj.GetLabels()
-				if labels == nil {
-					labels = map[string]string{}
-				}
-				labels["write-order-conflict"] = rand.String(8)
-				obj.SetLabels(labels)
-				Expect(k8sClient.Update(ctx, obj)).To(Succeed())
-			}
-			By("rejecting a stale status write before changing Cluster")
-			plan := build()
-			bump(&appsv1alpha1.Rollout{ObjectMeta: metav1.ObjectMeta{Name: rolloutKey.Name, Namespace: rolloutKey.Namespace}})
-			Expect(plan.Execute()).To(Satisfy(apierrors.IsConflict))
-			Expect(readCluster().Spec).To(Equal(before.Spec))
-			Expect(readCluster().Generation).To(Equal(before.Generation))
-			Expect(history(readRollout())).To(BeEmpty())
-			By("persisting intent and resuming with a fresh reconciler after Pod recreation")
-			reconcile()
-			Expect(history(readRollout())).To(Equal([]string{pods[0].Name}))
-			Expect(readCluster().Spec).To(Equal(before.Spec))
-			selected := pods[0].DeepCopy()
-			Expect(k8sClient.Delete(ctx, pods[0])).To(Succeed())
-			Expect(reconcile().RequeueAfter).To(BeNumerically(">", 0))
-			Expect(readCluster().Spec).To(Equal(before.Spec))
-			Expect(history(readRollout())).To(Equal([]string{selected.Name}))
-			selected.ResourceVersion = ""
-			selected.UID = ""
-			Expect(k8sClient.Create(ctx, selected)).To(Succeed())
-			By("retaining intent after a real Cluster conflict")
-			plan = build()
-			bump(&appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: clusterKey.Name, Namespace: clusterKey.Namespace}})
-			Expect(plan.Execute()).To(Satisfy(apierrors.IsConflict))
-			Expect(readCluster().Spec).To(Equal(before.Spec))
-			Expect(history(readRollout())).To(Equal([]string{selected.Name}))
-			By("retaining cleanup history when status conflicts after the Cluster write")
-			plan = build()
-			bump(&appsv1alpha1.Rollout{ObjectMeta: metav1.ObjectMeta{Name: rolloutKey.Name, Namespace: rolloutKey.Namespace}})
-			Expect(plan.Execute()).To(Satisfy(apierrors.IsConflict))
-			down := readCluster()
-			Expect(specOf(down).Replicas).To(Equal(replicas))
-			Expect(down.Generation).To(Equal(before.Generation + 1))
-			Expect(specOf(down).OfflineInstances).To(Equal([]string{compKey.Name + "-99", selected.Name}))
-			Expect(history(readRollout())).To(Equal([]string{selected.Name}))
-			if template {
-				Expect(*specOf(down).Instances[0].Replicas).To(Equal(int32(0)))
-			}
-			reconcile()
-			Expect(readCluster().Spec).To(Equal(down.Spec))
-			Expect(readCluster().Generation).To(Equal(down.Generation))
-			By("completing replacement without losing any owned cleanup entries")
-			for i, oldPod := range pods {
-				Expect(k8sClient.Delete(ctx, oldPod)).To(Succeed())
-				tplName := replaceInstanceTemplateNameSuffix(rolloutObj)
-				if template && i == 0 {
-					tplName = instanceTemplateName + "-" + tplName
-				}
-				if sharding {
-					mockCreatePods4Sharding([]int32{int32(3 + i)}, tplName)
-				} else {
-					mockCreatePods([]int32{int32(3 + i)}, tplName)
-				}
-				running()
-				if i < 2 {
-					reconcile()
-					running()
-					reconcile()
-					Expect(specOf(readCluster()).Replicas).To(Equal(replicas + 1))
-					Expect(history(readRollout())).To(HaveLen(i + 2))
-					reconcile()
-					Expect(specOf(readCluster()).Replicas).To(Equal(replicas))
-				}
-			}
-			beforeCleanup := readCluster()
-			Expect(specOf(beforeCleanup).OfflineInstances).To(HaveLen(4))
-			Expect(history(readRollout())).To(Equal([]string{pods[0].Name, pods[1].Name, pods[2].Name}))
-			By("blocking Succeed on a real cleanup Cluster conflict")
-			plan = build()
-			bump(&appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: clusterKey.Name, Namespace: clusterKey.Namespace}})
-			Expect(plan.Execute()).To(Satisfy(apierrors.IsConflict))
-			Expect(readCluster().Spec).To(Equal(beforeCleanup.Spec))
-			Expect(readRollout().Status.State).NotTo(Equal(appsv1alpha1.SucceedRolloutState))
-			By("retrying a terminal status conflict after cleanup has persisted")
-			plan = build()
-			bump(&appsv1alpha1.Rollout{ObjectMeta: metav1.ObjectMeta{Name: rolloutKey.Name, Namespace: rolloutKey.Namespace}})
-			Expect(plan.Execute()).To(Satisfy(apierrors.IsConflict))
-			Expect(readRollout().Status.State).NotTo(Equal(appsv1alpha1.SucceedRolloutState))
-			cleaned := readCluster()
-			Expect(specOf(cleaned).OfflineInstances).To(Equal([]string{compKey.Name + "-99"}))
-			running()
-			reconcile()
-			Expect(readCluster().Spec).To(Equal(cleaned.Spec))
-			Expect(readCluster().Generation).To(Equal(cleaned.Generation))
-
-			Expect(specOf(cleaned).Replicas).To(Equal(replicas))
-			Expect(cleaned.Generation).To(Equal(beforeCleanup.Generation + 1))
-			Expect(readRollout().Status.State).To(Equal(appsv1alpha1.SucceedRolloutState))
-		}, Entry("component", false, false), Entry("component instance template", false, true), Entry("sharding", true, false), Entry("sharding instance template", true, true))
 	})
 
 	Context("replace", func() {

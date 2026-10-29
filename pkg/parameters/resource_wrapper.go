@@ -64,6 +64,9 @@ func (r *ResourceFetcher[T]) Wrap(fn func() error) (ret *T) {
 
 func (r *ResourceFetcher[T]) Cluster() *T {
 	return r.Wrap(func() error {
+		if r.ClusterObj != nil {
+			return nil
+		}
 		clusterKey := client.ObjectKey{
 			Namespace: r.Namespace,
 			Name:      r.ClusterName,

@@ -40,11 +40,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -1995,91 +1998,6 @@ var _ = Describe("cluster component transformer test", func() {
 				To(Equal(resource.MustParse("10")))
 		})
 
-		for _, staleParent := range []bool{false, true} {
-			for _, cleared := range []bool{false, true} {
-				It(fmt.Sprintf("preserves local config execution target (stale parent=%t, cleared=%t)", staleParent, cleared), func() {
-					local := appsv1.ClusterComponentConfig{
-						Name: ptr.To("config"), ConfigHash: ptr.To("local-hash"),
-						ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{ConfigMap: &corev1.ConfigMapVolumeSource{
-							LocalObjectReference: corev1.LocalObjectReference{Name: "local-source"}}},
-						Restart: ptr.To(true), Reconfigure: ptr.To(true),
-						ReconfigureAction: &appsv1.Action{Exec: &appsv1.ExecAction{Command: []string{"local-action"}}},
-						ReconfigureArgs:   [][]string{{"key", "local"}},
-						Variables:         map[string]string{"old-user": "removed", constant.ConfigFilesUpdated: "local-checksum"},
-					}
-					if cleared {
-						local.Restart = nil
-						local.Reconfigure = ptr.To(false)
-						local.ReconfigureAction = nil
-						local.ReconfigureArgs = nil
-						delete(local.Variables, constant.ConfigFilesUpdated)
-					}
-					parent := appsv1.ClusterComponentConfig{Name: ptr.To("config"), Variables: map[string]string{"new-user": "applied"}}
-					if staleParent {
-						parent.ConfigHash, parent.Restart, parent.Reconfigure = ptr.To("stale-hash"), ptr.To(true), ptr.To(true)
-						parent.ReconfigureAction = &appsv1.Action{Exec: &appsv1.ExecAction{Command: []string{"stale-action"}}}
-						parent.ReconfigureArgs = [][]string{{"key", "stale"}}
-						parent.Variables[constant.ConfigFilesUpdated] = "stale-checksum"
-					}
-					oldCompObj.Spec.Configs = []appsv1.ClusterComponentConfig{local}
-					newCompObj.Spec.Configs = []appsv1.ClusterComponentConfig{parent, {Name: ptr.To("new-config"), Variables: map[string]string{"new": "value"}}}
-					newCompObj.Spec.Replicas = 5
-					newCompObj.Spec.Resources.Limits[corev1.ResourceCPU] = resource.MustParse("2")
-					prototype := newCompObj.DeepCopy()
-					merged := copyAndMergeComponent(oldCompObj, newCompObj)
-					Expect(merged).NotTo(BeNil())
-					Expect(merged.Spec.Replicas).To(Equal(int32(5)))
-					Expect(merged.Spec.Resources).To(Equal(newCompObj.Spec.Resources))
-					Expect(merged.Spec.Configs).To(HaveLen(2))
-					config := merged.Spec.Configs[0]
-					Expect(config.ConfigMap).To(Equal(local.ConfigMap))
-					Expect(config.ConfigHash).To(Equal(local.ConfigHash))
-					Expect(config.Restart).To(Equal(local.Restart))
-					Expect(config.Reconfigure).To(Equal(local.Reconfigure))
-					Expect(config.ReconfigureAction).To(Equal(local.ReconfigureAction))
-					Expect(config.ReconfigureArgs).To(Equal(local.ReconfigureArgs))
-					Expect(config.Variables).To(HaveKeyWithValue("new-user", "applied"))
-					Expect(config.Variables).NotTo(HaveKey("old-user"))
-					if cleared {
-						Expect(config.Variables).NotTo(HaveKey(constant.ConfigFilesUpdated))
-					} else {
-						Expect(config.Variables).To(HaveKeyWithValue(constant.ConfigFilesUpdated, "local-checksum"))
-					}
-					Expect(newCompObj).To(Equal(prototype))
-					Expect(copyAndMergeComponent(merged, newCompObj)).To(BeNil())
-				})
-			}
-		}
-
-		It("keeps explicit parent config sources and configs without local execution targets", func() {
-			oldCompObj.Spec.Configs = []appsv1.ClusterComponentConfig{{Name: ptr.To("config"),
-				ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{Name: "old-source"}}}}}
-			newCompObj.Spec.Configs = []appsv1.ClusterComponentConfig{{Name: ptr.To("config"), ConfigHash: ptr.To("parent-hash"),
-				ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{Name: "new-source"}}}}}
-			merged := copyAndMergeComponent(oldCompObj, newCompObj)
-			Expect(merged.Spec.Configs).To(Equal(newCompObj.Spec.Configs))
-			oldCompObj.Spec.Configs[0].ConfigHash = ptr.To("local-hash")
-			merged = copyAndMergeComponent(oldCompObj, newCompObj)
-			Expect(merged.Spec.Configs[0].ConfigMap.Name).To(Equal("new-source"))
-			Expect(merged.Spec.Configs[0].ConfigHash).To(HaveValue(Equal("parent-hash")))
-			newCompObj.Spec.Configs = nil
-			Expect(copyAndMergeComponent(oldCompObj, newCompObj)).To(BeNil())
-		})
-
-		It("preserves execution targets when the parent specifies the same source", func() {
-			oldCompObj.Spec.Configs = []appsv1.ClusterComponentConfig{{
-				Name: ptr.To("config"), ConfigHash: ptr.To("local-hash"), Reconfigure: ptr.To(false),
-				ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{Name: "same-source"}}},
-			}}
-			newCompObj.Spec.Configs = []appsv1.ClusterComponentConfig{*oldCompObj.Spec.Configs[0].DeepCopy()}
-			newCompObj.Spec.Configs[0].ConfigHash = ptr.To("stale-hash")
-			newCompObj.Spec.Configs[0].Reconfigure = ptr.To(true)
-			Expect(copyAndMergeComponent(oldCompObj, newCompObj)).To(BeNil())
-		})
-
 		It("should detect all changes when multiple fields change", func() {
 			newCompObj.Labels = map[string]string{"app": "test"}
 			newCompObj.Spec.Resources.Limits[corev1.ResourceCPU] = resource.MustParse("2")
@@ -3943,4 +3861,100 @@ var _ = Describe("cluster component transformer test", func() {
 			})
 		})
 	})
+})
+
+var _ = Describe("cluster config execution targets", func() {
+	var scheme *runtime.Scheme
+	BeforeEach(func() {
+		scheme = runtime.NewScheme()
+		Expect(corev1.AddToScheme(scheme)).To(Succeed())
+	})
+	newConfig := func(source, hash string) appsv1.ClusterComponentConfig {
+		return appsv1.ClusterComponentConfig{
+			Name: ptr.To("config"), ConfigHash: ptr.To(hash), Restart: ptr.To(false), Reconfigure: ptr.To(false),
+			ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{Name: source},
+			}},
+		}
+	}
+	for _, shard := range []bool{false, true} {
+		It(fmt.Sprintf("applies external config execution updates (shard=%t)", shard), func() {
+			old := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{Name: "cluster-comp", Namespace: "default"}}
+			if shard {
+				old.Labels = map[string]string{constant.KBAppShardingNameLabelKey: "sharding"}
+			}
+			old.Spec.Configs = []appsv1.ClusterComponentConfig{newConfig("external", "H1")}
+			old.Spec.Configs[0].ExternalManaged = ptr.To(true)
+			expected := old.DeepCopy()
+			expected.Spec.Configs[0].ConfigHash = ptr.To("H2")
+			expected.Spec.Configs[0].Restart = ptr.To(true)
+			expected.Spec.Configs[0].Reconfigure = ptr.To(true)
+			expected.Spec.Configs[0].ReconfigureAction = &appsv1.Action{Exec: &appsv1.ExecAction{Command: []string{"reload-new"}}}
+			expected.Spec.Configs[0].ReconfigureArgs = [][]string{{"key", "new"}}
+			expected.Spec.Configs[0].Variables = map[string]string{constant.ConfigFilesUpdated: "new-checksum"}
+			cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "external", Namespace: "default", Labels: map[string]string{
+				constant.AppInstanceLabelKey: "cluster", constant.KBAppComponentLabelKey: "comp",
+				constant.CMConfigurationSpecProviderLabelKey: "config", constant.CMConfigurationTemplateNameLabelKey: "template",
+			}}}
+			reader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cm).Build()
+			var got *appsv1.Component
+			if shard {
+				var err error
+				got, err = copyAndMergeShardComponent(context.Background(), reader, old, expected)
+				Expect(err).NotTo(HaveOccurred())
+			} else {
+				got = copyAndMergeComponent(old, expected)
+			}
+			Expect(got).NotTo(BeNil())
+			Expect(got.Spec.Configs).To(Equal(expected.Spec.Configs))
+		})
+	}
+	for i := range 2 {
+		It(fmt.Sprintf("preserves managed shard %d execution and accepts projection updates", i), func() {
+			name := fmt.Sprintf("cluster-shard-%d", i)
+			source := name + "-config"
+			old := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default", Labels: map[string]string{
+				constant.KBAppShardingNameLabelKey: "shard",
+			}}}
+			local := newConfig(source, fmt.Sprintf("shard-hash-%d", i))
+			local.Reconfigure = ptr.To(true)
+			local.ReconfigureArgs = [][]string{{"key", fmt.Sprint(i)}}
+			local.Variables = map[string]string{constant.ConfigFilesUpdated: fmt.Sprintf("shard-checksum-%d", i), "old-user": "removed"}
+			old.Spec.Configs = []appsv1.ClusterComponentConfig{local}
+			expected := old.DeepCopy()
+			expected.Spec.Configs[0] = newConfig(source, "shared-template-hash")
+			if i == 0 {
+				expected.Spec.Configs[0].ConfigMap = nil
+			} else {
+				expected.Spec.Configs[0].ConfigMap.Items = []corev1.KeyToPath{{Key: "settings.conf", Path: "projected.conf"}}
+				expected.Spec.Configs[0].ConfigMap.Optional = ptr.To(true)
+				expected.Spec.Configs[0].ConfigMap.DefaultMode = ptr.To(int32(0600))
+			}
+			expected.Spec.Configs[0].Variables = map[string]string{"new-user": "applied"}
+			expected.Spec.Replicas = 5
+			cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: source, Namespace: "default", Labels: map[string]string{
+				constant.AppInstanceLabelKey: "cluster", constant.KBAppComponentLabelKey: fmt.Sprintf("shard-%d", i),
+				constant.CMConfigurationSpecProviderLabelKey: "config", constant.CMConfigurationTemplateNameLabelKey: "template",
+			}, OwnerReferences: []metav1.OwnerReference{{APIVersion: parametersv1alpha1.SchemeGroupVersion.String(), Kind: "ComponentParameter", Name: name, Controller: ptr.To(true)}}}}
+			reader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cm).Build()
+			got, err := copyAndMergeShardComponent(context.Background(), reader, old, expected)
+			Expect(err).NotTo(HaveOccurred())
+			want := *local.DeepCopy()
+			if expected.Spec.Configs[0].ConfigMap != nil {
+				want.ConfigMap = expected.Spec.Configs[0].ConfigMap.DeepCopy()
+			}
+			want.Variables = map[string]string{"new-user": "applied", constant.ConfigFilesUpdated: fmt.Sprintf("shard-checksum-%d", i)}
+			Expect(got).NotTo(BeNil())
+			Expect(got.Spec.Replicas).To(Equal(int32(5)))
+			Expect(got.Spec.Configs).To(Equal([]appsv1.ClusterComponentConfig{want}))
+			next, err := copyAndMergeShardComponent(context.Background(), reader, got, expected)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(next).To(BeNil())
+			expected.Spec.Configs[0] = newConfig("new-source", "new-source-hash")
+			got, err = copyAndMergeShardComponent(context.Background(), reader, old, expected)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(got).NotTo(BeNil())
+			Expect(got.Spec.Configs).To(Equal(expected.Spec.Configs))
+		})
+	}
 })

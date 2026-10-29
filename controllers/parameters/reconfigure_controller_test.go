@@ -262,17 +262,16 @@ var _ = Describe("Reconfigure Controller", func() {
 
 	Context("reconfigure", func() {
 		var (
-			configmap                      *corev1.ConfigMap
-			clusterObj                     *appsv1.Cluster
-			synthesizedComp                *component.SynthesizedComponent
-			componentKey, compParameterKey types.NamespacedName
+			configmap                    *corev1.ConfigMap
+			clusterObj                   *appsv1.Cluster
+			synthesizedComp              *component.SynthesizedComponent
+			clusterKey, compParameterKey types.NamespacedName
 		)
 
 		BeforeEach(func() {
-			var comp *appsv1.Component
-			configmap, clusterObj, comp, synthesizedComp, _ = mockReconcileResource()
+			configmap, clusterObj, _, synthesizedComp, _ = mockReconcileResource()
 
-			componentKey = client.ObjectKeyFromObject(comp)
+			clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 			compParameterKey = types.NamespacedName{
 				Namespace: synthesizedComp.Namespace,
@@ -307,7 +306,7 @@ var _ = Describe("Reconfigure Controller", func() {
 			Expect(*differentHash).NotTo(Equal(*initialHash))
 		})
 
-		It("submit changes to component", func() {
+		It("submit changes to cluster", func() {
 			By("submit changes through component parameter")
 			Eventually(testapps.GetAndChangeObj(&testCtx, compParameterKey, func(compParameter *parametersv1alpha1.ComponentParameter) {
 				item := parameters.GetConfigTemplateItem(&compParameter.Spec, configSpecName)
@@ -326,23 +325,24 @@ var _ = Describe("Reconfigure Controller", func() {
 				"innodb_buffer_pool_size=1024M", "max_connections=100",
 			)
 
-			By("verify changes submit to component")
-			Eventually(testapps.CheckObj(&testCtx, componentKey, func(g Gomega, comp *appsv1.Component) {
-				g.Expect(comp.Spec.Configs).Should(HaveLen(1))
-				for _, config := range comp.Spec.Configs {
-					g.Expect(config.Variables).Should(BeNil())
-					g.Expect(config.ConfigHash).ShouldNot(BeNil())
-					g.Expect(*config.ConfigHash).Should(Equal(expectedHash))
-					g.Expect(config.Restart).ShouldNot(BeNil())
-					g.Expect(*config.Restart).Should(BeTrue())
-					g.Expect(config.Reconfigure).ShouldNot(BeNil())
-					g.Expect(*config.Reconfigure).Should(BeFalse())
-					g.Expect(config.ReconfigureAction).Should(BeNil())
+			By("verify changes submit to cluster")
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+				g.Expect(cluster.Spec.GetComponentByName(defaultCompName).Configs).Should(HaveLen(1))
+				for _, comp := range cluster.Spec.ComponentSpecs {
+					for _, config := range comp.Configs {
+						// g.Expect(config.Variables).Should(HaveKeyWithValue("innodb_buffer_pool_size", "1024M"))
+						// g.Expect(config.Variables).Should(HaveKeyWithValue("max_connections", "100"))
+						g.Expect(config.Variables).Should(BeNil())
+						g.Expect(config.ConfigHash).ShouldNot(BeNil())
+						g.Expect(*config.ConfigHash).Should(Equal(expectedHash))
+						g.Expect(config.Restart).ShouldNot(BeNil())
+						g.Expect(*config.Restart).Should(BeTrue())
+						g.Expect(config.Reconfigure).ShouldNot(BeNil())
+						g.Expect(*config.Reconfigure).Should(BeFalse())
+						g.Expect(config.ReconfigureAction).Should(BeNil())
+					}
 				}
 			})).Should(Succeed())
-			currentCluster := &appsv1.Cluster{}
-			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterObj), currentCluster)).Should(Succeed())
-			Expect(currentCluster.Spec).Should(Equal(clusterObj.Spec))
 		})
 
 		It("restart", func() {
@@ -373,23 +373,24 @@ var _ = Describe("Reconfigure Controller", func() {
 				"innodb_buffer_pool_size=1024M", "max_connections=100",
 			)
 
-			By("verify changes submit to component")
-			Eventually(testapps.CheckObj(&testCtx, componentKey, func(g Gomega, comp *appsv1.Component) {
-				g.Expect(comp.Spec.Configs).Should(HaveLen(1))
-				for _, config := range comp.Spec.Configs {
-					g.Expect(config.Variables).Should(BeNil())
-					g.Expect(config.ConfigHash).ShouldNot(BeNil())
-					g.Expect(*config.ConfigHash).Should(Equal(expectedHash))
-					g.Expect(config.Restart).ShouldNot(BeNil())
-					g.Expect(*config.Restart).Should(BeTrue())
-					g.Expect(config.Reconfigure).ShouldNot(BeNil())
-					g.Expect(*config.Reconfigure).Should(BeFalse())
-					g.Expect(config.ReconfigureAction).Should(BeNil())
+			By("verify changes submit to cluster")
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+				g.Expect(cluster.Spec.GetComponentByName(defaultCompName).Configs).Should(HaveLen(1))
+				for _, comp := range cluster.Spec.ComponentSpecs {
+					for _, config := range comp.Configs {
+						// g.Expect(config.Variables).Should(HaveKeyWithValue("innodb_buffer_pool_size", "1024M"))
+						// g.Expect(config.Variables).Should(HaveKeyWithValue("max_connections", "100"))
+						g.Expect(config.Variables).Should(BeNil())
+						g.Expect(config.ConfigHash).ShouldNot(BeNil())
+						g.Expect(*config.ConfigHash).Should(Equal(expectedHash))
+						g.Expect(config.Restart).ShouldNot(BeNil())
+						g.Expect(*config.Restart).Should(BeTrue())
+						g.Expect(config.Reconfigure).ShouldNot(BeNil())
+						g.Expect(*config.Reconfigure).Should(BeFalse())
+						g.Expect(config.ReconfigureAction).Should(BeNil())
+					}
 				}
 			})).Should(Succeed())
-			currentCluster := &appsv1.Cluster{}
-			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterObj), currentCluster)).Should(Succeed())
-			Expect(currentCluster.Spec).Should(Equal(clusterObj.Spec))
 		})
 
 		It("keeps changed shard config targets and completion independent", func() {
@@ -491,15 +492,19 @@ var _ = Describe("Reconfigure Controller", func() {
 			noRuntime      bool
 			unbound        bool
 			foreign        bool
+			foreignActual  bool
+			currentActual  bool
 			replicas       int32
 		}{
 			{name: "restored content", restored: "enabled=ON\n", recover: true},
 			{name: "same name from different source semantic no-op", restored: "# other source\nenabled=ON\n", foreign: true},
 			{name: "restored unbound source", restored: "enabled=ON\n", recover: true, unbound: true},
-			{name: "actual component replica override", restored: "enabled=ON\n", recover: true, replicas: 2},
+			{name: "ordinary component replica override", restored: "enabled=ON\n", recover: true, replicas: 2},
+			{name: "completed ordinary target stale while actual component hash is current", restored: "enabled=ON\n", recover: true, finished: true, currentActual: true},
+			{name: "unbound ordinary target from different actual source", restored: "# other source\nenabled=ON\n", foreignActual: true},
 			{name: "restored semantics", restored: "# restored\nenabled=ON\n", recover: true},
 			{name: "stable formatting change", restored: "# reformatted\nenabled=ON\n"},
-			{name: "component conflict", restored: "enabled=ON\n", recover: true, conflict: true},
+			{name: "cluster conflict", restored: "enabled=ON\n", recover: true, conflict: true},
 			{name: "newer revision", restored: "# restored\nenabled=ON\n", recover: true, newRevision: true},
 			{name: "completed stopped configuration", restored: "enabled=ON\n", finished: true, stopped: true, noRuntime: true},
 			{name: "completed unavailable configuration", restored: "enabled=ON\n", finished: true, noRuntime: true},
@@ -562,9 +567,16 @@ var _ = Describe("Reconfigure Controller", func() {
 						Labels: constant.GetCompLabels(clusterName, componentName), Annotations: map[string]string{constant.KBAppClusterUIDKey: "cluster-uid"}},
 					Spec: appsv1.ComponentSpec{CompDef: "mysql", Replicas: 1, Configs: []appsv1.ClusterComponentConfig{*cluster.Spec.ComponentSpecs[0].Configs[0].DeepCopy()}},
 				}
+				cluster.Spec.ComponentSpecs[0].Configs[0].Variables = map[string]string{"user-variable": "kept", constant.ConfigFilesUpdated: "old-checksum"}
 				component.Spec.Configs[0].ConfigMap = &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: cm.Name}}
 				if tc.foreign {
+					cluster.Spec.ComponentSpecs[0].Configs[0].ConfigMap = &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "another-configmap"}}
+				}
+				if tc.foreignActual {
 					component.Spec.Configs[0].ConfigMap.Name = "another-configmap"
+				}
+				if tc.currentActual {
+					component.Spec.Configs[0].ConfigHash = appliedHash
 				}
 				if tc.unbound {
 					component.Spec.Configs[0].ConfigMap = nil
@@ -618,12 +630,16 @@ var _ = Describe("Reconfigure Controller", func() {
 				cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(cp, ops, its).
 					WithObjects(cm, cluster, cp, component, definition, pd, its, ops, tpl).Build()
 				reconciler := &ReconfigureReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
-				if tc.foreign {
+				originalComponent := component.DeepCopy()
+				if tc.foreign || tc.foreignActual {
+					originalCluster := cluster.DeepCopy()
 					original := component.DeepCopy()
 					_, err := reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cm)})
 					Expect(err).Should(Succeed())
 					Expect(cli.Get(ctx, client.ObjectKeyFromObject(component), component)).Should(Succeed())
 					Expect(component.Spec).Should(Equal(original.Spec))
+					Expect(cli.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
+					Expect(cluster.Spec).Should(Equal(originalCluster.Spec))
 					Expect(cli.Get(ctx, client.ObjectKeyFromObject(cm), cm)).Should(Succeed())
 					Expect(parseResult(cm.Annotations[parameterscore.GenerateRevisionPhaseKey("3")], "3").Phase).Should(Equal(parametersv1alpha1.CFinishedPhase))
 					return
@@ -653,11 +669,14 @@ var _ = Describe("Reconfigure Controller", func() {
 					conflicted := false
 					reconciler.Client = interceptor.NewClient(cli, interceptor.Funcs{
 						Update: func(ctx context.Context, underlying client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
-							if _, ok := obj.(*appsv1.Component); ok && !conflicted {
+							if _, ok := obj.(*appsv1.Cluster); ok && !conflicted {
 								conflicted = true
-								concurrent := &appsv1.Component{}
+								concurrent := &appsv1.Cluster{}
 								if err := underlying.Get(ctx, client.ObjectKeyFromObject(obj), concurrent); err != nil {
 									return err
+								}
+								if concurrent.Annotations == nil {
+									concurrent.Annotations = map[string]string{}
 								}
 								concurrent.Annotations["concurrent"] = "kept"
 								if err := underlying.Update(ctx, concurrent); err != nil {
@@ -678,12 +697,14 @@ var _ = Describe("Reconfigure Controller", func() {
 				status := parametersv1alpha1.ConfigTemplateItemDetailStatus{UpdateRevision: "3"}
 				Expect(syncStatus(cm, &status)).Should(Succeed())
 				Expect(status.Phase).ShouldNot(Equal(parametersv1alpha1.CFinishedPhase))
-				Expect(parseResult(cm.Annotations[parameterscore.GenerateRevisionPhaseKey("3")], "3").ExpectedCount).Should(Equal(component.Spec.Replicas))
+				Expect(parseResult(cm.Annotations[parameterscore.GenerateRevisionPhaseKey("3")], "3").ExpectedCount).Should(Equal(cluster.Spec.ComponentSpecs[0].Replicas))
 				Expect(cli.Get(ctx, client.ObjectKeyFromObject(component), component)).Should(Succeed())
-				cfg := component.Spec.Configs[0]
+				Expect(component.Spec).Should(Equal(originalComponent.Spec))
+				Expect(cli.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
+				cfg := cluster.Spec.ComponentSpecs[0].Configs[0]
 				Expect(cluster.Spec.ComponentSpecs[0].Configs[1]).Should(Equal(otherConfig))
 				if tc.conflict {
-					Expect(component.Annotations).Should(HaveKeyWithValue("concurrent", "kept"))
+					Expect(cluster.Annotations).Should(HaveKeyWithValue("concurrent", "kept"))
 				}
 				if tc.recover {
 					Expect(cfg.ConfigHash).ShouldNot(Equal(failedHash))
@@ -692,14 +713,14 @@ var _ = Describe("Reconfigure Controller", func() {
 				if !tc.recover {
 					_, err = reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cm)})
 					Expect(err).Should(Succeed())
-					Expect(cli.Get(ctx, client.ObjectKeyFromObject(component), component)).Should(Succeed())
-					Expect(ptr.Deref(component.Spec.Configs[0].Restart, false)).Should(BeFalse())
+					Expect(cli.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
+					Expect(ptr.Deref(cluster.Spec.ComponentSpecs[0].Configs[0].Restart, false)).Should(BeFalse())
 				}
 				Expect(cfg.Restart).Should(HaveValue(BeFalse()))
 				Expect(cfg.Reconfigure).Should(HaveValue(BeFalse()))
 				Expect(cfg.ReconfigureArgs).Should(BeNil())
 				Expect(cfg.ReconfigureAction).Should(BeNil())
-				Expect(cfg.ConfigMap.Name).Should(Equal(cm.Name))
+				Expect(cfg.ConfigMap).Should(BeNil())
 				Expect(cfg.Variables).Should(Equal(map[string]string{"user-variable": "kept"}))
 				checkCompletion := func(finished bool) {
 					GinkgoHelper()
@@ -725,11 +746,6 @@ var _ = Describe("Reconfigure Controller", func() {
 					checkCompletion(false)
 				}
 				its.Status.InstanceStatus[0].Configs[0].ConfigHash = cfg.ConfigHash
-				if tc.replicas > 1 {
-					Expect(cli.Status().Update(ctx, its)).Should(Succeed())
-					checkCompletion(false)
-					its.Status.InstanceStatus = append(its.Status.InstanceStatus, *its.Status.InstanceStatus[0].DeepCopy())
-				}
 				Expect(cli.Status().Update(ctx, its)).Should(Succeed())
 				if tc.newRevision {
 					changed := false
@@ -758,8 +774,10 @@ var _ = Describe("Reconfigure Controller", func() {
 					Expect(cm.Annotations).Should(HaveKeyWithValue(constant.LastAppliedConfigAnnotationKey, string(applied)))
 					_, err = reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cm)})
 					Expect(err).Should(Succeed())
+					Expect(cli.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
+					Expect(cluster.Spec.ComponentSpecs[0].Configs[0].ConfigHash).Should(Equal(computeTargetConfigHash(nil, cm.Data)))
 					Expect(cli.Get(ctx, client.ObjectKeyFromObject(component), component)).Should(Succeed())
-					Expect(component.Spec.Configs[0].ConfigHash).Should(Equal(computeTargetConfigHash(nil, cm.Data)))
+					Expect(component.Spec).Should(Equal(originalComponent.Spec))
 					return
 				}
 				checkCompletion(true)
@@ -911,6 +929,30 @@ var _ = Describe("Reconfigure Controller", func() {
 			}
 		})
 
+		It("waits for the actual shard replica count", func() {
+			original := cluster.DeepCopy()
+			components[0].Spec.Replicas = 2
+			Expect(cli.Update(ctx, components[0])).Should(Succeed())
+			cm := configMaps[0]
+			result, err := reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cm)})
+			Expect(err).Should(Succeed())
+			Expect(result.RequeueAfter).Should(BeNumerically(">", 0))
+			Expect(cli.Get(ctx, client.ObjectKeyFromObject(cm), cm)).Should(Succeed())
+			Expect(parseResult(cm.Annotations[parameterscore.GenerateRevisionPhaseKey("3")], "3").ExpectedCount).Should(Equal(int32(2)))
+			Expect(cli.Get(ctx, client.ObjectKeyFromObject(components[0]), components[0])).Should(Succeed())
+			hash := components[0].Spec.Configs[0].ConfigHash
+			sets[0].Spec.Configs[0].ConfigHash = hash
+			Expect(cli.Update(ctx, sets[0])).Should(Succeed())
+			sets[0].Status.InstanceStatus[0].Configs[0].ConfigHash = hash
+			Expect(cli.Status().Update(ctx, sets[0])).Should(Succeed())
+			result, err = reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cm)})
+			Expect(err).Should(Succeed())
+			Expect(result.RequeueAfter).Should(BeNumerically(">", 0))
+			sets[0].Status.InstanceStatus = append(sets[0].Status.InstanceStatus, *sets[0].Status.InstanceStatus[0].DeepCopy())
+			Expect(cli.Status().Update(ctx, sets[0])).Should(Succeed())
+			reconcileFinished(0, original)
+		})
+
 		It("preserves shards with different applied parameter values", func() {
 			for index, value := range []string{"1", "2"} {
 				cm := configMaps[index]
@@ -978,6 +1020,36 @@ var _ = Describe("Reconfigure Controller", func() {
 			Expect(components[1].Spec).Should(Equal(sibling.Spec))
 		})
 
+		for _, unavailable := range []string{"Cluster", "Component"} {
+			for _, applied := range []bool{false, true} {
+				It(fmt.Sprintf("retries initialized shard configuration without %s (applied=%t)", unavailable, applied), func() {
+					cm := configMaps[0]
+					if applied {
+						cm.Data = map[string]string{"my.cnf": "enabled=ON\n"}
+						Expect(cli.Update(ctx, cm)).Should(Succeed())
+					}
+					lastApplied := cm.Annotations[constant.LastAppliedConfigAnnotationKey]
+					var missing client.Object = cluster.DeepCopy()
+					if unavailable == "Component" {
+						missing = components[0].DeepCopy()
+					}
+					Expect(cli.Delete(ctx, missing)).Should(Succeed())
+					_, err := reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cm)})
+					Expect(err).Should(HaveOccurred())
+					Expect(cli.Get(ctx, client.ObjectKeyFromObject(cm), cm)).Should(Succeed())
+					Expect(cm.Annotations[constant.LastAppliedConfigAnnotationKey]).Should(Equal(lastApplied))
+					Expect(parseResult(cm.Annotations[parameterscore.GenerateRevisionPhaseKey("3")], "3").Phase).
+						Should(Equal(parametersv1alpha1.CUpgradingPhase))
+					missing.SetResourceVersion("")
+					Expect(cli.Create(ctx, missing)).Should(Succeed())
+					_, err = reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cm)})
+					Expect(err).Should(Succeed())
+					Expect(cli.Get(ctx, client.ObjectKeyFromObject(components[0]), components[0])).Should(Succeed())
+					Expect(components[0].Spec.Configs[0].ConfigHash).Should(Equal(computeTargetConfigHash(nil, cm.Data)))
+				})
+			}
+		}
+
 		for _, unavailable := range []string{"InstanceSet", "ComponentParameter", "ComponentDefinition"} {
 			It("keeps applied shard configurations finished without "+unavailable, func() {
 				for index, cm := range configMaps {
@@ -1038,9 +1110,9 @@ var _ = Describe("Reconfigure Controller", func() {
 					Spec: appsv1.ComponentSpec{Replicas: 1, Configs: []appsv1.ClusterComponentConfig{{Name: ptr.To("other"), ConfigHash: ptr.To("other-hash")}}}}
 				switch name {
 				case "target without a hash":
-					component.Spec.Configs = append(component.Spec.Configs, appsv1.ClusterComponentConfig{Name: ptr.To("mysql-config")})
+					cluster.Spec.ComponentSpecs[0].Configs = append(cluster.Spec.ComponentSpecs[0].Configs, appsv1.ClusterComponentConfig{Name: ptr.To("mysql-config")})
 				case "target from a different source":
-					component.Spec.Configs = append(component.Spec.Configs, appsv1.ClusterComponentConfig{Name: ptr.To("mysql-config"),
+					cluster.Spec.ComponentSpecs[0].Configs = append(cluster.Spec.ComponentSpecs[0].Configs, appsv1.ClusterComponentConfig{Name: ptr.To("mysql-config"),
 						ConfigHash: ptr.To("unrelated-hash"), Restart: ptr.To(true),
 						ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "another-configmap"}}}})
 				case "initial configuration":

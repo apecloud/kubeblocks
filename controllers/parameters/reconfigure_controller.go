@@ -120,12 +120,12 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return updateConfigPhase(r.Client, reqCtx, config, parametersv1alpha1.CFinishedPhase, configurationNoChangedMessage)
 	}
 	rctx := newReconcileContext(reqCtx, r.Client, config)
-	if err := rctx.Component().Complete(); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,
+	if err := rctx.Cluster().Component().Complete(); err != nil {
+		return intctrlutil.RequeueWithError(err, reqCtx.Log,
 			errors.Wrap(err, "failed to fetch related resources").Error())
 	}
 	if isAppliedConfigs {
-		target := independentConfigurationTarget(rctx.ComponentObj, config)
+		target := independentConfigurationTarget(rctx)
 		if target == nil {
 			return updateConfigPhase(r.Client, reqCtx, config, parametersv1alpha1.CFinishedPhase, configurationNoChangedMessage)
 		}
@@ -214,7 +214,7 @@ func (r *ReconfigureReconciler) sync(rctx *reconcileContext, configSpec *appsv1.
 		return intctrlutil.RequeueWithErrorAndRecordEvent(configMap, r.Recorder, err, reqCtx.Log)
 	}
 
-	if rctx.ComponentObj == nil {
+	if rctx.ComponentObj == nil || rctx.ClusterComObj == nil {
 		reqCtx.Log.Info("not found component.")
 		return intctrlutil.Reconciled()
 	}
@@ -255,14 +255,30 @@ func (r *ReconfigureReconciler) sync(rctx *reconcileContext, configSpec *appsv1.
 	return r.performUpgrade(rctx, tasks)
 }
 
-func independentConfigurationTarget(component *appsv1.Component, cm *corev1.ConfigMap) *appsv1.ClusterComponentConfig {
-	if component == nil {
+func independentConfigurationTarget(rctx *reconcileContext) *appsv1.ClusterComponentConfig {
+	if rctx.ComponentObj == nil {
 		return nil
 	}
-	for i := range component.Spec.Configs {
-		config := &component.Spec.Configs[i]
+	configs := rctx.ComponentObj.Spec.Configs
+	if rctx.ComponentObj.Labels[constant.KBAppShardingNameLabelKey] == "" {
+		component := rctx.ClusterObj.Spec.GetComponentByName(rctx.ComponentName)
+		if component == nil {
+			return nil
+		}
+		configs = component.Configs
+	}
+	cm := rctx.configMap
+	for i := range configs {
+		config := &configs[i]
 		if ptr.Deref(config.Name, "") == cm.Labels[constant.CMConfigurationSpecProviderLabelKey] && config.ConfigHash != nil &&
 			(config.ConfigMap == nil || config.ConfigMap.Name == cm.Name) {
+			if config.ConfigMap == nil {
+				for _, actual := range rctx.ComponentObj.Spec.Configs {
+					if ptr.Equal(actual.Name, config.Name) && actual.ConfigMap != nil && actual.ConfigMap.Name != cm.Name {
+						return nil
+					}
+				}
+			}
 			return config
 		}
 	}
@@ -270,7 +286,7 @@ func independentConfigurationTarget(component *appsv1.Component, cm *corev1.Conf
 }
 
 func (r *ReconfigureReconciler) reconcileUnchangedConfig(rctx *reconcileContext, configSpec *appsv1.ComponentFileTemplate, applied bool) (ctrl.Result, error) {
-	config := independentConfigurationTarget(rctx.ComponentObj, rctx.configMap)
+	config := independentConfigurationTarget(rctx)
 	if config == nil {
 		if applied {
 			return updateConfigPhase(r.Client, rctx.RequestCtx, rctx.configMap, parametersv1alpha1.CFinishedPhase, configurationNoChangedMessage)
@@ -287,9 +303,13 @@ func (r *ReconfigureReconciler) reconcileUnchangedConfig(rctx *reconcileContext,
 			}
 		}
 		if !desired {
+			replicas := rctx.ComponentObj.Spec.Replicas
+			if rctx.ComponentObj.Labels[constant.KBAppShardingNameLabelKey] == "" {
+				replicas = rctx.ClusterObj.Spec.GetComponentByName(rctx.ComponentName).Replicas
+			}
 			return r.status(rctx, string(task.Policy), reconfigure.Status{
 				Status: reconfigure.StatusRetry, Reason: "waiting for configuration target propagation",
-				ExpectedCount: rctx.ComponentObj.Spec.Replicas, SucceedCount: 0,
+				ExpectedCount: replicas, SucceedCount: 0,
 			}, nil)
 		}
 		lastConfig, err := getLastVersionConfig(rctx.configMap)
@@ -388,6 +408,7 @@ func (r *ReconfigureReconciler) buildReloadTask(policy reconfigure.Policy,
 		ConfigHash:        computeTargetConfigHash(&rctx.RequestCtx, rctx.configMap.Data),
 		ConfigData:        rctx.configMap.Data,
 		Cluster:           rctx.ClusterObj,
+		ClusterComponent:  rctx.ClusterComObj,
 		Component:         rctx.ComponentObj,
 		ITS:               rctx.its,
 		ConfigDescription: configDescription,
@@ -401,14 +422,15 @@ func (r *ReconfigureReconciler) buildTargetTask(policy reconfigure.Policy, confi
 	return reconfigure.Task{
 		Policy: policy,
 		Ctx: reconfigure.Context{
-			RequestCtx:     rctx.RequestCtx,
-			Client:         rctx.Client,
-			ConfigTemplate: *configTemplate,
-			ConfigMapName:  rctx.configMap.Name,
-			ConfigHash:     computeTargetConfigHash(&rctx.RequestCtx, rctx.configMap.Data),
-			Cluster:        rctx.ClusterObj,
-			Component:      rctx.ComponentObj,
-			ITS:            rctx.its,
+			RequestCtx:       rctx.RequestCtx,
+			Client:           rctx.Client,
+			ConfigTemplate:   *configTemplate,
+			ConfigMapName:    rctx.configMap.Name,
+			ConfigHash:       computeTargetConfigHash(&rctx.RequestCtx, rctx.configMap.Data),
+			Cluster:          rctx.ClusterObj,
+			ClusterComponent: rctx.ClusterComObj,
+			Component:        rctx.ComponentObj,
+			ITS:              rctx.its,
 		},
 	}
 }
@@ -487,7 +509,7 @@ func (r *ReconfigureReconciler) performUpgrade(rctx *reconcileContext, tasks []r
 		}
 	}
 	if err1 := r.submit(rctx); err1 != nil {
-		return intctrlutil.RequeueAfter(configReconcileInterval, rctx.Log, "failed to submit changes to the component", "error", err1)
+		return intctrlutil.RequeueAfter(configReconcileInterval, rctx.Log, "failed to submit configuration changes", "error", err1)
 	}
 	if err != nil || status.Status != reconfigure.StatusNone {
 		return r.status(rctx, policy, status, err)
@@ -496,6 +518,15 @@ func (r *ReconfigureReconciler) performUpgrade(rctx *reconcileContext, tasks []r
 }
 
 func (r *ReconfigureReconciler) submit(rctx *reconcileContext) error {
+	if rctx.ComponentObj != nil && rctx.ComponentObj.Labels[constant.KBAppShardingNameLabelKey] == "" {
+		if rctx.ClusterObj == nil || rctx.ClusterObjCopy == nil {
+			return fmt.Errorf("the cluster object is nil")
+		}
+		if reflect.DeepEqual(rctx.ClusterObj.Spec, rctx.ClusterObjCopy.Spec) {
+			return nil
+		}
+		return rctx.Client.Update(rctx.RequestCtx.Ctx, rctx.ClusterObj)
+	}
 	if rctx.ComponentObj == nil || rctx.ComponentObjCopy == nil {
 		return fmt.Errorf("the component object is nil")
 	}

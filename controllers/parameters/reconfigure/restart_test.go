@@ -60,15 +60,14 @@ var _ = ginkgo.Describe("restartPolicy test", func() {
 						Namespace: "default",
 					},
 				},
-				ClusterComponent: &appsv1.ClusterComponentSpec{
-					Name:     "test-component",
+				Component: &appsv1.Component{Spec: appsv1.ComponentSpec{
 					Replicas: 2,
 					Configs: []appsv1.ClusterComponentConfig{
 						{
 							Name: ptr.To(cfgName),
 						},
 					},
-				},
+				}},
 				ITS: &workloads.InstanceSet{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-instanceset",

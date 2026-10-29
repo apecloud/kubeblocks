@@ -80,12 +80,13 @@ type Context struct {
 	Client client.Client
 
 	ConfigTemplate appsv1.ComponentFileTemplate
+	ConfigMapName  string
 	ConfigHash     *string // the hash of the new configuration content
 	ConfigData     map[string]string
 
-	Cluster          *appsv1.Cluster
-	ClusterComponent *appsv1.ClusterComponentSpec
-	ITS              *workloads.InstanceSet // TODO: use cluster or component API?
+	Cluster   *appsv1.Cluster
+	Component *appsv1.Component
+	ITS       *workloads.InstanceSet // TODO: use cluster or component API?
 
 	ConfigDescription *parametersv1alpha1.ComponentConfigDescription
 	ParametersDef     *parametersv1alpha1.ParametersDefinitionSpec
@@ -97,7 +98,7 @@ func (c *Context) getTargetConfigHash() *string {
 }
 
 func (c *Context) getTargetReplicas() int {
-	return int(c.ClusterComponent.Replicas)
+	return int(c.Component.Spec.Replicas)
 }
 
 // Policy defines the policy of reconfiguring.

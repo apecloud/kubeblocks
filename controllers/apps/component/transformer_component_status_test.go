@@ -172,7 +172,7 @@ var _ = Describe("component status transformer conditions", func() {
 
 	setWorkloadRestoreCondition := func(status metav1.ConditionStatus) {
 		runningITS.Status.Conditions = []metav1.Condition{{
-			Type:    string(workloads.InstanceRestore),
+			Type:    string(workloads.Restore),
 			Status:  status,
 			Reason:  workloads.ReasonRestoreRunning,
 			Message: "workload restore status",
@@ -281,6 +281,44 @@ var _ = Describe("component status transformer conditions", func() {
 			Expect(cond.Reason).Should(Equal(workloads.ReasonRestoreFailed))
 		})
 	})
+
+	DescribeTable("should project restore status onto component summary conditions",
+		func(restoreStatus metav1.ConditionStatus, expectedPhase appsv1.ComponentPhase,
+			expectedAvailable, expectedProgressing metav1.ConditionStatus, expectedRestoreReason string) {
+			setExpectedRestoreVCT()
+			setWorkloadRestoreCondition(restoreStatus)
+			compDef.Spec.Available = &appsv1.ComponentAvailable{
+				WithPhases: ptr.To("Running"),
+			}
+
+			err := transformer.reconcileStatus(transCtx)
+			Expect(err).Should(BeNil())
+			Expect(comp.Status.Phase).Should(Equal(expectedPhase))
+
+			restoreCond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeRestore)
+			Expect(restoreCond).ShouldNot(BeNil())
+			Expect(restoreCond.Status).Should(Equal(restoreStatus))
+			Expect(restoreCond.Reason).Should(Equal(expectedRestoreReason))
+			availableCond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionAvailable)
+			Expect(availableCond).ShouldNot(BeNil())
+			Expect(availableCond.Status).Should(Equal(expectedAvailable))
+			healthyCond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionHealthy)
+			Expect(healthyCond).ShouldNot(BeNil())
+			Expect(healthyCond.Status).Should(Equal(metav1.ConditionTrue))
+			progressingCond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionProgressing)
+			Expect(progressingCond).ShouldNot(BeNil())
+			Expect(progressingCond.Status).Should(Equal(expectedProgressing))
+			if restoreStatus == metav1.ConditionUnknown {
+				Expect(progressingCond.Reason).Should(Equal("RestoreRunning"))
+			}
+		},
+		Entry("restore is running", metav1.ConditionUnknown, appsv1.CreatingComponentPhase,
+			metav1.ConditionFalse, metav1.ConditionTrue, "Running"),
+		Entry("restore has failed", metav1.ConditionFalse, appsv1.FailedComponentPhase,
+			metav1.ConditionFalse, metav1.ConditionFalse, "Failed"),
+		Entry("restore has completed", metav1.ConditionTrue, appsv1.RunningComponentPhase,
+			metav1.ConditionTrue, metav1.ConditionFalse, "Completed"),
+	)
 
 	Context("reconcileHealthyCondition", func() {
 		It("should be unhealthy when runningITS is nil", func() {

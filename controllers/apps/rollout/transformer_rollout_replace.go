@@ -135,6 +135,15 @@ func (t *rolloutReplaceTransformer) compDown(rollout *appsv1alpha1.Rollout, comp
 		return err
 	}
 
+	if len(instance) > 0 {
+		for i, status := range rollout.Status.Components {
+			if status.Name == spec.Name && !slices.Contains(status.ScaleDownInstances, instance) {
+				rollout.Status.Components[i].ScaleDownInstances = append(rollout.Status.Components[i].ScaleDownInstances, instance)
+				return graph.ErrPrematureStop
+			}
+		}
+	}
+
 	spec.Replicas -= 1
 	if instTpl != nil {
 		if instTpl.Replicas == nil || *instTpl.Replicas == 0 {
@@ -144,16 +153,6 @@ func (t *rolloutReplaceTransformer) compDown(rollout *appsv1alpha1.Rollout, comp
 	}
 	if len(instance) > 0 {
 		spec.OfflineInstances = append(spec.OfflineInstances, instance)
-	}
-
-	// add the scale down instance to the rollout status
-	if len(instance) > 0 {
-		for i, status := range rollout.Status.Components {
-			if status.Name == spec.Name {
-				rollout.Status.Components[i].ScaleDownInstances = append(rollout.Status.Components[i].ScaleDownInstances, instance)
-				break
-			}
-		}
 	}
 
 	return nil
@@ -222,17 +221,41 @@ func (t *rolloutReplaceTransformer) pickCompInstanceToRollout(transCtx *rolloutT
 		return strings.Compare(a.Name, b.Name) * -1
 	})
 
+	var pending string
+	for _, status := range transCtx.Rollout.Status.Components {
+		if status.Name == spec.Name {
+			for _, name := range status.ScaleDownInstances {
+				if !slices.Contains(spec.OfflineInstances, name) {
+					pending = name
+					break
+				}
+			}
+		}
+	}
 	var targetPod *corev1.Pod
 	for i, pod := range pods.Items {
-		if pod.DeletionTimestamp == nil && !isRolloutManagedInstanceTemplateName(transCtx.Rollout, pod.Labels[constant.KBAppInstanceTemplateLabelKey]) {
+		if pending != "" {
+			if pod.Name == pending && pod.DeletionTimestamp == nil {
+				targetPod = &pods.Items[i]
+				break
+			}
+			continue
+		}
+		if pod.DeletionTimestamp == nil && !slices.Contains(spec.OfflineInstances, pod.Name) &&
+			!isRolloutManagedInstanceTemplateName(transCtx.Rollout, pod.Labels[constant.KBAppInstanceTemplateLabelKey]) {
 			targetPod = &pods.Items[i]
 			break
 		}
 	}
 
 	if targetPod == nil {
+		if pending != "" {
+			return "", nil, controllerutil.NewDelayedRequeueError(componentNotReadyRequeueDuration,
+				fmt.Sprintf("waiting for recorded scale-down instance %s", pending))
+		}
 		return "", nil, nil
 	}
+
 	tplName, ok := targetPod.Labels[constant.KBAppInstanceTemplateLabelKey]
 	if !ok || len(tplName) == 0 {
 		return targetPod.Name, nil, nil
@@ -318,6 +341,15 @@ func (t *rolloutReplaceTransformer) shardingDown(rollout *appsv1alpha1.Rollout, 
 		return err
 	}
 
+	if len(instance) > 0 {
+		for i, status := range rollout.Status.Shardings {
+			if status.Name == spec.Name && !slices.Contains(status.ScaleDownInstances, instance) {
+				rollout.Status.Shardings[i].ScaleDownInstances = append(rollout.Status.Shardings[i].ScaleDownInstances, instance)
+				return graph.ErrPrematureStop
+			}
+		}
+	}
+
 	spec.Template.Replicas -= 1
 	if instTpl != nil {
 		if instTpl.Replicas == nil || *instTpl.Replicas == 0 {
@@ -327,16 +359,6 @@ func (t *rolloutReplaceTransformer) shardingDown(rollout *appsv1alpha1.Rollout, 
 	}
 	if len(instance) > 0 {
 		spec.Template.OfflineInstances = append(spec.Template.OfflineInstances, instance)
-	}
-
-	// add the scale down instances to the rollout status
-	if len(instance) > 0 {
-		for i, status := range rollout.Status.Shardings {
-			if status.Name == spec.Name {
-				rollout.Status.Shardings[i].ScaleDownInstances = append(rollout.Status.Shardings[i].ScaleDownInstances, instance)
-				break
-			}
-		}
 	}
 
 	return nil
@@ -407,17 +429,41 @@ func (t *rolloutReplaceTransformer) pickShardingInstancesToRollout(transCtx *rol
 		return strings.Compare(a.Name, b.Name) * -1
 	})
 
+	var pending string
+	for _, status := range transCtx.Rollout.Status.Shardings {
+		if status.Name == spec.Name {
+			for _, name := range status.ScaleDownInstances {
+				if !slices.Contains(spec.Template.OfflineInstances, name) {
+					pending = name
+					break
+				}
+			}
+		}
+	}
 	var targetPod *corev1.Pod
 	for i, pod := range pods.Items {
-		if pod.DeletionTimestamp == nil && !isRolloutManagedInstanceTemplateName(transCtx.Rollout, pod.Labels[constant.KBAppInstanceTemplateLabelKey]) {
+		if pending != "" {
+			if pod.Name == pending && pod.DeletionTimestamp == nil {
+				targetPod = &pods.Items[i]
+				break
+			}
+			continue
+		}
+		if pod.DeletionTimestamp == nil && !slices.Contains(spec.Template.OfflineInstances, pod.Name) &&
+			!isRolloutManagedInstanceTemplateName(transCtx.Rollout, pod.Labels[constant.KBAppInstanceTemplateLabelKey]) {
 			targetPod = &pods.Items[i]
 			break
 		}
 	}
 
 	if targetPod == nil {
+		if pending != "" {
+			return "", nil, controllerutil.NewDelayedRequeueError(componentNotReadyRequeueDuration,
+				fmt.Sprintf("waiting for recorded scale-down instance %s", pending))
+		}
 		return "", nil, nil
 	}
+
 	tplName, ok := targetPod.Labels[constant.KBAppInstanceTemplateLabelKey]
 	if !ok || len(tplName) == 0 {
 		return targetPod.Name, nil, nil

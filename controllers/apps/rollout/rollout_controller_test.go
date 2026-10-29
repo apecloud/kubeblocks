@@ -889,7 +889,6 @@ var _ = Describe("rollout controller", func() {
 				pods = mockCreatePods([]int32{0, 1}, "")
 				pods = append(mockCreatePods([]int32{2}, originalTemplate), pods...)
 			}
-			// Complete metadata and initial status barriers, then perform the first up.
 			reconcile()
 			reconcile()
 			reconcile()
@@ -973,12 +972,12 @@ var _ = Describe("rollout controller", func() {
 				}
 				running()
 				if i < 2 {
-					reconcile() // up
+					reconcile()
 					running()
-					reconcile() // status-only intent
+					reconcile()
 					Expect(specOf(readCluster()).Replicas).To(Equal(replicas + 1))
 					Expect(history(readRollout())).To(HaveLen(i + 2))
-					reconcile() // down
+					reconcile()
 					Expect(specOf(readCluster()).Replicas).To(Equal(replicas))
 				}
 			}
@@ -998,7 +997,7 @@ var _ = Describe("rollout controller", func() {
 			Expect(readRollout().Status.State).NotTo(Equal(appsv1alpha1.SucceedRolloutState))
 			cleaned := readCluster()
 			Expect(specOf(cleaned).OfflineInstances).To(Equal([]string{compKey.Name + "-99"}))
-			running() // observe the successfully persisted cleanup generation
+			running()
 			reconcile()
 			Expect(readCluster().Spec).To(Equal(cleaned.Spec))
 			Expect(readCluster().Generation).To(Equal(cleaned.Generation))

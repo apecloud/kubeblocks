@@ -222,6 +222,9 @@ func (r *AddonReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx,
 	if err := r.cleanupJobPods(reqCtx); err != nil {
 		return nil, err
 	}
+	if err := r.deleteRegistrySecretCopy(reqCtx.Ctx, addon, viper.GetString(constant.CfgKeyCtrlrMgrNS)); err != nil {
+		return nil, err
+	}
 	return nil, nil
 }
 

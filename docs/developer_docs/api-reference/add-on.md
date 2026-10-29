@@ -946,6 +946,21 @@ string
 </tr>
 <tr>
 <td>
+<code>registrySecretRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#secretreference-v1-core">
+Kubernetes core/v1.SecretReference
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>References a kubernetes.io/dockerconfigjson Secret for OCI registry authentication.
+Both name and namespace are required.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>installOptions</code><br/>
 <em>
 <a href="#extensions.kubeblocks.io/v1alpha1.HelmInstallOptions">

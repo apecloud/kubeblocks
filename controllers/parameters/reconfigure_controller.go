@@ -203,7 +203,7 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 		return intctrlutil.RequeueWithErrorAndRecordEvent(configMap, r.Recorder, err, reqCtx.Log)
 	}
 
-	if rctx.ComponentObj == nil {
+	if rctx.ComponentObj == nil || rctx.ClusterComObj == nil {
 		reqCtx.Log.Info("not found component.")
 		return intctrlutil.Reconciled()
 	}
@@ -324,6 +324,7 @@ func (r *ReconfigureReconciler) buildReloadTask(policy reconfigure.Policy,
 		ConfigHash:        computeTargetConfigHash(&rctx.RequestCtx, rctx.configMap.Data),
 		ConfigData:        rctx.configMap.Data,
 		Cluster:           rctx.ClusterObj,
+		ClusterComponent:  rctx.ClusterComObj,
 		Component:         rctx.ComponentObj,
 		ITS:               rctx.its,
 		ConfigDescription: configDescription,
@@ -337,14 +338,15 @@ func (r *ReconfigureReconciler) buildRestartTask(configTemplate *appsv1.Componen
 	return reconfigure.Task{
 		Policy: reconfigure.RestartPolicy,
 		Ctx: reconfigure.Context{
-			RequestCtx:     rctx.RequestCtx,
-			Client:         rctx.Client,
-			ConfigTemplate: *configTemplate,
-			ConfigMapName:  rctx.configMap.Name,
-			ConfigHash:     computeTargetConfigHash(&rctx.RequestCtx, rctx.configMap.Data),
-			Cluster:        rctx.ClusterObj,
-			Component:      rctx.ComponentObj,
-			ITS:            rctx.its,
+			RequestCtx:       rctx.RequestCtx,
+			Client:           rctx.Client,
+			ConfigTemplate:   *configTemplate,
+			ConfigMapName:    rctx.configMap.Name,
+			ConfigHash:       computeTargetConfigHash(&rctx.RequestCtx, rctx.configMap.Data),
+			Cluster:          rctx.ClusterObj,
+			ClusterComponent: rctx.ClusterComObj,
+			Component:        rctx.ComponentObj,
+			ITS:              rctx.its,
 		},
 	}
 }
@@ -423,7 +425,7 @@ func (r *ReconfigureReconciler) performUpgrade(rctx *reconcileContext, tasks []r
 		}
 	}
 	if err1 := r.submit(rctx); err1 != nil {
-		return intctrlutil.RequeueAfter(configReconcileInterval, rctx.Log, "failed to submit changes to the component", "error", err1)
+		return intctrlutil.RequeueAfter(configReconcileInterval, rctx.Log, "failed to submit configuration changes", "error", err1)
 	}
 	if err != nil || status.Status != reconfigure.StatusNone {
 		return r.status(rctx, policy, status, err)
@@ -432,6 +434,15 @@ func (r *ReconfigureReconciler) performUpgrade(rctx *reconcileContext, tasks []r
 }
 
 func (r *ReconfigureReconciler) submit(rctx *reconcileContext) error {
+	if rctx.ComponentObj != nil && rctx.ComponentObj.Labels[constant.KBAppShardingNameLabelKey] == "" {
+		if rctx.ClusterObj == nil || rctx.ClusterObjCopy == nil {
+			return fmt.Errorf("the cluster object is nil")
+		}
+		if reflect.DeepEqual(rctx.ClusterObj.Spec, rctx.ClusterObjCopy.Spec) {
+			return nil
+		}
+		return rctx.Client.Update(rctx.RequestCtx.Ctx, rctx.ClusterObj)
+	}
 	if rctx.ComponentObj == nil || rctx.ComponentObjCopy == nil {
 		return fmt.Errorf("the component object is nil")
 	}

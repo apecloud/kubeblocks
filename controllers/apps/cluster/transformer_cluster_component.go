@@ -40,6 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -237,9 +238,7 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 	mergeConfigs := func(running, expected []appsv1.ClusterComponentConfig) []appsv1.ClusterComponentConfig {
 		var mergedConfigs []appsv1.ClusterComponentConfig
 
-		for i := range expected {
-			mergedConfigs = append(mergedConfigs, *expected[i].DeepCopy())
-		}
+		mergedConfigs = append(mergedConfigs, expected...)
 		for _, config := range running {
 			if config.Name == nil || config.ConfigMap == nil {
 				continue
@@ -254,21 +253,6 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 			}
 			if mergedConfigs[index].ConfigMap == nil {
 				mergedConfigs[index].ConfigMap = config.ConfigMap
-			}
-			if config.ConfigHash != nil && *config.ConfigHash != "" && mergedConfigs[index].ConfigMap.Name == config.ConfigMap.Name {
-				merged := &mergedConfigs[index]
-				merged.ConfigHash = config.ConfigHash
-				merged.Restart = config.Restart
-				merged.Reconfigure = config.Reconfigure
-				merged.ReconfigureAction = config.ReconfigureAction
-				merged.ReconfigureArgs = config.ReconfigureArgs
-				delete(merged.Variables, constant.ConfigFilesUpdated)
-				if value, ok := config.Variables[constant.ConfigFilesUpdated]; ok {
-					if merged.Variables == nil {
-						merged.Variables = make(map[string]string)
-					}
-					merged.Variables[constant.ConfigFilesUpdated] = value
-				}
 			}
 		}
 		return mergedConfigs
@@ -938,7 +922,9 @@ func (h *clusterShardingHandler) updateShards(transCtx *clusterTransformContext,
 
 	// TODO: update strategy
 	h.deleteComps(transCtx, dag, runningComps, toDelete.Difference(blocked))
-	h.updateComps(transCtx, dag, runningComps, protoComps, toUpdate.Difference(blocked))
+	if updateErr := h.updateComps(transCtx, dag, runningComps, protoComps, toUpdate.Difference(blocked)); updateErr != nil {
+		return updateErr
+	}
 	h.createComps(transCtx, dag, protoComps, toCreate.Difference(blocked))
 
 	return err
@@ -962,14 +948,63 @@ func (h *clusterShardingHandler) deleteComps(transCtx *clusterTransformContext, 
 }
 
 func (h *clusterShardingHandler) updateComps(transCtx *clusterTransformContext, dag *graph.DAG,
-	runningComps map[string]*appsv1.Component, protoComps map[string]*appsv1.Component, updateSet sets.Set[string]) {
+	runningComps map[string]*appsv1.Component, protoComps map[string]*appsv1.Component, updateSet sets.Set[string]) error {
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for name := range updateSet {
 		running, proto := runningComps[name], protoComps[name]
-		if obj := copyAndMergeComponent(running, proto); obj != nil {
+		obj, err := copyAndMergeShardComponent(transCtx.Context, transCtx.Client, running, proto)
+		if err != nil {
+			return err
+		}
+		if obj != nil {
 			graphCli.Update(dag, running, obj)
 		}
 	}
+	return nil
+}
+
+func copyAndMergeShardComponent(ctx context.Context, reader client.Reader, running, expected *appsv1.Component) (*appsv1.Component, error) {
+	proto := expected.DeepCopy()
+	for _, config := range running.Spec.Configs {
+		if config.Name == nil || config.ConfigMap == nil || ptr.Deref(config.ConfigHash, "") == "" {
+			continue
+		}
+		index := slices.IndexFunc(proto.Spec.Configs, func(c appsv1.ClusterComponentConfig) bool {
+			return ptr.Equal(c.Name, config.Name)
+		})
+		if index < 0 || (proto.Spec.Configs[index].ConfigMap != nil && proto.Spec.Configs[index].ConfigMap.Name != config.ConfigMap.Name) {
+			continue
+		}
+		cm := &corev1.ConfigMap{}
+		if err := reader.Get(ctx, client.ObjectKey{Namespace: running.Namespace, Name: config.ConfigMap.Name}, cm); err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			return nil, err
+		}
+		owner := metav1.GetControllerOf(cm)
+		if owner == nil || owner.APIVersion != parametersv1alpha1.SchemeGroupVersion.String() ||
+			owner.Kind != "ComponentParameter" || owner.Name != running.Name ||
+			cm.Labels[constant.CMConfigurationSpecProviderLabelKey] != *config.Name ||
+			cm.Labels[constant.CMConfigurationTemplateNameLabelKey] == "" ||
+			constant.GenerateClusterComponentName(cm.Labels[constant.AppInstanceLabelKey], cm.Labels[constant.KBAppComponentLabelKey]) != running.Name {
+			continue
+		}
+		merged := &proto.Spec.Configs[index]
+		merged.ConfigHash = config.ConfigHash
+		merged.Restart = config.Restart
+		merged.Reconfigure = config.Reconfigure
+		merged.ReconfigureAction = config.ReconfigureAction
+		merged.ReconfigureArgs = config.ReconfigureArgs
+		delete(merged.Variables, constant.ConfigFilesUpdated)
+		if value, ok := config.Variables[constant.ConfigFilesUpdated]; ok {
+			if merged.Variables == nil {
+				merged.Variables = make(map[string]string)
+			}
+			merged.Variables[constant.ConfigFilesUpdated] = value
+		}
+	}
+	return copyAndMergeComponent(running, proto), nil
 }
 
 func (h *clusterShardingHandler) protoComps(transCtx *clusterTransformContext, name string, running *appsv1.Component) ([]*appsv1.Component, error) {

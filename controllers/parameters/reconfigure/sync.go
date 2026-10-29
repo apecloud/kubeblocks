@@ -96,31 +96,48 @@ func createSyncPolicy(restart bool) func(Context) (Status, error) {
 }
 
 func submit(ctx Context, parameters map[string]string, restart bool) (Status, error) {
+	var sources [][]appsv1.ClusterComponentConfig
+	if ctx.Component != nil {
+		sources = append(sources, ctx.Component.Spec.Configs)
+	}
+	if ctx.ClusterComponent != nil {
+		sources = append(sources, ctx.ClusterComponent.Configs)
+	}
+	for _, configs := range sources {
+		for _, config := range configs {
+			if ptr.Deref(config.Name, "") == ctx.ConfigTemplate.Name && config.ConfigMap != nil &&
+				ctx.ConfigMapName != "" && config.ConfigMap.Name != ctx.ConfigMapName {
+				err := fmt.Errorf("configuration %q source changed from ConfigMap %q to %q", ctx.ConfigTemplate.Name, ctx.ConfigMapName, config.ConfigMap.Name)
+				return makeStatus(StatusFailedAndRetry, withReason(err.Error())), err
+			}
+		}
+	}
+	configs := ctx.targetConfigs()
 	var config *appsv1.ClusterComponentConfig
-	for i, cfg := range ctx.Component.Spec.Configs {
+	for i, cfg := range *configs {
 		if ptr.Deref(cfg.Name, "") == ctx.ConfigTemplate.Name {
-			config = &ctx.Component.Spec.Configs[i]
+			config = &(*configs)[i]
 			break
 		}
 	}
 	if config == nil {
-		ctx.Component.Spec.Configs = append(ctx.Component.Spec.Configs, appsv1.ClusterComponentConfig{
+		*configs = append(*configs, appsv1.ClusterComponentConfig{
 			Name: ptr.To(ctx.ConfigTemplate.Name),
 		})
-		config = &ctx.Component.Spec.Configs[len(ctx.Component.Spec.Configs)-1]
+		config = &(*configs)[len(*configs)-1]
 	}
-	if config.ConfigMap == nil && ctx.ConfigMapName != "" {
+	if ctx.Component != nil && configs == &ctx.Component.Spec.Configs && config.ConfigMap == nil && ctx.ConfigMapName != "" {
 		config.ConfigMap = &corev1.ConfigMapVolumeSource{
 			LocalObjectReference: corev1.LocalObjectReference{Name: ctx.ConfigMapName},
 		}
 	}
 	if !ptr.Equal(config.ConfigHash, ctx.getTargetConfigHash()) {
-		return applyChangesToComponent(ctx, config, parameters, restart), nil
+		return applyChanges(ctx, config, parameters, restart), nil
 	}
 	return syncReconfigureStatus(ctx), nil
 }
 
-func applyChangesToComponent(ctx Context, config *appsv1.ClusterComponentConfig, params map[string]string, restart bool) Status {
+func applyChanges(ctx Context, config *appsv1.ClusterComponentConfig, params map[string]string, restart bool) Status {
 	if !shouldBuildLegacyReconfigureAction(ctx, params, restart) && shouldRejectTemplateReconfigureAction(ctx, params, restart) {
 		return makeStatus(StatusFailed, withReason("parameter update reconfigure currently supports only exec actions"))
 	}
@@ -146,7 +163,7 @@ func applyChangesToComponent(ctx Context, config *appsv1.ClusterComponentConfig,
 	default:
 		config.ReconfigureAction = nil
 	}
-	return makeStatus(StatusRetry, withReason("apply changes to component API"), withExpected(int32(ctx.getTargetReplicas())), withSucceed(0))
+	return makeStatus(StatusRetry, withReason("apply configuration changes"), withExpected(int32(ctx.getTargetReplicas())), withSucceed(0))
 }
 
 func buildReconfigureArgs(params map[string]string) [][]string {

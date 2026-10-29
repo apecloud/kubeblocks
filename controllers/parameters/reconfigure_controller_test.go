@@ -254,17 +254,16 @@ var _ = Describe("Reconfigure Controller", func() {
 
 	Context("reconfigure", func() {
 		var (
-			configmap                      *corev1.ConfigMap
-			clusterObj                     *appsv1.Cluster
-			synthesizedComp                *component.SynthesizedComponent
-			componentKey, compParameterKey types.NamespacedName
+			configmap                    *corev1.ConfigMap
+			clusterObj                   *appsv1.Cluster
+			synthesizedComp              *component.SynthesizedComponent
+			clusterKey, compParameterKey types.NamespacedName
 		)
 
 		BeforeEach(func() {
-			var comp *appsv1.Component
-			configmap, clusterObj, comp, synthesizedComp, _ = mockReconcileResource()
+			configmap, clusterObj, _, synthesizedComp, _ = mockReconcileResource()
 
-			componentKey = client.ObjectKeyFromObject(comp)
+			clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 			compParameterKey = types.NamespacedName{
 				Namespace: synthesizedComp.Namespace,
@@ -299,7 +298,7 @@ var _ = Describe("Reconfigure Controller", func() {
 			Expect(*differentHash).NotTo(Equal(*initialHash))
 		})
 
-		It("submit changes to component", func() {
+		It("submit changes to cluster", func() {
 			By("submit changes through component parameter")
 			Eventually(testapps.GetAndChangeObj(&testCtx, compParameterKey, func(compParameter *parametersv1alpha1.ComponentParameter) {
 				item := parameters.GetConfigTemplateItem(&compParameter.Spec, configSpecName)
@@ -318,23 +317,24 @@ var _ = Describe("Reconfigure Controller", func() {
 				"innodb_buffer_pool_size=1024M", "max_connections=100",
 			)
 
-			By("verify changes submit to component")
-			Eventually(testapps.CheckObj(&testCtx, componentKey, func(g Gomega, comp *appsv1.Component) {
-				g.Expect(comp.Spec.Configs).Should(HaveLen(1))
-				for _, config := range comp.Spec.Configs {
-					g.Expect(config.Variables).Should(BeNil())
-					g.Expect(config.ConfigHash).ShouldNot(BeNil())
-					g.Expect(*config.ConfigHash).Should(Equal(expectedHash))
-					g.Expect(config.Restart).ShouldNot(BeNil())
-					g.Expect(*config.Restart).Should(BeTrue())
-					g.Expect(config.Reconfigure).ShouldNot(BeNil())
-					g.Expect(*config.Reconfigure).Should(BeFalse())
-					g.Expect(config.ReconfigureAction).Should(BeNil())
+			By("verify changes submit to cluster")
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+				g.Expect(cluster.Spec.GetComponentByName(defaultCompName).Configs).Should(HaveLen(1))
+				for _, comp := range cluster.Spec.ComponentSpecs {
+					for _, config := range comp.Configs {
+						// g.Expect(config.Variables).Should(HaveKeyWithValue("innodb_buffer_pool_size", "1024M"))
+						// g.Expect(config.Variables).Should(HaveKeyWithValue("max_connections", "100"))
+						g.Expect(config.Variables).Should(BeNil())
+						g.Expect(config.ConfigHash).ShouldNot(BeNil())
+						g.Expect(*config.ConfigHash).Should(Equal(expectedHash))
+						g.Expect(config.Restart).ShouldNot(BeNil())
+						g.Expect(*config.Restart).Should(BeTrue())
+						g.Expect(config.Reconfigure).ShouldNot(BeNil())
+						g.Expect(*config.Reconfigure).Should(BeFalse())
+						g.Expect(config.ReconfigureAction).Should(BeNil())
+					}
 				}
 			})).Should(Succeed())
-			currentCluster := &appsv1.Cluster{}
-			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterObj), currentCluster)).Should(Succeed())
-			Expect(currentCluster.Spec).Should(Equal(clusterObj.Spec))
 		})
 
 		It("restart", func() {
@@ -365,23 +365,24 @@ var _ = Describe("Reconfigure Controller", func() {
 				"innodb_buffer_pool_size=1024M", "max_connections=100",
 			)
 
-			By("verify changes submit to component")
-			Eventually(testapps.CheckObj(&testCtx, componentKey, func(g Gomega, comp *appsv1.Component) {
-				g.Expect(comp.Spec.Configs).Should(HaveLen(1))
-				for _, config := range comp.Spec.Configs {
-					g.Expect(config.Variables).Should(BeNil())
-					g.Expect(config.ConfigHash).ShouldNot(BeNil())
-					g.Expect(*config.ConfigHash).Should(Equal(expectedHash))
-					g.Expect(config.Restart).ShouldNot(BeNil())
-					g.Expect(*config.Restart).Should(BeTrue())
-					g.Expect(config.Reconfigure).ShouldNot(BeNil())
-					g.Expect(*config.Reconfigure).Should(BeFalse())
-					g.Expect(config.ReconfigureAction).Should(BeNil())
+			By("verify changes submit to cluster")
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+				g.Expect(cluster.Spec.GetComponentByName(defaultCompName).Configs).Should(HaveLen(1))
+				for _, comp := range cluster.Spec.ComponentSpecs {
+					for _, config := range comp.Configs {
+						// g.Expect(config.Variables).Should(HaveKeyWithValue("innodb_buffer_pool_size", "1024M"))
+						// g.Expect(config.Variables).Should(HaveKeyWithValue("max_connections", "100"))
+						g.Expect(config.Variables).Should(BeNil())
+						g.Expect(config.ConfigHash).ShouldNot(BeNil())
+						g.Expect(*config.ConfigHash).Should(Equal(expectedHash))
+						g.Expect(config.Restart).ShouldNot(BeNil())
+						g.Expect(*config.Restart).Should(BeTrue())
+						g.Expect(config.Reconfigure).ShouldNot(BeNil())
+						g.Expect(*config.Reconfigure).Should(BeFalse())
+						g.Expect(config.ReconfigureAction).Should(BeNil())
+					}
 				}
 			})).Should(Succeed())
-			currentCluster := &appsv1.Cluster{}
-			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterObj), currentCluster)).Should(Succeed())
-			Expect(currentCluster.Spec).Should(Equal(clusterObj.Spec))
 		})
 
 		It("keeps changed shard config targets and completion independent", func() {

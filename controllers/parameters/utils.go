@@ -56,8 +56,8 @@ func newReconcileContext(reqCtx intctrlutil.RequestCtx, cli client.Client, cm *c
 }
 
 func (c *reconcileContext) objects() error {
-	return c.ComponentAndComponentDef().
-		ComponentSpec().
+	return c.Cluster().
+		ComponentAndComponentDef().
 		workload().
 		parametersDefinitions().
 		Complete()

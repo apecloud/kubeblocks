@@ -280,32 +280,19 @@ func (c componentOpsHelper) emptyInstanceProgress(opsRes *OpsResource) map[strin
 	return progress
 }
 
-func (c componentOpsHelper) componentActionPhase(opsRes *OpsResource, terminalPhase appsv1.ComponentPhase) opsv1alpha1.OpsPhase {
+func (c componentOpsHelper) componentActionPhase(opsRes *OpsResource, completionPhase appsv1.ComponentPhase) opsv1alpha1.OpsPhase {
 	if opsRes.Cluster.Generation < opsRes.OpsRequest.Status.ClusterGeneration {
 		return opsv1alpha1.OpsRunningPhase
 	}
 	actionPhase := opsv1alpha1.OpsSucceedPhase
 	matched := 0
-	setProcessing := func() {
-		if actionPhase != opsv1alpha1.OpsFailedPhase {
-			actionPhase = opsv1alpha1.OpsRunningPhase
-		}
-	}
 	checkTarget := func(name string, componentPhase appsv1.ComponentPhase, observedGeneration int64, upToDate bool) {
 		matched++
 		compStatus := opsRes.OpsRequest.Status.Components[name]
 		compStatus.Phase = componentPhase
 		opsRes.OpsRequest.Status.Components[name] = compStatus
-		if observedGeneration != opsRes.Cluster.Generation || !upToDate {
-			setProcessing()
-			return
-		}
-		if componentPhase == appsv1.FailedComponentPhase {
-			actionPhase = opsv1alpha1.OpsFailedPhase
-			return
-		}
-		if componentPhase != terminalPhase {
-			setProcessing()
+		if observedGeneration != opsRes.Cluster.Generation || !upToDate || componentPhase != completionPhase {
+			actionPhase = opsv1alpha1.OpsRunningPhase
 		}
 	}
 	for i := range opsRes.Cluster.Spec.ComponentSpecs {
@@ -323,7 +310,7 @@ func (c componentOpsHelper) componentActionPhase(opsRes *OpsResource, terminalPh
 		}
 	}
 	if len(c.componentOpsSet) > 0 && matched != len(c.componentOpsSet) {
-		setProcessing()
+		actionPhase = opsv1alpha1.OpsRunningPhase
 	}
 	return actionPhase
 }

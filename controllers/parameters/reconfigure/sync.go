@@ -28,16 +28,16 @@ import (
 	"sort"
 	"strconv"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
-
-const configFilesUpdated = "KB_CONFIG_FILES_UPDATED"
 
 func init() {
 	registerPolicy(NonePolicy, func(ctx Context) (Status, error) {
@@ -100,27 +100,30 @@ func createSyncPolicy(restart bool) func(Context) (Status, error) {
 
 func submit(ctx Context, parameters map[string]string, restart bool) (Status, error) {
 	var config *appsv1.ClusterComponentConfig
-	for i, cfg := range ctx.ClusterComponent.Configs {
+	for i, cfg := range ctx.Component.Spec.Configs {
 		if ptr.Deref(cfg.Name, "") == ctx.ConfigTemplate.Name {
-			config = &ctx.ClusterComponent.Configs[i]
+			config = &ctx.Component.Spec.Configs[i]
 			break
 		}
 	}
 	if config == nil {
-		// TODO: remove me after the ConfigMap source is set to the Cluster object
-		ctx.ClusterComponent.Configs = append(ctx.ClusterComponent.Configs, appsv1.ClusterComponentConfig{
+		ctx.Component.Spec.Configs = append(ctx.Component.Spec.Configs, appsv1.ClusterComponentConfig{
 			Name: ptr.To(ctx.ConfigTemplate.Name),
-			// do not set the ConfigMap source here, it will be merged in copyAndMergeComponent on the Component object
 		})
-		config = &ctx.ClusterComponent.Configs[len(ctx.ClusterComponent.Configs)-1]
+		config = &ctx.Component.Spec.Configs[len(ctx.Component.Spec.Configs)-1]
+	}
+	if config.ConfigMap == nil && ctx.ConfigMapName != "" {
+		config.ConfigMap = &corev1.ConfigMapVolumeSource{
+			LocalObjectReference: corev1.LocalObjectReference{Name: ctx.ConfigMapName},
+		}
 	}
 	if !ptr.Equal(config.ConfigHash, ctx.getTargetConfigHash()) {
-		return applyChangesToCluster(ctx, config, parameters, restart), nil
+		return applyChangesToComponent(ctx, config, parameters, restart), nil
 	}
 	return syncReconfigureStatus(ctx), nil
 }
 
-func applyChangesToCluster(ctx Context, config *appsv1.ClusterComponentConfig, params map[string]string, restart bool) Status {
+func applyChangesToComponent(ctx Context, config *appsv1.ClusterComponentConfig, params map[string]string, restart bool) Status {
 	if !shouldBuildLegacyReconfigureAction(ctx, params, restart) && shouldRejectTemplateReconfigureAction(ctx, params, restart) {
 		return makeStatus(StatusFailed, withReason("parameter update reconfigure currently supports only exec actions"))
 	}
@@ -146,7 +149,7 @@ func applyChangesToCluster(ctx Context, config *appsv1.ClusterComponentConfig, p
 	default:
 		config.ReconfigureAction = nil
 	}
-	return makeStatus(StatusRetry, withReason("apply changes to cluster API"), withExpected(int32(ctx.getTargetReplicas())), withSucceed(0))
+	return makeStatus(StatusRetry, withReason("apply changes to component API"), withExpected(int32(ctx.getTargetReplicas())), withSucceed(0))
 }
 
 func buildReconfigureArgs(params map[string]string) [][]string {
@@ -169,7 +172,7 @@ func clearReconfigureSystemParameters(vars map[string]string) map[string]string 
 	if len(vars) == 0 {
 		return vars
 	}
-	delete(vars, configFilesUpdated)
+	delete(vars, constant.ConfigFilesUpdated)
 	return vars
 }
 
@@ -201,7 +204,7 @@ func buildUpdatedConfigFileChecksums(ctx Context) map[string]string {
 	}
 	checksum := sha256.Sum256([]byte(content))
 	return map[string]string{
-		configFilesUpdated: fmt.Sprintf("%s:%x", path, checksum),
+		constant.ConfigFilesUpdated: fmt.Sprintf("%s:%x", path, checksum),
 	}
 }
 

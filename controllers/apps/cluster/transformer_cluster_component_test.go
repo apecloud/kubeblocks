@@ -1995,6 +1995,91 @@ var _ = Describe("cluster component transformer test", func() {
 				To(Equal(resource.MustParse("10")))
 		})
 
+		for _, staleParent := range []bool{false, true} {
+			for _, cleared := range []bool{false, true} {
+				It(fmt.Sprintf("preserves local config execution target (stale parent=%t, cleared=%t)", staleParent, cleared), func() {
+					local := appsv1.ClusterComponentConfig{
+						Name: ptr.To("config"), ConfigHash: ptr.To("local-hash"),
+						ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{ConfigMap: &corev1.ConfigMapVolumeSource{
+							LocalObjectReference: corev1.LocalObjectReference{Name: "local-source"}}},
+						Restart: ptr.To(true), Reconfigure: ptr.To(true),
+						ReconfigureAction: &appsv1.Action{Exec: &appsv1.ExecAction{Command: []string{"local-action"}}},
+						ReconfigureArgs:   [][]string{{"key", "local"}},
+						Variables:         map[string]string{"old-user": "removed", constant.ConfigFilesUpdated: "local-checksum"},
+					}
+					if cleared {
+						local.Restart = nil
+						local.Reconfigure = ptr.To(false)
+						local.ReconfigureAction = nil
+						local.ReconfigureArgs = nil
+						delete(local.Variables, constant.ConfigFilesUpdated)
+					}
+					parent := appsv1.ClusterComponentConfig{Name: ptr.To("config"), Variables: map[string]string{"new-user": "applied"}}
+					if staleParent {
+						parent.ConfigHash, parent.Restart, parent.Reconfigure = ptr.To("stale-hash"), ptr.To(true), ptr.To(true)
+						parent.ReconfigureAction = &appsv1.Action{Exec: &appsv1.ExecAction{Command: []string{"stale-action"}}}
+						parent.ReconfigureArgs = [][]string{{"key", "stale"}}
+						parent.Variables[constant.ConfigFilesUpdated] = "stale-checksum"
+					}
+					oldCompObj.Spec.Configs = []appsv1.ClusterComponentConfig{local}
+					newCompObj.Spec.Configs = []appsv1.ClusterComponentConfig{parent, {Name: ptr.To("new-config"), Variables: map[string]string{"new": "value"}}}
+					newCompObj.Spec.Replicas = 5
+					newCompObj.Spec.Resources.Limits[corev1.ResourceCPU] = resource.MustParse("2")
+					prototype := newCompObj.DeepCopy()
+					merged := copyAndMergeComponent(oldCompObj, newCompObj)
+					Expect(merged).NotTo(BeNil())
+					Expect(merged.Spec.Replicas).To(Equal(int32(5)))
+					Expect(merged.Spec.Resources).To(Equal(newCompObj.Spec.Resources))
+					Expect(merged.Spec.Configs).To(HaveLen(2))
+					config := merged.Spec.Configs[0]
+					Expect(config.ConfigMap).To(Equal(local.ConfigMap))
+					Expect(config.ConfigHash).To(Equal(local.ConfigHash))
+					Expect(config.Restart).To(Equal(local.Restart))
+					Expect(config.Reconfigure).To(Equal(local.Reconfigure))
+					Expect(config.ReconfigureAction).To(Equal(local.ReconfigureAction))
+					Expect(config.ReconfigureArgs).To(Equal(local.ReconfigureArgs))
+					Expect(config.Variables).To(HaveKeyWithValue("new-user", "applied"))
+					Expect(config.Variables).NotTo(HaveKey("old-user"))
+					if cleared {
+						Expect(config.Variables).NotTo(HaveKey(constant.ConfigFilesUpdated))
+					} else {
+						Expect(config.Variables).To(HaveKeyWithValue(constant.ConfigFilesUpdated, "local-checksum"))
+					}
+					Expect(newCompObj).To(Equal(prototype))
+					Expect(copyAndMergeComponent(merged, newCompObj)).To(BeNil())
+				})
+			}
+		}
+
+		It("keeps explicit parent config sources and configs without local execution targets", func() {
+			oldCompObj.Spec.Configs = []appsv1.ClusterComponentConfig{{Name: ptr.To("config"),
+				ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "old-source"}}}}}
+			newCompObj.Spec.Configs = []appsv1.ClusterComponentConfig{{Name: ptr.To("config"), ConfigHash: ptr.To("parent-hash"),
+				ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "new-source"}}}}}
+			merged := copyAndMergeComponent(oldCompObj, newCompObj)
+			Expect(merged.Spec.Configs).To(Equal(newCompObj.Spec.Configs))
+			oldCompObj.Spec.Configs[0].ConfigHash = ptr.To("local-hash")
+			merged = copyAndMergeComponent(oldCompObj, newCompObj)
+			Expect(merged.Spec.Configs[0].ConfigMap.Name).To(Equal("new-source"))
+			Expect(merged.Spec.Configs[0].ConfigHash).To(HaveValue(Equal("parent-hash")))
+			newCompObj.Spec.Configs = nil
+			Expect(copyAndMergeComponent(oldCompObj, newCompObj)).To(BeNil())
+		})
+
+		It("preserves execution targets when the parent specifies the same source", func() {
+			oldCompObj.Spec.Configs = []appsv1.ClusterComponentConfig{{
+				Name: ptr.To("config"), ConfigHash: ptr.To("local-hash"), Reconfigure: ptr.To(false),
+				ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "same-source"}}},
+			}}
+			newCompObj.Spec.Configs = []appsv1.ClusterComponentConfig{*oldCompObj.Spec.Configs[0].DeepCopy()}
+			newCompObj.Spec.Configs[0].ConfigHash = ptr.To("stale-hash")
+			newCompObj.Spec.Configs[0].Reconfigure = ptr.To(true)
+			Expect(copyAndMergeComponent(oldCompObj, newCompObj)).To(BeNil())
+		})
+
 		It("should detect all changes when multiple fields change", func() {
 			newCompObj.Labels = map[string]string{"app": "test"}
 			newCompObj.Spec.Resources.Limits[corev1.ResourceCPU] = resource.MustParse("2")

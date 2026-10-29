@@ -49,3 +49,6 @@ const (
 const (
 	FeatureGateIgnoreConfigTemplateDefaultMode = "IGNORE_CONFIG_TEMPLATE_DEFAULT_MODE"
 )
+
+// ConfigFilesUpdated carries updated file checksums to configuration actions.
+const ConfigFilesUpdated = "KB_CONFIG_FILES_UPDATED"

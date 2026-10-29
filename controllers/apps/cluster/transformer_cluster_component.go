@@ -237,7 +237,9 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 	mergeConfigs := func(running, expected []appsv1.ClusterComponentConfig) []appsv1.ClusterComponentConfig {
 		var mergedConfigs []appsv1.ClusterComponentConfig
 
-		mergedConfigs = append(mergedConfigs, expected...)
+		for i := range expected {
+			mergedConfigs = append(mergedConfigs, *expected[i].DeepCopy())
+		}
 		for _, config := range running {
 			if config.Name == nil || config.ConfigMap == nil {
 				continue
@@ -252,6 +254,21 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 			}
 			if mergedConfigs[index].ConfigMap == nil {
 				mergedConfigs[index].ConfigMap = config.ConfigMap
+			}
+			if config.ConfigHash != nil && *config.ConfigHash != "" && mergedConfigs[index].ConfigMap.Name == config.ConfigMap.Name {
+				merged := &mergedConfigs[index]
+				merged.ConfigHash = config.ConfigHash
+				merged.Restart = config.Restart
+				merged.Reconfigure = config.Reconfigure
+				merged.ReconfigureAction = config.ReconfigureAction
+				merged.ReconfigureArgs = config.ReconfigureArgs
+				delete(merged.Variables, constant.ConfigFilesUpdated)
+				if value, ok := config.Variables[constant.ConfigFilesUpdated]; ok {
+					if merged.Variables == nil {
+						merged.Variables = make(map[string]string)
+					}
+					merged.Variables[constant.ConfigFilesUpdated] = value
+				}
 			}
 		}
 		return mergedConfigs

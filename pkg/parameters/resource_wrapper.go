@@ -38,10 +38,10 @@ type ResourceFetcher[T any] struct {
 	obj *T
 	*render.ResourceCtx
 
-	ClusterObj, ClusterObjCopy *appsv1.Cluster
-	ComponentObj               *appsv1.Component
-	ComponentDefObj            *appsv1.ComponentDefinition
-	ClusterComObj              *appsv1.ClusterComponentSpec
+	ClusterObj, ClusterObjCopy     *appsv1.Cluster
+	ComponentObj, ComponentObjCopy *appsv1.Component
+	ComponentDefObj                *appsv1.ComponentDefinition
+	ClusterComObj                  *appsv1.ClusterComponentSpec
 
 	ConfigMapObj          *corev1.ConfigMap
 	ComponentParameterObj *parametersv1alpha1.ComponentParameter
@@ -78,16 +78,28 @@ func (r *ResourceFetcher[T]) Cluster() *T {
 	})
 }
 
-func (r *ResourceFetcher[T]) ComponentAndComponentDef() *T {
-	componentKey := client.ObjectKey{
-		Namespace: r.Namespace,
-		Name:      constant.GenerateClusterComponentName(r.ClusterName, r.ComponentName),
-	}
+func (r *ResourceFetcher[T]) Component() *T {
 	return r.Wrap(func() error {
-		r.ComponentObj = &appsv1.Component{}
-		if err := r.Client.Get(r.Context, componentKey, r.ComponentObj); err != nil {
+		if r.ComponentObj != nil {
+			return nil
+		}
+		component := &appsv1.Component{}
+		componentKey := client.ObjectKey{
+			Namespace: r.Namespace,
+			Name:      constant.GenerateClusterComponentName(r.ClusterName, r.ComponentName),
+		}
+		if err := r.Client.Get(r.Context, componentKey, component); err != nil {
 			return err
 		}
+		r.ComponentObj = component
+		r.ComponentObjCopy = component.DeepCopy()
+		return nil
+	})
+}
+
+func (r *ResourceFetcher[T]) ComponentAndComponentDef() *T {
+	r.Component()
+	return r.Wrap(func() error {
 		if len(r.ComponentObj.Spec.CompDef) == 0 {
 			return fmt.Errorf("componentDefinition not found in component: %s", r.ComponentObj.Name)
 		}

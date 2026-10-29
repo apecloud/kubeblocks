@@ -131,7 +131,9 @@ ParameterInputs
 </td>
 <td>
 <em>(Optional)</em>
-<p>Initial provides the initial parameter inputs used when the managed runtime configuration is created.</p>
+<p>Initial provides the initial parameter inputs used when the managed runtime configuration is created.
+It can only be supplied at creation and cannot be changed or removed afterward.
+Managed assignments and updates may specify immutable parameters.</p>
 </td>
 </tr>
 <tr>
@@ -820,7 +822,8 @@ HTTP and gRPC reconfigure actions are not currently supported for parameter upda
 <td>
 <em>(Optional)</em>
 <p>Lists the parameters that cannot be modified once set.
-Attempts to change any of these parameters are rejected during configuration merge and surface as a merge failure.</p>
+These parameters may be specified by managed assignments and updates in ComponentParameter.spec.initial at creation.
+Subsequent managed parameter updates are rejected during configuration merge and surface as a merge failure.</p>
 </td>
 </tr>
 </tbody>
@@ -1060,7 +1063,9 @@ ParameterInputs
 </td>
 <td>
 <em>(Optional)</em>
-<p>Initial provides the initial parameter inputs used when the managed runtime configuration is created.</p>
+<p>Initial provides the initial parameter inputs used when the managed runtime configuration is created.
+It can only be supplied at creation and cannot be changed or removed afterward.
+Managed assignments and updates may specify immutable parameters.</p>
 </td>
 </tr>
 <tr>
@@ -3069,7 +3074,8 @@ HTTP and gRPC reconfigure actions are not currently supported for parameter upda
 <td>
 <em>(Optional)</em>
 <p>Lists the parameters that cannot be modified once set.
-Attempts to change any of these parameters are rejected during configuration merge and surface as a merge failure.</p>
+These parameters may be specified by managed assignments and updates in ComponentParameter.spec.initial at creation.
+Subsequent managed parameter updates are rejected during configuration merge and surface as a merge failure.</p>
 </td>
 </tr>
 </tbody>

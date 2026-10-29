@@ -870,8 +870,10 @@ spec:
                     type: object
                 type: object
               initial:
-                description: Initial provides the initial parameter inputs used when
-                  the managed runtime configuration is created.
+                description: |-
+                  Initial provides the initial parameter inputs used when the managed runtime configuration is created.
+                  It can only be supplied at creation and cannot be changed or removed afterward.
+                  Managed assignments and updates may specify immutable parameters.
                 properties:
                   assignments:
                     additionalProperties:
@@ -990,6 +992,10 @@ spec:
             required:
             - componentName
             type: object
+            x-kubernetes-validations:
+            - message: spec.initial cannot be changed after creation
+              rule: has(self.initial) == has(oldSelf.initial) && (!has(self.initial)
+                || self.initial == oldSelf.initial)
           status:
             description: ComponentParameterStatus defines the observed state of ComponentConfiguration
             properties:

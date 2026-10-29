@@ -20,13 +20,119 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	"context"
+	"encoding/json"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	parampkg "github.com/apecloud/kubeblocks/pkg/parameters"
 )
+
+func TestReconcileInitialImmutableArray(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	for _, addToScheme := range []func(*runtime.Scheme) error{corev1.AddToScheme, appsv1.AddToScheme, parametersv1alpha1.AddToScheme} {
+		if err := addToScheme(scheme); err != nil {
+			t.Fatal(err)
+		}
+	}
+	configSpec := appsv1.ComponentFileTemplate{Name: "config", Template: "template", Namespace: "default", ExternalManaged: ptr.To(true)}
+	compDef := &appsv1.ComponentDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "array-component"},
+		Spec:       appsv1.ComponentDefinitionSpec{Configs: []appsv1.ComponentFileTemplate{configSpec}},
+		Status:     appsv1.ComponentDefinitionStatus{Phase: appsv1.AvailablePhase},
+	}
+	// Schema-free definitions preserve array field prefixes through the default classifier.
+	paramsDef := &parametersv1alpha1.ParametersDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "array-parameters"},
+		Spec: parametersv1alpha1.ParametersDefinitionSpec{
+			ComponentDef:        compDef.Name,
+			TemplateName:        configSpec.Name,
+			FileName:            "config.json",
+			FileFormatConfig:    &parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.JSON},
+			ImmutableParameters: []string{"hosts"},
+		},
+		Status: parametersv1alpha1.ParametersDefinitionStatus{Phase: parametersv1alpha1.PDAvailablePhase},
+	}
+	baseConfig := &corev1.ConfigMap{Data: map[string]string{"config.json": `{"hosts":["template"],"mode":"default"}`}}
+	current := baseConfig.DeepCopy()
+	current.ObjectMeta = metav1.ObjectMeta{
+		Name: "rendered-config", Namespace: "default",
+		Labels: constant.GetCompLabels("cluster", "component"),
+	}
+	current.Labels[constant.CMConfigurationTemplateNameLabelKey] = configSpec.Template
+	current.Labels[constant.CMConfigurationTypeLabelKey] = constant.ConfigInstanceType
+	current.Labels[constant.CMConfigurationSpecProviderLabelKey] = configSpec.Name
+	compParam := &parametersv1alpha1.ComponentParameter{
+		ObjectMeta: metav1.ObjectMeta{Name: "component-parameters", Namespace: "default"},
+		Spec: parametersv1alpha1.ComponentParameterSpec{
+			ClusterName: "cluster", ComponentName: "component",
+			Initial:           &parametersv1alpha1.ParameterInputs{Assignments: map[string]*string{"@hosts": ptr.To(`["initial"]`)}},
+			ConfigItemDetails: []parametersv1alpha1.ConfigTemplateItemDetail{{Name: configSpec.Name, ConfigSpec: &configSpec}},
+		},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(compDef, paramsDef, current, compParam).Build()
+	fetchTask := &Task{}
+	fetchTask.ComponentDefObj = compDef
+	projectAndApply := func(wantMode string) *corev1.ConfigMap {
+		t.Helper()
+		changed, err := reconcileParameterValuesIntoSpec(ctx, cli, compParam, fetchTask)
+		if err != nil || !changed {
+			t.Fatalf("reconcile parameter values: changed=%v, error=%v", changed, err)
+		}
+		if err := cli.Get(ctx, client.ObjectKeyFromObject(compParam), compParam); err != nil {
+			t.Fatal(err)
+		}
+		descs, defs, err := parampkg.ResolveCmpdParametersDefs(ctx, cli, compDef)
+		if err != nil {
+			t.Fatal(err)
+		}
+		configmaps, err := resolveComponentRefConfigMap(ctx, cli, compParam.Namespace, compParam.Spec.ClusterName, compParam.Spec.ComponentName)
+		if err != nil {
+			t.Fatal(err)
+		}
+		initial, err := classifyManagedParameterInputs(compParam.Spec.Initial, compDef, configmaps, descs, defs)
+		if err != nil {
+			t.Fatal(err)
+		}
+		item := parampkg.GetConfigTemplateItem(&compParam.Spec, configSpec.Name)
+		applied, err := parampkg.ApplyParameters(*item, baseConfig, descs, defs, parampkg.DerefMapValues(initial[configSpec.Name]))
+		if err != nil {
+			t.Fatalf("apply projected parameters: %v", err)
+		}
+		var got struct {
+			Hosts []string `json:"hosts"`
+			Mode  string   `json:"mode"`
+		}
+		if err := json.Unmarshal([]byte(applied.Data["config.json"]), &got); err != nil {
+			t.Fatal(err)
+		}
+		if len(got.Hosts) != 1 || got.Hosts[0] != "initial" || got.Mode != wantMode {
+			t.Fatalf("expected initial hosts and mode %q, got %s", wantMode, applied.Data["config.json"])
+		}
+		return applied
+	}
+
+	applied := projectAndApply("default")
+	current.Data = applied.Data
+	if err := cli.Update(ctx, current); err != nil {
+		t.Fatal(err)
+	}
+	compParam.Spec.Desired = &parametersv1alpha1.ParameterInputs{Assignments: map[string]*string{"mode": ptr.To("updated")}}
+	if err := cli.Update(ctx, compParam); err != nil {
+		t.Fatal(err)
+	}
+	projectAndApply("updated")
+}
 
 func TestNormalizeManagedParameterInputs(t *testing.T) {
 	t.Run("updates override assignments and remove is explicit", func(t *testing.T) {

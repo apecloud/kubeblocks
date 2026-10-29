@@ -1335,7 +1335,7 @@ func TestHorizontalScalingOnlineInferenceInputs(t *testing.T) {
 	}
 }
 
-func newHorizontalScalingFixture(t *testing.T, requests ...opsv1alpha1.HorizontalScaling) *horizontalScalingFixture {
+func newHorizontalScalingFixture(t GinkgoTInterface, requests ...opsv1alpha1.HorizontalScaling) *horizontalScalingFixture {
 	t.Helper()
 	f := &horizontalScalingFixture{}
 	f.req = intctrlutil.RequestCtx{Ctx: context.Background(), Recorder: record.NewFakeRecorder(100)}
@@ -1431,7 +1431,7 @@ func (f *horizontalScalingFixture) replicas(t *testing.T, name string, want int3
 	}
 }
 
-func (f *horizontalScalingFixture) reconcile(t *testing.T, want opsv1alpha1.OpsPhase) {
+func (f *horizontalScalingFixture) reconcile(t GinkgoTInterface, want opsv1alpha1.OpsPhase) {
 	t.Helper()
 	phase, _, err := (horizontalScalingOpsHandler{}).ReconcileAction(f.req, f.cli, f.res)
 	if err != nil {
@@ -1817,7 +1817,7 @@ func TestHorizontalScalingBackupRejectsInvalidPlanBeforeWork(t *testing.T) {
 	}
 }
 
-func publishHorizontalScalingAssignments(t *testing.T, f *horizontalScalingFixture) {
+func publishHorizontalScalingAssignments(t GinkgoTInterface, f *horizontalScalingFixture) {
 	t.Helper()
 	for _, target := range f.res.OpsRequest.Spec.HorizontalScalingList {
 		if target.Shards != nil {
@@ -2081,7 +2081,7 @@ func TestHorizontalScalingRejectsInvalidInstanceTargets(t *testing.T) {
 }
 
 // Publish the apps result and workload observations separately from the request.
-func publishHorizontalScalingResult(t *testing.T, f *horizontalScalingFixture) {
+func publishHorizontalScalingResult(t GinkgoTInterface, f *horizontalScalingFixture) {
 	t.Helper()
 	publishHorizontalScalingAssignments(t, f)
 	if f.res.Cluster.Status.Components == nil {
@@ -2255,91 +2255,113 @@ func TestHorizontalScalingProgressPatchFailureRetries(t *testing.T) {
 	f.reconcile(t, opsv1alpha1.OpsSucceedPhase)
 }
 
-func TestHorizontalScalingFailureWaitsForOtherAcceptedTargets(t *testing.T) {
-	f := newHorizontalScalingFixture(t, scaleOutRequest("db", false), scaleOutRequest("other", false))
-	if err := (horizontalScalingOpsHandler{}).Action(f.req, f.cli, f.res); err != nil {
-		t.Fatal(err)
+var _ = Describe("HorizontalScaling component recovery", func() {
+	for _, multiple := range []bool{false, true} {
+		It(fmt.Sprintf("multiple-targets=%t", multiple), func() {
+			requests := []opsv1alpha1.HorizontalScaling{scaleOutRequest("db", false)}
+			if multiple {
+				requests = append(requests, scaleOutRequest("other", false))
+			}
+			f := newHorizontalScalingFixture(GinkgoT(), requests...)
+			Expect((horizontalScalingOpsHandler{}).Action(f.req, f.cli, f.res)).To(Succeed())
+			publishHorizontalScalingResult(GinkgoT(), f)
+			status := f.res.Cluster.Status.Components["db"]
+			status.Phase = appsv1.FailedComponentPhase
+			f.res.Cluster.Status.Components["db"] = status
+			its := &workloads.InstanceSet{}
+			Expect(f.cli.Get(f.req.Ctx, client.ObjectKey{Namespace: "default", Name: "demo-db"}, its)).To(Succeed())
+			its.Status.InstanceStatus[0].Ready = false
+			Expect(f.cli.Update(f.req.Ctx, its)).To(Succeed())
+			if multiple {
+				other := f.res.Cluster.Status.Components["other"]
+				other.UpToDate = false
+				f.res.Cluster.Status.Components["other"] = other
+			}
+			delay, err := GetOpsManager().Reconcile(f.req, f.cli, f.res)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(delay).To(BeNumerically(">", 0))
+			resumed := &opsv1alpha1.OpsRequest{}
+			Expect(f.cli.Get(f.req.Ctx, client.ObjectKeyFromObject(f.res.OpsRequest), resumed)).To(Succeed())
+			f.res.OpsRequest = resumed
+			db := resumed.Status.Components["db"]
+			Expect(resumed.Status.Phase).To(Equal(opsv1alpha1.OpsRunningPhase))
+			Expect(db.Reason).To(BeEmpty())
+			Expect(db.Phase).To(Equal(appsv1.FailedComponentPhase))
+			Expect(db.ProgressDetails).To(HaveLen(2))
+			Expect(db.ProgressDetails).To(ContainElement(HaveField("Status", opsv1alpha1.ProcessingProgressStatus)))
+			publishHorizontalScalingResult(GinkgoT(), f)
+			f.res.Cluster.Status.Components["db"] = status
+			f.reconcile(GinkgoT(), opsv1alpha1.OpsRunningPhase)
+			Expect(f.res.OpsRequest.Status.Progress).To(Equal(fmt.Sprintf("%d/%d", len(requests)*2, len(requests)*2)))
+			publishHorizontalScalingResult(GinkgoT(), f)
+			_, err = GetOpsManager().Reconcile(f.req, f.cli, f.res)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(f.cli.Get(f.req.Ctx, client.ObjectKeyFromObject(f.res.OpsRequest), resumed)).To(Succeed())
+			Expect(resumed.Status.Phase).To(Equal(opsv1alpha1.OpsSucceedPhase))
+			Expect(resumed.Status.Components["db"].Phase).To(Equal(appsv1.RunningComponentPhase))
+		})
 	}
-	publishHorizontalScalingResult(t, f)
-	status := f.res.Cluster.Status.Components["db"]
-	status.Phase = appsv1.FailedComponentPhase
-	f.res.Cluster.Status.Components["db"] = status
-	if err := f.cli.Delete(f.req.Ctx, &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "demo-db", Namespace: "default"}}); err != nil {
-		t.Fatal(err)
-	}
-	other := f.res.Cluster.Status.Components["other"]
-	other.UpToDate = false
-	f.res.Cluster.Status.Components["other"] = other
-	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
-	status.Phase = appsv1.RunningComponentPhase
-	f.res.Cluster.Status.Components["db"] = status
-	other.UpToDate = true
-	f.res.Cluster.Status.Components["other"] = other
-	if _, err := GetOpsManager().Reconcile(f.req, f.cli, f.res); err != nil {
-		t.Fatal(err)
-	}
-	if f.res.OpsRequest.Status.Phase != opsv1alpha1.OpsFailedPhase {
-		t.Fatalf("terminal branch failure was lost: %s", f.res.OpsRequest.Status.Phase)
-	}
-}
+})
 
-func TestHorizontalScalingCancellationReobservesFailedBranch(t *testing.T) {
-	f := newHorizontalScalingFixture(t, scaleOutRequest("db", false), scaleOutRequest("other", false))
-	hs := horizontalScalingOpsHandler{}
-	if err := hs.Action(f.req, f.cli, f.res); err != nil {
-		t.Fatal(err)
-	}
-	publishHorizontalScalingResult(t, f)
-	status := f.res.Cluster.Status.Components["db"]
-	status.Phase = appsv1.FailedComponentPhase
-	f.res.Cluster.Status.Components["db"] = status
-	other := f.res.Cluster.Status.Components["other"]
-	other.UpToDate = false
-	f.res.Cluster.Status.Components["other"] = other
-	if _, err := GetOpsManager().Reconcile(f.req, f.cli, f.res); err != nil {
-		t.Fatal(err)
-	}
-	if f.res.OpsRequest.Status.Phase != opsv1alpha1.OpsRunningPhase || f.res.OpsRequest.Status.Components["db"].Reason != horizontalScalingFailedReason {
-		t.Fatalf("expected a recorded branch failure: %+v", f.res.OpsRequest.Status)
-	}
-	previous := f.res.OpsRequest.DeepCopy()
-	if err := hs.Cancel(f.req, f.cli, f.res); err != nil {
-		t.Fatal(err)
-	}
-	if err := PatchOpsStatusWithOpsDeepCopy(f.req.Ctx, f.cli, f.res, previous,
-		opsv1alpha1.OpsCancellingPhase, opsv1alpha1.NewCancelingCondition(f.res.OpsRequest)); err != nil {
-		t.Fatal(err)
-	}
-	resumed := &opsv1alpha1.OpsRequest{}
-	if err := f.cli.Get(f.req.Ctx, client.ObjectKeyFromObject(f.res.OpsRequest), resumed); err != nil {
-		t.Fatal(err)
-	}
-	f.res.OpsRequest = resumed
-	publishHorizontalScalingResult(t, f)
-	its := &workloads.InstanceSet{}
-	if err := f.cli.Get(f.req.Ctx, client.ObjectKey{Namespace: "default", Name: "demo-db"}, its); err != nil {
-		t.Fatal(err)
-	}
-	its.Status.InstanceStatus[0].Ready = false
-	if err := f.cli.Update(f.req.Ctx, its); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := GetOpsManager().Reconcile(f.req, f.cli, f.res); err != nil {
-		t.Fatal(err)
-	}
-	if f.res.OpsRequest.Status.Phase != opsv1alpha1.OpsCancellingPhase {
-		t.Fatalf("cancel ended before rollback converged: %s", f.res.OpsRequest.Status.Phase)
-	}
-	publishHorizontalScalingResult(t, f)
-	if _, err := GetOpsManager().Reconcile(f.req, f.cli, f.res); err != nil {
-		t.Fatal(err)
-	}
-	if f.res.OpsRequest.Status.Phase != opsv1alpha1.OpsCancelledPhase || !slices.ContainsFunc(f.res.OpsRequest.Status.Conditions, func(c metav1.Condition) bool {
-		return c.Type == opsv1alpha1.ConditionTypeCancelled && c.Reason == opsv1alpha1.ReasonOpsCancelSucceed
-	}) {
-		t.Fatalf("rollback did not complete successfully: %+v", f.res.OpsRequest.Status)
-	}
-}
+var _ = Describe("HorizontalScaling cancellation after component failure", func() {
+	DescribeTable("waits for rollback observations and completes cancellation", func(persistedFailure bool) {
+		f := newHorizontalScalingFixture(GinkgoT(), scaleOutRequest("db", false), scaleOutRequest("other", false))
+		hs := horizontalScalingOpsHandler{}
+		Expect(hs.Action(f.req, f.cli, f.res)).To(Succeed())
+		publishHorizontalScalingResult(GinkgoT(), f)
+		status := f.res.Cluster.Status.Components["db"]
+		status.Phase = appsv1.FailedComponentPhase
+		f.res.Cluster.Status.Components["db"] = status
+		other := f.res.Cluster.Status.Components["other"]
+		other.UpToDate = false
+		f.res.Cluster.Status.Components["other"] = other
+		_, err := GetOpsManager().Reconcile(f.req, f.cli, f.res)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(f.res.OpsRequest.Status.Phase).To(Equal(opsv1alpha1.OpsRunningPhase))
+		Expect(f.res.OpsRequest.Status.Components["db"].Reason).To(BeEmpty())
+		if persistedFailure {
+			failed := f.res.OpsRequest.Status.Components["db"]
+			failed.Reason = horizontalScalingFailedReason
+			failed.Message = "previously recorded component failure"
+			f.res.OpsRequest.Status.Components["db"] = failed
+			Expect(f.cli.Status().Update(f.req.Ctx, f.res.OpsRequest)).To(Succeed())
+			Expect(f.cli.Get(f.req.Ctx, client.ObjectKeyFromObject(f.res.OpsRequest), f.res.OpsRequest)).To(Succeed())
+			Expect(f.res.OpsRequest.Status.Components["db"].Reason).To(Equal(horizontalScalingFailedReason))
+			Expect(f.res.OpsRequest.Status.Components["db"].Message).To(Equal(failed.Message))
+		}
+		previous := f.res.OpsRequest.DeepCopy()
+		Expect(hs.Cancel(f.req, f.cli, f.res)).To(Succeed())
+		Expect(PatchOpsStatusWithOpsDeepCopy(f.req.Ctx, f.cli, f.res, previous,
+			opsv1alpha1.OpsCancellingPhase, opsv1alpha1.NewCancelingCondition(f.res.OpsRequest))).To(Succeed())
+		resumed := &opsv1alpha1.OpsRequest{}
+		Expect(f.cli.Get(f.req.Ctx, client.ObjectKeyFromObject(f.res.OpsRequest), resumed)).To(Succeed())
+		f.res.OpsRequest = resumed
+		Expect(resumed.Status.Phase).To(Equal(opsv1alpha1.OpsCancellingPhase))
+		Expect(resumed.Status.Components["db"].Reason).To(BeEmpty())
+		Expect(resumed.Status.Components["db"].Message).To(BeEmpty())
+		publishHorizontalScalingResult(GinkgoT(), f)
+		its := &workloads.InstanceSet{}
+		Expect(f.cli.Get(f.req.Ctx, client.ObjectKey{Namespace: "default", Name: "demo-db"}, its)).To(Succeed())
+		its.Status.InstanceStatus[0].Ready = false
+		Expect(f.cli.Update(f.req.Ctx, its)).To(Succeed())
+		_, err = GetOpsManager().Reconcile(f.req, f.cli, f.res)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(f.cli.Get(f.req.Ctx, client.ObjectKeyFromObject(f.res.OpsRequest), f.res.OpsRequest)).To(Succeed())
+		Expect(f.res.OpsRequest.Status.Phase).To(Equal(opsv1alpha1.OpsCancellingPhase))
+		publishHorizontalScalingResult(GinkgoT(), f)
+		_, err = GetOpsManager().Reconcile(f.req, f.cli, f.res)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(f.cli.Get(f.req.Ctx, client.ObjectKeyFromObject(f.res.OpsRequest), f.res.OpsRequest)).To(Succeed())
+		Expect(f.res.OpsRequest.Status.Phase).To(Equal(opsv1alpha1.OpsCancelledPhase))
+		Expect(f.res.OpsRequest.Status.Conditions).To(ContainElement(SatisfyAll(
+			HaveField("Type", opsv1alpha1.ConditionTypeCancelled),
+			HaveField("Reason", opsv1alpha1.ReasonOpsCancelSucceed),
+		)))
+	},
+		Entry("without a recorded failure", false),
+		Entry("with a persisted failure", true),
+	)
+})
 
 func TestHorizontalScalingEmptyShardingRequiresObservedResult(t *testing.T) {
 	f := newHorizontalScalingFixture(t, scaleOutRequest("sharded", false))

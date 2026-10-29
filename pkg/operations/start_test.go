@@ -89,121 +89,106 @@ func TestStartTargetsStarted(t *testing.T) {
 	}
 }
 
-func TestStartReconcilesCurrentInstanceStatus(t *testing.T) {
-	scheme := runtime.NewScheme()
-	for _, add := range []func(*runtime.Scheme) error{appsv1.AddToScheme, opsv1alpha1.AddToScheme, workloads.AddToScheme} {
-		if err := add(scheme); err != nil {
-			t.Fatal(err)
+var _ = Describe("Start component recovery", func() {
+	It("keeps the operation running until component health and progress recover", func() {
+		scheme := runtime.NewScheme()
+		for _, add := range []func(*runtime.Scheme) error{appsv1.AddToScheme, opsv1alpha1.AddToScheme, workloads.AddToScheme} {
+			Expect(add(scheme)).To(Succeed())
 		}
-	}
-	replicas := int32(1)
-	cluster := &appsv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{Name: "cluster", Namespace: "default", Generation: 2},
-		Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{
-			Name: "mysql", Replicas: replicas,
-		}}},
-		Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{
-			"mysql": {Phase: appsv1.RunningComponentPhase, ObservedGeneration: 2, UpToDate: true},
-		}},
-	}
-	opsRequest := &opsv1alpha1.OpsRequest{
-		ObjectMeta: metav1.ObjectMeta{Name: "start", Namespace: "default"},
-		Spec: opsv1alpha1.OpsRequestSpec{
-			ClusterName: "cluster", Type: opsv1alpha1.StartType,
-			SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{StartList: []opsv1alpha1.ComponentOps{{ComponentName: "mysql"}}},
-		},
-		Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsRunningPhase, ClusterGeneration: 2},
-	}
-	failProgressPatch := false
-	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, opsRequest).
-		WithStatusSubresource(cluster, opsRequest).WithInterceptorFuncs(interceptor.Funcs{
-		SubResourcePatch: func(ctx context.Context, c client.Client, subresource string, obj client.Object,
-			patch client.Patch, opts ...client.SubResourcePatchOption) error {
-			if request, ok := obj.(*opsv1alpha1.OpsRequest); ok && failProgressPatch && request.Status.Phase == opsv1alpha1.OpsRunningPhase {
-				failProgressPatch = false
-				return errors.New("injected progress patch failure")
+		replicas := int32(1)
+		cluster := &appsv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "cluster", Namespace: "default", Generation: 2},
+			Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{
+				Name: "mysql", Replicas: replicas,
+			}}},
+			Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{
+				"mysql": {Phase: appsv1.FailedComponentPhase, ObservedGeneration: 2, UpToDate: true},
+			}},
+		}
+		opsRequest := &opsv1alpha1.OpsRequest{
+			ObjectMeta: metav1.ObjectMeta{Name: "start", Namespace: "default"},
+			Spec: opsv1alpha1.OpsRequestSpec{
+				ClusterName: "cluster", Type: opsv1alpha1.StartType,
+				SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{StartList: []opsv1alpha1.ComponentOps{{ComponentName: "mysql"}}},
+			},
+			Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsRunningPhase, ClusterGeneration: 2},
+		}
+		failProgressPatch := false
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, opsRequest).
+			WithStatusSubresource(cluster, opsRequest).WithInterceptorFuncs(interceptor.Funcs{
+			SubResourcePatch: func(ctx context.Context, c client.Client, subresource string, obj client.Object,
+				patch client.Patch, opts ...client.SubResourcePatchOption) error {
+				if request, ok := obj.(*opsv1alpha1.OpsRequest); ok && failProgressPatch && request.Status.Phase == opsv1alpha1.OpsRunningPhase {
+					failProgressPatch = false
+					return errors.New("injected progress patch failure")
+				}
+				return c.SubResource(subresource).Patch(ctx, obj, patch, opts...)
+			},
+		}).Build()
+		reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
+		load := func() *OpsResource {
+			currentCluster, currentOps := &appsv1.Cluster{}, &opsv1alpha1.OpsRequest{}
+			Expect(cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(cluster), currentCluster)).To(Succeed())
+			Expect(cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(opsRequest), currentOps)).To(Succeed())
+			return &OpsResource{Cluster: currentCluster, OpsRequest: currentOps, Recorder: record.NewFakeRecorder(16)}
+		}
+		reconcile := func(wantPhase opsv1alpha1.OpsPhase, wantProgress string, wantDetail opsv1alpha1.ProgressStatus) {
+			GinkgoHelper()
+			delay, err := GetOpsManager().Reconcile(reqCtx, cli, load())
+			Expect(err).NotTo(HaveOccurred())
+			current := load().OpsRequest
+			Expect(current.Status.Phase).To(Equal(wantPhase))
+			Expect(current.Status.Progress).To(Equal(wantProgress))
+			details := current.Status.Components["mysql"].ProgressDetails
+			if wantDetail == "" {
+				Expect(details).To(BeEmpty())
+			} else {
+				Expect(details).To(HaveLen(1))
+				Expect(details[0].Status).To(Equal(wantDetail))
 			}
-			return c.SubResource(subresource).Patch(ctx, obj, patch, opts...)
-		},
-	}).Build()
-	reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
-	load := func() *OpsResource {
-		currentCluster, currentOps := &appsv1.Cluster{}, &opsv1alpha1.OpsRequest{}
-		if err := cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(cluster), currentCluster); err != nil {
-			t.Fatal(err)
-		}
-		if err := cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(opsRequest), currentOps); err != nil {
-			t.Fatal(err)
-		}
-		return &OpsResource{Cluster: currentCluster, OpsRequest: currentOps, Recorder: record.NewFakeRecorder(16)}
-	}
-	reconcile := func(wantPhase opsv1alpha1.OpsPhase, wantProgress string, wantDetail opsv1alpha1.ProgressStatus) {
-		t.Helper()
-		delay, err := GetOpsManager().Reconcile(reqCtx, cli, load())
-		if err != nil {
-			t.Fatal(err)
-		}
-		current := load().OpsRequest
-		if current.Status.Phase != wantPhase || current.Status.Progress != wantProgress {
-			t.Fatalf("phase=%s progress=%s, want %s %s", current.Status.Phase, current.Status.Progress, wantPhase, wantProgress)
-		}
-		details := current.Status.Components["mysql"].ProgressDetails
-		if wantDetail == "" {
-			if len(details) != 0 {
-				t.Fatalf("details=%v, want no invented rows", details)
+			if wantPhase == opsv1alpha1.OpsRunningPhase {
+				Expect(delay).To(BeNumerically(">", 0))
 			}
-		} else if len(details) != 1 || details[0].Status != wantDetail {
-			t.Fatalf("details=%v, want one %s row", details, wantDetail)
 		}
-		if wantPhase == opsv1alpha1.OpsRunningPhase && delay <= 0 {
-			t.Fatal("missing retry while current observations have not converged")
+
+		reconcile(opsv1alpha1.OpsRunningPhase, "0/1", "")
+		its := &workloads.InstanceSet{
+			ObjectMeta: metav1.ObjectMeta{Name: constant.GenerateClusterComponentName("cluster", "mysql"), Namespace: "default"},
+			Spec:       workloads.InstanceSetSpec{Replicas: &replicas},
+			Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{
+				PodName: "cluster-mysql-0", DesiredState: workloads.InstanceDesiredStateActive,
+				CurrentState: workloads.InstanceCurrentStatePresent, UpToDate: true, Ready: true, Available: true, Failed: true,
+			}}},
 		}
-	}
+		Expect(cli.Create(reqCtx.Ctx, its)).To(Succeed())
+		reconcile(opsv1alpha1.OpsRunningPhase, "1/1", opsv1alpha1.FailedProgressStatus)
 
-	reconcile(opsv1alpha1.OpsRunningPhase, "0/1", "")
-	its := &workloads.InstanceSet{
-		ObjectMeta: metav1.ObjectMeta{Name: constant.GenerateClusterComponentName("cluster", "mysql"), Namespace: "default"},
-		Spec:       workloads.InstanceSetSpec{Replicas: &replicas},
-		Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{
-			PodName: "cluster-mysql-0", DesiredState: workloads.InstanceDesiredStateActive,
-			CurrentState: workloads.InstanceCurrentStatePresent, UpToDate: true, Ready: true, Available: true, Failed: true,
-		}}},
-	}
-	if err := cli.Create(reqCtx.Ctx, its); err != nil {
-		t.Fatal(err)
-	}
-	reconcile(opsv1alpha1.OpsRunningPhase, "1/1", opsv1alpha1.FailedProgressStatus)
+		its.Status.InstanceStatus[0].Failed = false
+		its.Status.InstanceStatus[0].UpToDate = false
+		Expect(cli.Update(reqCtx.Ctx, its)).To(Succeed())
+		failProgressPatch = true
+		_, err := GetOpsManager().Reconcile(reqCtx, cli, load())
+		Expect(err).To(HaveOccurred())
+		Expect(load().OpsRequest.Status.Components["mysql"].ProgressDetails[0].Status).To(Equal(opsv1alpha1.FailedProgressStatus))
+		reconcile(opsv1alpha1.OpsRunningPhase, "0/1", opsv1alpha1.ProcessingProgressStatus)
+		Expect(load().OpsRequest.Status.Components["mysql"].ProgressDetails[0].EndTime.IsZero()).To(BeTrue())
 
-	its.Status.InstanceStatus[0].Failed = false
-	its.Status.InstanceStatus[0].UpToDate = false
-	if err := cli.Update(reqCtx.Ctx, its); err != nil {
-		t.Fatal(err)
-	}
-	failProgressPatch = true
-	if _, err := GetOpsManager().Reconcile(reqCtx, cli, load()); err == nil {
-		t.Fatal("expected failed progress patch")
-	}
-	if got := load().OpsRequest.Status.Components["mysql"].ProgressDetails[0].Status; got != opsv1alpha1.FailedProgressStatus {
-		t.Fatalf("unpersisted progress leaked after patch failure: %s", got)
-	}
-	reconcile(opsv1alpha1.OpsRunningPhase, "0/1", opsv1alpha1.ProcessingProgressStatus)
-	if !load().OpsRequest.Status.Components["mysql"].ProgressDetails[0].EndTime.IsZero() {
-		t.Fatal("recovered processing observation retained the failed EndTime")
-	}
+		its.Status.InstanceStatus[0].UpToDate = true
+		Expect(cli.Update(reqCtx.Ctx, its)).To(Succeed())
+		reconcile(opsv1alpha1.OpsRunningPhase, "1/1", opsv1alpha1.SucceedProgressStatus)
 
-	its.Status.InstanceStatus[0].UpToDate = true
-	if err := cli.Update(reqCtx.Ctx, its); err != nil {
-		t.Fatal(err)
-	}
-	failProgressPatch = true
-	if _, err := GetOpsManager().Reconcile(reqCtx, cli, load()); err == nil {
-		t.Fatal("expected failed final progress patch")
-	}
-	if load().OpsRequest.Status.Phase != opsv1alpha1.OpsRunningPhase {
-		t.Fatal("Start completed before final progress was persisted")
-	}
-	reconcile(opsv1alpha1.OpsSucceedPhase, "1/1", opsv1alpha1.SucceedProgressStatus)
-}
+		currentCluster := load().Cluster
+		status := currentCluster.Status.Components["mysql"]
+		status.Phase = appsv1.RunningComponentPhase
+		currentCluster.Status.Components["mysql"] = status
+		Expect(cli.Status().Update(reqCtx.Ctx, currentCluster)).To(Succeed())
+		failProgressPatch = true
+		_, err = GetOpsManager().Reconcile(reqCtx, cli, load())
+		Expect(err).To(HaveOccurred())
+		Expect(load().OpsRequest.Status.Phase).To(Equal(opsv1alpha1.OpsRunningPhase))
+		reconcile(opsv1alpha1.OpsSucceedPhase, "1/1", opsv1alpha1.SucceedProgressStatus)
+	})
+})
 
 func TestStartAllTargetsComplete(t *testing.T) {
 	const (

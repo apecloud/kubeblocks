@@ -316,18 +316,14 @@ var _ = Describe("Instance Controller", func() {
 			})).Should(Succeed())
 
 			By("delete pod")
-			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: podKey.Namespace,
-					Name:      podKey.Name,
-				},
-			}
+			pod := &corev1.Pod{}
+			Expect(k8sClient.Get(ctx, podKey, pod)).Should(Succeed())
 			Expect(k8sClient.Delete(ctx, pod)).Should(Succeed())
-			Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, false)).Should(Succeed())
 
 			By("check the pod recreated with new spec")
-			Eventually(testapps.CheckObj(&testCtx, podKey, func(g Gomega, pod *corev1.Pod) {
-				g.Expect(pod.Spec.Containers[0].Image).Should(Equal("bar:v2"))
+			Eventually(testapps.CheckObj(&testCtx, podKey, func(g Gomega, replacement *corev1.Pod) {
+				g.Expect(replacement.UID).ShouldNot(Equal(pod.UID))
+				g.Expect(replacement.Spec.Containers[0].Image).Should(Equal("bar:v2"))
 			})).Should(Succeed())
 		})
 

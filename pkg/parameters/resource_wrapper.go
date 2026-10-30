@@ -64,9 +64,6 @@ func (r *ResourceFetcher[T]) Wrap(fn func() error) (ret *T) {
 
 func (r *ResourceFetcher[T]) Cluster() *T {
 	return r.Wrap(func() error {
-		if r.ClusterObj != nil {
-			return nil
-		}
 		clusterKey := client.ObjectKey{
 			Namespace: r.Namespace,
 			Name:      r.ClusterName,
@@ -83,9 +80,6 @@ func (r *ResourceFetcher[T]) Cluster() *T {
 
 func (r *ResourceFetcher[T]) Component() *T {
 	return r.Wrap(func() error {
-		if r.ComponentObj != nil {
-			return nil
-		}
 		component := &appsv1.Component{}
 		componentKey := client.ObjectKey{
 			Namespace: r.Namespace,
@@ -100,8 +94,7 @@ func (r *ResourceFetcher[T]) Component() *T {
 	})
 }
 
-func (r *ResourceFetcher[T]) ComponentAndComponentDef() *T {
-	r.Component()
+func (r *ResourceFetcher[T]) ComponentDefinition() *T {
 	return r.Wrap(func() error {
 		if len(r.ComponentObj.Spec.CompDef) == 0 {
 			return fmt.Errorf("componentDefinition not found in component: %s", r.ComponentObj.Name)

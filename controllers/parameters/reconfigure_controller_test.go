@@ -433,7 +433,10 @@ var _ = Describe("Reconfigure Controller", func() {
 				configMaps[i].Data = map[string]string{testparameters.MysqlConfigFile: fmt.Sprintf("[mysqld]\nmax_connections=%d\n", 200+i*100)}
 				Expect(k8sClient.Update(ctx, configMaps[i])).Should(Succeed())
 				hashes[i] = *computeTargetConfigHash(nil, configMaps[i].Data)
-				_, err := reconciler.sync(newReconcileContext(reqCtx, k8sClient, configMaps[i]), configSpec, false)
+				rctx, err := initReconcileContext(reqCtx, k8sClient, configMaps[i])
+				Expect(err).Should(Succeed())
+				Expect(rctx.initRuntime()).Should(Succeed())
+				_, err = reconciler.sync(rctx, configSpec, false)
 				Expect(err).Should(Succeed())
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(components[i]), components[i])).Should(Succeed())
 				Expect(components[i].Spec.Configs).Should(HaveLen(1))
@@ -466,7 +469,10 @@ var _ = Describe("Reconfigure Controller", func() {
 			}
 			reconcilePhase := func(index int, phase parametersv1alpha1.ParameterPhase, count int32) {
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(configMaps[index]), configMaps[index])).Should(Succeed())
-				_, err := reconciler.sync(newReconcileContext(reqCtx, k8sClient, configMaps[index]), configSpec, false)
+				rctx, err := initReconcileContext(reqCtx, k8sClient, configMaps[index])
+				Expect(err).Should(Succeed())
+				Expect(rctx.initRuntime()).Should(Succeed())
+				_, err = reconciler.sync(rctx, configSpec, false)
 				Expect(err).Should(Succeed())
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(configMaps[index]), configMaps[index])).Should(Succeed())
 				result := parseResult(configMaps[index].Annotations[parameterscore.GenerateRevisionPhaseKey("2")], "2")
@@ -1053,6 +1059,66 @@ var _ = Describe("Reconfigure Controller", func() {
 					Expect(components[0].Spec.Configs[0].ConfigHash).Should(Equal(computeTargetConfigHash(nil, cm.Data)))
 				})
 			}
+		}
+
+		for _, dependency := range []string{"missing ComponentParameter", "nil ConfigSpec", "missing ComponentDefinition"} {
+			It("context preparation dependencies: "+dependency, func() {
+				cm := configMaps[0]
+				applied, err := json.Marshal(cm.Data)
+				Expect(err).Should(Succeed())
+				cm.Annotations[constant.LastAppliedConfigAnnotationKey] = string(applied)
+				if dependency == "nil ConfigSpec" {
+					delete(cm.Annotations, parameterscore.GenerateRevisionPhaseKey("3"))
+				}
+				Expect(cli.Update(ctx, cm)).Should(Succeed())
+				components[0].Spec.Configs[0].ConfigHash = ptr.To("stale-target")
+				Expect(cli.Update(ctx, components[0])).Should(Succeed())
+				cp := &parametersv1alpha1.ComponentParameter{ObjectMeta: metav1.ObjectMeta{
+					Name: parameterscore.GenerateComponentConfigurationName(clusterName, "db-aaa"), Namespace: namespace}}
+				switch dependency {
+				case "missing ComponentParameter":
+					Expect(cli.Delete(ctx, cp)).Should(Succeed())
+				case "nil ConfigSpec":
+					Expect(cli.Get(ctx, client.ObjectKeyFromObject(cp), cp)).Should(Succeed())
+					cp.Spec.ConfigItemDetails[0].ConfigSpec = nil
+					Expect(cli.Update(ctx, cp)).Should(Succeed())
+				case "missing ComponentDefinition":
+					Expect(cli.Delete(ctx, &appsv1.ComponentDefinition{ObjectMeta: metav1.ObjectMeta{Name: "mysql"}})).Should(Succeed())
+				}
+				var reads []string
+				reconciler.Client = interceptor.NewClient(cli.(client.WithWatch), interceptor.Funcs{
+					Get: func(ctx context.Context, underlying client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						reads = append(reads, fmt.Sprintf("%T", obj))
+						return underlying.Get(ctx, key, obj, opts...)
+					},
+					List: func(ctx context.Context, underlying client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+						reads = append(reads, fmt.Sprintf("%T", list))
+						return underlying.List(ctx, list, opts...)
+					},
+				})
+				recorder := record.NewFakeRecorder(10)
+				reconciler.Recorder = recorder
+				result, err := reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cm)})
+				expectedReads := []string{"*v1.ConfigMap", "*v1.Cluster", "*v1.Component", "*v1alpha1.ComponentParameter"}
+				if dependency == "missing ComponentDefinition" {
+					expectedReads = append(expectedReads, "*v1.ComponentDefinition")
+				}
+				Expect(reads).Should(Equal(expectedReads))
+				if dependency == "nil ConfigSpec" {
+					Expect(err).Should(Succeed())
+					Expect(result).Should(Equal(ctrl.Result{}))
+					Expect(recorder.Events).Should(Receive(Equal(corev1.EventTypeWarning + " " + reasonReconfigureFailed + " " + configurationNotRelatedComponentMessage)))
+					Expect(cli.Get(ctx, client.ObjectKeyFromObject(cm), cm)).Should(Succeed())
+					Expect(parseResult(cm.Annotations[parameterscore.GenerateRevisionPhaseKey("3")], "3").Phase).
+						Should(Equal(parametersv1alpha1.CFinishedPhase))
+					return
+				}
+				Expect(err).Should(HaveOccurred())
+				Expect(err.Error()).Should(ContainSubstring("not found"))
+				Expect(cli.Get(ctx, client.ObjectKeyFromObject(cm), cm)).Should(Succeed())
+				Expect(parseResult(cm.Annotations[parameterscore.GenerateRevisionPhaseKey("3")], "3").Phase).
+					Should(Equal(parametersv1alpha1.CUpgradingPhase))
+			})
 		}
 
 		for _, unavailable := range []string{"InstanceSet", "ComponentParameter", "ComponentDefinition"} {

@@ -119,8 +119,8 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if isAppliedConfigs && !initialized {
 		return updateConfigPhase(r.Client, reqCtx, config, parametersv1alpha1.CFinishedPhase, configurationNoChangedMessage)
 	}
-	rctx := newReconcileContext(reqCtx, r.Client, config)
-	if err := rctx.Cluster().Component().Complete(); err != nil {
+	rctx, err := initReconcileContext(reqCtx, r.Client, config)
+	if err != nil {
 		return intctrlutil.RequeueWithError(err, reqCtx.Log,
 			errors.Wrap(err, "failed to fetch related resources").Error())
 	}
@@ -149,6 +149,9 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			reasonReconfigureFailed,
 			configurationNotRelatedComponentMessage)
 		return updateConfigPhase(r.Client, reqCtx, config, parametersv1alpha1.CFinishedPhase, configurationNotRelatedComponentMessage)
+	}
+	if err := rctx.initRuntime(); err != nil {
+		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
 	}
 
 	return r.sync(rctx, configSpec, isAppliedConfigs)
@@ -210,9 +213,6 @@ func (r *ReconfigureReconciler) getConfigSpec(reqCtx intctrlutil.RequestCtx, cm 
 func (r *ReconfigureReconciler) sync(rctx *reconcileContext, configSpec *appsv1.ComponentFileTemplate, applied bool) (ctrl.Result, error) {
 	reqCtx := rctx.RequestCtx
 	configMap := rctx.configMap
-	if err := rctx.objects(); err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(configMap, r.Recorder, err, reqCtx.Log)
-	}
 
 	if rctx.ClusterComObj == nil || rctx.ComponentObj == nil {
 		reqCtx.Log.Info("not found component.")

@@ -41,24 +41,24 @@ type reconcileContext struct {
 	parametersDefs map[string]*parametersv1alpha1.ParametersDefinition
 }
 
-func newReconcileContext(reqCtx intctrlutil.RequestCtx, cli client.Client, cm *corev1.ConfigMap) *reconcileContext {
+func initReconcileContext(reqCtx intctrlutil.RequestCtx, cli client.Client, cm *corev1.ConfigMap) (*reconcileContext, error) {
 	rctx := reconcileContext{
 		RequestCtx: reqCtx,
 		configMap:  cm,
 	}
-	return rctx.Init(&render.ResourceCtx{
+	rctx.Init(&render.ResourceCtx{
 		Context:       reqCtx.Ctx,
 		Client:        cli,
 		Namespace:     cm.Namespace,
 		ClusterName:   cm.Labels[constant.AppInstanceLabelKey],
 		ComponentName: cm.Labels[constant.KBAppComponentLabelKey],
 	}, &rctx)
+	return &rctx, rctx.Cluster().Component().Complete()
 }
 
-func (c *reconcileContext) objects() error {
-	return c.Cluster().
-		ComponentSpec().
-		ComponentAndComponentDef().
+func (c *reconcileContext) initRuntime() error {
+	return c.ComponentSpec().
+		ComponentDefinition().
 		workload().
 		parametersDefinitions().
 		Complete()

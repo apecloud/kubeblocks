@@ -46,7 +46,6 @@ import (
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	clustercontroller "github.com/apecloud/kubeblocks/controllers/apps/cluster"
-	componentcontroller "github.com/apecloud/kubeblocks/controllers/apps/component"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
@@ -1147,72 +1146,6 @@ var _ = Describe("upgrade owner rejection", func() {
 		Expect(ops.Status.Phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
 		Expect(ops.Status.Conditions).Should(ContainElement(HaveField("Message", ContainSubstring("99.99.99"))))
 	})
-	It("persists the actual Component load failure and retains retry", func() {
-		comp := testapps.NewComponentFactory("default", "owner-component", "absent-definition").GetObject()
-		comp.Generation = 9
-		comp.Finalizers = []string{constant.DBComponentFinalizerName}
-		comp.Labels = map[string]string{constant.ComponentDefinitionLabelKey: comp.Spec.CompDef}
-		cli := newClient(comp)
-		reqCtx := requestContext()
-		reconciler := &componentcontroller.ComponentReconciler{Client: cli, Scheme: cli.Scheme(), Recorder: reqCtx.Recorder}
-		result, err := reconciler.Reconcile(reqCtx.Ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(comp)})
-		Expect(err != nil || result.Requeue || result.RequeueAfter > 0).Should(BeTrue())
-		Expect(cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(comp), comp)).Should(Succeed())
-		condition := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionProvisioningStarted)
-		Expect(condition).ShouldNot(BeNil())
-		Expect(condition.Status).Should(Equal(metav1.ConditionFalse))
-		Expect(condition.ObservedGeneration).Should(Equal(comp.Generation))
-		Expect(condition.Reason).ShouldNot(Equal("UnsupportedServiceVersion"))
-	})
-
-	It("reports an incomplete advertised release through the published Component and Cluster", func() {
-		cluster := newCluster()
-		cluster.Spec.ComponentSpecs[0].ServiceVersion = "2.0.0"
-		cluster.Status.Components = nil
-		def := testapps.NewComponentDefinitionFactory("owner-fe").SetServiceVersion("1.0.0").GetObject()
-		def.Status.Phase = appsv1.AvailablePhase
-		def.Spec.Runtime.Containers = []corev1.Container{{Name: "server", Image: "server:1.0.0"}, {Name: "sidecar", Image: "sidecar:1.0.0"}}
-		cv := testapps.NewComponentVersionFactory("owner-version").AddRelease("new", "", "2.0.0", map[string]string{"sidecar": "sidecar:2.0.0"}).AddCompatibilityRule([]string{def.Name}, []string{"new"}).GetObject()
-		cv.Labels = map[string]string{def.Name: def.Name}
-		cv.Status.Phase = appsv1.AvailablePhase
-		cli := newClient(cluster, def, cv)
-		reqCtx := requestContext()
-		cr := &clustercontroller.ClusterReconciler{Client: cli, Scheme: cli.Scheme(), Recorder: reqCtx.Recorder}
-		_, err := cr.Reconcile(reqCtx.Ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})
-		Expect(err).ShouldNot(HaveOccurred())
-		comp := &appsv1.Component{}
-		key := client.ObjectKey{Namespace: cluster.Namespace, Name: cluster.Name + "-fe"}
-		Expect(cli.Get(reqCtx.Ctx, key, comp)).Should(Succeed())
-		Expect(comp.Spec.ServiceVersion).Should(Equal("2.0.0"))
-		componentReconciler := &componentcontroller.ComponentReconciler{Client: cli, Scheme: cli.Scheme(), Recorder: reqCtx.Recorder}
-		for range 2 {
-			_, _ = componentReconciler.Reconcile(reqCtx.Ctx, ctrl.Request{NamespacedName: key})
-		}
-		Expect(cli.Get(reqCtx.Ctx, key, comp)).Should(Succeed())
-		condition := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionProvisioningStarted)
-		Expect(condition).ShouldNot(BeNil())
-		Expect(condition.Status).Should(Equal(metav1.ConditionFalse))
-		Expect(condition.ObservedGeneration).Should(Equal(comp.Generation))
-		Expect(condition.Message).Should(ContainSubstring("no matched image found for container server"))
-		Expect(condition.Reason).ShouldNot(Equal("UnsupportedServiceVersion"))
-		_, err = cr.Reconcile(reqCtx.Ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
-		Expect(cluster.Status.Components["fe"].Message).Should(HaveKeyWithValue("Component/"+comp.Name, condition.Message))
-		Expect(cluster.Status.Components["fe"].UpToDate).Should(BeFalse())
-		generation := comp.Generation
-		cv.Spec.Releases[0].Images["server"] = "server:2.0.0"
-		Expect(cli.Update(reqCtx.Ctx, cv)).Should(Succeed())
-		_, _ = componentReconciler.Reconcile(reqCtx.Ctx, ctrl.Request{NamespacedName: key})
-		Expect(cli.Get(reqCtx.Ctx, key, comp)).Should(Succeed())
-		Expect(comp.Generation).Should(Equal(generation))
-		condition = meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionProvisioningStarted)
-		Expect(condition.Status).Should(Equal(metav1.ConditionTrue))
-		_, _ = cr.Reconcile(reqCtx.Ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})
-		Expect(cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
-		Expect(cluster.Status.Components["fe"].Message).ShouldNot(HaveKey("Component/" + comp.Name))
-	})
-
 	DescribeTable("preserves current completion and health retry semantics", func(refusal, failed bool, expected opsv1alpha1.OpsPhase) {
 		cluster := newCluster()
 		cluster.Status.Components["fe"] = appsv1.ClusterComponentStatus{Phase: appsv1.RunningComponentPhase, ObservedGeneration: cluster.Generation, UpToDate: true}

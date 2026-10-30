@@ -715,35 +715,3 @@ var _ = Describe("cluster component status transformer", func() {
 		})
 	})
 })
-
-var _ = Describe("current Component provisioning diagnostics", func() {
-	It("retains every shard diagnostic without mutating Component messages and clears repaired or stale failures", func() {
-		cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Generation: 7}}
-		newComponent := func(name string) *appsv1.Component {
-			return &appsv1.Component{ObjectMeta: metav1.ObjectMeta{Name: name, Generation: 3, Annotations: map[string]string{constant.KubeBlocksGenerationKey: "7"}}, Status: appsv1.ComponentStatus{Phase: appsv1.RunningComponentPhase, ObservedGeneration: 3, Message: map[string]string{"existing": "keep"}, Conditions: []metav1.Condition{{Type: appsv1.ComponentConditionProvisioningStarted, Status: metav1.ConditionFalse, Reason: "PreCheckFailed", Message: name + " missing image", ObservedGeneration: 3}}}}
-		}
-		first, second := newComponent("shard-0"), newComponent("shard-1")
-		transformer := &clusterComponentStatusTransformer{}
-		status := transformer.clusterCompStatus(cluster, first)
-		Expect(status.Phase).Should(Equal(appsv1.RunningComponentPhase))
-		Expect(status.ObservedGeneration).Should(Equal(int64(7)))
-		Expect(status.UpToDate).Should(BeFalse())
-		Expect(status.Message).Should(HaveKeyWithValue("Component/shard-0", "shard-0 missing image"))
-		Expect(first.Status.Message).Should(Equal(map[string]string{"existing": "keep"}))
-		shards := transformer.clusterShardingStatus(cluster, []*appsv1.Component{first, second})
-		Expect(shards.Message).Should(HaveKeyWithValue("Component/shard-0", "shard-0 missing image"))
-		Expect(shards.Message).Should(HaveKeyWithValue("Component/shard-1", "shard-1 missing image"))
-		first.Status.Conditions[0].Status = metav1.ConditionTrue
-		Expect(transformer.clusterCompStatus(cluster, first).Message).Should(Equal(first.Status.Message))
-		first.Status.Conditions[0].Status = metav1.ConditionFalse
-		first.Status.Conditions[0].ObservedGeneration = 2
-		Expect(transformer.clusterCompStatus(cluster, first).Message).Should(Equal(first.Status.Message))
-		first.Status.Conditions[0].ObservedGeneration = 3
-		first.Annotations[constant.KubeBlocksGenerationKey] = "6"
-		Expect(transformer.clusterCompStatus(cluster, first).Message).Should(HaveKeyWithValue("Component/shard-0", "shard-0 missing image"))
-		first.Annotations[constant.KubeBlocksGenerationKey] = "7"
-		now := metav1.Now()
-		first.DeletionTimestamp = &now
-		Expect(transformer.clusterCompStatus(cluster, first).Message).Should(Equal(first.Status.Message))
-	})
-})

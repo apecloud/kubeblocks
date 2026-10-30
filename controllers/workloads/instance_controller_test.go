@@ -1291,9 +1291,54 @@ func TestInstanceStopResumeRetriesAfterPodCreatedBeforeStatusCommit(t *testing.T
 			if !reflect.DeepEqual(claim, committedClaim) {
 				t.Fatal("retry changed the already committed PVC")
 			}
-			if minReadySeconds > 0 && result.RequeueAfter != time.Second {
-				t.Fatalf("retry lost the earlier readiness wait: %#v", result)
+			if result.RequeueAfter != 0 {
+				t.Fatalf("unready runtime should wait for a Pod event: %#v", result)
 			}
 		})
 	}
 }
+
+var _ = Describe("Instance availability scheduling", func() {
+	It("allows storage alignment and Stop while ready runtime waits for availability", func() {
+		scheme := runtime.NewScheme()
+		Expect(clientgoscheme.AddToScheme(scheme)).Should(Succeed())
+		Expect(workloads.AddToScheme(scheme)).Should(Succeed())
+		inst := stopTestInstance()
+		inst.Spec.MinReadySeconds = 3600
+		claims := inst.Spec.VolumeClaimTemplates
+		inst.Spec.VolumeClaimTemplates = nil
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&workloads.Instance{}, &corev1.Pod{}, &corev1.PersistentVolumeClaim{}).WithObjects(inst).Build()
+		key := client.ObjectKeyFromObject(inst)
+		run := func() ctrl.Result {
+			result, err := (&InstanceReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(1000)}).Reconcile(context.Background(), ctrl.Request{NamespacedName: key})
+			Expect(err).ShouldNot(HaveOccurred())
+			return result
+		}
+		for i := 0; i < 3; i++ {
+			run()
+		}
+		pod := &corev1.Pod{}
+		Expect(cli.Get(context.Background(), key, pod)).Should(Succeed())
+		pod.Status.Phase = corev1.PodRunning
+		pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: metav1.Now()}}
+		pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "db", Image: "db:v1", Ready: true}}
+		Expect(cli.Status().Update(context.Background(), pod)).Should(Succeed())
+		Expect(cli.Get(context.Background(), key, inst)).Should(Succeed())
+		inst.Spec.VolumeClaimTemplates = claims
+		inst.Generation++
+		Expect(cli.Update(context.Background(), inst)).Should(Succeed())
+		Expect(run().RequeueAfter).Should(BeNumerically(">", 0))
+		pvcs := &corev1.PersistentVolumeClaimList{}
+		Expect(cli.List(context.Background(), pvcs)).Should(Succeed())
+		Expect(pvcs.Items).Should(HaveLen(1))
+		Expect(cli.Get(context.Background(), key, inst)).Should(Succeed())
+		Expect(inst.Status.Ready).Should(BeTrue())
+		Expect(inst.Status.Available).Should(BeFalse())
+
+		inst.Spec.Stop = ptr.To(true)
+		inst.Generation++
+		Expect(cli.Update(context.Background(), inst)).Should(Succeed())
+		Expect(run().RequeueAfter).Should(Equal(time.Second))
+		Expect(apierrors.IsNotFound(cli.Get(context.Background(), key, pod))).Should(BeTrue())
+	})
+})

@@ -1027,8 +1027,15 @@ func TestUpgradeInstanceTemplateOwnerConvergence(t *testing.T) {
 				if err := tree.Update(pod); err != nil {
 					t.Fatal(err)
 				}
-				if _, err := instanceset.NewStatusReconciler().Reconcile(tree); err != nil {
+				status := instanceset.NewStatusReconciler()
+				result, err := status.Reconcile(tree)
+				if err != nil {
 					t.Fatal(err)
+				}
+				if result == kubebuilderx.RetryAfter(time.Millisecond) {
+					if _, err := status.Reconcile(tree); err != nil {
+						t.Fatal(err)
+					}
 				}
 			}
 			publish()

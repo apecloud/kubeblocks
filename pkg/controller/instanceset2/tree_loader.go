@@ -24,14 +24,17 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 )
 
 func NewTreeLoader() kubebuilderx.TreeLoader {
@@ -59,6 +62,9 @@ func (r *treeLoader) Load(ctx context.Context, reader client.Reader, req ctrl.Re
 	if err = loadInstanceAssistantObjects(ctx, reader, tree); err != nil {
 		return nil, err
 	}
+	if err = loadInstanceRuntimePods(ctx, reader, tree); err != nil {
+		return nil, err
+	}
 
 	tree.Context = ctx
 	tree.EventRecorder = recorder
@@ -66,6 +72,49 @@ func (r *treeLoader) Load(ctx context.Context, reader client.Reader, req ctrl.Re
 	tree.SetFinalizer(finalizer)
 
 	return tree, err
+}
+
+func loadInstanceRuntimePods(ctx context.Context, reader client.Reader, tree *kubebuilderx.ObjectTree) error {
+	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
+		return nil
+	}
+	its := tree.GetRoot().(*workloads.InstanceSet)
+	selector, err := metav1.LabelSelectorAsSelector(its.Spec.Selector)
+	if err != nil {
+		return err
+	}
+	seenPlacements := make(map[string]bool)
+	for _, object := range tree.List(&workloads.Instance{}) {
+		inst := object.(*workloads.Instance)
+		placement := inst.Annotations[constant.KBAppMultiClusterPlacementKey]
+		if seenPlacements[placement] {
+			continue
+		}
+		seenPlacements[placement] = true
+		podContext := multicluster.IntoContext(ctx, placement)
+		pods := &corev1.PodList{}
+		if err := reader.List(podContext, pods, client.InNamespace(its.Namespace), client.MatchingLabelsSelector{Selector: selector}, multicluster.InDataContext()); err != nil {
+			return err
+		}
+		for i := range pods.Items {
+			pod := &pods.Items[i]
+			owner := metav1.GetControllerOf(pod)
+			if owner == nil || owner.Kind != "Instance" {
+				continue
+			}
+			owned := false
+			for _, child := range tree.List(&workloads.Instance{}) {
+				candidate := child.(*workloads.Instance)
+				owned = owned || candidate.UID != "" && candidate.UID == owner.UID
+			}
+			if owned {
+				if err := tree.AddWithOption(pod, kubebuilderx.SkipToReconcile(true)); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func ownedKinds() []client.ObjectList {

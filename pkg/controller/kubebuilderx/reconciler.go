@@ -112,7 +112,9 @@ const (
 )
 
 type Result struct {
-	Next       controlMethod
+	Next controlMethod
+	// RetryAfter requests a retry after commit, including when Next is Continue.
+	// Chained reconcilers retain the shortest positive delay.
 	RetryAfter time.Duration
 }
 

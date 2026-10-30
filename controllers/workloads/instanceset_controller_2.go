@@ -21,14 +21,21 @@ package workloads
 
 import (
 	"context"
+	"fmt"
+	"strings"
+	"sync"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -44,11 +51,30 @@ import (
 
 type InstanceSetReconciler2 struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	Scheme       *runtime.Scheme
+	Recorder     record.EventRecorder
+	dataContexts []string
+	podQueue     workqueue.RateLimitingInterface
+	podQueueOnce sync.Once
 }
 
+// A slash cannot occur in an InstanceSet name, so failed owner lookups can
+// share this controller's queue without being mistaken for parent requests.
+const podOwnerRetryPrefix = "pod-owner/"
+
 func (r *InstanceSetReconciler2) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	if strings.HasPrefix(req.Name, podOwnerRetryPrefix) {
+		name, uid, ok := strings.Cut(strings.TrimPrefix(req.Name, podOwnerRetryPrefix), "/")
+		if !ok {
+			return ctrl.Result{}, fmt.Errorf("invalid Pod owner retry request %q", req.Name)
+		}
+		inst, err := r.lookupPodOwner(ctx, client.ObjectKey{Namespace: req.Namespace, Name: name}, types.UID(uid))
+		if err != nil || inst == nil {
+			return ctrl.Result{}, err
+		}
+		r.podQueue.Add(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: inst.Namespace, Name: inst.Spec.InstanceSetName}})
+		return ctrl.Result{}, nil
+	}
 	logger := log.FromContext(ctx).WithValues("InstanceSet2", req.NamespacedName)
 	return kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
 		Prepare(instanceset2.NewTreeLoader()).
@@ -79,21 +105,90 @@ func (r *InstanceSetReconciler2) setupWithManager(mgr ctrl.Manager) error {
 		}).
 		Owns(&workloads.Instance{}).
 		Owns(&corev1.Service{}). // headless service
+		Watches(&corev1.Pod{}, r.podEventHandler()).
 		Complete(r)
 }
 
 func (r *InstanceSetReconciler2) setupWithMultiClusterManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
+	r.dataContexts = multiClusterMgr.GetContexts()
 	b := intctrlutil.NewControllerManagedBy(mgr).
 		For(&workloads.InstanceSet{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
 		}).
-		Owns(&corev1.Service{}) // we don't create the headless service for multi-cluster objects
+		Owns(&corev1.Service{}). // we don't create the headless service for multi-cluster objects
+		Watches(&corev1.Pod{}, r.podEventHandler())
 
 	eventHandler := handler.EnqueueRequestsFromMapFunc(r.instanceFilter)
 	multiClusterMgr.Watch(b, &workloads.Instance{}, eventHandler)
+	multiClusterMgr.Watch(b, &corev1.Pod{}, r.podEventHandler())
 
 	return b.Complete(r)
+}
+
+func (r *InstanceSetReconciler2) podEventHandler() handler.EventHandler {
+	mapped := handler.EnqueueRequestsFromMapFunc(r.podFilter)
+	rememberQueue := func(q workqueue.RateLimitingInterface) {
+		r.podQueueOnce.Do(func() { r.podQueue = q })
+	}
+	return handler.Funcs{
+		CreateFunc: func(ctx context.Context, e event.CreateEvent, q workqueue.RateLimitingInterface) {
+			rememberQueue(q)
+			mapped.Create(ctx, e, q)
+		},
+		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+			rememberQueue(q)
+			mapped.Update(ctx, e, q)
+		},
+		DeleteFunc: func(ctx context.Context, e event.DeleteEvent, q workqueue.RateLimitingInterface) {
+			rememberQueue(q)
+			mapped.Delete(ctx, e, q)
+		},
+		GenericFunc: func(ctx context.Context, e event.GenericEvent, q workqueue.RateLimitingInterface) {
+			rememberQueue(q)
+			mapped.Generic(ctx, e, q)
+		},
+	}
+}
+
+func (r *InstanceSetReconciler2) podFilter(ctx context.Context, obj client.Object) []reconcile.Request {
+	owner := metav1.GetControllerOf(obj)
+	if owner == nil || owner.APIVersion != workloads.GroupVersion.String() || owner.Kind != "Instance" {
+		return nil
+	}
+	key := client.ObjectKey{Namespace: obj.GetNamespace(), Name: owner.Name}
+	inst, err := r.lookupPodOwner(ctx, key, owner.UID)
+	if inst != nil {
+		return []reconcile.Request{{NamespacedName: types.NamespacedName{Namespace: inst.Namespace, Name: inst.Spec.InstanceSetName}}}
+	}
+	if err != nil {
+		return []reconcile.Request{{NamespacedName: types.NamespacedName{Namespace: key.Namespace, Name: podOwnerRetryPrefix + key.Name + "/" + string(owner.UID)}}}
+	}
+	return nil
+}
+
+func (r *InstanceSetReconciler2) lookupPodOwner(ctx context.Context, key client.ObjectKey, uid types.UID) (*workloads.Instance, error) {
+	var lookupErr error
+	// Native Instance controllers do not propagate the Instance placement annotation to Pods.
+	for _, placement := range append([]string{""}, r.dataContexts...) {
+		inst := &workloads.Instance{}
+		readCtx, option := ctx, multicluster.InControlContext()
+		if placement != "" {
+			readCtx, option = multicluster.IntoContext(ctx, placement), multicluster.InDataContext()
+		}
+		if err := r.Get(readCtx, key, inst, option); err != nil {
+			if !apierrors.IsNotFound(err) {
+				log.FromContext(ctx).Error(err, "Unable to read Pod owner Instance", "Instance", key, "placement", placement)
+				lookupErr = err
+			}
+			continue
+		}
+		if inst.UID == "" || inst.UID != uid || inst.Spec.InstanceSetName == "" {
+			continue
+		}
+		return inst, nil
+	}
+	return nil, lookupErr
 }
 
 func (r *InstanceSetReconciler2) instanceFilter(ctx context.Context, obj client.Object) []reconcile.Request {

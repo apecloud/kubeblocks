@@ -77,7 +77,7 @@ func buildInstanceTemplates(its *workloads.InstanceSet, instancesCompressed *cor
 		instanceTemplateList = append(instanceTemplateList, tpl)
 		replicasInTemplates += *tpl.Replicas
 	}
-	totalReplicas := *its.Spec.Replicas
+	totalReplicas := ptr.Deref(its.Spec.Replicas, int32(1))
 	if replicasInTemplates < totalReplicas {
 		replicas := totalReplicas - replicasInTemplates
 		instance := &workloads.InstanceTemplate{Replicas: &replicas, Ordinals: its.Spec.Ordinals}

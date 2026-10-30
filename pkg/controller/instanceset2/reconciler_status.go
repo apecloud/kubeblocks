@@ -37,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
+	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancereadiness"
 	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancestatus"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -50,13 +51,34 @@ type statusReconciler struct{}
 var _ kubebuilderx.Reconciler = &statusReconciler{}
 
 func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
-	if tree.GetRoot() == nil || !model.IsObjectStatusUpdating(tree.GetRoot()) {
+	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
 	return kubebuilderx.ConditionSatisfied
 }
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
+	its := tree.GetRoot().(*workloads.InstanceSet)
+	previous := append([]metav1.Condition(nil), its.Status.Conditions...)
+	pending, err := reconcileReadiness(tree)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	if instancereadiness.PublicationChanged(previous, its.Status.Conditions) {
+		return kubebuilderx.RetryAfter(time.Millisecond), nil
+	}
+	result := kubebuilderx.Continue
+	if pending {
+		result.RetryAfter = time.Second
+	}
+	if !model.IsObjectStatusUpdating(its) {
+		return result, nil
+	}
+	_, err = r.reconcileStatus(tree)
+	return result, err
+}
+
+func (r *statusReconciler) reconcileStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 
 	instances := tree.List(&workloads.Instance{})
@@ -65,8 +87,8 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		inst, _ := object.(*workloads.Instance)
 		instanceList = append(instanceList, inst)
 	}
-	// Flat-ordinal reassignment can temporarily expose fewer authoritative names than spec.replicas.
-	// Validate before mutating any status fields so a partial view cannot replace the last complete status.
+	// Keep the previous full projection until flat allocation is complete.
+	// Readiness has already reported incomplete allocation as Unknown.
 	if its.Spec.FlatInstanceOrdinal {
 		if _, _, err := instancetemplate.BuildAssignments(tree, its); err != nil {
 			if instancetemplate.IsAssignmentIncomplete(err) {
@@ -78,8 +100,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	replicas := int32(0)
 	currentReplicas, updatedReplicas := int32(0), int32(0)
 	readyReplicas, availableReplicas := int32(0), int32(0)
-	notReadyNames := sets.New[string]()
-	notAvailableNames := sets.New[string]()
 	currentRevisions := map[string]string{}
 	updateRevisions, err := revisionmap.Decode(its.Status.UpdateRevisions)
 	if err != nil {
@@ -107,19 +127,16 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			continue
 		}
 		{
-			notReadyNames.Insert(inst.Name)
 			replicas++
 			template2TemplatesStatus[templateName].Replicas++
 		}
-		if intctrlutil.IsInstanceReady(inst) {
+		health := instanceReadiness(tree, its, inst)
+		if health.Ready {
 			readyReplicas++
 			template2TemplatesStatus[templateName].ReadyReplicas++
-			notReadyNames.Delete(inst.Name)
-			if intctrlutil.IsInstanceAvailable(inst) {
+			if health.Available {
 				availableReplicas++
 				template2TemplatesStatus[templateName].AvailableReplicas++
-			} else {
-				notAvailableNames.Insert(inst.Name)
 			}
 		}
 		currentRevisions[inst.Name] = getInstanceRevision(inst)
@@ -156,18 +173,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 	}
 
-	readyCondition, err := buildReadyCondition(its, readyReplicas >= replicas, notReadyNames)
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
-	meta.SetStatusCondition(&its.Status.Conditions, *readyCondition)
-
-	availableCondition, err := buildAvailableCondition(its, availableReplicas >= replicas, notAvailableNames)
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
-	meta.SetStatusCondition(&its.Status.Conditions, *availableCondition)
-
 	// 3. set InstanceFailure condition
 	failureCondition, err := buildFailureCondition(its, instanceList)
 	if err != nil {
@@ -188,13 +193,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.Continue, err
 	}
 
-	pendingLifecycle := isStopRequested(its)
-	for _, inst := range instanceList {
-		pendingLifecycle = pendingLifecycle || ptr.Deref(inst.Spec.Stop, false)
-	}
-	if !pendingLifecycle && its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
-		return kubebuilderx.RetryAfter(time.Second), nil
-	}
 	return kubebuilderx.Continue, nil
 }
 
@@ -316,44 +314,6 @@ func buildTemplatesStatus(template2TemplatesStatus map[string]*workloads.Instanc
 	return templatesStatus
 }
 
-func buildReadyCondition(its *workloads.InstanceSet, ready bool, notReadyNames sets.Set[string]) (*metav1.Condition, error) {
-	condition := &metav1.Condition{
-		Type:               string(workloads.InstanceReady),
-		Status:             metav1.ConditionTrue,
-		ObservedGeneration: its.Generation,
-		Reason:             workloads.ReasonReady,
-	}
-	if !ready {
-		condition.Status = metav1.ConditionFalse
-		condition.Reason = workloads.ReasonNotReady
-		message, err := buildConditionMessageWithNames(notReadyNames.UnsortedList())
-		if err != nil {
-			return nil, err
-		}
-		condition.Message = string(message)
-	}
-	return condition, nil
-}
-
-func buildAvailableCondition(its *workloads.InstanceSet, available bool, notAvailableNames sets.Set[string]) (*metav1.Condition, error) {
-	condition := &metav1.Condition{
-		Type:               string(workloads.InstanceAvailable),
-		Status:             metav1.ConditionTrue,
-		ObservedGeneration: its.Generation,
-		Reason:             workloads.ReasonAvailable,
-	}
-	if !available {
-		condition.Status = metav1.ConditionFalse
-		condition.Reason = workloads.ReasonNotAvailable
-		message, err := buildConditionMessageWithNames(notAvailableNames.UnsortedList())
-		if err != nil {
-			return nil, err
-		}
-		condition.Message = string(message)
-	}
-	return condition, nil
-}
-
 func buildFailureCondition(its *workloads.InstanceSet, instances []*workloads.Instance) (*metav1.Condition, error) {
 	var failureNames []string
 	for _, inst := range instances {
@@ -444,14 +404,15 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		case workloads.InstanceCurrentStatePresent, workloads.InstanceCurrentStateTerminating:
 			// InstanceSet revisions identify desired Instance specs, while Instance CurrentRevision identifies the
 			// actual Pod revision. Keep the two revision domains separate.
+			health := instanceReadiness(tree, its, inst)
 			instanceSpecRevision := getInstanceRevision(inst)
 			observation := instancestatus.Observation{
 				InstanceName:    inst.Name,
 				State:           inst.Status.CurrentState,
 				Revision:        inst.Status.CurrentRevision,
 				UpToDate:        isInstanceUpdatedWithRevisions(inst, instanceSpecRevision, instanceSpecUpdateRevisions),
-				Ready:           inst.Status.Ready,
-				Available:       inst.Status.Available,
+				Ready:           health.Ready,
+				Available:       health.Available,
 				Failed:          meta.IsStatusConditionTrue(inst.Status.Conditions, string(workloads.InstanceFailure)),
 				Configs:         inst.Status.Configs,
 				VolumeExpansion: inst.Status.VolumeExpansion,

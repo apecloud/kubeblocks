@@ -26,6 +26,8 @@ import (
 
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -144,10 +146,30 @@ func (t *clusterComponentStatusTransformer) clusterCompStatus(cluster *appsv1.Cl
 		status.ObservedGeneration = ig
 		status.UpToDate = comp.Generation == comp.Status.ObservedGeneration && ig == cluster.Generation
 	}
+
+	if failure := currentComponentProvisioningFailure(comp); failure != nil {
+		status.Message = maps.Clone(status.Message)
+		if status.Message == nil {
+			status.Message = make(map[string]string)
+		}
+		status.Message["Component/"+comp.Name] = failure.Message
+		status.UpToDate = false
+	}
 	if hasPendingNonBlockingAction(comp) {
 		status.UpToDate = false
 	}
 	return status
+}
+
+func currentComponentProvisioningFailure(comp *appsv1.Component) *metav1.Condition {
+	if !comp.DeletionTimestamp.IsZero() {
+		return nil
+	}
+	condition := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionProvisioningStarted)
+	if condition != nil && condition.Status == metav1.ConditionFalse && condition.ObservedGeneration == comp.Generation {
+		return condition
+	}
+	return nil
 }
 
 func (t *clusterComponentStatusTransformer) transformShardingStatus(transCtx *clusterTransformContext, shardingComps map[string][]*appsv1.Component) {
@@ -229,9 +251,13 @@ func (t *clusterComponentStatusTransformer) clusterShardingStatus(cluster *appsv
 		phasedMessage = map[appsv1.ComponentPhase]map[string]string{}
 		generation    = int64(math.MaxInt64)
 		upToDate      = true
+		diagnostics   = map[string]string{}
 	)
 	for _, comp := range comps {
 		status := t.clusterCompStatus(cluster, comp)
+		if failure := currentComponentProvisioningFailure(comp); failure != nil {
+			diagnostics["Component/"+comp.Name] = failure.Message
+		}
 		statusList = append(statusList, status)
 		if _, ok := phasedMessage[status.Phase]; !ok {
 			phasedMessage[status.Phase] = status.Message
@@ -254,9 +280,16 @@ func (t *clusterComponentStatusTransformer) clusterShardingStatus(cluster *appsv
 		composedPhase = appsv1.FailedClusterPhase
 	}
 	phase := appsv1.ComponentPhase(composedPhase)
+	message := maps.Clone(phasedMessage[phase])
+	if len(diagnostics) > 0 {
+		if message == nil {
+			message = make(map[string]string)
+		}
+		maps.Copy(message, diagnostics)
+	}
 	return appsv1.ClusterShardingStatus{
 		Phase:              phase,
-		Message:            phasedMessage[phase],
+		Message:            message,
 		ObservedGeneration: generation,
 		UpToDate:           upToDate,
 	}

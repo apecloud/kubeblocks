@@ -20,9 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"fmt"
 	"slices"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -112,7 +114,30 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	}
 	upgradeSpec := opsRes.OpsRequest.Spec.Upgrade
 	compOpsHelper := newComponentOpsHelper(upgradeSpec.Components)
-	return compOpsHelper.reconcileRunningAction(reqCtx, cli, opsRes, "upgrade")
+
+	phase, requeueAfter, err := compOpsHelper.reconcileRunningAction(reqCtx, cli, opsRes, "upgrade")
+	if err != nil {
+		return phase, requeueAfter, err
+	}
+	if rejection := u.targetRejection(opsRes); rejection != nil {
+		if phase == opsv1alpha1.OpsSucceedPhase {
+			return opsv1alpha1.OpsRunningPhase, time.Second, nil
+		}
+		return opsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("%s", rejection.Message)
+	}
+	return phase, requeueAfter, nil
+}
+
+func (u upgradeOpsHandler) targetRejection(opsRes *OpsResource) *metav1.Condition {
+	generation := opsRes.OpsRequest.Status.ClusterGeneration
+	if generation <= 0 || opsRes.Cluster.Generation != generation {
+		return nil
+	}
+	condition := meta.FindStatusCondition(opsRes.Cluster.Status.Conditions, appsv1.ConditionTypeProvisioningStarted)
+	if condition != nil && condition.Status == metav1.ConditionFalse && condition.Reason == appsv1.ReasonUnsupportedServiceVersion && condition.ObservedGeneration == generation {
+		return condition
+	}
+	return nil
 }
 
 func (u upgradeOpsHandler) targetsUnchanged(opsRes *OpsResource) bool {

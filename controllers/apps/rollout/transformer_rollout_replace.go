@@ -35,8 +35,10 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -235,7 +237,7 @@ func (t *rolloutReplaceTransformer) pickCompInstanceToRollout(transCtx *rolloutT
 	var targetPod *corev1.Pod
 	for i, pod := range pods.Items {
 		if pending != "" {
-			if pod.Name == pending && pod.DeletionTimestamp == nil {
+			if pod.Name == pending {
 				targetPod = &pods.Items[i]
 				break
 			}
@@ -250,8 +252,8 @@ func (t *rolloutReplaceTransformer) pickCompInstanceToRollout(transCtx *rolloutT
 
 	if targetPod == nil {
 		if pending != "" {
-			return "", nil, controllerutil.NewDelayedRequeueError(componentNotReadyRequeueDuration,
-				fmt.Sprintf("waiting for recorded scale-down instance %s", pending))
+			tpl, err := replacePendingInstanceTemplate(transCtx, pending, spec.Instances, []*appsv1.Component{transCtx.Components[spec.Name]})
+			return pending, tpl, err
 		}
 		return "", nil, nil
 	}
@@ -443,7 +445,7 @@ func (t *rolloutReplaceTransformer) pickShardingInstancesToRollout(transCtx *rol
 	var targetPod *corev1.Pod
 	for i, pod := range pods.Items {
 		if pending != "" {
-			if pod.Name == pending && pod.DeletionTimestamp == nil {
+			if pod.Name == pending {
 				targetPod = &pods.Items[i]
 				break
 			}
@@ -458,8 +460,8 @@ func (t *rolloutReplaceTransformer) pickShardingInstancesToRollout(transCtx *rol
 
 	if targetPod == nil {
 		if pending != "" {
-			return "", nil, controllerutil.NewDelayedRequeueError(componentNotReadyRequeueDuration,
-				fmt.Sprintf("waiting for recorded scale-down instance %s", pending))
+			tpl, err := replacePendingInstanceTemplate(transCtx, pending, spec.Template.Instances, transCtx.ShardingComps[spec.Name])
+			return pending, tpl, err
 		}
 		return "", nil, nil
 	}
@@ -474,6 +476,57 @@ func (t *rolloutReplaceTransformer) pickShardingInstancesToRollout(transCtx *rol
 		}
 	}
 	return "", nil, fmt.Errorf("the instance template %s has not been found", tplName)
+}
+
+func replacePendingInstanceTemplate(transCtx *rolloutTransformContext, instance string,
+	templates []appsv1.InstanceTemplate, components []*appsv1.Component) (*appsv1.InstanceTemplate, error) {
+	if !slices.ContainsFunc(templates, func(tpl appsv1.InstanceTemplate) bool {
+		return tpl.Name != "" && !isRolloutManagedInstanceTemplate(transCtx.Rollout, tpl)
+	}) {
+		return nil, nil
+	}
+
+	var parent string
+	if index := strings.LastIndex(instance, "-"); index > 0 {
+		parent = instance[:index]
+	}
+	var owner *appsv1.Component
+	for _, comp := range components {
+		if comp != nil && comp.Name == parent {
+			owner = comp
+			break
+		}
+	}
+	if owner == nil {
+		return nil, fmt.Errorf("the component for recorded scale-down instance %s has not been found", instance)
+	}
+	its := &workloadsv1.InstanceSet{}
+	if err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(owner), its); err != nil {
+		return nil, err
+	}
+
+	var tplName string
+	if status := its.FindInstanceStatus(instance); status != nil && status.TemplateName != nil {
+		tplName = *status.TemplateName
+	} else {
+		name, found, err := instancetemplate.ResolveHistoricalTemplate(its, instance, nil)
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			return nil, fmt.Errorf("the instance template for recorded scale-down instance %s has not been found", instance)
+		}
+		tplName = name
+	}
+	if tplName == "" {
+		return nil, nil
+	}
+	for i := range templates {
+		if templates[i].Name == tplName {
+			return &templates[i], nil
+		}
+	}
+	return nil, fmt.Errorf("the instance template %s has not been found", tplName)
 }
 
 func replaceCompReplicas(rollout *appsv1alpha1.Rollout,

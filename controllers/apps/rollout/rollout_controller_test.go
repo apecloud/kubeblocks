@@ -2742,9 +2742,11 @@ var _ = Context("replace write order", Ordered, ContinueOnFailure, func() {
 		}
 		compKey := client.ObjectKeyFromObject(componentFactory.Create(&localTestCtx).GetObject())
 		if template {
-			its := testapps.NewInstanceSetFactory(localTestCtx.DefaultNamespace, compKey.Name, clusterKey.Name, componentName).
+			itsFactory := testapps.NewInstanceSetFactory(localTestCtx.DefaultNamespace, compKey.Name, clusterKey.Name, componentName).
 				SetReplicas(replicas).SetFlatInstanceOrdinal(true).
-				AddContainer(corev1.Container{Name: "rollout", Image: "rollout"}).Create(&localTestCtx).GetObject()
+				AddContainer(corev1.Container{Name: "rollout", Image: "rollout"})
+			itsFactory.Get().Spec.Instances = []workloadsv1.InstanceTemplate{{Name: instanceTemplateName, Replicas: ptr.To[int32](1)}}
+			its := itsFactory.Create(&localTestCtx).GetObject()
 			if sharding {
 				its.Status.AssignedOrdinals = map[string]workloadsv1.Ordinals{
 					instanceTemplateName: {Discrete: []int32{2}},

@@ -98,7 +98,9 @@ var _ = Describe("Reconfigure Controller", func() {
 			configMap := &corev1.ConfigMap{
 				Data: configHashData,
 			}
+			configMap.Name = "reload-config"
 			cluster := &appsv1.Cluster{}
+			componentSpec := &appsv1.ClusterComponentSpec{Name: defaultCompName}
 			comp := &appsv1.Component{}
 			its := &workloads.InstanceSet{}
 			templateSpec := &appsv1.ComponentFileTemplate{
@@ -122,9 +124,10 @@ var _ = Describe("Reconfigure Controller", func() {
 					ResourceCtx: &render.ResourceCtx{
 						ComponentName: defaultCompName,
 					},
-					ConfigMapObj: configMap,
-					ClusterObj:   cluster,
-					ComponentObj: comp,
+					ConfigMapObj:  configMap,
+					ClusterObj:    cluster,
+					ClusterComObj: componentSpec,
+					ComponentObj:  comp,
 				},
 				its:       its,
 				configMap: configMap,
@@ -140,10 +143,12 @@ var _ = Describe("Reconfigure Controller", func() {
 			)
 
 			Expect(task.Policy).Should(Equal(reconfigure.SyncDynamicReloadPolicy))
+			Expect(task.Ctx.ConfigMapName).Should(Equal(configMap.Name))
 			Expect(task.Ctx.ConfigTemplate).Should(Equal(*templateSpec))
 			Expect(task.Ctx.ConfigHash).ShouldNot(BeNil())
 			Expect(*task.Ctx.ConfigHash).Should(Equal(*computeTargetConfigHash(nil, configHashData)))
 			Expect(task.Ctx.Cluster).Should(BeIdenticalTo(cluster))
+			Expect(task.Ctx.ClusterComponent).Should(BeIdenticalTo(componentSpec))
 			Expect(task.Ctx.Component).Should(BeIdenticalTo(comp))
 			Expect(task.Ctx.ITS).Should(BeIdenticalTo(its))
 			Expect(task.Ctx.ConfigDescription).Should(BeIdenticalTo(configDesc))

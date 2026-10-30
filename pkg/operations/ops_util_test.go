@@ -436,6 +436,23 @@ var _ = Describe("OpsUtil functions", func() {
 			Expect(opsRequestSlice[0].Name).Should(Equal(ops1.Name))
 			Expect(opsRequestSlice[1].Name).Should(Equal(ops2.Name))
 			Expect(opsRequestSlice[2].Name).Should(Equal(ops3.Name))
+
+			By("verify ops3 has released the queue lock after being swapped behind its dependent opsRequests")
+			Expect(opsRequestSlice[2].InQueue).Should(BeTrue())
+			Expect(opsRecorder.InQueue).Should(BeTrue())
+
+			By("expect ops1 can be handled now, instead of waiting for the queue lock held by ops3")
+			opsRes.OpsRequest = ops1
+			// the first reconciliation promotes ops1 to the queue head, and the next one starts it.
+			for i := 0; i < 2; i++ {
+				_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+				Expect(err).ShouldNot(HaveOccurred())
+			}
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			opsRequestSlice, _ = opsutil.GetOpsRequestSliceFromCluster(opsRes.Cluster)
+			Expect(opsRequestSlice[0].Name).Should(Equal(ops1.Name))
+			Expect(opsRequestSlice[0].InQueue).Should(BeFalse())
+			Expect(opsRequestSlice[2].InQueue).Should(BeTrue())
 		})
 	})
 })

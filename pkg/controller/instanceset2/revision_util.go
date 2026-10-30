@@ -29,6 +29,7 @@ import (
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 )
 
 const instanceSetRevisionAnnotationKey = "workloads.kubeblocks.io/instance-revision-hash"
@@ -44,6 +45,7 @@ type instanceRevisionIntent struct {
 	PodUpgradePolicy           workloads.PodUpdatePolicyType
 	Roles                      []workloads.ReplicaRole
 	Configs                    []workloads.ConfigTemplate
+	LifecycleActions           *workloads.LifecycleActions
 }
 
 type podTemplateRevisionIntent struct {
@@ -92,6 +94,7 @@ func buildInstanceRevisionIntent(inst *workloads.Instance) instanceRevisionInten
 		PodUpgradePolicy:           spec.PodUpgradePolicy,
 		Roles:                      copyReplicaRoles(spec.Roles),
 		Configs:                    copyConfigTemplates(spec.Configs),
+		LifecycleActions:           revisionLifecycleActions(spec.LifecycleActions),
 	}
 }
 
@@ -162,4 +165,12 @@ func copyConfigTemplates(configs []workloads.ConfigTemplate) []workloads.ConfigT
 		configs[i].DeepCopyInto(&copied[i])
 	}
 	return copied
+}
+
+func revisionLifecycleActions(actions *workloads.LifecycleActions) *workloads.LifecycleActions {
+	its := &workloads.InstanceSet{Spec: workloads.InstanceSetSpec{LifecycleActions: actions}}
+	if !workloadlifecycle.Enabled(its) {
+		return nil
+	}
+	return &workloads.LifecycleActions{MemberJoin: actions.MemberJoin, MemberLeave: actions.MemberLeave, Switchover: actions.Switchover, Reconfigure: actions.Reconfigure, TemplateVars: actions.TemplateVars}
 }

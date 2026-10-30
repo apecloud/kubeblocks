@@ -106,7 +106,7 @@ var _ = Describe("revision update reconciler test", func() {
 			Expect(revisions).Should(HaveKey("demo-0"))
 			Expect(revisions).Should(HaveKey("demo-1"))
 
-			res, err = NewReplicasAlignmentReconciler().Reconcile(tree)
+			res, err = NewReplicasAlignmentReconciler(nil).Reconcile(tree)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 			Expect(tree.List(&corev1.Pod{})).Should(HaveLen(2))

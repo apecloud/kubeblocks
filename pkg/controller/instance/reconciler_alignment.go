@@ -29,6 +29,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 func NewAlignmentReconciler() kubebuilderx.Reconciler {
@@ -52,33 +53,13 @@ func (r *alignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubeb
 func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	inst := tree.GetRoot().(*workloads.Instance)
 
-	// create pod
-	obj, err := tree.Get(podObj(inst))
-	if err != nil {
-		return kubebuilderx.Continue, err
+	pod, result, err := reconcilePod(tree, inst)
+	if err != nil || result != kubebuilderx.Continue {
+		return result, err
 	}
-	if ptr.Deref(inst.Spec.Stop, false) {
-		if obj != nil && !isTerminating(obj.(*corev1.Pod)) {
-			if err := tree.Delete(obj); err != nil {
-				return kubebuilderx.Continue, err
-			}
-		}
-		if obj != nil {
-			return kubebuilderx.RetryAfter(time.Second), nil
-		}
+
+	if ptr.Deref(inst.Spec.Stop, false) || (pod != nil && isTerminating(pod)) {
 		return kubebuilderx.Continue, nil
-	}
-	if obj != nil && isTerminating(obj.(*corev1.Pod)) {
-		return kubebuilderx.Continue, nil
-	}
-	if obj == nil {
-		newPod, err := buildInstancePod(inst, "")
-		if err != nil {
-			return kubebuilderx.Continue, err
-		}
-		if err := tree.Add(newPod); err != nil {
-			return kubebuilderx.Continue, err
-		}
 	}
 
 	// handle pvcs
@@ -123,5 +104,47 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 		}
 	}
 
-	return kubebuilderx.Continue, nil
+	if pod == nil || !needsMemberJoin(inst) {
+		return kubebuilderx.Continue, nil
+	}
+	if !intctrlutil.IsPodAvailable(pod, inst.Spec.MinReadySeconds) {
+		return kubebuilderx.Continue, nil
+	}
+	result, err = reconcileMember(tree, inst, pod, true)
+	if err == nil && needsMemberJoin(inst) {
+		return kubebuilderx.Continue, nil
+	}
+	return result, err
+}
+
+func reconcilePod(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) (*corev1.Pod, kubebuilderx.Result, error) {
+	obj, err := tree.Get(podObj(inst))
+	if err != nil {
+		return nil, kubebuilderx.Continue, err
+	}
+	if ptr.Deref(inst.Spec.Stop, false) {
+		if obj != nil && !isTerminating(obj.(*corev1.Pod)) {
+			if err := tree.Delete(obj); err != nil {
+				return nil, kubebuilderx.Continue, err
+			}
+		}
+		if obj != nil {
+			return obj.(*corev1.Pod), kubebuilderx.RetryAfter(time.Second), nil
+		}
+		return nil, kubebuilderx.Continue, nil
+	}
+	if obj != nil && isTerminating(obj.(*corev1.Pod)) {
+		return obj.(*corev1.Pod), kubebuilderx.Continue, nil
+	}
+	if obj == nil {
+		newPod, err := buildInstancePod(inst, "")
+		if err != nil {
+			return nil, kubebuilderx.Continue, err
+		}
+		if err := tree.Add(newPod); err != nil {
+			return nil, kubebuilderx.Continue, err
+		}
+		return nil, kubebuilderx.Continue, nil
+	}
+	return obj.(*corev1.Pod), kubebuilderx.Continue, nil
 }

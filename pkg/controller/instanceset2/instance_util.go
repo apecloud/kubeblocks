@@ -147,6 +147,9 @@ func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree,
 	}
 
 	inst := b.GetObject()
+	if err := configureInstance(its, inst); err != nil {
+		return nil, err
+	}
 	stampInstanceRevision(inst)
 	if !shouldCloneInstanceAssistantObjects(its) {
 		if err := controllerutil.SetControllerReference(its, inst, model.GetScheme()); err != nil {

@@ -572,7 +572,7 @@ var _ = Describe("Reconfigure Controller", func() {
 						Labels: constant.GetCompLabels(clusterName, componentName), Annotations: map[string]string{constant.KBAppClusterUIDKey: "cluster-uid"}},
 					Spec: appsv1.ComponentSpec{CompDef: "mysql", Replicas: 1, Configs: []appsv1.ClusterComponentConfig{*cluster.Spec.ComponentSpecs[0].Configs[0].DeepCopy()}},
 				}
-				cluster.Spec.ComponentSpecs[0].Configs[0].Variables = map[string]string{"user-variable": "kept", constant.ConfigFilesUpdated: "old-checksum"}
+				cluster.Spec.ComponentSpecs[0].Configs[0].Variables = map[string]string{"user-variable": "kept", "KB_CONFIG_FILES_UPDATED": "old-checksum"}
 				component.Spec.Configs[0].ConfigMap = &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: cm.Name}}
 				if tc.foreign {
 					cluster.Spec.ComponentSpecs[0].Configs[0].ConfigMap = &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "another-configmap"}}
@@ -589,7 +589,7 @@ var _ = Describe("Reconfigure Controller", func() {
 				if tc.replicas > 0 {
 					component.Spec.Replicas = tc.replicas
 				}
-				component.Spec.Configs[0].Variables = map[string]string{"user-variable": "kept", constant.ConfigFilesUpdated: "old-checksum"}
+				component.Spec.Configs[0].Variables = map[string]string{"user-variable": "kept", "KB_CONFIG_FILES_UPDATED": "old-checksum"}
 				definition := &appsv1.ComponentDefinition{
 					ObjectMeta: metav1.ObjectMeta{Name: "mysql"},
 					Spec:       appsv1.ComponentDefinitionSpec{Configs: []appsv1.ComponentFileTemplate{template}},

@@ -44,7 +44,6 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	rolloutctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
@@ -2699,7 +2698,6 @@ var _ = Context("replace write order", Ordered, ContinueOnFailure, func() {
 		Expect(corev1.AddToScheme(localScheme)).To(Succeed())
 		Expect(appsv1.AddToScheme(localScheme)).To(Succeed())
 		Expect(appsv1alpha1.AddToScheme(localScheme)).To(Succeed())
-		Expect(workloadsv1.AddToScheme(localScheme)).To(Succeed())
 		localClient, err = client.New(localConfig, client.Options{Scheme: localScheme})
 		Expect(err).NotTo(HaveOccurred())
 		var localCancel context.CancelFunc
@@ -2741,23 +2739,6 @@ var _ = Context("replace write order", Ordered, ContinueOnFailure, func() {
 			componentFactory.AddInstances(instance).SetFlatInstanceOrdinal(true)
 		}
 		compKey := client.ObjectKeyFromObject(componentFactory.Create(&localTestCtx).GetObject())
-		if template {
-			itsFactory := testapps.NewInstanceSetFactory(localTestCtx.DefaultNamespace, compKey.Name, clusterKey.Name, componentName).
-				SetReplicas(replicas).SetFlatInstanceOrdinal(true).
-				AddContainer(corev1.Container{Name: "rollout", Image: "rollout"})
-			itsFactory.Get().Spec.Instances = []workloadsv1.InstanceTemplate{{Name: instanceTemplateName, Replicas: ptr.To[int32](1)}}
-			its := itsFactory.Create(&localTestCtx).GetObject()
-			if sharding {
-				its.Status.AssignedOrdinals = map[string]workloadsv1.Ordinals{
-					instanceTemplateName: {Discrete: []int32{2}},
-				}
-			} else {
-				its.Status.InstanceStatus = []workloadsv1.InstanceStatus{{
-					PodName: compKey.Name + "-2", TemplateName: ptr.To(instanceTemplateName),
-				}}
-			}
-			Expect(localClient.Status().Update(localCtx, its)).To(Succeed())
-		}
 		createPods := func(ordinals []int32, templateName string) []*corev1.Pod {
 			pods := make([]*corev1.Pod, 0, len(ordinals))
 			for _, ordinal := range ordinals {
@@ -2811,9 +2792,12 @@ var _ = Context("replace write order", Ordered, ContinueOnFailure, func() {
 			factory.AddComponent(compName).SetCompCompDef(compDefName).SetCompServiceVersion(serviceVersion2).SetCompStrategy(strategy).SetCompReplicas(replicas)
 		}
 		rolloutObj := factory.Create(&localTestCtx).GetObject()
-		reconcile := func() ctrl.Result {
+		rawReconcile := func() (ctrl.Result, error) {
 			r := &RolloutReconciler{Client: localClient, Scheme: localClient.Scheme(), Recorder: record.NewFakeRecorder(100)}
-			result, err := r.Reconcile(localCtx, ctrl.Request{NamespacedName: rolloutKey})
+			return r.Reconcile(localCtx, ctrl.Request{NamespacedName: rolloutKey})
+		}
+		reconcile := func() ctrl.Result {
+			result, err := rawReconcile()
 			Expect(err).NotTo(HaveOccurred())
 			return result
 		}
@@ -2888,13 +2872,25 @@ var _ = Context("replace write order", Ordered, ContinueOnFailure, func() {
 		Expect(readCluster().Spec).To(Equal(before.Spec))
 		selected := pods[0].DeepCopy()
 		Expect(localClient.Delete(localCtx, pods[0])).To(Succeed())
+		if template {
+			By("retrying when the missing recorded Pod's template cannot be determined")
+			result, err := rawReconcile()
+			Expect(err).To(HaveOccurred())
+			Expect(rolloutctrlutil.IsDelayedRequeueError(err)).To(BeFalse())
+			Expect(result.RequeueAfter).To(BeZero())
+			Expect(readCluster().Spec).To(Equal(before.Spec))
+			Expect(history(readRollout())).To(Equal([]string{selected.Name}))
+			pods[0] = createPods([]int32{2}, originalTemplate)[0]
+		}
 		By("retaining intent after a real Cluster conflict")
 		plan = build()
 		bump(&appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: clusterKey.Name, Namespace: clusterKey.Namespace}})
 		Expect(plan.Execute()).To(Satisfy(apierrors.IsConflict))
 		Expect(readCluster().Spec).To(Equal(before.Spec))
 		Expect(history(readRollout())).To(Equal([]string{selected.Name}))
-		Expect(localClient.Get(localCtx, client.ObjectKeyFromObject(selected), &corev1.Pod{})).To(Satisfy(apierrors.IsNotFound))
+		if !template {
+			Expect(localClient.Get(localCtx, client.ObjectKeyFromObject(selected), &corev1.Pod{})).To(Satisfy(apierrors.IsNotFound))
+		}
 		By("retaining cleanup history when status conflicts after the Cluster write")
 		plan = build()
 		bump(&appsv1alpha1.Rollout{ObjectMeta: metav1.ObjectMeta{Name: rolloutKey.Name, Namespace: rolloutKey.Namespace}})
@@ -2904,7 +2900,9 @@ var _ = Context("replace write order", Ordered, ContinueOnFailure, func() {
 		Expect(down.Generation).To(Equal(before.Generation + 1))
 		Expect(specOf(down).OfflineInstances).To(Equal([]string{compKey.Name + "-99", selected.Name}))
 		Expect(history(readRollout())).To(Equal([]string{selected.Name}))
-		Expect(localClient.Get(localCtx, client.ObjectKeyFromObject(selected), &corev1.Pod{})).To(Satisfy(apierrors.IsNotFound))
+		if !template {
+			Expect(localClient.Get(localCtx, client.ObjectKeyFromObject(selected), &corev1.Pod{})).To(Satisfy(apierrors.IsNotFound))
+		}
 		if template {
 			Expect(*specOf(down).Instances[0].Replicas).To(Equal(int32(0)))
 		}
@@ -2917,7 +2915,7 @@ var _ = Context("replace write order", Ordered, ContinueOnFailure, func() {
 				Expect(testapps.GetAndChangeObj(&localTestCtx, client.ObjectKeyFromObject(oldPod), func(pod *corev1.Pod) {
 					pod.Finalizers = nil
 				})()).To(Succeed())
-			} else if i > 1 {
+			} else if i > 1 || (template && i == 0) {
 				Expect(localClient.Delete(localCtx, oldPod)).To(Succeed())
 			}
 			tplName := replaceInstanceTemplateNameSuffix(rolloutObj)

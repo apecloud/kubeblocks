@@ -214,7 +214,7 @@ func (r *ReconfigureReconciler) sync(rctx *reconcileContext, configSpec *appsv1.
 		return intctrlutil.RequeueWithErrorAndRecordEvent(configMap, r.Recorder, err, reqCtx.Log)
 	}
 
-	if rctx.ComponentObj == nil || rctx.ClusterComObj == nil {
+	if rctx.ClusterComObj == nil || rctx.ComponentObj == nil {
 		reqCtx.Log.Info("not found component.")
 		return intctrlutil.Reconciled()
 	}
@@ -259,13 +259,15 @@ func independentConfigurationTarget(rctx *reconcileContext) *appsv1.ClusterCompo
 	if rctx.ComponentObj == nil {
 		return nil
 	}
-	configs := rctx.ComponentObj.Spec.Configs
+	var configs []appsv1.ClusterComponentConfig
 	if rctx.ComponentObj.Labels[constant.KBAppShardingNameLabelKey] == "" {
 		component := rctx.ClusterObj.Spec.GetComponentByName(rctx.ComponentName)
 		if component == nil {
 			return nil
 		}
 		configs = component.Configs
+	} else {
+		configs = rctx.ComponentObj.Spec.Configs
 	}
 	cm := rctx.configMap
 	for i := range configs {
@@ -303,9 +305,11 @@ func (r *ReconfigureReconciler) reconcileUnchangedConfig(rctx *reconcileContext,
 			}
 		}
 		if !desired {
-			replicas := rctx.ComponentObj.Spec.Replicas
+			var replicas int32
 			if rctx.ComponentObj.Labels[constant.KBAppShardingNameLabelKey] == "" {
 				replicas = rctx.ClusterObj.Spec.GetComponentByName(rctx.ComponentName).Replicas
+			} else {
+				replicas = rctx.ComponentObj.Spec.Replicas
 			}
 			return r.status(rctx, string(task.Policy), reconfigure.Status{
 				Status: reconfigure.StatusRetry, Reason: "waiting for configuration target propagation",

@@ -100,11 +100,11 @@ func createSyncPolicy(restart bool) func(Context) (Status, error) {
 
 func submit(ctx Context, parameters map[string]string, restart bool) (Status, error) {
 	var sources [][]appsv1.ClusterComponentConfig
-	if ctx.Component != nil {
-		sources = append(sources, ctx.Component.Spec.Configs)
-	}
 	if ctx.ClusterComponent != nil {
 		sources = append(sources, ctx.ClusterComponent.Configs)
+	}
+	if ctx.Component != nil {
+		sources = append(sources, ctx.Component.Spec.Configs)
 	}
 	for _, configs := range sources {
 		for _, config := range configs {
@@ -124,12 +124,16 @@ func submit(ctx Context, parameters map[string]string, restart bool) (Status, er
 		}
 	}
 	if config == nil {
+		// Ordinary Component targets leave source unset in Cluster because apps
+		// preserves the Component's existing binding when merging the target.
 		*configs = append(*configs, appsv1.ClusterComponentConfig{
 			Name: ptr.To(ctx.ConfigTemplate.Name),
 		})
 		config = &(*configs)[len(*configs)-1]
 	}
 	if ctx.Component != nil && configs == &ctx.Component.Spec.Configs && config.ConfigMap == nil && ctx.ConfigMapName != "" {
+		// Shard targets are written directly to Component, so persist the source
+		// with the hash and action for later Cluster reconciliation to inherit.
 		config.ConfigMap = &corev1.ConfigMapVolumeSource{
 			LocalObjectReference: corev1.LocalObjectReference{Name: ctx.ConfigMapName},
 		}

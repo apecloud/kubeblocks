@@ -39,9 +39,9 @@ type ResourceFetcher[T any] struct {
 	*render.ResourceCtx
 
 	ClusterObj, ClusterObjCopy     *appsv1.Cluster
+	ClusterComObj                  *appsv1.ClusterComponentSpec
 	ComponentObj, ComponentObjCopy *appsv1.Component
 	ComponentDefObj                *appsv1.ComponentDefinition
-	ClusterComObj                  *appsv1.ClusterComponentSpec
 
 	ConfigMapObj          *corev1.ConfigMap
 	ComponentParameterObj *parametersv1alpha1.ComponentParameter

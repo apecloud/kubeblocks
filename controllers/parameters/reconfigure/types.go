@@ -100,17 +100,17 @@ func (c *Context) getTargetConfigHash() *string {
 }
 
 func (c *Context) getTargetReplicas() int {
-	if c.Component != nil && c.Component.Labels[constant.KBAppShardingNameLabelKey] != "" {
-		return int(c.Component.Spec.Replicas)
+	if c.Component == nil || c.Component.Labels[constant.KBAppShardingNameLabelKey] == "" {
+		return int(c.ClusterComponent.Replicas)
 	}
-	return int(c.ClusterComponent.Replicas)
+	return int(c.Component.Spec.Replicas)
 }
 
 func (c *Context) targetConfigs() *[]appsv1.ClusterComponentConfig {
-	if c.Component != nil && c.Component.Labels[constant.KBAppShardingNameLabelKey] != "" {
-		return &c.Component.Spec.Configs
+	if c.Component == nil || c.Component.Labels[constant.KBAppShardingNameLabelKey] == "" {
+		return &c.ClusterComponent.Configs
 	}
-	return &c.ClusterComponent.Configs
+	return &c.Component.Spec.Configs
 }
 
 // Policy defines the policy of reconfiguring.

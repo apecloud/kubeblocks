@@ -144,21 +144,25 @@ func enqueueOpsRequestToClusterAnnotation(ctx context.Context, cli client.Client
 		var doSwap bool
 		opsRequestSlice, doSwap = swapOpsWithDependentBefore(opsRequestSlice, index, opsRes)
 		// check if dependent ops are after current ops in the slice, if so swap positions and update the queue in the cluster annotation.
-		if !doSwap {
-			if !opsRecorder.InQueue {
-				// the opsRequest is already running.
-				return &opsRecorder, nil
-			}
-			if hasStopQueueConflict(opsRequestSlice, index, opsRes.OpsRequest.Spec.Type, opsBehaviour.QueueWithStop) {
-				return &opsRecorder, nil
-			}
-			if !opsRes.OpsRequest.Spec.Force && existOtherRunningOps(opsRequestSlice, opsRecorder.Type, opsBehaviour) {
-				// if exists other running opsRequest, return.
-				return &opsRecorder, nil
-			}
-			// mark to handle the next opsRequest
-			opsRequestSlice[index].InQueue = false
+		if doSwap {
+			// the opsRequest has been moved behind its dependent opsRequests and put back into the queue by
+			// swapOpsWithDependentBefore, so it can not be handled now.
+			_, opsRecorder = GetOpsRecorderFromSlice(opsRequestSlice, opsRes.OpsRequest.Name)
+			return &opsRecorder, opsutil.UpdateClusterOpsAnnotations(ctx, cli, opsRes.Cluster, opsRequestSlice)
 		}
+		if !opsRecorder.InQueue {
+			// the opsRequest is already running.
+			return &opsRecorder, nil
+		}
+		if hasStopQueueConflict(opsRequestSlice, index, opsRes.OpsRequest.Spec.Type, opsBehaviour.QueueWithStop) {
+			return &opsRecorder, nil
+		}
+		if !opsRes.OpsRequest.Spec.Force && existOtherRunningOps(opsRequestSlice, opsRecorder.Type, opsBehaviour) {
+			// if exists other running opsRequest, return.
+			return &opsRecorder, nil
+		}
+		// mark to handle the next opsRequest
+		opsRequestSlice[index].InQueue = false
 	}
 	return &opsRecorder, opsutil.UpdateClusterOpsAnnotations(ctx, cli, opsRes.Cluster, opsRequestSlice)
 }
@@ -197,6 +201,13 @@ func swapOpsWithDependentBefore(opsRequestSlice []opsv1alpha1.OpsRecorder, curre
 			currentIndex = i
 			doSwap = true
 		}
+	}
+	if doSwap {
+		// the opsRequest has been moved behind its dependent opsRequests, and the opsRequests before it
+		// are waiting for the queue lock. It must be put back into the queue (InQueue=true) instead of
+		// keeping holding the queue lock, otherwise the opsRequests before it can never be handled
+		// while it is waiting for them to succeed, which deadlocks the queue.
+		opsRequestSlice[currentIndex].InQueue = true
 	}
 	return opsRequestSlice, doSwap
 }

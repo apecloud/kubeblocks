@@ -702,6 +702,15 @@ var _ = Describe("Reconfigure Controller", func() {
 					Expect(result.RequeueAfter).Should(BeNumerically(">", 0))
 					Expect(conflicted).Should(BeTrue())
 				}
+				if tc.finished && tc.recover {
+					result, err := reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cm)})
+					Expect(err).Should(Succeed())
+					Expect(result.RequeueAfter).Should(BeNumerically(">", 0))
+					Expect(cli.Get(ctx, client.ObjectKeyFromObject(cm), cm)).Should(Succeed())
+					Expect(parseResult(cm.Annotations[parameterscore.GenerateRevisionPhaseKey("3")], "3").Phase).Should(Equal(parametersv1alpha1.CUpgradingPhase))
+					Expect(cli.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
+					Expect(cluster.Spec.ComponentSpecs[0].Configs[0].ConfigHash).Should(Equal(failedHash))
+				}
 				_, err = reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cm)})
 				Expect(err).Should(Succeed())
 				Expect(cli.Get(ctx, client.ObjectKeyFromObject(cm), cm)).Should(Succeed())
@@ -792,6 +801,180 @@ var _ = Describe("Reconfigure Controller", func() {
 					return
 				}
 				checkCompletion(true)
+			})
+		}
+	})
+
+	Context("interrupted completed recovery", func() {
+		for _, shard := range []bool{false, true} {
+			owner := "Cluster"
+			if shard {
+				owner = "shard Component"
+			}
+			It("invalidates completion before publishing to "+owner+" and waits through retries", func() {
+				ctx := context.Background()
+				scheme := runtime.NewScheme()
+				for _, add := range []func(*runtime.Scheme) error{corev1.AddToScheme, appsv1.AddToScheme, parametersv1alpha1.AddToScheme, workloads.AddToScheme} {
+					Expect(add(scheme)).Should(Succeed())
+				}
+				const namespace, clusterName, configName = "default", "mysql", "mysql-config"
+				componentName := "mysql"
+				if shard {
+					componentName = "db-aaa"
+				}
+				data := map[string]string{"my.cnf": "enabled=ON\n"}
+				applied, err := json.Marshal(data)
+				Expect(err).Should(Succeed())
+				failedHash := computeTargetConfigHash(nil, map[string]string{"my.cnf": "enabled=nonsense\n"})
+				restoredHash := computeTargetConfigHash(nil, data)
+				template := appsv1.ComponentFileTemplate{Name: configName, Template: "template", Namespace: namespace, ExternalManaged: ptr.To(true)}
+				target := appsv1.ClusterComponentConfig{Name: ptr.To(configName), ConfigHash: failedHash,
+					Restart: ptr.To(true), Reconfigure: ptr.To(true), ReconfigureArgs: [][]string{{"enabled", "nonsense"}}}
+				spec := appsv1.ClusterComponentSpec{Name: componentName, ComponentDef: "mysql", Replicas: 2, Configs: []appsv1.ClusterComponentConfig{target}}
+				cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: namespace}}
+				if shard {
+					cluster.Spec.Shardings = []appsv1.ClusterSharding{{Name: "db", Shards: 1, Template: spec}}
+				} else {
+					cluster.Spec.ComponentSpecs = []appsv1.ClusterComponentSpec{spec}
+				}
+				cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+					Name: parameterscore.GetComponentCfgName(clusterName, componentName, configName), Namespace: namespace,
+					Labels:      constant.GetCompLabels(clusterName, componentName),
+					Annotations: map[string]string{constant.LastAppliedConfigAnnotationKey: string(applied), constant.ConfigurationRevision: "3"}}, Data: data}
+				cm.Labels[constant.CMConfigurationTemplateNameLabelKey] = template.Template
+				cm.Labels[constant.CMConfigurationTypeLabelKey] = constant.ConfigInstanceType
+				cm.Labels[constant.CMConfigurationSpecProviderLabelKey] = configName
+				phaseKey := parameterscore.GenerateRevisionPhaseKey("3")
+				finished, err := json.Marshal(unReconciled(parametersv1alpha1.CFinishedPhase, "3", "already applied"))
+				Expect(err).Should(Succeed())
+				cm.Annotations[phaseKey] = string(finished)
+				component := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{
+					Name: constant.GenerateClusterComponentName(clusterName, componentName), Namespace: namespace,
+					Labels: constant.GetCompLabels(clusterName, componentName)},
+					Spec: appsv1.ComponentSpec{CompDef: "mysql", Replicas: 2, Configs: []appsv1.ClusterComponentConfig{*target.DeepCopy()}}}
+				component.Spec.Configs[0].ConfigMap = &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: cm.Name}}
+				if shard {
+					component.Labels[constant.KBAppShardingNameLabelKey] = "db"
+				}
+				definition := &appsv1.ComponentDefinition{ObjectMeta: metav1.ObjectMeta{Name: "mysql"},
+					Spec:   appsv1.ComponentDefinitionSpec{Configs: []appsv1.ComponentFileTemplate{template}},
+					Status: appsv1.ComponentDefinitionStatus{Phase: appsv1.AvailablePhase}}
+				cp := &parametersv1alpha1.ComponentParameter{ObjectMeta: metav1.ObjectMeta{
+					Name: parameterscore.GenerateComponentConfigurationName(clusterName, componentName), Namespace: namespace},
+					Spec: parametersv1alpha1.ComponentParameterSpec{ClusterName: clusterName, ComponentName: componentName,
+						ConfigItemDetails: []parametersv1alpha1.ConfigTemplateItemDetail{{Name: configName, ConfigSpec: &template}}}}
+				its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: component.Name, Namespace: namespace},
+					Spec: workloads.InstanceSetSpec{Replicas: ptr.To(int32(2)), Configs: []workloads.ConfigTemplate{{Name: configName, ConfigHash: failedHash}}}}
+				for index := range 2 {
+					its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{PodName: fmt.Sprintf("%s-%d", component.Name, index),
+						DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent,
+						Configs: []workloads.InstanceConfigStatus{{Name: configName, ConfigHash: failedHash}}})
+				}
+				base := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(its).
+					WithObjects(cluster, component, definition, cp, cm, its).Build()
+				failPhase, failOwner, ownerWrites, runtimeReads := true, false, 0, 0
+				cli := interceptor.NewClient(base, interceptor.Funcs{
+					Get: func(ctx context.Context, underlying client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						if _, ok := obj.(*workloads.InstanceSet); ok {
+							runtimeReads++
+						}
+						return underlying.Get(ctx, key, obj, opts...)
+					},
+					Update: func(ctx context.Context, underlying client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
+						if _, ok := obj.(*appsv1.Cluster); ok || shard {
+							ownerWrites++
+							persisted := &corev1.ConfigMap{}
+							Expect(underlying.Get(ctx, client.ObjectKeyFromObject(cm), persisted)).Should(Succeed())
+							Expect(parseResult(persisted.Annotations[phaseKey], "3").Phase).Should(Equal(parametersv1alpha1.CUpgradingPhase), "invalidate Finished durably before any owner Update")
+							if failOwner {
+								failOwner = false
+								return errors.New("injected owner update failure")
+							}
+						}
+						return underlying.Update(ctx, obj, opts...)
+					},
+					Patch: func(ctx context.Context, underlying client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+						if _, ok := obj.(*corev1.ConfigMap); ok && failPhase {
+							failPhase = false
+							return errors.New("injected phase patch failure")
+						}
+						return underlying.Patch(ctx, obj, patch, opts...)
+					},
+				})
+				newReconciler := func() *ReconfigureReconciler {
+					return &ReconfigureReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(100)}
+				}
+				reconciler := newReconciler()
+				reconcileWaiting := func() {
+					GinkgoHelper()
+					result, err := reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cm)})
+					Expect(err != nil || result.Requeue || result.RequeueAfter > 0).Should(BeTrue())
+				}
+				checkState := func(hash *string, phase parametersv1alpha1.ParameterPhase) {
+					GinkgoHelper()
+					Expect(base.Get(ctx, client.ObjectKeyFromObject(cm), cm)).Should(Succeed())
+					Expect(parseResult(cm.Annotations[phaseKey], "3").Phase).Should(Equal(phase))
+					Expect(cm.Annotations[constant.LastAppliedConfigAnnotationKey]).Should(Equal(string(applied)))
+					if shard {
+						Expect(base.Get(ctx, client.ObjectKeyFromObject(component), component)).Should(Succeed())
+						Expect(component.Spec.Configs[0].ConfigHash).Should(Equal(hash))
+					} else {
+						Expect(base.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
+						Expect(cluster.Spec.ComponentSpecs[0].Configs[0].ConfigHash).Should(Equal(hash))
+					}
+				}
+
+				By("retrying a failed invalidation without publishing the target")
+				reconcileWaiting()
+				Expect(failPhase).Should(BeFalse())
+				Expect(ownerWrites).Should(BeZero())
+				checkState(failedHash, parametersv1alpha1.CFinishedPhase)
+				By("persisting the reconciled Upgrading result before an owner write")
+				reconcileWaiting()
+				Expect(ownerWrites).Should(BeZero())
+				checkState(failedHash, parametersv1alpha1.CUpgradingPhase)
+				phase := parseResult(cm.Annotations[phaseKey], "3")
+				Expect(phase.ExpectedCount).Should(Equal(int32(2)))
+				Expect(phase.Policy).Should(Equal(string(reconfigure.NonePolicy)))
+				Expect(phase.Message).Should(Equal("apply configuration changes"))
+				By("resuming after restart and preserving Upgrading when owner submission fails")
+				reconciler = newReconciler()
+				failOwner = true
+				reconcileWaiting()
+				Expect(failOwner).Should(BeFalse())
+				checkState(failedHash, parametersv1alpha1.CUpgradingPhase)
+				By("keeping Upgrading durable if the post-owner phase patch fails")
+				failPhase = true
+				reconcileWaiting()
+				Expect(failPhase).Should(BeFalse())
+				checkState(restoredHash, parametersv1alpha1.CUpgradingPhase)
+				By("loading runtime again after restart while the desired hash is stale")
+				reconciler = newReconciler()
+				runtimeReads = 0
+				reconcileWaiting()
+				Expect(runtimeReads).Should(BeNumerically(">", 0))
+				checkState(restoredHash, parametersv1alpha1.CUpgradingPhase)
+				By("waiting for the desired hash even when all observed hashes are current")
+				for index := range its.Status.InstanceStatus {
+					its.Status.InstanceStatus[index].Configs[0].ConfigHash = restoredHash
+				}
+				Expect(base.Status().Update(ctx, its)).Should(Succeed())
+				reconcileWaiting()
+				checkState(restoredHash, parametersv1alpha1.CUpgradingPhase)
+				By("waiting for every actual instance after the desired hash propagates")
+				its.Spec.Configs[0].ConfigHash = restoredHash
+				Expect(base.Update(ctx, its)).Should(Succeed())
+				its.Status.InstanceStatus[1].Configs[0].ConfigHash = failedHash
+				Expect(base.Status().Update(ctx, its)).Should(Succeed())
+				reconcileWaiting()
+				checkState(restoredHash, parametersv1alpha1.CUpgradingPhase)
+				Expect(parseResult(cm.Annotations[phaseKey], "3").SucceedCount).Should(Equal(int32(1)))
+				its.Status.InstanceStatus[1].Configs[0].ConfigHash = restoredHash
+				Expect(base.Status().Update(ctx, its)).Should(Succeed())
+				result, err := reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cm)})
+				Expect(err).Should(Succeed())
+				Expect(result).Should(Equal(ctrl.Result{}))
+				checkState(restoredHash, parametersv1alpha1.CFinishedPhase)
 			})
 		}
 	})

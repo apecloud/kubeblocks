@@ -444,8 +444,8 @@ var _ = Describe("Reconfigure Controller", func() {
 				Expect(target.Reconfigure).Should(HaveValue(BeTrue()))
 				Expect(target.ReconfigureAction).Should(BeNil())
 				Expect(target.ReconfigureArgs).Should(Equal([][]string{{"max_connections", fmt.Sprint(200 + i*100)}}))
-				Expect(target.Variables).Should(HaveKey(constant.ConfigFilesUpdated))
-				checksums[i] = target.Variables[constant.ConfigFilesUpdated]
+				Expect(target.Variables).Should(HaveKey("KB_CONFIG_FILES_UPDATED"))
+				checksums[i] = target.Variables["KB_CONFIG_FILES_UPDATED"]
 			}
 			Expect(hashes[0]).ShouldNot(Equal(hashes[1]))
 			Expect(checksums[0]).ShouldNot(Equal(checksums[1]))

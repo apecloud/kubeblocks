@@ -34,10 +34,11 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
+
+const configFilesUpdated = "KB_CONFIG_FILES_UPDATED"
 
 func init() {
 	registerPolicy(NonePolicy, func(ctx Context) (Status, error) {
@@ -193,7 +194,7 @@ func clearReconfigureSystemParameters(vars map[string]string) map[string]string 
 	if len(vars) == 0 {
 		return vars
 	}
-	delete(vars, constant.ConfigFilesUpdated)
+	delete(vars, configFilesUpdated)
 	return vars
 }
 
@@ -225,7 +226,7 @@ func buildUpdatedConfigFileChecksums(ctx Context) map[string]string {
 	}
 	checksum := sha256.Sum256([]byte(content))
 	return map[string]string{
-		constant.ConfigFilesUpdated: fmt.Sprintf("%s:%x", path, checksum),
+		configFilesUpdated: fmt.Sprintf("%s:%x", path, checksum),
 	}
 }
 

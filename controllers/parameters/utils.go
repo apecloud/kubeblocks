@@ -23,7 +23,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -42,21 +41,24 @@ type reconcileContext struct {
 	parametersDefs map[string]*parametersv1alpha1.ParametersDefinition
 }
 
-func newReconcileContext(reqCtx intctrlutil.RequestCtx, resource *render.ResourceCtx, cm *corev1.ConfigMap, cluster *appsv1.Cluster) *reconcileContext {
+func initReconcileContext(reqCtx intctrlutil.RequestCtx, cli client.Client, cm *corev1.ConfigMap) (*reconcileContext, error) {
 	rctx := reconcileContext{
-		ResourceFetcher: parameters.ResourceFetcher[reconcileContext]{
-			ClusterObj: cluster,
-		},
 		RequestCtx: reqCtx,
 		configMap:  cm,
 	}
-	return rctx.Init(resource, &rctx)
+	rctx.Init(&render.ResourceCtx{
+		Context:       reqCtx.Ctx,
+		Client:        cli,
+		Namespace:     cm.Namespace,
+		ClusterName:   cm.Labels[constant.AppInstanceLabelKey],
+		ComponentName: cm.Labels[constant.KBAppComponentLabelKey],
+	}, &rctx)
+	return &rctx, rctx.Cluster().Component().Complete()
 }
 
-func (c *reconcileContext) objects() error {
-	return c.Cluster().
-		ComponentSpec().
-		ComponentAndComponentDef().
+func (c *reconcileContext) initRuntime() error {
+	return c.ComponentSpec().
+		ComponentDefinition().
 		workload().
 		parametersDefinitions().
 		Complete()

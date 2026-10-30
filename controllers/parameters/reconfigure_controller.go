@@ -203,7 +203,7 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 		return intctrlutil.RequeueWithErrorAndRecordEvent(configMap, r.Recorder, err, reqCtx.Log)
 	}
 
-	if rctx.ComponentObj == nil || rctx.ClusterComObj == nil {
+	if rctx.ClusterComObj == nil || rctx.ComponentObj == nil {
 		reqCtx.Log.Info("not found component.")
 		return intctrlutil.Reconciled()
 	}

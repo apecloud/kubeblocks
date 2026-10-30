@@ -38,6 +38,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
@@ -528,7 +529,7 @@ func TestApplyChangesToClusterLegacyReconfigure(t *testing.T) {
 			}},
 		}}
 		config := &appsv1.ClusterComponentConfig{Name: ptr.To("my.cnf")}
-		applyChangesToCluster(ctx, config, map[string]string{"a": "b"}, false)
+		applyChanges(ctx, config, map[string]string{"a": "b"}, false)
 		if config.Reconfigure == nil || !*config.Reconfigure {
 			t.Fatalf("expected reconfigure intent to be true")
 		}
@@ -551,7 +552,7 @@ func TestApplyChangesToClusterLegacyReconfigure(t *testing.T) {
 		ctx := newContext()
 		ctx.ParametersDef.MergeReloadAndRestart = ptr.To(true)
 		config := &appsv1.ClusterComponentConfig{Name: ptr.To("my.cnf")}
-		applyChangesToCluster(ctx, config, map[string]string{"a": "b"}, true)
+		applyChanges(ctx, config, map[string]string{"a": "b"}, true)
 		if config.Reconfigure == nil || *config.Reconfigure {
 			t.Fatalf("expected reconfigure intent to be false")
 		}
@@ -658,7 +659,7 @@ func TestApplyChangesToClusterClearsHistoricalRestartFlag(t *testing.T) {
 		Restart: ptr.To(true),
 	}
 
-	applyChangesToCluster(ctx, config, map[string]string{"binlog_expire_logs_seconds": "259200"}, false)
+	applyChanges(ctx, config, map[string]string{"binlog_expire_logs_seconds": "259200"}, false)
 
 	if config.Restart == nil || *config.Restart {
 		t.Fatalf("expected restart to be cleared to false, got %v", config.Restart)
@@ -714,7 +715,7 @@ func TestApplyChangesToClusterTemplateReconfigureArgs(t *testing.T) {
 		},
 	}
 
-	applyChangesToCluster(ctx, config, map[string]string{
+	applyChanges(ctx, config, map[string]string{
 		"timeout":   "30",
 		"maxmemory": "1gb",
 	}, false)
@@ -767,7 +768,7 @@ func TestApplyChangesToClusterTemplateReconfigureWithRestartSemantics(t *testing
 		ctx.ParametersDef = &parametersv1alpha1.ParametersDefinitionSpec{}
 		config := &ctx.ClusterComponent.Configs[0]
 
-		applyChangesToCluster(ctx, config, nil, true)
+		applyChanges(ctx, config, nil, true)
 
 		if config.Reconfigure == nil || *config.Reconfigure {
 			t.Fatalf("expected reconfigure intent to be false for restart-only path")
@@ -787,7 +788,7 @@ func TestApplyChangesToClusterTemplateReconfigureWithRestartSemantics(t *testing
 		}
 		config := &ctx.ClusterComponent.Configs[0]
 
-		applyChangesToCluster(ctx, config, map[string]string{"performance_schema": "ON"}, true)
+		applyChanges(ctx, config, map[string]string{"performance_schema": "ON"}, true)
 
 		if config.Reconfigure == nil || !*config.Reconfigure {
 			t.Fatalf("expected reconfigure intent to be true for reload-before-restart")
@@ -811,7 +812,7 @@ func TestApplyChangesToClusterTemplateReconfigureWithRestartSemantics(t *testing
 		}
 		config := &ctx.ClusterComponent.Configs[0]
 
-		applyChangesToCluster(ctx, config, map[string]string{"binlog_expire_logs_seconds": "432000"}, true)
+		applyChanges(ctx, config, map[string]string{"binlog_expire_logs_seconds": "432000"}, true)
 
 		if config.Reconfigure == nil || !*config.Reconfigure {
 			t.Fatalf("expected reconfigure intent to be true for split mixed update")
@@ -835,7 +836,7 @@ func TestApplyChangesToClusterTemplateReconfigureWithRestartSemantics(t *testing
 		}
 		config := &ctx.ClusterComponent.Configs[0]
 
-		applyChangesToCluster(ctx, config, map[string]string{"binlog_expire_logs_seconds": "432000"}, true)
+		applyChanges(ctx, config, map[string]string{"binlog_expire_logs_seconds": "432000"}, true)
 
 		if config.Reconfigure == nil || *config.Reconfigure {
 			t.Fatalf("expected reconfigure intent to be false when restart absorbs mixed update")
@@ -874,7 +875,7 @@ func TestApplyChangesToClusterTemplateReconfigureWithNonExecAction(t *testing.T)
 			ConfigHash: ptr.To(originalHash),
 		}
 
-		status := applyChangesToCluster(ctx, config, map[string]string{"maxmemory": "1gb"}, false)
+		status := applyChanges(ctx, config, map[string]string{"maxmemory": "1gb"}, false)
 
 		if status.Status != StatusFailed {
 			t.Fatalf("expected status %q, got %q", StatusFailed, status.Status)
@@ -901,7 +902,7 @@ func TestApplyChangesToClusterTemplateReconfigureWithNonExecAction(t *testing.T)
 		ctx.ParametersDef.ReloadStaticParamsBeforeRestart = ptr.To(true)
 		config := &appsv1.ClusterComponentConfig{Name: ptr.To("my.cnf")}
 
-		status := applyChangesToCluster(ctx, config, map[string]string{"maxmemory": "1gb"}, true)
+		status := applyChanges(ctx, config, map[string]string{"maxmemory": "1gb"}, true)
 
 		if status.Status != StatusFailed {
 			t.Fatalf("expected status %q, got %q", StatusFailed, status.Status)
@@ -919,7 +920,7 @@ func TestApplyChangesToClusterTemplateReconfigureWithNonExecAction(t *testing.T)
 		ctx.ParametersDef.MergeReloadAndRestart = ptr.To(true)
 		config := &appsv1.ClusterComponentConfig{Name: ptr.To("my.cnf")}
 
-		status := applyChangesToCluster(ctx, config, map[string]string{"maxmemory": "1gb"}, true)
+		status := applyChanges(ctx, config, map[string]string{"maxmemory": "1gb"}, true)
 
 		if status.Status != StatusRetry {
 			t.Fatalf("expected status %q, got %q", StatusRetry, status.Status)
@@ -937,4 +938,77 @@ func TestApplyChangesToClusterTemplateReconfigureWithNonExecAction(t *testing.T)
 			t.Fatalf("expected restart to remain true")
 		}
 	})
+}
+
+func TestSubmitConfigurationTarget(t *testing.T) {
+	for _, shard := range []bool{false, true} {
+		t.Run(fmt.Sprintf("shard=%t", shard), func(t *testing.T) {
+			ctx := Context{
+				ConfigTemplate: appsv1.ComponentFileTemplate{Name: "config"}, ConfigMapName: "current-source", ConfigHash: ptr.To("new-hash"),
+				ClusterComponent: &appsv1.ClusterComponentSpec{Replicas: 9},
+				Component:        &appsv1.Component{Spec: appsv1.ComponentSpec{Replicas: 2}},
+			}
+			if shard {
+				ctx.Component.Labels = map[string]string{constant.KBAppShardingNameLabelKey: "shard"}
+			}
+			status, err := submit(ctx, nil, true)
+			if err != nil || status.Status != StatusRetry {
+				t.Fatalf("submit failed: status=%#v err=%v", status, err)
+			}
+			configs, replicas := ctx.ClusterComponent.Configs, int32(9)
+			if shard {
+				configs, replicas = ctx.Component.Spec.Configs, 2
+				if len(ctx.ClusterComponent.Configs) != 0 {
+					t.Fatal("shard updated shared template")
+				}
+			} else if len(ctx.Component.Spec.Configs) != 0 {
+				t.Fatal("ordinary component bypassed Cluster")
+			}
+			if len(configs) != 1 || ptr.Deref(configs[0].ConfigHash, "") != "new-hash" || status.ExpectedCount != replicas {
+				t.Fatalf("incorrect configuration target: configs=%#v status=%#v", configs, status)
+			}
+			if shard && (configs[0].ConfigMap == nil || configs[0].ConfigMap.Name != "current-source") {
+				t.Fatal("shard ConfigMap source is missing")
+			}
+			if !shard && configs[0].ConfigMap != nil {
+				t.Fatal("ordinary submit populated ConfigMap source on Cluster")
+			}
+		})
+	}
+}
+
+func TestSubmitRejectsChangedConfigurationSource(t *testing.T) {
+	for _, shard := range []bool{false, true} {
+		for _, parentChanged := range []bool{false, true} {
+			t.Run(fmt.Sprintf("shard=%t parentChanged=%t", shard, parentChanged), func(t *testing.T) {
+				ctx := Context{
+					ConfigTemplate: appsv1.ComponentFileTemplate{Name: "config"}, ConfigMapName: "old-source", ConfigHash: ptr.To("old-task-hash"),
+					ClusterComponent: &appsv1.ClusterComponentSpec{Replicas: 9},
+					Component:        &appsv1.Component{Spec: appsv1.ComponentSpec{Replicas: 2}},
+				}
+				if shard {
+					ctx.Component.Labels = map[string]string{constant.KBAppShardingNameLabelKey: "shard"}
+				}
+				config := appsv1.ClusterComponentConfig{Name: ptr.To("config"), ConfigHash: ptr.To("new-source-hash"),
+					ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "new-source"}}},
+				}
+				if shard && !parentChanged {
+					config.ConfigHash = ctx.ConfigHash
+				}
+				if parentChanged {
+					ctx.ClusterComponent.Configs = []appsv1.ClusterComponentConfig{config}
+				} else {
+					ctx.Component.Spec.Configs = []appsv1.ClusterComponentConfig{config}
+				}
+				beforeParent, beforeComponent := ctx.ClusterComponent.DeepCopy(), ctx.Component.DeepCopy()
+				status, err := submit(ctx, nil, true)
+				if err == nil || status.Status != StatusFailedAndRetry {
+					t.Fatalf("old ConfigMap task accepted changed source: status=%#v err=%v", status, err)
+				}
+				if !reflect.DeepEqual(ctx.ClusterComponent, beforeParent) || !reflect.DeepEqual(ctx.Component, beforeComponent) {
+					t.Fatal("source rejection mutated configuration target")
+				}
+			})
+		}
+	}
 }

@@ -38,10 +38,10 @@ type ResourceFetcher[T any] struct {
 	obj *T
 	*render.ResourceCtx
 
-	ClusterObj, ClusterObjCopy *appsv1.Cluster
-	ComponentObj               *appsv1.Component
-	ComponentDefObj            *appsv1.ComponentDefinition
-	ClusterComObj              *appsv1.ClusterComponentSpec
+	ClusterObj, ClusterObjCopy     *appsv1.Cluster
+	ClusterComObj                  *appsv1.ClusterComponentSpec
+	ComponentObj, ComponentObjCopy *appsv1.Component
+	ComponentDefObj                *appsv1.ComponentDefinition
 
 	ConfigMapObj          *corev1.ConfigMap
 	ComponentParameterObj *parametersv1alpha1.ComponentParameter
@@ -88,6 +88,7 @@ func (r *ResourceFetcher[T]) ComponentAndComponentDef() *T {
 		if err := r.Client.Get(r.Context, componentKey, r.ComponentObj); err != nil {
 			return err
 		}
+		r.ComponentObjCopy = r.ComponentObj.DeepCopy()
 		if len(r.ComponentObj.Spec.CompDef) == 0 {
 			return fmt.Errorf("componentDefinition not found in component: %s", r.ComponentObj.Name)
 		}

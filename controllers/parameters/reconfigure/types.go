@@ -27,6 +27,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
@@ -80,11 +81,13 @@ type Context struct {
 	Client client.Client
 
 	ConfigTemplate appsv1.ComponentFileTemplate
+	ConfigMapName  string
 	ConfigHash     *string // the hash of the new configuration content
 	ConfigData     map[string]string
 
 	Cluster          *appsv1.Cluster
 	ClusterComponent *appsv1.ClusterComponentSpec
+	Component        *appsv1.Component
 	ITS              *workloads.InstanceSet // TODO: use cluster or component API?
 
 	ConfigDescription *parametersv1alpha1.ComponentConfigDescription
@@ -97,7 +100,17 @@ func (c *Context) getTargetConfigHash() *string {
 }
 
 func (c *Context) getTargetReplicas() int {
-	return int(c.ClusterComponent.Replicas)
+	if c.Component == nil || c.Component.Labels[constant.KBAppShardingNameLabelKey] == "" {
+		return int(c.ClusterComponent.Replicas)
+	}
+	return int(c.Component.Spec.Replicas)
+}
+
+func (c *Context) targetConfigs() *[]appsv1.ClusterComponentConfig {
+	if c.Component == nil || c.Component.Labels[constant.KBAppShardingNameLabelKey] == "" {
+		return &c.ClusterComponent.Configs
+	}
+	return &c.Component.Spec.Configs
 }
 
 // Policy defines the policy of reconfiguring.

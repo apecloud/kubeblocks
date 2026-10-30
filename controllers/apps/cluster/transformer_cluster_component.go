@@ -949,10 +949,27 @@ func (h *clusterShardingHandler) updateComps(transCtx *clusterTransformContext, 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for name := range updateSet {
 		running, proto := runningComps[name], protoComps[name]
-		if obj := copyAndMergeComponent(running, proto); obj != nil {
+		if obj := copyAndMergeShardComponent(running, proto); obj != nil {
 			graphCli.Update(dag, running, obj)
 		}
 	}
+}
+
+func copyAndMergeShardComponent(running, expected *appsv1.Component) *appsv1.Component {
+	proto := expected.DeepCopy()
+	for _, config := range running.Spec.Configs {
+		if config.Name == nil || config.ConfigMap == nil {
+			continue
+		}
+		index := slices.IndexFunc(proto.Spec.Configs, func(c appsv1.ClusterComponentConfig) bool {
+			return ptr.Equal(c.Name, config.Name)
+		})
+		if index < 0 || proto.Spec.Configs[index].ConfigMap != nil {
+			continue
+		}
+		proto.Spec.Configs[index] = *config.DeepCopy()
+	}
+	return copyAndMergeComponent(running, proto)
 }
 
 func (h *clusterShardingHandler) protoComps(transCtx *clusterTransformContext, name string, running *appsv1.Component) ([]*appsv1.Component, error) {

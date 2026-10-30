@@ -55,8 +55,8 @@ func newReconcileContext(reqCtx intctrlutil.RequestCtx, resource *render.Resourc
 
 func (c *reconcileContext) objects() error {
 	return c.Cluster().
-		ComponentAndComponentDef().
 		ComponentSpec().
+		ComponentAndComponentDef().
 		workload().
 		parametersDefinitions().
 		Complete()

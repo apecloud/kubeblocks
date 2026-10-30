@@ -43,7 +43,7 @@ func setProvisioningStartedCondition(conditions *[]metav1.Condition, clusterName
 	if err == nil {
 		condition = newProvisioningStartedCondition(clusterName, clusterGeneration)
 	} else {
-		condition = newFailedProvisioningStartedCondition(err)
+		condition = newFailedProvisioningStartedCondition(clusterGeneration, err)
 	}
 	meta.SetStatusCondition(conditions, condition)
 }
@@ -70,13 +70,13 @@ func getConditionReasonWithError(defaultReason string, err error) string {
 	return defaultReason
 }
 
-// newApplyResourcesCondition creates a condition when applied resources succeed.
-func newFailedProvisioningStartedCondition(err error) metav1.Condition {
+func newFailedProvisioningStartedCondition(generation int64, err error) metav1.Condition {
 	return metav1.Condition{
-		Type:    appsv1.ComponentConditionProvisioningStarted,
-		Status:  metav1.ConditionFalse,
-		Message: intctrlutil.TruncateConditionMessage(err.Error()),
-		Reason:  intctrlutil.TruncateConditionReason(getConditionReasonWithError(reasonPreCheckFailed, err)),
+		ObservedGeneration: generation,
+		Type:               appsv1.ComponentConditionProvisioningStarted,
+		Status:             metav1.ConditionFalse,
+		Message:            intctrlutil.TruncateConditionMessage(err.Error()),
+		Reason:             intctrlutil.TruncateConditionReason(getConditionReasonWithError(reasonPreCheckFailed, err)),
 	}
 }
 

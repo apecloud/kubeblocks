@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
+	"context"
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -29,6 +32,7 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -725,5 +729,130 @@ var _ = Describe("resolve CompDefinition and ServiceVersion", func() {
 			Expect(resolvedServiceVersion).Should(Equal(testapps.ServiceVersion("v2")))
 			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
 		})
+	})
+})
+
+var _ = Describe("explicit unsupported service version ownership", func() {
+	DescribeTable("classifies only fully resolved available candidates", func(scenario string, terminal bool) {
+		scheme := runtime.NewScheme()
+		Expect(appsv1.AddToScheme(scheme)).Should(Succeed())
+		def := testapps.NewComponentDefinitionFactory("owner-def").SetServiceVersion("1.0.0").SetRuntime(&corev1.Container{Name: "server", Image: "server:1.0.0"}).GetObject()
+		def.Generation = 2
+		def.Status.ObservedGeneration = 2
+		def.Status.Phase = appsv1.AvailablePhase
+		requested := "99.99.99"
+		objects := []client.Object{def}
+		switch scenario {
+		case "semantic prefix":
+			requested = "1.0.0"
+			def.Spec.ServiceVersion = "v1.0.0"
+		case "semantic prerelease":
+			requested = "1.0.0"
+			def.Spec.ServiceVersion = "1.0.0-beta.1"
+		case "missing":
+			objects = nil
+		case "unavailable":
+			def.Status.Phase = appsv1.UnavailablePhase
+		case "stale":
+			def.Status.ObservedGeneration = 1
+		case "invalid request":
+			requested = "invalid"
+		case "invalid provider":
+			def.Spec.ServiceVersion = "invalid"
+		case "empty provider":
+			def.Spec.ServiceVersion = ""
+		case "CV-only provider":
+			def.Spec.ServiceVersion = ""
+			cv := testapps.NewComponentVersionFactory("owner-version").AddRelease("release", "", "1.0.0", map[string]string{"server": "server:1.0.0"}).AddCompatibilityRule([]string{def.Name}, []string{"release"}).GetObject()
+			cv.Labels = map[string]string{def.Name: def.Name}
+			cv.Status.Phase = appsv1.AvailablePhase
+			objects = append(objects, cv)
+		case "empty default":
+			requested = ""
+			def.Spec.ServiceVersion = ""
+		case "unavailable version", "stale version":
+			cv := testapps.NewComponentVersionFactory("owner-version").AddRelease("release", "", "1.0.0", map[string]string{"server": "server:1.0.0"}).AddCompatibilityRule([]string{def.Name}, []string{"release"}).GetObject()
+			cv.Labels = map[string]string{def.Name: def.Name}
+			cv.Generation = 2
+			cv.Status.ObservedGeneration = 2
+			cv.Status.Phase = appsv1.AvailablePhase
+			if scenario == "unavailable version" {
+				cv.Status.Phase = appsv1.UnavailablePhase
+			} else {
+				cv.Status.ObservedGeneration = 1
+			}
+			objects = append(objects, cv)
+		}
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
+
+		reader := interceptor.NewClient(cli, interceptor.Funcs{List: func(ctx context.Context, cli client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+			_, definitions := list.(*appsv1.ComponentDefinitionList)
+			if scenario == "definition list error" && definitions || scenario == "version list error" && !definitions {
+				return fmt.Errorf("provider read failed")
+			}
+			return cli.List(ctx, list, opts...)
+		}})
+		_, _, err := resolveCompDefinitionNServiceVersion(ctx, reader, def.Name, requested)
+		Expect(err).Should(HaveOccurred())
+		Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorType("UnsupportedServiceVersion"))).Should(Equal(terminal))
+	},
+		Entry("definite unsupported request", "unsupported", true),
+		Entry("semantic match with version prefix remains retryable", "semantic prefix", false),
+		Entry("semantic prerelease match remains retryable", "semantic prerelease", false),
+		Entry("definition read error", "definition list error", false),
+		Entry("version read error", "version list error", false),
+		Entry("missing provider version catalog", "empty provider", false),
+		Entry("CV-only version catalog", "CV-only provider", true),
+		Entry("missing definition", "missing", false), Entry("unavailable definition", "unavailable", false), Entry("stale definition", "stale", false),
+		Entry("invalid request", "invalid request", false), Entry("invalid provider", "invalid provider", false), Entry("unspecified empty default", "empty default", false),
+		Entry("unavailable ComponentVersion", "unavailable version", false), Entry("stale ComponentVersion", "stale version", false),
+	)
+	DescribeTable("rejects unsupported targets at every normalization entry", func(target string) {
+		scheme := runtime.NewScheme()
+		Expect(appsv1.AddToScheme(scheme)).Should(Succeed())
+		def := testapps.NewComponentDefinitionFactory("owner-def").SetServiceVersion("1.0.0").SetRuntime(&corev1.Container{Name: "server", Image: "server:1.0.0"}).GetObject()
+		def.Status.Phase = appsv1.AvailablePhase
+		cluster := testapps.NewClusterFactory("default", "owner-target", "").AddComponent("db", def.Name).SetServiceVersion("1.0.0").GetObject()
+		cluster.Generation = 7
+		switch target {
+		case "component":
+			cluster.Spec.ComponentSpecs[0].ServiceVersion = "99.99.99"
+		case "instance":
+			cluster.Spec.ComponentSpecs[0].Instances = []appsv1.InstanceTemplate{{Name: "canary", ServiceVersion: "99.99.99", CompDef: def.Name}}
+		default:
+			cluster.Spec.ComponentSpecs = nil
+			cluster.Spec.Shardings = []appsv1.ClusterSharding{{Name: "db", Shards: 1, Template: appsv1.ClusterComponentSpec{ComponentDef: def.Name, ServiceVersion: "1.0.0", Replicas: 1}}}
+			switch target {
+			case "sharding":
+				cluster.Spec.Shardings[0].Template.ServiceVersion = "99.99.99"
+			case "shard template":
+				cluster.Spec.Shardings[0].ShardTemplates = []appsv1.ShardTemplate{{Name: "canary", Shards: ptr.To(int32(1)), ServiceVersion: ptr.To("99.99.99")}}
+			case "sharding instance":
+				cluster.Spec.Shardings[0].Template.Instances = []appsv1.InstanceTemplate{{Name: "canary", ServiceVersion: "99.99.99", CompDef: def.Name}}
+			}
+		}
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(def).Build()
+		transCtx := &clusterTransformContext{Context: ctx, Client: cli, Cluster: cluster.DeepCopy(), OrigCluster: cluster.DeepCopy()}
+		err := (&clusterNormalizationTransformer{}).Transform(transCtx, graph.NewDAG())
+		Expect(err).Should(HaveOccurred())
+		Expect(transCtx.Cluster.Status.Conditions).Should(ContainElement(And(HaveField("Status", metav1.ConditionFalse), HaveField("Reason", "UnsupportedServiceVersion"), HaveField("ObservedGeneration", int64(7)))))
+	}, Entry("normal component", "component"), Entry("normal instance template", "instance"), Entry("sharding default", "sharding"), Entry("named shard template", "shard template"), Entry("shard instance template", "sharding instance"))
+	It("recovers after provider repair without changing the Cluster generation", func() {
+		scheme := runtime.NewScheme()
+		Expect(appsv1.AddToScheme(scheme)).Should(Succeed())
+		def := testapps.NewComponentDefinitionFactory("owner-def").SetServiceVersion("1.0.0").SetRuntime(&corev1.Container{Name: "server", Image: "server:1.0.0"}).GetObject()
+		def.Status.Phase = appsv1.AvailablePhase
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(def).Build()
+		cluster := testapps.NewClusterFactory("default", "owner-repair", "").AddComponent("db", def.Name).SetServiceVersion("99.99.99").GetObject()
+		cluster.Generation = 7
+		transCtx := &clusterTransformContext{Context: ctx, Client: cli, Cluster: cluster.DeepCopy(), OrigCluster: cluster.DeepCopy()}
+		Expect((&clusterNormalizationTransformer{}).Transform(transCtx, graph.NewDAG())).Should(HaveOccurred())
+
+		cv := testapps.NewComponentVersionFactory("owner-repair-version").AddRelease("new", "", "99.99.99", map[string]string{"server": "server:99.99.99"}).AddCompatibilityRule([]string{def.Name}, []string{"new"}).GetObject()
+		cv.Labels = map[string]string{def.Name: def.Name}
+		cv.Status.Phase = appsv1.AvailablePhase
+		Expect(cli.Create(ctx, cv)).Should(Succeed())
+		Expect((&clusterNormalizationTransformer{}).Transform(transCtx, graph.NewDAG())).Should(Succeed())
+		Expect(transCtx.Cluster.Status.Conditions).Should(ContainElement(And(HaveField("Status", metav1.ConditionTrue), HaveField("ObservedGeneration", int64(7)))))
 	})
 })

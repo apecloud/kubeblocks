@@ -967,21 +967,7 @@ func copyAndMergeShardComponent(running, expected *appsv1.Component) *appsv1.Com
 		if index < 0 || proto.Spec.Configs[index].ConfigMap != nil {
 			continue
 		}
-		merged := &proto.Spec.Configs[index]
-		config = *config.DeepCopy()
-		merged.ConfigMap = config.ConfigMap
-		merged.ConfigHash = config.ConfigHash
-		merged.Restart = config.Restart
-		merged.Reconfigure = config.Reconfigure
-		merged.ReconfigureAction = config.ReconfigureAction
-		merged.ReconfigureArgs = config.ReconfigureArgs
-		delete(merged.Variables, constant.ConfigFilesUpdated)
-		if value, ok := config.Variables[constant.ConfigFilesUpdated]; ok {
-			if merged.Variables == nil {
-				merged.Variables = make(map[string]string)
-			}
-			merged.Variables[constant.ConfigFilesUpdated] = value
-		}
+		proto.Spec.Configs[index] = *config.DeepCopy()
 	}
 	return copyAndMergeComponent(running, proto)
 }

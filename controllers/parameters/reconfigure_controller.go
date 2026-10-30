@@ -512,6 +512,15 @@ func (r *ReconfigureReconciler) performUpgrade(rctx *reconcileContext, tasks []r
 			break
 		}
 	}
+	if policy == string(reconfigure.NonePolicy) && err == nil && status.Status == reconfigure.StatusRetry {
+		revision := rctx.configMap.Annotations[constant.ConfigurationRevision]
+		result := parseResult(rctx.configMap.Annotations[core.GenerateRevisionPhaseKey(revision)], revision)
+		if revision != "" && result.Revision == revision && result.Phase == parametersv1alpha1.CFinishedPhase {
+			// Invalidate completed recovery before publishing its target so an interruption
+			// cannot leave the repaired target paired with an old Finished result.
+			return r.status(rctx, policy, status, nil)
+		}
+	}
 	if err1 := r.submit(rctx); err1 != nil {
 		return intctrlutil.RequeueAfter(configReconcileInterval, rctx.Log, "failed to submit configuration changes", "error", err1)
 	}

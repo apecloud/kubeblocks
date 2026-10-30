@@ -62,6 +62,7 @@ const (
 
 	defaultActionCallTimeout = 30 * time.Second
 	maxActionCallTimeout     = 60 * time.Second
+	maxSwitchoverCallTimeout = kbaproto.MaxSwitchoverActionTimeout
 
 	defaultHTTPHost   = "127.0.0.1"
 	defaultHTTPScheme = "HTTP"
@@ -152,7 +153,7 @@ func nonBlockingCallAction(ctx context.Context, action *kbaproto.Action, paramet
 func nonBlockingCallActionX(ctx context.Context, action *kbaproto.Action, parameters map[string]string, timeout *int32,
 	stdinReader io.Reader, stdoutWriter, stderrWriter io.Writer) (chan error, error) {
 	var cancel context.CancelFunc
-	ctx, cancel = actionCallTimeoutContext(ctx, timeout)
+	ctx, cancel = actionCallTimeoutContext(ctx, action.Name, timeout)
 
 	var err error
 	errChan := make(chan error, 1)
@@ -173,12 +174,22 @@ func nonBlockingCallActionX(ctx context.Context, action *kbaproto.Action, parame
 	return errChan, nil
 }
 
-func actionCallTimeoutContext(ctx context.Context, timeout *int32) (context.Context, context.CancelFunc) {
+// Only the named lifecycle switchover action may opt into a longer declared
+// timeout. Requests cannot raise this bound; the value comes from the installed
+// action definition. Parent cancellation/deadlines are always preserved.
+func actionCallTimeoutContext(ctx context.Context, actionName string, timeout *int32) (context.Context, context.CancelFunc) {
+	limit := maxActionCallTimeout
+	if actionName == "switchover" {
+		limit = maxSwitchoverCallTimeout
+		if ptr.Deref(timeout, 0) < 0 {
+			return context.WithTimeout(ctx, limit)
+		}
+	}
 	switch {
 	case ptr.Deref(timeout, 0) == 0:
 		return context.WithTimeout(ctx, defaultActionCallTimeout)
 	case *timeout > 0:
-		return context.WithTimeout(ctx, min(time.Duration(*timeout)*time.Second, maxActionCallTimeout))
+		return context.WithTimeout(ctx, min(time.Duration(*timeout)*time.Second, limit))
 	default:
 		return ctx, func() {}
 	}

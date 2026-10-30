@@ -40,6 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	kbaproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
 // switchover constants
@@ -237,8 +238,25 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 	}
 	switch progressDetail.Status {
 	case opsv1alpha1.PendingProgressStatus:
-		// do switchover
-		if err = doSwitchover(reqCtx.Ctx, cli, synthesizedComp, switchover); err != nil {
+		// Refuse before any mutation when the caller cannot wait for the
+		// configured long action and its response. Do not detach the action.
+		if synthesizedComp.LifecycleActions == nil || synthesizedComp.LifecycleActions.Switchover == nil {
+			err = fmt.Errorf("switchover action is not defined")
+		} else {
+			err = checkLongSwitchoverBudget(reqCtx.Ctx, opsRequest,
+				synthesizedComp.LifecycleActions.Switchover.TimeoutSeconds)
+		}
+		if err == nil {
+			callCtx := reqCtx.Ctx
+			cancel := func() {}
+			if (synthesizedComp.LifecycleActions.Switchover.TimeoutSeconds > 60 || synthesizedComp.LifecycleActions.Switchover.TimeoutSeconds < 0) && opsRequest.Spec.TimeoutSeconds != nil && *opsRequest.Spec.TimeoutSeconds > 0 {
+				deadline := opsRequest.Status.StartTimestamp.Add(time.Duration(*opsRequest.Spec.TimeoutSeconds) * time.Second)
+				callCtx, cancel = context.WithDeadline(callCtx, deadline)
+			}
+			err = doSwitchover(callCtx, cli, synthesizedComp, switchover)
+			cancel()
+		}
+		if err != nil {
 			progressDetail.Status = opsv1alpha1.FailedProgressStatus
 			progressDetail.Message = fmt.Sprintf("component %s %s", compName, err.Error())
 		} else {
@@ -265,6 +283,33 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 		}
 	}
 	handleProgressDetail(reqCtx, opsRequest, progressDetail, compName, completedCount, failedCount)
+	return nil
+}
+
+// The five-minute Processing timeout starts AFTER the blocking action returns;
+// it is a role-observation window, not the action execution deadline. A caller's
+// explicit Ops or context deadline must also leave enough runway before launch.
+func checkLongSwitchoverBudget(ctx context.Context, ops *opsv1alpha1.OpsRequest, actionSeconds int32) error {
+	if actionSeconds >= 0 && actionSeconds <= 60 {
+		return nil // preserve the existing short-action contract
+	}
+	duration := kbaproto.MaxSwitchoverActionTimeout
+	if actionSeconds > 0 {
+		duration = min(duration, time.Duration(actionSeconds)*time.Second)
+	}
+	needed := duration + 10*time.Second // connection and response headroom
+	if deadline, ok := ctx.Deadline(); ok && time.Until(deadline) < needed {
+		return fmt.Errorf("not launching long switchover: caller deadline has less than %s remaining", needed)
+	}
+	if ops.Spec.TimeoutSeconds != nil && *ops.Spec.TimeoutSeconds > 0 {
+		if ops.Status.StartTimestamp.IsZero() {
+			return fmt.Errorf("not launching long switchover: Ops start timestamp is missing")
+		}
+		deadline := ops.Status.StartTimestamp.Add(time.Duration(*ops.Spec.TimeoutSeconds) * time.Second)
+		if time.Until(deadline) < needed {
+			return fmt.Errorf("not launching long switchover: Ops timeout has less than %s remaining", needed)
+		}
+	}
 	return nil
 }
 

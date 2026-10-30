@@ -23,6 +23,10 @@ import (
 	"time"
 )
 
+// MaxSwitchoverActionTimeout bounds explicitly configured long switchover
+// actions. Other lifecycle actions retain their existing timeout policy.
+const MaxSwitchoverActionTimeout = 5 * time.Minute
+
 type Action struct {
 	Name           string       `json:"name"`
 	Exec           *ExecAction  `json:"exec,omitempty"`

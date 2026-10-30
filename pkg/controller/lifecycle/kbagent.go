@@ -330,7 +330,13 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 			continue // not kb-agent container and port defined, for test only
 		}
 
-		rsp, err := cli.Action(ctx, *req)
+		callCtx, cancel, err := longSwitchoverCallContext(ctx, lfa.name(), spec.TimeoutSeconds, len(pods))
+		if err != nil {
+			_ = cli.Close()
+			return nil, err
+		}
+		rsp, err := cli.Action(callCtx, *req)
+		cancel()
 		_ = cli.Close()
 
 		if err != nil {
@@ -345,6 +351,27 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 		}
 	}
 	return output, nil
+}
+
+// Bound transport waiting separately from the agent's execution deadline. A
+// disconnect is an unknown outcome, not permission to submit a second mutation.
+func longSwitchoverCallContext(ctx context.Context, name string, seconds int32, targets int) (context.Context, context.CancelFunc, error) {
+	if name != "switchover" || (seconds >= 0 && seconds <= 60) {
+		return ctx, func() {}, nil
+	}
+	if targets != 1 {
+		return nil, nil, fmt.Errorf("long switchover requires exactly one execution pod, got %d", targets)
+	}
+	duration := proto.MaxSwitchoverActionTimeout
+	if seconds > 0 {
+		duration = min(duration, time.Duration(seconds)*time.Second)
+	}
+	duration += 10 * time.Second // allow connection setup and the final response
+	if deadline, ok := ctx.Deadline(); ok && time.Until(deadline) < duration {
+		return nil, nil, fmt.Errorf("not launching long switchover: caller deadline has less than %s remaining", duration)
+	}
+	callCtx, cancel := context.WithTimeout(ctx, duration)
+	return callCtx, cancel, nil
 }
 
 func (a *kbagent) selectTargetPods(spec *appsv1.Action) ([]*corev1.Pod, error) {

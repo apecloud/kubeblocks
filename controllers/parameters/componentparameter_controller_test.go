@@ -26,7 +26,10 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -93,6 +96,70 @@ var _ = Describe("ComponentParameter Controller", func() {
 				g.Expect(status).ShouldNot(BeNil())
 				g.Expect(status.UpdateRevision).Should(BeEquivalentTo("3"))
 				g.Expect(status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
+			})).Should(Succeed())
+		})
+
+		It("should retry when a referenced Service is created later", func() {
+			reconciler := &ComponentParameterReconciler{
+				Client: k8sClient, Scheme: k8sClient.Scheme(), Recorder: record.NewFakeRecorder(100),
+			}
+			cfgKey := client.ObjectKey{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      core.GenerateComponentConfigurationName(clusterName, defaultCompName),
+			}
+
+			By("ignoring a deleted ComponentParameter")
+			_, err := reconciler.Reconcile(testCtx.Ctx, ctrl.Request{NamespacedName: cfgKey})
+			Expect(err).ShouldNot(HaveOccurred())
+
+			templateObj, _, compObj, _, _ := mockReconcileResource()
+			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
+				g.Expect(cfg.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
+			})).Should(Succeed())
+
+			By("making the next render depend on a Service that does not exist yet")
+			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(templateObj), func(tpl *corev1.ConfigMap) {
+				tpl.Data[testparameters.MysqlConfigFile] = strings.ReplaceAll(
+					tpl.Data[testparameters.MysqlConfigFile], "server-id=1", "server-id={{ $.component.replicas }}")
+			})).Should(Succeed())
+			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKey{Name: compObj.Spec.CompDef}, func(def *appsv1.ComponentDefinition) {
+				def.Spec.ServiceRefDeclarations = []appsv1.ServiceRefDeclaration{{
+					Name:                       "backend",
+					ServiceRefDeclarationSpecs: []appsv1.ServiceRefDeclarationSpec{{ServiceKind: "mysql", ServiceVersion: "8.0"}},
+				}}
+			})).Should(Succeed())
+			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compObj), func(comp *appsv1.Component) {
+				comp.Spec.Replicas = 2
+				comp.Spec.ServiceRefs = []appsv1.ServiceRef{{
+					Name: "backend",
+					ClusterServiceSelector: &appsv1.ServiceRefClusterSelector{
+						Cluster: clusterName,
+						Service: &appsv1.ServiceRefServiceSelector{Service: "late-backend", Port: "mysql"},
+					},
+				}}
+			})).Should(Succeed())
+
+			By("returning the missing dependency error to the controller work queue")
+			_, err = reconciler.Reconcile(testCtx.Ctx, ctrl.Request{NamespacedName: cfgKey})
+			Expect(apierrors.IsNotFound(err)).Should(BeTrue(), "dependency NotFound must schedule a retry: %v", err)
+			Expect(err.Error()).Should(ContainSubstring("late-backend"))
+
+			By("resuming rendering after the Service appears without editing the ComponentParameter")
+			service := &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      constant.GenerateClusterServiceName(clusterName, "late-backend"),
+				},
+				Spec: corev1.ServiceSpec{Ports: []corev1.ServicePort{{Name: "mysql", Port: 3306}}},
+			}
+			Expect(k8sClient.Create(testCtx.Ctx, service)).Should(Succeed())
+			DeferCleanup(func() { Expect(k8sClient.Delete(testCtx.Ctx, service)).Should(Succeed()) })
+			configKey := client.ObjectKey{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      core.GetComponentCfgName(clusterName, defaultCompName, configSpecName),
+			}
+			Eventually(testapps.CheckObj(&testCtx, configKey, func(g Gomega, cfg *corev1.ConfigMap) {
+				g.Expect(cfg.Data[testparameters.MysqlConfigFile]).Should(ContainSubstring("server-id=2"))
 			})).Should(Succeed())
 		})
 

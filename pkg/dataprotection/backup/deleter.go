@@ -48,6 +48,10 @@ import (
 const (
 	deleteBackupFilesJobNamePrefix = "delete-"
 	deleteContainerName            = "deleter"
+
+	// containerConfigErrorReason is the waiting reason reported by kubelet when a container
+	// can not be started because an env/envFrom reference (e.g. a secret) can not be resolved.
+	containerConfigErrorReason = "CreateContainerConfigError"
 )
 
 type DeletionStatus string
@@ -155,6 +159,11 @@ func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, 
 		}
 		allCompleted := true
 		for _, preJob := range preJobs {
+			if preJob == nil {
+				// the pre-delete job has been deleted and will be rebuilt in the next reconciliation.
+				allCompleted = false
+				continue
+			}
 			_, finishedType, msg := utils.IsJobFinished(preJob)
 			if finishedType == batchv1.JobFailed {
 				return DeletionStatusFailed,
@@ -355,7 +364,23 @@ func (d *Deleter) doPreDeleteAction(
 	if exists, err := ctrlutil.CheckResourceExists(d.Ctx, d.Client, preJobKey, preJob); err != nil {
 		return nil, err
 	} else if exists {
-		return preJob, nil
+		stale, err := d.shouldDeleteStalePreDeleteJob(backup, target, preJob)
+		if err != nil {
+			return nil, err
+		}
+		if !stale {
+			return preJob, nil
+		}
+		// The job can never be started since the credentials of the target cluster have been
+		// recycled with the cluster, and the pod template of a job is immutable. Delete it here,
+		// and the next reconciliation will create a new one, which doesn't inherit the credentials
+		// anymore since the cluster is gone.
+		d.Log.Info("delete the pre-delete job that can never be started",
+			"job", preJobKey.String(), "backup", backup.Name, "invalidSecret", target.ConnectionCredential.SecretName)
+		if err = d.Client.Delete(d.Ctx, preJob, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil && !apierrors.IsNotFound(err) {
+			return nil, err
+		}
+		return nil, nil
 	}
 	// create pre-delete action
 	runAsUser := int64(0)
@@ -442,6 +467,102 @@ func (d *Deleter) selectAvailableTargetPod(namespace string, selector *dpv1alpha
 		return targetPod, err
 	}
 	return selectPod(selector.FallbackLabelSelector)
+}
+
+// shouldDeleteStalePreDeleteJob checks whether the existing pre-delete job can never be started
+// and should be deleted (it will be re-created by the next reconciliation). It happens when the
+// target cluster is deleted while the backup is being deleted: the job has copied the connection
+// credentials of the target pod, but the credentials are recycled with the cluster, so the
+// container can not be started and the backup sticks in the deleting phase forever.
+func (d *Deleter) shouldDeleteStalePreDeleteJob(
+	backup *dpv1alpha1.Backup,
+	target *dpv1alpha1.BackupStatusTarget,
+	job *batchv1.Job) (bool, error) {
+	if job == nil || target == nil || target.ConnectionCredential == nil || target.ConnectionCredential.SecretName == "" {
+		return false, nil
+	}
+	// the job doesn't reference the connection credential at all, deleting it can not help.
+	if !jobReferencesSecret(job, target.ConnectionCredential.SecretName) {
+		return false, nil
+	}
+	clusterGone, err := d.isTargetClusterGone(backup)
+	if err != nil || !clusterGone {
+		return false, err
+	}
+	// the credential still exists, the job can be started as expected.
+	secret := &corev1.Secret{}
+	err = d.Client.Get(d.Ctx, client.ObjectKey{Namespace: backup.Namespace, Name: target.ConnectionCredential.SecretName}, secret)
+	if err == nil {
+		return false, nil
+	}
+	if !apierrors.IsNotFound(err) {
+		return false, err
+	}
+	// only delete the job if the container has never been started, otherwise the running
+	// container keeps its env and can still finish the deletion.
+	return d.isPodWaitingForContainerConfig(job.Namespace, job.Name)
+}
+
+// isTargetClusterGone checks whether the cluster that the backup belongs to has been deleted.
+// A cluster recreated with the same name is also treated as gone, since its credentials are new
+// and can not be used by the backup anymore.
+func (d *Deleter) isTargetClusterGone(backup *dpv1alpha1.Backup) (bool, error) {
+	clusterName := backup.Labels[constant.AppInstanceLabelKey]
+	clusterUID := backup.Labels[dptypes.ClusterUIDLabelKey]
+	if clusterName == "" || clusterUID == "" {
+		return false, nil
+	}
+	cluster := &appsv1.Cluster{}
+	if err := d.Client.Get(d.Ctx, client.ObjectKey{Namespace: backup.Namespace, Name: clusterName}, cluster); err != nil {
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	}
+	return string(cluster.UID) != clusterUID, nil
+}
+
+// isPodWaitingForContainerConfig checks whether the pods of the job can not be started because
+// a referenced config (e.g. a secret) does not exist.
+func (d *Deleter) isPodWaitingForContainerConfig(namespace, jobName string) (bool, error) {
+	pods, err := utils.GetAssociatedPodsOfJob(d.Ctx, d.Client, namespace, jobName)
+	if err != nil {
+		return false, err
+	}
+	for i := range pods.Items {
+		pod := &pods.Items[i]
+		if isContainerConfigError(pod.Status.InitContainerStatuses) ||
+			isContainerConfigError(pod.Status.ContainerStatuses) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func isContainerConfigError(statuses []corev1.ContainerStatus) bool {
+	for i := range statuses {
+		if waiting := statuses[i].State.Waiting; waiting != nil && waiting.Reason == containerConfigErrorReason {
+			return true
+		}
+	}
+	return false
+}
+
+// jobReferencesSecret checks whether the containers of the job reference the secret.
+func jobReferencesSecret(job *batchv1.Job, secretName string) bool {
+	for _, container := range job.Spec.Template.Spec.Containers {
+		for _, env := range container.Env {
+			if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil && env.ValueFrom.SecretKeyRef.Name == secretName {
+				return true
+			}
+		}
+		for _, envFrom := range container.EnvFrom {
+			if envFrom.SecretRef != nil && envFrom.SecretRef.Name == secretName {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (d *Deleter) DeleteVolumeSnapshots(backup *dpv1alpha1.Backup) error {

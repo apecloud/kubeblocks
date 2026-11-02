@@ -26,6 +26,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -118,6 +119,12 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for upgrade opsRequest.
 func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
+	if rejection := u.targetRejection(opsRes); rejection != nil {
+		if u.targetsCurrentlyRunning(opsRes) {
+			return opsv1alpha1.OpsRunningPhase, time.Second, nil
+		}
+		return opsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("%s", rejection.Message)
+	}
 	upgradeSpec := opsRes.OpsRequest.Spec.Upgrade
 	var (
 		compOpsHelper componentOpsHelper
@@ -203,6 +210,64 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, podApplyCompOps)
 	}
 	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "upgrade", handleUpgradeProgress)
+}
+
+func (u upgradeOpsHandler) targetRejection(opsRes *OpsResource) *metav1.Condition {
+	generation := opsRes.OpsRequest.Status.ClusterGeneration
+	if opsRes.OpsRequest.Status.Phase != opsv1alpha1.OpsRunningPhase || generation <= 0 ||
+		opsRes.Cluster.Generation != generation || !u.targetsUnchanged(opsRes) {
+		return nil
+	}
+	condition := meta.FindStatusCondition(opsRes.Cluster.Status.Conditions, appsv1.ConditionTypeProvisioningStarted)
+	if condition != nil && condition.Status == metav1.ConditionFalse && condition.Reason == appsv1.ReasonUnsupportedServiceVersion && condition.ObservedGeneration == generation {
+		return condition
+	}
+	return nil
+}
+
+func (u upgradeOpsHandler) targetsUnchanged(opsRes *OpsResource) bool {
+	for _, target := range opsRes.OpsRequest.Spec.Upgrade.Components {
+		spec := getComponentSpecOrShardingTemplate(opsRes.Cluster, target.ComponentName)
+		if spec == nil || u.needUpdateCompDef(target, opsRes.Cluster) && spec.ComponentDef != *target.ComponentDefinitionName ||
+			target.ServiceVersion != nil && spec.ServiceVersion != *target.ServiceVersion {
+			return false
+		}
+		for _, requested := range target.Instances {
+			found := false
+			for _, instance := range spec.Instances {
+				if instance.Name != requested.Name {
+					continue
+				}
+				if requested.ComponentDefinitionName != nil && instance.CompDef != *requested.ComponentDefinitionName ||
+					requested.ServiceVersion != nil && instance.ServiceVersion != *requested.ServiceVersion {
+					return false
+				}
+				found = true
+				break
+			}
+			if !found {
+				return false
+			}
+		}
+	}
+	return len(opsRes.OpsRequest.Spec.Upgrade.Components) > 0
+}
+
+func (u upgradeOpsHandler) targetsCurrentlyRunning(opsRes *OpsResource) bool {
+	for _, target := range opsRes.OpsRequest.Spec.Upgrade.Components {
+		if status, ok := opsRes.Cluster.Status.Components[target.ComponentName]; ok {
+			if status.ObservedGeneration != opsRes.Cluster.Generation || !status.UpToDate || status.Phase != appsv1.RunningComponentPhase {
+				return false
+			}
+		} else if status, ok := opsRes.Cluster.Status.Shardings[target.ComponentName]; ok {
+			if status.ObservedGeneration != opsRes.Cluster.Generation || !status.UpToDate || status.Phase != appsv1.RunningComponentPhase {
+				return false
+			}
+		} else {
+			return false
+		}
+	}
+	return len(opsRes.OpsRequest.Spec.Upgrade.Components) > 0
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration

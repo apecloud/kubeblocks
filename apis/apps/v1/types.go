@@ -49,6 +49,9 @@ const (
 	ConditionTypeAvailable           = "Available"           // ConditionTypeAvailable indicates whether the target object is available for serving.
 )
 
+// ReasonUnsupportedServiceVersion indicates that the requested service version is not supported by the available definitions.
+const ReasonUnsupportedServiceVersion = "UnsupportedServiceVersion"
+
 type ServiceRef struct {
 	// Specifies the identifier of the service reference declaration.
 	// It corresponds to the serviceRefDeclaration name defined in either:

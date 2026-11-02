@@ -737,6 +737,7 @@ func shardsOutOfLimitError(shardingName string, shards int32, limit appsv1.Shard
 
 // resolveCompDefinitionNServiceVersion resolves and returns the specific component definition object and the service version supported.
 func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader, compDefName, serviceVersion string) (*appsv1.ComponentDefinition, string, error) {
+	requestedServiceVersion := serviceVersion
 	var (
 		compDef *appsv1.ComponentDefinition
 	)
@@ -746,7 +747,7 @@ func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader
 	}
 
 	// mapping from <service version> to <[]*appsv1.ComponentDefinition>
-	serviceVersionToCompDefs, err := serviceVersionToCompDefinitions(ctx, cli, compDefs, serviceVersion)
+	serviceVersionToCompDefs, completeVersions, err := serviceVersionToCompDefinitions(ctx, cli, compDefs, serviceVersion)
 	if err != nil {
 		return compDef, serviceVersion, err
 	}
@@ -763,7 +764,22 @@ func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader
 	// component definitions that support the service version
 	compatibleCompDefs := serviceVersionToCompDefs[serviceVersion]
 	if len(compatibleCompDefs) == 0 {
-		return compDef, serviceVersion, fmt.Errorf(`no matched component definition found with componentDef "%s" and serviceVersion "%s"`, compDefName, serviceVersion)
+		err := fmt.Errorf(`no matched component definition found with componentDef "%s" and serviceVersion "%s"`, compDefName, serviceVersion)
+		_, versionErr := version.ParseSemantic(requestedServiceVersion)
+		available := len(compDefs) > 0
+		for _, candidate := range compDefs {
+			available = available && candidate.Status.Phase == appsv1.AvailablePhase && candidate.Status.ObservedGeneration == candidate.Generation
+		}
+		if requestedServiceVersion != "" && versionErr == nil && available && completeVersions && len(serviceVersionToCompDefs) == 0 {
+			canReject, discoveryErr := canRejectServiceVersion(ctx, cli, compDefs, requestedServiceVersion)
+			if discoveryErr != nil {
+				return compDef, serviceVersion, discoveryErr
+			}
+			if canReject {
+				return compDef, serviceVersion, controllerutil.NewError(controllerutil.ErrorType(appsv1.ReasonUnsupportedServiceVersion), err.Error())
+			}
+		}
+		return compDef, serviceVersion, err
 	}
 
 	// choose the latest one
@@ -772,6 +788,53 @@ func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader
 	compatibleCompDefName := compatibleCompDefNames[len(compatibleCompDefNames)-1]
 
 	return compatibleCompDefs[compatibleCompDefName], serviceVersion, nil
+}
+
+func canRejectServiceVersion(ctx context.Context, cli client.Reader, compDefs []*appsv1.ComponentDefinition, requested string) (bool, error) {
+	versions := &appsv1.ComponentVersionList{}
+	if err := cli.List(ctx, versions); err != nil {
+		return false, err
+	}
+	resolvedPatterns := make(map[string]sets.Set[string])
+	for _, compDef := range compDefs {
+		for _, cv := range versions.Items {
+			if cv.Labels[compDef.Name] == compDef.Name {
+				if cv.Status.Phase != appsv1.AvailablePhase || cv.Status.ObservedGeneration != cv.Generation {
+					return false, nil
+				}
+				for serviceVersion := range compatibleServiceVersions4Definition(compDef, &cv) {
+					match, err := component.CompareServiceVersion(requested, serviceVersion)
+					if err != nil || match {
+						return false, err
+					}
+				}
+				continue
+			}
+			for _, rule := range cv.Spec.CompatibilityRules {
+				for _, pattern := range rule.CompDefs {
+					if !component.PrefixOrRegexMatched(compDef.Name, pattern) {
+						continue
+					}
+					names, ok := resolvedPatterns[pattern]
+					if !ok {
+						definitions, err := listCompDefinitionsWithPattern(ctx, cli, pattern)
+						if err != nil {
+							return false, err
+						}
+						names = sets.New[string]()
+						for _, definition := range definitions {
+							names.Insert(definition.Name)
+						}
+						resolvedPatterns[pattern] = names
+					}
+					if names.Has(compDef.Name) {
+						return false, nil
+					}
+				}
+			}
+		}
+	}
+	return true, nil
 }
 
 // listCompDefinitionsWithPattern returns all component definitions whose names match the given pattern
@@ -797,7 +860,8 @@ func listCompDefinitionsWithPattern(ctx context.Context, cli client.Reader, name
 }
 
 func serviceVersionToCompDefinitions(ctx context.Context, cli client.Reader,
-	compDefs []*appsv1.ComponentDefinition, serviceVersion string) (map[string]map[string]*appsv1.ComponentDefinition, error) {
+	compDefs []*appsv1.ComponentDefinition, serviceVersion string) (map[string]map[string]*appsv1.ComponentDefinition, bool, error) {
+	completeVersions := len(compDefs) > 0
 	result := make(map[string]map[string]*appsv1.ComponentDefinition)
 
 	insert := func(version string, compDef *appsv1.ComponentDefinition) {
@@ -818,7 +882,7 @@ func serviceVersionToCompDefinitions(ctx context.Context, cli client.Reader,
 	for _, compDef := range compDefs {
 		compVersions, err := component.CompatibleCompVersions4Definition(ctx, cli, compDef)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 
 		serviceVersions := sets.New[string]()
@@ -830,13 +894,15 @@ func serviceVersionToCompDefinitions(ctx context.Context, cli client.Reader,
 			serviceVersions = serviceVersions.Union(compatibleServiceVersions4Definition(compDef, compVersion))
 		}
 
+		completeVersions = completeVersions && len(serviceVersions) > 0
+
 		for version := range serviceVersions {
 			if err = checkedInsert(version, compDef); err != nil {
-				return nil, err
+				return nil, false, err
 			}
 		}
 	}
-	return result, nil
+	return result, completeVersions, nil
 }
 
 // compatibleServiceVersions4Definition returns all service versions that are compatible with specified component definition.

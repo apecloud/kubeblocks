@@ -710,7 +710,13 @@ func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader
 			available = available && candidate.Status.Phase == appsv1.AvailablePhase && candidate.Status.ObservedGeneration == candidate.Generation
 		}
 		if requestedServiceVersion != "" && versionErr == nil && available && completeVersions && len(serviceVersionToCompDefs) == 0 {
-			return compDef, serviceVersion, intctrlutil.NewError(intctrlutil.ErrorType(appsv1.ReasonUnsupportedServiceVersion), err.Error())
+			canReject, discoveryErr := canRejectServiceVersion(ctx, cli, compDefs, requestedServiceVersion)
+			if discoveryErr != nil {
+				return compDef, serviceVersion, discoveryErr
+			}
+			if canReject {
+				return compDef, serviceVersion, intctrlutil.NewError(intctrlutil.ErrorType(appsv1.ReasonUnsupportedServiceVersion), err.Error())
+			}
 		}
 		return compDef, serviceVersion, err
 	}
@@ -721,6 +727,60 @@ func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader
 	compatibleCompDefName := compatibleCompDefNames[len(compatibleCompDefNames)-1]
 
 	return compatibleCompDefs[compatibleCompDefName], serviceVersion, nil
+}
+
+func canRejectServiceVersion(ctx context.Context, cli client.Reader, compDefs []*appsv1.ComponentDefinition, requested string) (bool, error) {
+	versions := &appsv1.ComponentVersionList{}
+	if err := cli.List(ctx, versions); err != nil {
+		return false, err
+	}
+	resolvedPatterns := make(map[string]sets.Set[string])
+	for _, compDef := range compDefs {
+		for _, cv := range versions.Items {
+			releases := sets.New[string]()
+			compatible := false
+			for _, rule := range cv.Spec.CompatibilityRules {
+				for _, pattern := range rule.CompDefs {
+					if !component.PrefixOrRegexMatched(compDef.Name, pattern) {
+						continue
+					}
+					names, ok := resolvedPatterns[pattern]
+					if !ok {
+						definitions, err := listCompDefinitionsWithPattern(ctx, cli, pattern)
+						if err != nil {
+							return false, err
+						}
+						names = sets.New[string]()
+						for _, definition := range definitions {
+							names.Insert(definition.Name)
+						}
+						resolvedPatterns[pattern] = names
+					}
+					if names.Has(compDef.Name) {
+						compatible = true
+						releases.Insert(rule.Releases...)
+						break
+					}
+				}
+			}
+			if !compatible {
+				continue
+			}
+			if cv.Labels[compDef.Name] != compDef.Name || cv.Status.Phase != appsv1.AvailablePhase || cv.Status.ObservedGeneration != cv.Generation {
+				return false, nil
+			}
+			for _, release := range cv.Spec.Releases {
+				if !releases.Has(release.Name) {
+					continue
+				}
+				match, err := component.CompareServiceVersion(requested, release.ServiceVersion)
+				if err != nil || match {
+					return false, err
+				}
+			}
+		}
+	}
+	return true, nil
 }
 
 // listCompDefinitionsWithPattern returns all component definitions whose names match the given pattern

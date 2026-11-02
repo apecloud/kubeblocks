@@ -743,6 +743,40 @@ var _ = Describe("explicit unsupported service version ownership", func() {
 		requested := "99.99.99"
 		objects := []client.Object{def}
 		switch scenario {
+		case "unlabelled prefix", "unlabelled regex", "stale compatibility", "missing label", "unrelated pending", "exact preference", "shadowed release", "published other version", "publication race", "fallback list error", "pattern list error", "successful":
+			cv := testapps.NewComponentVersionFactory("pending-version").AddRelease("release", "", requested, map[string]string{"server": "server:new"}).AddCompatibilityRule([]string{def.Name}, []string{"release"}).GetObject()
+			cv.Generation = 2
+			switch scenario {
+			case "unlabelled prefix":
+				cv.Spec.CompatibilityRules[0].CompDefs = []string{"owner-"}
+			case "unlabelled regex":
+				cv.Spec.CompatibilityRules[0].CompDefs = []string{"^owner-.*$"}
+			case "stale compatibility":
+				cv.Labels = map[string]string{"old-def": "old-def"}
+				cv.Status.ObservedGeneration = 1
+			case "unrelated pending":
+				cv.Spec.CompatibilityRules[0].CompDefs = []string{"unrelated"}
+			case "exact preference", "shadowed release":
+				exact := def.DeepCopy()
+				exact.Name = "owner"
+				objects = append(objects, exact)
+				cv.Spec.CompatibilityRules[0].CompDefs = []string{exact.Name}
+				if scenario == "shadowed release" {
+					cv.Spec.CompatibilityRules = append(cv.Spec.CompatibilityRules, appsv1.ComponentVersionCompatibilityRule{CompDefs: []string{def.Name}, Releases: []string{"other"}})
+					cv.Spec.Releases = append(cv.Spec.Releases, appsv1.ComponentVersionRelease{Name: "other", ServiceVersion: "1.0.0", Images: map[string]string{"server": "server:1.0.0"}})
+					cv.Labels = map[string]string{def.Name: def.Name}
+				}
+			case "published other version":
+				cv.Spec.Releases[0].ServiceVersion = "1.0.0"
+				cv.Labels = map[string]string{def.Name: def.Name}
+			case "successful":
+				requested = "1.0.0"
+			}
+			if scenario == "missing label" || scenario == "published other version" || scenario == "shadowed release" {
+				cv.Status.Phase = appsv1.AvailablePhase
+				cv.Status.ObservedGeneration = cv.Generation
+			}
+			objects = append(objects, cv)
 		case "semantic prefix":
 			requested = "1.0.0"
 			def.Spec.ServiceVersion = "v1.0.0"
@@ -785,17 +819,63 @@ var _ = Describe("explicit unsupported service version ownership", func() {
 		}
 		cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
 
+		definitionReads := 0
 		reader := interceptor.NewClient(cli, interceptor.Funcs{List: func(ctx context.Context, cli client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
 			_, definitions := list.(*appsv1.ComponentDefinitionList)
+			options := &client.ListOptions{}
+			options.ApplyOptions(opts)
+			filtered := options.LabelSelector != nil && !options.LabelSelector.Empty()
+			if !definitions && !filtered && (scenario == "fallback list error" || scenario == "successful") {
+				return fmt.Errorf("fallback discovery failed")
+			}
+			if definitions && scenario == "pattern list error" {
+				definitionReads++
+				if definitionReads > 1 {
+					return fmt.Errorf("pattern discovery failed")
+				}
+			}
+			if !definitions && (scenario == "publication race" || scenario == "shadowed release") {
+				if filtered {
+					return nil
+				}
+				if scenario == "publication race" {
+					cv := &appsv1.ComponentVersion{}
+					if err := cli.Get(ctx, client.ObjectKey{Name: "pending-version"}, cv); err != nil {
+						return err
+					}
+					cv.Labels = map[string]string{def.Name: def.Name}
+					cv.Status.Phase = appsv1.AvailablePhase
+					cv.Status.ObservedGeneration = cv.Generation
+					if err := cli.Update(ctx, cv); err != nil {
+						return err
+					}
+				}
+			}
 			if scenario == "definition list error" && definitions || scenario == "version list error" && !definitions {
 				return fmt.Errorf("provider read failed")
 			}
 			return cli.List(ctx, list, opts...)
 		}})
 		_, _, err := resolveCompDefinitionNServiceVersion(ctx, reader, def.Name, requested)
+		if scenario == "successful" {
+			Expect(err).ShouldNot(HaveOccurred())
+			return
+		}
 		Expect(err).Should(HaveOccurred())
 		Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorType("UnsupportedServiceVersion"))).Should(Equal(terminal))
 	},
+		Entry("unlabelled prefix-compatible catalog", "unlabelled prefix", false),
+		Entry("unlabelled regex-compatible catalog", "unlabelled regex", false),
+		Entry("stale compatibility labels", "stale compatibility", false),
+		Entry("current catalog missing discovery label", "missing label", false),
+		Entry("unrelated pending catalog", "unrelated pending", true),
+		Entry("exact rule name preempts prefix", "exact preference", true),
+		Entry("shadowed rule does not contribute releases", "shadowed release", true),
+		Entry("published catalog with other versions", "published other version", true),
+		Entry("publication between filtered and unfiltered reads", "publication race", false),
+		Entry("fallback discovery failure", "fallback list error", false),
+		Entry("compatibility pattern discovery failure", "pattern list error", false),
+		Entry("success does not require fallback discovery", "successful", false),
 		Entry("definite unsupported request", "unsupported", true),
 		Entry("semantic match with version prefix remains retryable", "semantic prefix", false),
 		Entry("semantic prerelease match remains retryable", "semantic prerelease", false),

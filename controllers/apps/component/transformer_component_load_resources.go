@@ -48,7 +48,8 @@ func (t *componentLoadResourcesTransformer) Transform(ctx graph.TransformContext
 		setProvisioningStartedCondition(&comp.Status.Conditions, comp.Name, comp.Generation, err)
 	}()
 
-	return t.transformForNativeComponent(transCtx)
+	err = t.transformForNativeComponent(transCtx)
+	return err
 }
 
 func (t *componentLoadResourcesTransformer) transformForNativeComponent(transCtx *componentTransformContext) error {

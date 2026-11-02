@@ -737,8 +737,18 @@ func canRejectServiceVersion(ctx context.Context, cli client.Reader, compDefs []
 	resolvedPatterns := make(map[string]sets.Set[string])
 	for _, compDef := range compDefs {
 		for _, cv := range versions.Items {
-			releases := sets.New[string]()
-			compatible := false
+			if cv.Labels[compDef.Name] == compDef.Name {
+				if cv.Status.Phase != appsv1.AvailablePhase || cv.Status.ObservedGeneration != cv.Generation {
+					return false, nil
+				}
+				for serviceVersion := range compatibleServiceVersions4Definition(compDef, &cv) {
+					match, err := component.CompareServiceVersion(requested, serviceVersion)
+					if err != nil || match {
+						return false, err
+					}
+				}
+				continue
+			}
 			for _, rule := range cv.Spec.CompatibilityRules {
 				for _, pattern := range rule.CompDefs {
 					if !component.PrefixOrRegexMatched(compDef.Name, pattern) {
@@ -757,25 +767,8 @@ func canRejectServiceVersion(ctx context.Context, cli client.Reader, compDefs []
 						resolvedPatterns[pattern] = names
 					}
 					if names.Has(compDef.Name) {
-						compatible = true
-						releases.Insert(rule.Releases...)
-						break
+						return false, nil
 					}
-				}
-			}
-			if !compatible {
-				continue
-			}
-			if cv.Labels[compDef.Name] != compDef.Name || cv.Status.Phase != appsv1.AvailablePhase || cv.Status.ObservedGeneration != cv.Generation {
-				return false, nil
-			}
-			for _, release := range cv.Spec.Releases {
-				if !releases.Has(release.Name) {
-					continue
-				}
-				match, err := component.CompareServiceVersion(requested, release.ServiceVersion)
-				if err != nil || match {
-					return false, err
 				}
 			}
 		}

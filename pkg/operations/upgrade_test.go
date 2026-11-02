@@ -31,6 +31,7 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1251,7 +1252,7 @@ func TestUpgradeInstanceTemplateOwnerConvergence(t *testing.T) {
 }
 
 var _ = Describe("upgrade owner rejection", func() {
-	newClient := func(objects ...client.Object) client.Client {
+	newClient := func(objects ...client.Object) client.WithWatch {
 		scheme := runtime.NewScheme()
 		for _, add := range []func(*runtime.Scheme) error{corev1.AddToScheme, appsv1.AddToScheme, opsv1alpha1.AddToScheme, workloads.AddToScheme} {
 			Expect(add(scheme)).Should(Succeed())
@@ -1279,7 +1280,12 @@ var _ = Describe("upgrade owner rejection", func() {
 		comp.Labels = constant.GetCompLabels(cluster.Name, "fe")
 		comp.Status.Phase = appsv1.RunningComponentPhase
 		ops := newUpgrade(cluster)
-		cli := newClient(cluster, comp, def, ops)
+		cli := interceptor.NewClient(newClient(cluster, comp, def, ops), interceptor.Funcs{Get: func(ctx context.Context, inner client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+			if _, ok := obj.(*workloads.InstanceSet); ok {
+				return apierrors.NewServiceUnavailable("InstanceSet reads unavailable")
+			}
+			return inner.Get(ctx, key, obj, opts...)
+		}})
 		reqCtx := requestContext()
 		reconciler := &clustercontroller.ClusterReconciler{Client: cli, Scheme: cli.Scheme(), Recorder: reqCtx.Recorder}
 		_, err := reconciler.Reconcile(reqCtx.Ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})

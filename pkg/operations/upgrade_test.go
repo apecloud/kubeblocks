@@ -41,6 +41,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
@@ -1196,7 +1197,7 @@ var _ = Describe("upgrade owner rejection", func() {
 })
 
 var _ = Describe("upgrade catalog publication", func() {
-	It("keeps an upgrade retryable until its ComponentVersion is published", func() {
+	DescribeTable("keeps an upgrade retryable across ComponentVersion publication", func(overlappingRules bool) {
 		ctx := context.Background()
 		scheme := runtime.NewScheme()
 		for _, add := range []func(*runtime.Scheme) error{corev1.AddToScheme, appsv1.AddToScheme, opsv1alpha1.AddToScheme, workloads.AddToScheme} {
@@ -1209,6 +1210,17 @@ var _ = Describe("upgrade catalog publication", func() {
 		def.Status.Phase = appsv1.AvailablePhase
 		cv := testapps.NewComponentVersionFactory("audit-new-catalog").AddRelease("new", "", "2.0.0", map[string]string{"server": "server:2.0.0"}).AddCompatibilityRule([]string{def.Name}, []string{"new"}).GetObject()
 		cv.Generation = 1
+		objects := []client.Object{def, cv}
+		if overlappingRules {
+			exact := def.DeepCopy()
+			exact.Name = "audit"
+			objects = append(objects, exact)
+			cv.Spec.CompatibilityRules = []appsv1.ComponentVersionCompatibilityRule{
+				{CompDefs: []string{exact.Name}, Releases: []string{"new"}},
+				{CompDefs: []string{def.Name}, Releases: []string{"other"}},
+			}
+			cv.Spec.Releases = append(cv.Spec.Releases, appsv1.ComponentVersionRelease{Name: "other", ServiceVersion: "1.0.0", Images: map[string]string{"server": "server:1.0.0"}})
+		}
 		cluster := testapps.NewClusterFactory("default", "audit-catalog", "").AddComponent("db", def.Name).SetServiceVersion("2.0.0").SetReplicas(1).GetObject()
 		cluster.Generation, cluster.UID = 7, "audit-cluster"
 		cluster.Status.Components = map[string]appsv1.ClusterComponentStatus{"db": {Phase: appsv1.RunningComponentPhase, ObservedGeneration: 6, UpToDate: true}}
@@ -1216,8 +1228,32 @@ var _ = Describe("upgrade catalog publication", func() {
 		comp.Labels = constant.GetCompLabels(cluster.Name, "db")
 		comp.Status.Phase = appsv1.RunningComponentPhase
 		ops := &opsv1alpha1.OpsRequest{ObjectMeta: metav1.ObjectMeta{Name: "upgrade", Namespace: cluster.Namespace}, Spec: opsv1alpha1.OpsRequestSpec{ClusterName: cluster.Name, Type: opsv1alpha1.UpgradeType, SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{Upgrade: &opsv1alpha1.Upgrade{Components: []opsv1alpha1.UpgradeComponent{{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "db"}, ServiceVersion: ptr.To("2.0.0")}}}}}, Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsRunningPhase, ClusterGeneration: 7}}
-		cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&appsv1.Cluster{}, &appsv1.Component{}, &appsv1.ComponentVersion{}, &opsv1alpha1.OpsRequest{}).WithObjects(def, cv, cluster, comp, ops).Build()
+		objects = append(objects, cluster, comp, ops)
+		base := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&appsv1.Cluster{}, &appsv1.Component{}, &appsv1.ComponentVersion{}, &opsv1alpha1.OpsRequest{}).WithObjects(objects...).Build()
 		recorder := record.NewFakeRecorder(100)
+		publish := func() {
+			publisher := &appscontroller.ComponentVersionReconciler{Client: base, Scheme: scheme, Recorder: recorder}
+			for range 3 {
+				_, err := publisher.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cv)})
+				Expect(err).ShouldNot(HaveOccurred())
+			}
+		}
+		firstFiltered, published := false, false
+		cli := interceptor.NewClient(base, interceptor.Funcs{List: func(ctx context.Context, inner client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+			if _, ok := list.(*appsv1.ComponentVersionList); ok && overlappingRules {
+				options := &client.ListOptions{}
+				options.ApplyOptions(opts)
+				filtered := options.LabelSelector != nil && !options.LabelSelector.Empty()
+				if filtered {
+					firstFiltered = true
+				}
+				if !filtered && firstFiltered && !published {
+					publish()
+					published = true
+				}
+			}
+			return inner.List(ctx, list, opts...)
+		}})
 		reqCtx := intctrlutil.RequestCtx{Ctx: ctx, Log: logr.Discard(), Recorder: recorder}
 		reconciler := &clustercontroller.ClusterReconciler{Client: cli, Scheme: scheme, Recorder: recorder}
 		reconcile := func() *metav1.Condition {
@@ -1228,27 +1264,33 @@ var _ = Describe("upgrade catalog publication", func() {
 			return condition
 		}
 		condition := reconcile()
-		expectedOpsPhase := opsv1alpha1.OpsRunningPhase
 		Expect(condition.Reason).Should(Equal("PreCheckFailed"))
 		_, err := GetOpsManager().Reconcile(reqCtx, cli, &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: recorder})
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(cli.Get(ctx, client.ObjectKeyFromObject(ops), ops)).Should(Succeed())
-		Expect(ops.Status.Phase).Should(Equal(expectedOpsPhase))
-		cvReconciler := &appscontroller.ComponentVersionReconciler{Client: cli, Scheme: scheme, Recorder: recorder}
-		for i := 0; i < 3; i++ {
-			_, err := cvReconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cv)})
-			Expect(err).ShouldNot(HaveOccurred())
+		Expect(ops.Status.Phase).Should(Equal(opsv1alpha1.OpsRunningPhase))
+		if !overlappingRules {
+			Expect(published).Should(BeFalse())
+			publish()
+		} else {
+			Expect(published).Should(BeTrue())
 		}
 		Expect(cli.Get(ctx, client.ObjectKeyFromObject(cv), cv)).Should(Succeed())
 		Expect(cv.Labels[def.Name]).Should(Equal(def.Name))
 		Expect(cv.Status.Phase).Should(Equal(appsv1.AvailablePhase))
 		Expect(cv.Status.ObservedGeneration).Should(Equal(cv.Generation))
+		publishedVersion := cv.DeepCopy()
 		condition = reconcile()
 		Expect(condition.Status).Should(Equal(metav1.ConditionTrue))
 		Expect(cluster.Generation).Should(Equal(int64(7)))
 		_, err = GetOpsManager().Reconcile(reqCtx, cli, &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: recorder})
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(cli.Get(ctx, client.ObjectKeyFromObject(ops), ops)).Should(Succeed())
-		Expect(ops.Status.Phase).Should(Equal(expectedOpsPhase))
-	})
+		Expect(ops.Status.Phase).Should(Equal(opsv1alpha1.OpsRunningPhase))
+		Expect(cli.Get(ctx, client.ObjectKeyFromObject(cv), cv)).Should(Succeed())
+		Expect(cv).Should(Equal(publishedVersion))
+	},
+		Entry("pending catalog then publication", false),
+		Entry("overlapping rules published between reads", true),
+	)
 })

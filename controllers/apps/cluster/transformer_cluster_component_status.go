@@ -147,13 +147,12 @@ func (t *clusterComponentStatusTransformer) clusterCompStatus(cluster *appsv1.Cl
 		status.UpToDate = comp.Generation == comp.Status.ObservedGeneration && ig == cluster.Generation
 	}
 
-	if failure := currentComponentProvisioningFailure(comp); failure != nil {
+	if failure := componentProvisioningFailure(comp); failure != nil {
 		status.Message = maps.Clone(status.Message)
 		if status.Message == nil {
 			status.Message = make(map[string]string)
 		}
 		status.Message["Component/"+comp.Name] = failure.Message
-		status.UpToDate = false
 	}
 	if hasPendingNonBlockingAction(comp) {
 		status.UpToDate = false
@@ -161,7 +160,7 @@ func (t *clusterComponentStatusTransformer) clusterCompStatus(cluster *appsv1.Cl
 	return status
 }
 
-func currentComponentProvisioningFailure(comp *appsv1.Component) *metav1.Condition {
+func componentProvisioningFailure(comp *appsv1.Component) *metav1.Condition {
 	if !comp.DeletionTimestamp.IsZero() {
 		return nil
 	}
@@ -255,7 +254,7 @@ func (t *clusterComponentStatusTransformer) clusterShardingStatus(cluster *appsv
 	)
 	for _, comp := range comps {
 		status := t.clusterCompStatus(cluster, comp)
-		if failure := currentComponentProvisioningFailure(comp); failure != nil {
+		if failure := componentProvisioningFailure(comp); failure != nil {
 			diagnostics["Component/"+comp.Name] = failure.Message
 		}
 		statusList = append(statusList, status)

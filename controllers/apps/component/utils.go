@@ -72,9 +72,9 @@ func getConditionReasonWithError(defaultReason string, err error) string {
 
 func newFailedProvisioningStartedCondition(generation int64, err error) metav1.Condition {
 	return metav1.Condition{
-		ObservedGeneration: generation,
 		Type:               appsv1.ComponentConditionProvisioningStarted,
 		Status:             metav1.ConditionFalse,
+		ObservedGeneration: generation,
 		Message:            intctrlutil.TruncateConditionMessage(err.Error()),
 		Reason:             intctrlutil.TruncateConditionReason(getConditionReasonWithError(reasonPreCheckFailed, err)),
 	}

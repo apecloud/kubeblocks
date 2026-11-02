@@ -2784,7 +2784,6 @@ var _ = Describe("Component provisioning failures", func() {
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
 		Expect(cluster.Status.Components["fe"].Message).Should(HaveKeyWithValue("Component/"+comp.Name, condition.Message))
-		Expect(cluster.Status.Components["fe"].UpToDate).Should(BeFalse())
 		generation := comp.Generation
 		cv.Spec.Releases[0].Images["server"] = "server:2.0.0"
 		Expect(cli.Update(reqCtx.Ctx, cv)).Should(Succeed())

@@ -727,10 +727,11 @@ var _ = Describe("current Component provisioning diagnostics", func() {
 		status := transformer.clusterCompStatus(cluster, first)
 		Expect(status.Phase).Should(Equal(appsv1.RunningComponentPhase))
 		Expect(status.ObservedGeneration).Should(Equal(int64(7)))
-		Expect(status.UpToDate).Should(BeFalse())
+		Expect(status.UpToDate).Should(BeTrue())
 		Expect(status.Message).Should(HaveKeyWithValue("Component/shard-0", "shard-0 missing image"))
 		Expect(first.Status.Message).Should(Equal(map[string]string{"existing": "keep"}))
 		shards := transformer.clusterShardingStatus(cluster, []*appsv1.Component{first, second})
+		Expect(shards.UpToDate).Should(BeTrue())
 		Expect(shards.Message).Should(HaveKeyWithValue("Component/shard-0", "shard-0 missing image"))
 		Expect(shards.Message).Should(HaveKeyWithValue("Component/shard-1", "shard-1 missing image"))
 		first.Status.Conditions[0].Status = metav1.ConditionTrue

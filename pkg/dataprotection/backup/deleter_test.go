@@ -30,6 +30,7 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -240,6 +241,160 @@ func TestDeleterDoPreDeleteActionsCreatesJobForEachTarget(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, buildTargetPreDeleteJobKey(backup, "first", 0).Name, jobs[0].Name)
 	assert.Equal(t, buildTargetPreDeleteJobKey(backup, "second", 1).Name, jobs[1].Name)
+}
+
+func TestDeleterDeleteStalePreDeleteJob(t *testing.T) {
+	scheme := runtime.NewScheme()
+	assert.NoError(t, corev1.AddToScheme(scheme))
+	assert.NoError(t, batchv1.AddToScheme(scheme))
+	assert.NoError(t, appsv1.AddToScheme(scheme))
+	assert.NoError(t, dpv1alpha1.AddToScheme(scheme))
+
+	const (
+		clusterName = "cluster"
+		secretName  = "connection"
+	)
+	newCluster := func(uid string) *appsv1.Cluster {
+		return &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{
+			Name: clusterName, Namespace: "ns", UID: types.UID(uid),
+		}}
+	}
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "backup", Namespace: "ns", UID: types.UID("backup-uid"),
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey: clusterName,
+				dptypes.ClusterUIDLabelKey:   "cluster-uid",
+			},
+		},
+		Status: dpv1alpha1.BackupStatus{Target: &dpv1alpha1.BackupStatusTarget{
+			BackupTarget: dpv1alpha1.BackupTarget{
+				ConnectionCredential: &dpv1alpha1.ConnectionCredential{
+					SecretName: secretName, UsernameKey: "username", PasswordKey: "password",
+				},
+			},
+		}},
+	}
+	preDeleteAction := &dpv1alpha1.BaseJobActionSpec{Image: "deleter", Command: []string{"delete"}}
+	jobKey := BuildDeleteBackupFilesJobKey(backup, true)
+
+	// newPreDeleteJob builds the pre-delete job that has inherited the env of the target pod.
+	newPreDeleteJob := func(referenceCredential bool) *batchv1.Job {
+		envVars := []corev1.EnvVar{{Name: dptypes.DPBackupBasePath, Value: "/backup/path"}}
+		if referenceCredential {
+			envVars = append(envVars, corev1.EnvVar{
+				Name: "MONGODB_USER",
+				ValueFrom: &corev1.EnvVarSource{SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: secretName}, Key: "username",
+				}},
+			})
+		}
+		return &batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{Name: jobKey.Name, Namespace: jobKey.Namespace},
+			Spec: batchv1.JobSpec{Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: deleteContainerName, Env: envVars}}},
+			}},
+		}
+	}
+	newPod := func(state corev1.ContainerState) *corev1.Pod {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: jobKey.Name + "-pod", Namespace: jobKey.Namespace,
+				Labels: map[string]string{"job-name": jobKey.Name},
+			},
+			Status: corev1.PodStatus{ContainerStatuses: []corev1.ContainerStatus{{
+				Name: deleteContainerName, State: state,
+			}}},
+		}
+	}
+	stuckPod := func() *corev1.Pod {
+		return newPod(corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{
+			Reason: containerConfigErrorReason, Message: "secret not found",
+		}})
+	}
+	startedPod := func() *corev1.Pod {
+		return newPod(corev1.ContainerState{Running: &corev1.ContainerStateRunning{}})
+	}
+
+	doPreDeleteAction := func(objects ...client.Object) (*Deleter, *batchv1.Job, error) {
+		deepCopies := make([]client.Object, 0, len(objects))
+		for _, obj := range objects {
+			deepCopies = append(deepCopies, obj.DeepCopyObject().(client.Object))
+		}
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(deepCopies...).Build()
+		deleter := &Deleter{
+			RequestCtx:           ctrlutil.RequestCtx{Ctx: context.Background()},
+			Client:               cli,
+			Scheme:               scheme,
+			WorkerServiceAccount: "worker",
+		}
+		job, err := deleter.doPreDeleteAction(backup, backup.Status.Target, jobKey,
+			&dpv1alpha1.BackupRepo{}, preDeleteAction, "", "/backup/path")
+		return deleter, job, err
+	}
+	deleted := func(deleter *Deleter) bool {
+		err := deleter.Client.Get(context.Background(), jobKey, &batchv1.Job{})
+		return apierrors.IsNotFound(err)
+	}
+
+	t.Run("deletes the job that can never be started", func(t *testing.T) {
+		deleter, job, err := doPreDeleteAction(newPreDeleteJob(true), stuckPod())
+		assert.NoError(t, err)
+		assert.Nil(t, job)
+		assert.True(t, deleted(deleter))
+	})
+
+	t.Run("the new job does not inherit the recycled credentials", func(t *testing.T) {
+		deleter, job, err := doPreDeleteAction(newPreDeleteJob(true), stuckPod())
+		assert.NoError(t, err)
+		assert.Nil(t, job)
+
+		_, err = deleter.doPreDeleteAction(backup, backup.Status.Target, jobKey,
+			&dpv1alpha1.BackupRepo{}, preDeleteAction, "", "/backup/path")
+		assert.NoError(t, err)
+		rebuilt := &batchv1.Job{}
+		assert.NoError(t, deleter.Client.Get(context.Background(), jobKey, rebuilt))
+		assert.False(t, jobReferencesSecret(rebuilt, secretName))
+		for _, env := range rebuilt.Spec.Template.Spec.Containers[0].Env {
+			assert.NotEqual(t, "MONGODB_USER", env.Name)
+		}
+	})
+
+	t.Run("keeps the job when the cluster still exists", func(t *testing.T) {
+		deleter, job, err := doPreDeleteAction(newCluster("cluster-uid"), newPreDeleteJob(true), stuckPod())
+		assert.NoError(t, err)
+		assert.NotNil(t, job)
+		assert.False(t, deleted(deleter))
+	})
+
+	t.Run("keeps the job when the credential still exists", func(t *testing.T) {
+		secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: secretName, Namespace: "ns"}}
+		deleter, job, err := doPreDeleteAction(secret, newPreDeleteJob(true), stuckPod())
+		assert.NoError(t, err)
+		assert.NotNil(t, job)
+		assert.False(t, deleted(deleter))
+	})
+
+	t.Run("keeps the job that does not reference the credential", func(t *testing.T) {
+		deleter, job, err := doPreDeleteAction(newPreDeleteJob(false), stuckPod())
+		assert.NoError(t, err)
+		assert.NotNil(t, job)
+		assert.False(t, deleted(deleter))
+	})
+
+	t.Run("keeps the job whose container has been started", func(t *testing.T) {
+		deleter, job, err := doPreDeleteAction(newPreDeleteJob(true), startedPod())
+		assert.NoError(t, err)
+		assert.NotNil(t, job)
+		assert.False(t, deleted(deleter))
+	})
+
+	t.Run("keeps the job when the pod has not been created", func(t *testing.T) {
+		deleter, job, err := doPreDeleteAction(newPreDeleteJob(true))
+		assert.NoError(t, err)
+		assert.NotNil(t, job)
+		assert.False(t, deleted(deleter))
+	})
 }
 
 func TestDeleterBuildConnectionEnv(t *testing.T) {

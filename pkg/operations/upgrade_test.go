@@ -52,7 +52,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	opsutil "github.com/apecloud/kubeblocks/pkg/operations/util"
@@ -1098,12 +1097,11 @@ func TestUpgradeInstanceTemplateOwnerConvergence(t *testing.T) {
 }
 
 var _ = Describe("upgrade owner rejection", func() {
-	newClient := func(objects ...client.Object) client.Client {
+	newClient := func(objects ...client.Object) client.WithWatch {
 		scheme := runtime.NewScheme()
 		for _, add := range []func(*runtime.Scheme) error{corev1.AddToScheme, appsv1.AddToScheme, opsv1alpha1.AddToScheme, workloads.AddToScheme} {
 			Expect(add(scheme)).Should(Succeed())
 		}
-		model.AddScheme(appsv1.AddToScheme)
 		return fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&appsv1.Cluster{}, &appsv1.Component{}, &opsv1alpha1.OpsRequest{}).WithObjects(objects...).Build()
 	}
 	requestContext := func() intctrlutil.RequestCtx {
@@ -1127,7 +1125,12 @@ var _ = Describe("upgrade owner rejection", func() {
 		comp.Labels = constant.GetCompLabels(cluster.Name, "fe")
 		comp.Status.Phase = appsv1.RunningComponentPhase
 		ops := newUpgrade(cluster)
-		cli := newClient(cluster, comp, def, ops)
+		cli := interceptor.NewClient(newClient(cluster, comp, def, ops), interceptor.Funcs{Get: func(ctx context.Context, inner client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+			if _, ok := obj.(*workloads.InstanceSet); ok {
+				return apierrors.NewServiceUnavailable("InstanceSet reads unavailable")
+			}
+			return inner.Get(ctx, key, obj, opts...)
+		}})
 		reqCtx := requestContext()
 		reconciler := &clustercontroller.ClusterReconciler{Client: cli, Scheme: cli.Scheme(), Recorder: reqCtx.Recorder}
 		_, err := reconciler.Reconcile(reqCtx.Ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})
@@ -1161,7 +1164,11 @@ var _ = Describe("upgrade owner rejection", func() {
 		}
 		ops := newUpgrade(cluster)
 		its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: cluster.Name + "-fe", Namespace: cluster.Namespace, Generation: 3}, Spec: workloads.InstanceSetSpec{Replicas: ptr.To(int32(1))}, Status: workloads.InstanceSetStatus{ObservedGeneration: 3, InstanceStatus: []workloads.InstanceStatus{{PodName: cluster.Name + "-fe-0", UpToDate: true, Ready: !failed, Available: !failed, Failed: failed}}}}
-		cli := newClient(cluster, ops, its)
+		objects := []client.Object{cluster, ops}
+		if !refusal {
+			objects = append(objects, its)
+		}
+		cli := newClient(objects...)
 		phase, _, err := (upgradeOpsHandler{}).ReconcileAction(requestContext(), cli, &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(100)})
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(phase).Should(Equal(expected))
@@ -1203,7 +1210,6 @@ var _ = Describe("upgrade catalog publication", func() {
 		for _, add := range []func(*runtime.Scheme) error{corev1.AddToScheme, appsv1.AddToScheme, opsv1alpha1.AddToScheme, workloads.AddToScheme} {
 			Expect(add(scheme)).Should(Succeed())
 		}
-		model.AddScheme(appsv1.AddToScheme)
 		def := testapps.NewComponentDefinitionFactory("audit-def").SetServiceVersion("1.0.0").SetRuntime(&corev1.Container{Name: "server", Image: "server:1.0.0"}).GetObject()
 		def.Generation = 1
 		def.Status.ObservedGeneration = 1

@@ -115,22 +115,18 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	upgradeSpec := opsRes.OpsRequest.Spec.Upgrade
 	compOpsHelper := newComponentOpsHelper(upgradeSpec.Components)
 
-	phase, requeueAfter, err := compOpsHelper.reconcileRunningAction(reqCtx, cli, opsRes, "upgrade")
-	if err != nil {
-		return phase, requeueAfter, err
-	}
 	if rejection := u.targetRejection(opsRes); rejection != nil {
-		if phase == opsv1alpha1.OpsSucceedPhase {
+		if u.targetsCurrentlyRunning(opsRes) {
 			return opsv1alpha1.OpsRunningPhase, time.Second, nil
 		}
 		return opsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("%s", rejection.Message)
 	}
-	return phase, requeueAfter, nil
+	return compOpsHelper.reconcileRunningAction(reqCtx, cli, opsRes, "upgrade")
 }
 
 func (u upgradeOpsHandler) targetRejection(opsRes *OpsResource) *metav1.Condition {
 	generation := opsRes.OpsRequest.Status.ClusterGeneration
-	if generation <= 0 || opsRes.Cluster.Generation != generation {
+	if opsRes.OpsRequest.Status.Phase != opsv1alpha1.OpsRunningPhase || generation <= 0 || opsRes.Cluster.Generation != generation {
 		return nil
 	}
 	condition := meta.FindStatusCondition(opsRes.Cluster.Status.Conditions, appsv1.ConditionTypeProvisioningStarted)
@@ -176,6 +172,23 @@ func (u upgradeOpsHandler) targetsUnchanged(opsRes *OpsResource) bool {
 		}
 	}
 	return true
+}
+
+func (u upgradeOpsHandler) targetsCurrentlyRunning(opsRes *OpsResource) bool {
+	for _, target := range opsRes.OpsRequest.Spec.Upgrade.Components {
+		if status, ok := opsRes.Cluster.Status.Components[target.ComponentName]; ok {
+			if status.ObservedGeneration != opsRes.Cluster.Generation || !status.UpToDate || status.Phase != appsv1.RunningComponentPhase {
+				return false
+			}
+		} else if status, ok := opsRes.Cluster.Status.Shardings[target.ComponentName]; ok {
+			if status.ObservedGeneration != opsRes.Cluster.Generation || !status.UpToDate || status.Phase != appsv1.RunningComponentPhase {
+				return false
+			}
+		} else {
+			return false
+		}
+	}
+	return len(opsRes.OpsRequest.Spec.Upgrade.Components) > 0
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration

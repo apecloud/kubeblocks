@@ -65,6 +65,7 @@ spec:
           description: "S3 endpoint (optional)"
         mountOptions:
           type: string
+          default: ""
           description: "Extra mount options for geesefs"
         geesefsMemoryLimit:
           type: integer

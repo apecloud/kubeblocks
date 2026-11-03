@@ -146,7 +146,7 @@ func TestDeleteBackupFilesRecordsTerminatingNamespaceBlockerWithoutStoppingRetry
 	reconciler := &BackupReconciler{Client: countingClient, Scheme: scheme}
 	reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
 
-	err := reconciler.deleteBackupFiles(reqCtx, backup.DeepCopy())
+	_, err := reconciler.deleteBackupFiles(reqCtx, backup.DeepCopy())
 	var terminatingErr *backupNamespaceTerminatingError
 	g.Expect(errors.As(err, &terminatingErr)).To(BeTrue())
 	g.Expect(err.Error()).To(ContainSubstring("is terminating; cannot create worker resources to delete backup files"))
@@ -168,7 +168,7 @@ func TestDeleteBackupFilesRecordsTerminatingNamespaceBlockerWithoutStoppingRetry
 	g.Expect(baseClient.List(reqCtx.Ctx, roleBindings, client.InNamespace(namespace.Name))).To(Succeed())
 	g.Expect(roleBindings.Items).To(BeEmpty())
 
-	err = reconciler.deleteBackupFiles(reqCtx, stored.DeepCopy())
+	_, err = reconciler.deleteBackupFiles(reqCtx, stored.DeepCopy())
 	g.Expect(errors.As(err, &terminatingErr)).To(BeTrue())
 	g.Expect(countingClient.statusPatchCount).To(Equal(1))
 }
@@ -196,7 +196,7 @@ func TestDeleteBackupFilesDoesNotRecordOrdinaryDeletingError(t *testing.T) {
 		Scheme: scheme,
 	}
 
-	err := reconciler.deleteBackupFiles(intctrlutil.RequestCtx{Ctx: context.Background()}, backup.DeepCopy())
+	_, err := reconciler.deleteBackupFiles(intctrlutil.RequestCtx{Ctx: context.Background()}, backup.DeepCopy())
 	g.Expect(err).To(MatchError("get failed"))
 	g.Expect(countingClient.statusPatchCount).To(Equal(0))
 	g.Expect(backup.Status.FailureReason).To(BeEmpty())
@@ -239,7 +239,7 @@ func TestDeleteBackupFilesReturnsStatusPatchError(t *testing.T) {
 	countingClient := &statusPatchCountingClient{Client: baseClient, statusPatchErr: patchErr}
 	reconciler := &BackupReconciler{Client: countingClient, Scheme: scheme}
 
-	err := reconciler.deleteBackupFiles(intctrlutil.RequestCtx{Ctx: context.Background()}, backup.DeepCopy())
+	_, err := reconciler.deleteBackupFiles(intctrlutil.RequestCtx{Ctx: context.Background()}, backup.DeepCopy())
 	g.Expect(err).To(MatchError(patchErr))
 	g.Expect(countingClient.statusPatchCount).To(Equal(1))
 

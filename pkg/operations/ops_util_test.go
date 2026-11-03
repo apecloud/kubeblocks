@@ -436,6 +436,102 @@ var _ = Describe("OpsUtil functions", func() {
 			Expect(opsRequestSlice[0].Name).Should(Equal(ops1.Name))
 			Expect(opsRequestSlice[1].Name).Should(Equal(ops2.Name))
 			Expect(opsRequestSlice[2].Name).Should(Equal(ops3.Name))
+
+			By("verify ops3 has released the queue lock after being swapped behind its dependent opsRequests")
+			Expect(opsRequestSlice[2].InQueue).Should(BeTrue())
+			Expect(opsRecorder.InQueue).Should(BeTrue())
+
+			By("expect ops1 can be handled now, instead of waiting for the queue lock held by ops3")
+			opsRes.OpsRequest = ops1
+			// the first reconciliation promotes ops1 to the queue head, and the next one starts it.
+			for i := 0; i < 2; i++ {
+				_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+				Expect(err).ShouldNot(HaveOccurred())
+			}
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			opsRequestSlice, _ = opsutil.GetOpsRequestSliceFromCluster(opsRes.Cluster)
+			Expect(opsRequestSlice[0].Name).Should(Equal(ops1.Name))
+			Expect(opsRequestSlice[0].InQueue).Should(BeFalse())
+			Expect(opsRequestSlice[2].InQueue).Should(BeTrue())
+		})
+		It("Test the queue lock is not acquired when the dependent opsRequest is still in the queue", func() {
+			By("init operations resources ")
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+
+			newOps := func() *opsv1alpha1.OpsRequest {
+				return createHorizontalScaling(clusterName, opsv1alpha1.HorizontalScaling{
+					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+					ScaleOut: &opsv1alpha1.ScaleOut{
+						ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)},
+					},
+				}, false)
+			}
+			ops1 := newOps()
+			ops2 := newOps()
+			ops2.Annotations[constant.OpsDependentOnSuccessfulOpsAnnoKey] = ops1.Name
+
+			By("mock the queue where both opsRequests are queued and the dependent one is still in it")
+			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(cluster *appsv1.Cluster) {
+				opsutil.SetOpsRequestToCluster(cluster, []opsv1alpha1.OpsRecorder{
+					{Name: ops1.Name, Type: opsv1alpha1.HorizontalScalingType, InQueue: true},
+					{Name: ops2.Name, Type: opsv1alpha1.HorizontalScalingType, InQueue: true},
+				})
+			})).Should(Succeed())
+
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			opsBehaviour := GetOpsManager().OpsMap[opsv1alpha1.HorizontalScalingType]
+
+			By("reconcile ops2, it must not acquire the queue lock because its dependent is still in the queue")
+			opsRes.OpsRequest = ops2
+			opsRecorder, err := enqueueOpsRequestToClusterAnnotation(reqCtx.Ctx, k8sClient, opsRes, opsBehaviour)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(opsRecorder.InQueue).Should(BeTrue())
+			opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(opsRes.Cluster)
+			Expect(opsRequestSlice[0].InQueue).Should(BeTrue())
+			Expect(opsRequestSlice[1].InQueue).Should(BeTrue())
+
+			By("reconcile ops1, it can acquire the queue lock and be handled")
+			opsRes.OpsRequest = ops1
+			for i := 0; i < 2; i++ {
+				_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+				Expect(err).ShouldNot(HaveOccurred())
+			}
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			opsRequestSlice, _ = opsutil.GetOpsRequestSliceFromCluster(opsRes.Cluster)
+			Expect(opsRequestSlice[0].Name).Should(Equal(ops1.Name))
+			Expect(opsRequestSlice[0].InQueue).Should(BeFalse())
+			Expect(opsRequestSlice[1].InQueue).Should(BeTrue())
+		})
+
+		It("Test the queue lock is acquired when the dependent opsRequest is not in the queue", func() {
+			By("init operations resources ")
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+
+			ops1 := createHorizontalScaling(clusterName, opsv1alpha1.HorizontalScaling{
+				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+				ScaleOut: &opsv1alpha1.ScaleOut{
+					ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)},
+				},
+			}, false)
+			// the dependent opsRequest has been completed, so it is not in the queue anymore.
+			ops1.Annotations[constant.OpsDependentOnSuccessfulOpsAnnoKey] = "completed-ops"
+
+			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(cluster *appsv1.Cluster) {
+				opsutil.SetOpsRequestToCluster(cluster, []opsv1alpha1.OpsRecorder{
+					{Name: ops1.Name, Type: opsv1alpha1.HorizontalScalingType, InQueue: true},
+				})
+			})).Should(Succeed())
+
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			opsBehaviour := GetOpsManager().OpsMap[opsv1alpha1.HorizontalScalingType]
+			opsRes.OpsRequest = ops1
+			_, err := enqueueOpsRequestToClusterAnnotation(reqCtx.Ctx, k8sClient, opsRes, opsBehaviour)
+			Expect(err).ShouldNot(HaveOccurred())
+			opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(opsRes.Cluster)
+			Expect(opsRequestSlice).Should(HaveLen(1))
+			Expect(opsRequestSlice[0].InQueue).Should(BeFalse())
 		})
 	})
 })

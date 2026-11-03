@@ -194,6 +194,9 @@ func mockReconfigureDone(namespace, itsName, configName, configHash string) {
 		Namespace: namespace,
 		Name:      itsName,
 	}
+	Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+		its.Spec.Configs = []workloads.ConfigTemplate{{Name: configName, ConfigHash: ptr.To(configHash)}}
+	})()).Should(Succeed())
 	Expect(testapps.GetAndChangeObjStatus(&testCtx, itsKey, func(its *workloads.InstanceSet) {
 		its.Status.Replicas = int32(1)
 		its.Status.InstanceStatus = []workloads.InstanceStatus{

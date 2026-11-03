@@ -20,11 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
-	"fmt"
 	"slices"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -41,10 +39,11 @@ var _ OpsHandler = upgradeOpsHandler{}
 func init() {
 	upgradeBehaviour := OpsBehaviour{
 		// if cluster is Abnormal or Failed, new opsRequest may can repair it.
-		FromClusterPhases: appsv1.GetClusterUpRunningPhases(),
-		ToClusterPhase:    appsv1.UpdatingClusterPhase,
-		QueueByCluster:    true,
-		OpsHandler:        upgradeOpsHandler{},
+		FromClusterPhases:    appsv1.GetClusterUpRunningPhases(),
+		ToClusterPhase:       appsv1.UpdatingClusterPhase,
+		QueueByCluster:       true,
+		OpsHandler:           upgradeOpsHandler{},
+		ClusterActionTargets: upgradeOpsHandler{}.clusterActionTargets,
 	}
 
 	opsMgr := GetOpsManager()
@@ -114,26 +113,18 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	}
 	upgradeSpec := opsRes.OpsRequest.Spec.Upgrade
 	compOpsHelper := newComponentOpsHelper(upgradeSpec.Components)
-
-	if rejection := u.targetRejection(opsRes); rejection != nil {
-		if u.targetsCurrentlyRunning(opsRes) {
-			return opsv1alpha1.OpsRunningPhase, time.Second, nil
-		}
-		return opsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("%s", rejection.Message)
-	}
 	return compOpsHelper.reconcileRunningAction(reqCtx, cli, opsRes, "upgrade")
 }
 
-func (u upgradeOpsHandler) targetRejection(opsRes *OpsResource) *metav1.Condition {
-	generation := opsRes.OpsRequest.Status.ClusterGeneration
-	if opsRes.OpsRequest.Status.Phase != opsv1alpha1.OpsRunningPhase || generation <= 0 || opsRes.Cluster.Generation != generation {
+func (u upgradeOpsHandler) clusterActionTargets(opsRes *OpsResource) []string {
+	if !u.targetsUnchanged(opsRes) {
 		return nil
 	}
-	condition := meta.FindStatusCondition(opsRes.Cluster.Status.Conditions, appsv1.ConditionTypeProvisioningStarted)
-	if condition != nil && condition.Status == metav1.ConditionFalse && condition.Reason == appsv1.ReasonUnsupportedServiceVersion && condition.ObservedGeneration == generation {
-		return condition
+	targets := make([]string, 0, len(opsRes.OpsRequest.Spec.Upgrade.Components))
+	for _, target := range opsRes.OpsRequest.Spec.Upgrade.Components {
+		targets = append(targets, target.ComponentName)
 	}
-	return nil
+	return targets
 }
 
 func (u upgradeOpsHandler) targetsUnchanged(opsRes *OpsResource) bool {
@@ -172,23 +163,6 @@ func (u upgradeOpsHandler) targetsUnchanged(opsRes *OpsResource) bool {
 		}
 	}
 	return true
-}
-
-func (u upgradeOpsHandler) targetsCurrentlyRunning(opsRes *OpsResource) bool {
-	for _, target := range opsRes.OpsRequest.Spec.Upgrade.Components {
-		if status, ok := opsRes.Cluster.Status.Components[target.ComponentName]; ok {
-			if status.ObservedGeneration != opsRes.Cluster.Generation || !status.UpToDate || status.Phase != appsv1.RunningComponentPhase {
-				return false
-			}
-		} else if status, ok := opsRes.Cluster.Status.Shardings[target.ComponentName]; ok {
-			if status.ObservedGeneration != opsRes.Cluster.Generation || !status.UpToDate || status.Phase != appsv1.RunningComponentPhase {
-				return false
-			}
-		} else {
-			return false
-		}
-	}
-	return len(opsRes.OpsRequest.Spec.Upgrade.Components) > 0
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration

@@ -1096,7 +1096,7 @@ func TestUpgradeInstanceTemplateOwnerConvergence(t *testing.T) {
 	}
 }
 
-var _ = Describe("upgrade owner rejection", func() {
+var _ = Describe("upgrade unsupported service version", func() {
 	newClient := func(objects ...client.Object) client.WithWatch {
 		scheme := runtime.NewScheme()
 		for _, add := range []func(*runtime.Scheme) error{corev1.AddToScheme, appsv1.AddToScheme, opsv1alpha1.AddToScheme, workloads.AddToScheme} {
@@ -1116,7 +1116,7 @@ var _ = Describe("upgrade owner rejection", func() {
 		cluster.Status.Components = map[string]appsv1.ClusterComponentStatus{"fe": {Phase: appsv1.RunningComponentPhase, ObservedGeneration: 6, UpToDate: true}}
 		return cluster
 	}
-	It("persists a Cluster resolver refusal and completes the matching Upgrade through the Ops manager", func() {
+	It("persists a Cluster unsupported-version error and completes the matching Upgrade through the Ops manager", func() {
 		cluster := newCluster()
 		def := testapps.NewComponentDefinitionFactory("owner-fe").SetServiceVersion("3.3.0").SetRuntime(&corev1.Container{Name: "server", Image: "server:3.3.0"}).GetObject()
 		def.Status.Phase = appsv1.AvailablePhase
@@ -1151,10 +1151,10 @@ var _ = Describe("upgrade owner rejection", func() {
 		Expect(ops.Status.Phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
 		Expect(ops.Status.Conditions).Should(ContainElement(HaveField("Message", ContainSubstring("99.99.99"))))
 	})
-	DescribeTable("preserves current completion and health retry semantics", func(refusal, failed bool, expected opsv1alpha1.OpsPhase) {
+	DescribeTable("preserves current completion and health retry semantics", func(versionError, failed bool, expected opsv1alpha1.OpsPhase) {
 		cluster := newCluster()
 		cluster.Status.Components["fe"] = appsv1.ClusterComponentStatus{Phase: appsv1.RunningComponentPhase, ObservedGeneration: cluster.Generation, UpToDate: true}
-		if refusal {
+		if versionError {
 			cluster.Status.Conditions = []metav1.Condition{{Type: appsv1.ConditionTypeProvisioningStarted, Status: metav1.ConditionFalse, Reason: "UnsupportedServiceVersion", Message: "owner diagnostic", ObservedGeneration: cluster.Generation, LastTransitionTime: metav1.Now()}}
 		}
 		if failed {
@@ -1165,41 +1165,56 @@ var _ = Describe("upgrade owner rejection", func() {
 		ops := newUpgrade(cluster)
 		its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: cluster.Name + "-fe", Namespace: cluster.Namespace, Generation: 3}, Spec: workloads.InstanceSetSpec{Replicas: ptr.To(int32(1))}, Status: workloads.InstanceSetStatus{ObservedGeneration: 3, InstanceStatus: []workloads.InstanceStatus{{PodName: cluster.Name + "-fe-0", UpToDate: true, Ready: !failed, Available: !failed, Failed: failed}}}}
 		objects := []client.Object{cluster, ops}
-		if !refusal {
+		if !versionError {
 			objects = append(objects, its)
 		}
 		cli := newClient(objects...)
-		phase, _, err := (upgradeOpsHandler{}).ReconcileAction(requestContext(), cli, &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(100)})
+		_, err := GetOpsManager().Reconcile(requestContext(), cli, &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(100)})
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(phase).Should(Equal(expected))
-	}, Entry("ordinary current success", false, false, opsv1alpha1.OpsSucceedPhase), Entry("contradictory current success and refusal waits", true, false, opsv1alpha1.OpsRunningPhase), Entry("health failure remains retryable", false, true, opsv1alpha1.OpsRunningPhase))
-	DescribeTable("consumes only a refusal for its exact unchanged target", func(opsGeneration, clusterGeneration, conditionGeneration int64, status metav1.ConditionStatus, reason string, overwritten bool, expected opsv1alpha1.OpsPhase) {
+		Expect(cli.Get(context.Background(), client.ObjectKeyFromObject(ops), ops)).Should(Succeed())
+		Expect(ops.Status.Phase).Should(Equal(expected))
+	}, Entry("ordinary current success", false, false, opsv1alpha1.OpsSucceedPhase), Entry("contradictory current success and version error waits", true, false, opsv1alpha1.OpsRunningPhase), Entry("health failure remains retryable", false, true, opsv1alpha1.OpsRunningPhase))
+	DescribeTable("fails only for an unsupported version of its exact unchanged target", func(targetKind string, opsGeneration, clusterGeneration, conditionGeneration int64, status metav1.ConditionStatus, reason string, overwritten bool, expected opsv1alpha1.OpsPhase) {
 		cluster := newCluster()
 		cluster.Generation = clusterGeneration
 		cluster.Status.Conditions = []metav1.Condition{{Type: appsv1.ConditionTypeProvisioningStarted, Status: status, Reason: reason, Message: "owner diagnostic", ObservedGeneration: conditionGeneration, LastTransitionTime: metav1.Now()}}
 		ops := newUpgrade(cluster)
 		ops.Status.ClusterGeneration = opsGeneration
+		if targetKind == "restart" {
+			ops.Spec.Type = opsv1alpha1.RestartType
+			ops.Spec.Upgrade = nil
+			ops.Spec.RestartList = []opsv1alpha1.ComponentOps{{ComponentName: "fe"}}
+			cluster.Spec.ComponentSpecs[0].Annotations = map[string]string{constant.RestartAnnotationKey: ops.Status.StartTimestamp.Format(time.RFC3339)}
+		}
 		if overwritten {
 			cluster.Spec.ComponentSpecs[0].ServiceVersion = "3.3.0"
 		}
+		if targetKind == "sharding" {
+			cluster.Spec.Shardings = []appsv1.ClusterSharding{{Name: "fe", Shards: 1, Template: cluster.Spec.ComponentSpecs[0]}}
+			cluster.Spec.ComponentSpecs = nil
+			cluster.Status.Shardings = map[string]appsv1.ClusterShardingStatus{"fe": {Phase: appsv1.RunningComponentPhase, ObservedGeneration: 6, UpToDate: true}}
+			cluster.Status.Components = nil
+		}
 		cli := newClient(cluster, ops)
-		phase, _, err := (upgradeOpsHandler{}).ReconcileAction(requestContext(), cli, &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(100)})
-		Expect(phase).Should(Equal(expected))
+		_, err := GetOpsManager().Reconcile(requestContext(), cli, &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(100)})
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(cli.Get(context.Background(), client.ObjectKeyFromObject(ops), ops)).Should(Succeed())
+		Expect(ops.Status.Phase).Should(Equal(expected))
 		if expected == opsv1alpha1.OpsFailedPhase {
-			Expect(err).Should(MatchError("owner diagnostic"))
-		} else {
-			Expect(err).ShouldNot(HaveOccurred())
+			Expect(ops.Status.Conditions).Should(ContainElement(HaveField("Message", Equal("owner diagnostic"))))
 		}
 	},
-		Entry("current refusal", int64(7), int64(7), int64(7), metav1.ConditionFalse, "UnsupportedServiceVersion", false, opsv1alpha1.OpsFailedPhase),
-		Entry("unknown target generation", int64(0), int64(7), int64(7), metav1.ConditionFalse, "UnsupportedServiceVersion", false, opsv1alpha1.OpsRunningPhase),
-		Entry("older target generation", int64(6), int64(7), int64(7), metav1.ConditionFalse, "UnsupportedServiceVersion", false, opsv1alpha1.OpsRunningPhase),
-		Entry("future target generation", int64(8), int64(7), int64(7), metav1.ConditionFalse, "UnsupportedServiceVersion", false, opsv1alpha1.OpsRunningPhase),
-		Entry("old condition", int64(7), int64(7), int64(6), metav1.ConditionFalse, "UnsupportedServiceVersion", false, opsv1alpha1.OpsRunningPhase),
-		Entry("future condition", int64(7), int64(7), int64(8), metav1.ConditionFalse, "UnsupportedServiceVersion", false, opsv1alpha1.OpsRunningPhase),
-		Entry("generic load error", int64(7), int64(7), int64(7), metav1.ConditionFalse, "PreCheckFailed", false, opsv1alpha1.OpsRunningPhase),
-		Entry("repaired condition", int64(7), int64(7), int64(7), metav1.ConditionTrue, "PreCheckSucceed", false, opsv1alpha1.OpsRunningPhase),
-		Entry("overwritten target", int64(7), int64(7), int64(7), metav1.ConditionFalse, "UnsupportedServiceVersion", true, opsv1alpha1.OpsAbortedPhase),
+		Entry("unrelated Restart", "restart", int64(7), int64(7), int64(7), metav1.ConditionFalse, "UnsupportedServiceVersion", false, opsv1alpha1.OpsRunningPhase),
+		Entry("current unsupported sharding version", "sharding", int64(7), int64(7), int64(7), metav1.ConditionFalse, "UnsupportedServiceVersion", false, opsv1alpha1.OpsFailedPhase),
+		Entry("current unsupported version", "component", int64(7), int64(7), int64(7), metav1.ConditionFalse, "UnsupportedServiceVersion", false, opsv1alpha1.OpsFailedPhase),
+		Entry("unknown target generation", "component", int64(0), int64(7), int64(7), metav1.ConditionFalse, "UnsupportedServiceVersion", false, opsv1alpha1.OpsRunningPhase),
+		Entry("older target generation", "component", int64(6), int64(7), int64(7), metav1.ConditionFalse, "UnsupportedServiceVersion", false, opsv1alpha1.OpsRunningPhase),
+		Entry("future target generation", "component", int64(8), int64(7), int64(7), metav1.ConditionFalse, "UnsupportedServiceVersion", false, opsv1alpha1.OpsRunningPhase),
+		Entry("old condition", "component", int64(7), int64(7), int64(6), metav1.ConditionFalse, "UnsupportedServiceVersion", false, opsv1alpha1.OpsRunningPhase),
+		Entry("future condition", "component", int64(7), int64(7), int64(8), metav1.ConditionFalse, "UnsupportedServiceVersion", false, opsv1alpha1.OpsRunningPhase),
+		Entry("generic load error", "component", int64(7), int64(7), int64(7), metav1.ConditionFalse, "PreCheckFailed", false, opsv1alpha1.OpsRunningPhase),
+		Entry("repaired condition", "component", int64(7), int64(7), int64(7), metav1.ConditionTrue, "PreCheckSucceed", false, opsv1alpha1.OpsRunningPhase),
+		Entry("overwritten target", "component", int64(7), int64(7), int64(7), metav1.ConditionFalse, "UnsupportedServiceVersion", true, opsv1alpha1.OpsAbortedPhase),
 	)
 })
 
@@ -1244,21 +1259,14 @@ var _ = Describe("upgrade catalog publication", func() {
 				Expect(err).ShouldNot(HaveOccurred())
 			}
 		}
-		firstFiltered, published := false, false
+		published := false
 		cli := interceptor.NewClient(base, interceptor.Funcs{List: func(ctx context.Context, inner client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
-			if _, ok := list.(*appsv1.ComponentVersionList); ok && overlappingRules {
-				options := &client.ListOptions{}
-				options.ApplyOptions(opts)
-				filtered := options.LabelSelector != nil && !options.LabelSelector.Empty()
-				if filtered {
-					firstFiltered = true
-				}
-				if !filtered && firstFiltered && !published {
-					publish()
-					published = true
-				}
+			err := inner.List(ctx, list, opts...)
+			if _, ok := list.(*appsv1.ComponentVersionList); ok && err == nil && overlappingRules && !published {
+				publish()
+				published = true
 			}
-			return inner.List(ctx, list, opts...)
+			return err
 		}})
 		reqCtx := intctrlutil.RequestCtx{Ctx: ctx, Log: logr.Discard(), Recorder: recorder}
 		reconciler := &clustercontroller.ClusterReconciler{Client: cli, Scheme: scheme, Recorder: recorder}
@@ -1297,6 +1305,6 @@ var _ = Describe("upgrade catalog publication", func() {
 		Expect(cv).Should(Equal(publishedVersion))
 	},
 		Entry("pending catalog then publication", false),
-		Entry("overlapping rules published between reads", true),
+		Entry("overlapping rules published after the catalog snapshot", true),
 	)
 })

@@ -76,10 +76,6 @@ type OpsBehaviour struct {
 	// It does not change the queue relationship with other operation types.
 	QueueWithStop bool
 
-	// ClusterActionTargets returns the component and sharding names whose submitted
-	// Cluster targets still match this action. An empty result disables failure attribution.
-	ClusterActionTargets func(*OpsResource) []string
-
 	OpsHandler OpsHandler
 }
 

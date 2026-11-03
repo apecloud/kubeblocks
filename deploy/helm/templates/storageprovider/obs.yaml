@@ -67,6 +67,7 @@ spec:
           description: "OBS endpoint (optional)"
         mountOptions:
           type: string
+          default: ""
           description: "Extra mount options for geesefs"
         geesefsMemoryLimit:
           type: integer

@@ -737,7 +737,6 @@ func shardsOutOfLimitError(shardingName string, shards int32, limit appsv1.Shard
 
 // resolveCompDefinitionNServiceVersion resolves and returns the specific component definition object and the service version supported.
 func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader, compDefName, serviceVersion string) (*appsv1.ComponentDefinition, string, error) {
-	requestedServiceVersion := serviceVersion
 	var (
 		compDef *appsv1.ComponentDefinition
 	)
@@ -765,8 +764,8 @@ func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader
 	compatibleCompDefs := serviceVersionToCompDefs[serviceVersion]
 	if len(compatibleCompDefs) == 0 {
 		err := fmt.Errorf(`no matched component definition found with componentDef "%s" and serviceVersion "%s"`, compDefName, serviceVersion)
-		_, versionErr := version.ParseSemantic(requestedServiceVersion)
-		if requestedServiceVersion != "" && versionErr == nil && len(serviceVersionToCompDefs) == 0 {
+		_, versionErr := version.ParseSemantic(serviceVersion)
+		if serviceVersion != "" && versionErr == nil && len(serviceVersionToCompDefs) == 0 {
 			return compDef, serviceVersion, controllerutil.NewError(controllerutil.ErrorType(appsv1.ReasonUnsupportedServiceVersion), err.Error())
 		}
 		return compDef, serviceVersion, err

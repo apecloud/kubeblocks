@@ -69,10 +69,6 @@ type OpsBehaviour struct {
 	// QueueWithSelf indicates that the operation is queued for execution within opsType scope.
 	QueueBySelf bool
 
-	// ClusterActionTargets returns the component and sharding names whose submitted
-	// Cluster targets still match this action. An empty result disables failure attribution.
-	ClusterActionTargets func(*OpsResource) []string
-
 	OpsHandler OpsHandler
 }
 

@@ -20,19 +20,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
-	"errors"
 	"slices"
 	"strings"
 	"sync"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -168,13 +165,6 @@ func (opsMgr *OpsManager) Reconcile(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		return 0, PatchOpsHandlerNotSupported(reqCtx.Ctx, cli, opsRes)
 	}
 	opsRes.ToClusterPhase = opsBehaviour.ToClusterPhase
-	if observed, failure := observeClusterActionFailure(opsRes, opsBehaviour); observed {
-		if failure == nil {
-			return opsMgr.checkAndHandleOpsTimeout(reqCtx, cli, opsRes, time.Second)
-		}
-		return 0, opsMgr.handleOpsCompleted(reqCtx, cli, opsRes, opsv1alpha1.OpsFailedPhase,
-			opsv1alpha1.NewCancelFailedCondition(opsRequest, failure), opsv1alpha1.NewFailedCondition(opsRequest, failure))
-	}
 	if opsRequest.Spec.Type == opsv1alpha1.CustomType {
 		err = initOpsDefAndValidate(reqCtx, cli, opsRes)
 		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
@@ -204,38 +194,6 @@ func (opsMgr *OpsManager) Reconcile(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	default:
 		return opsMgr.checkAndHandleOpsTimeout(reqCtx, cli, opsRes, requeueAfter)
 	}
-}
-
-func observeClusterActionFailure(opsRes *OpsResource, behaviour OpsBehaviour) (bool, error) {
-	generation := opsRes.OpsRequest.Status.ClusterGeneration
-	if behaviour.ClusterActionTargets == nil || opsRes.OpsRequest.Status.Phase != opsv1alpha1.OpsRunningPhase ||
-		generation <= 0 || opsRes.Cluster.Generation != generation {
-		return false, nil
-	}
-	condition := meta.FindStatusCondition(opsRes.Cluster.Status.Conditions, appsv1.ConditionTypeProvisioningStarted)
-	if condition == nil || condition.Status != metav1.ConditionFalse ||
-		condition.Reason != appsv1.ReasonUnsupportedServiceVersion || condition.ObservedGeneration != generation {
-		return false, nil
-	}
-	targets := behaviour.ClusterActionTargets(opsRes)
-	if len(targets) == 0 {
-		return false, nil
-	}
-	for _, name := range targets {
-		if status, ok := opsRes.Cluster.Status.Components[name]; ok {
-			if status.ObservedGeneration != generation || !status.UpToDate || status.Phase != appsv1.RunningComponentPhase {
-				return true, errors.New(condition.Message)
-			}
-		} else if status, ok := opsRes.Cluster.Status.Shardings[name]; ok {
-			if status.ObservedGeneration != generation || !status.UpToDate || status.Phase != appsv1.RunningComponentPhase {
-				return true, errors.New(condition.Message)
-			}
-		} else {
-			return true, errors.New(condition.Message)
-		}
-	}
-	// Current Running targets contradict the failure; wait for a consistent owner observation.
-	return true, nil
 }
 
 func (opsMgr *OpsManager) handleOpsCompleted(reqCtx intctrlutil.RequestCtx,

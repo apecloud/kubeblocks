@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -53,11 +54,10 @@ var _ OpsHandler = upgradeOpsHandler{}
 func init() {
 	upgradeBehaviour := OpsBehaviour{
 		// if cluster is Abnormal or Failed, new opsRequest may can repair it.
-		FromClusterPhases:    appsv1.GetClusterUpRunningPhases(),
-		ToClusterPhase:       appsv1.UpdatingClusterPhase,
-		QueueByCluster:       true,
-		OpsHandler:           upgradeOpsHandler{},
-		ClusterActionTargets: upgradeOpsHandler{}.clusterActionTargets,
+		FromClusterPhases: appsv1.GetClusterUpRunningPhases(),
+		ToClusterPhase:    appsv1.UpdatingClusterPhase,
+		QueueByCluster:    true,
+		OpsHandler:        upgradeOpsHandler{},
 	}
 
 	opsMgr := GetOpsManager()
@@ -126,6 +126,12 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		err           error
 	)
 	compOpsHelper = newComponentOpsHelper(upgradeSpec.Components)
+	if failure := clusterProvisioningFailure(opsRes); failure != nil && failure.Reason == appsv1.ReasonUnsupportedServiceVersion && u.targetsUnchanged(opsRes) {
+		if compOpsHelper.targetsCurrentlyRunning(opsRes.Cluster) {
+			return opsv1alpha1.OpsRunningPhase, time.Second, nil
+		}
+		return opsv1alpha1.OpsFailedPhase, 0, errors.New(failure.Message)
+	}
 	legacyDefinitions := map[string]*appsv1.ComponentDefinition{}
 	for _, target := range upgradeSpec.Components {
 		if len(target.Instances) > 0 || upgradeTargetHasInstanceVersions(opsRes.Cluster, target.ComponentName) {
@@ -204,17 +210,6 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, podApplyCompOps)
 	}
 	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "upgrade", handleUpgradeProgress)
-}
-
-func (u upgradeOpsHandler) clusterActionTargets(opsRes *OpsResource) []string {
-	if !u.targetsUnchanged(opsRes) {
-		return nil
-	}
-	targets := make([]string, 0, len(opsRes.OpsRequest.Spec.Upgrade.Components))
-	for _, target := range opsRes.OpsRequest.Spec.Upgrade.Components {
-		targets = append(targets, target.ComponentName)
-	}
-	return targets
 }
 
 func (u upgradeOpsHandler) targetsUnchanged(opsRes *OpsResource) bool {

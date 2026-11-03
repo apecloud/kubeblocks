@@ -26,6 +26,8 @@ import (
 	"slices"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -52,6 +54,35 @@ func newComponentOpsHelper[T ComponentOpsInterface](compOpsList []T) componentOp
 		compOpsHelper.componentOpsSet[compOps.GetComponentName()] = compOps
 	}
 	return compOpsHelper
+}
+
+func clusterProvisioningFailure(opsRes *OpsResource) *metav1.Condition {
+	generation := opsRes.OpsRequest.Status.ClusterGeneration
+	if opsRes.OpsRequest.Status.Phase != opsv1alpha1.OpsRunningPhase || generation <= 0 || opsRes.Cluster.Generation != generation {
+		return nil
+	}
+	condition := meta.FindStatusCondition(opsRes.Cluster.Status.Conditions, appsv1.ConditionTypeProvisioningStarted)
+	if condition != nil && condition.Status == metav1.ConditionFalse && condition.ObservedGeneration == generation {
+		return condition
+	}
+	return nil
+}
+
+func (c componentOpsHelper) targetsCurrentlyRunning(cluster *appsv1.Cluster) bool {
+	for name := range c.componentOpsSet {
+		if status, ok := cluster.Status.Components[name]; ok {
+			if status.ObservedGeneration != cluster.Generation || !status.UpToDate || status.Phase != appsv1.RunningComponentPhase {
+				return false
+			}
+		} else if status, ok := cluster.Status.Shardings[name]; ok {
+			if status.ObservedGeneration != cluster.Generation || !status.UpToDate || status.Phase != appsv1.RunningComponentPhase {
+				return false
+			}
+		} else {
+			return false
+		}
+	}
+	return len(c.componentOpsSet) > 0
 }
 
 func (c componentOpsHelper) updateClusterComponentsAndShardings(cluster *appsv1.Cluster,

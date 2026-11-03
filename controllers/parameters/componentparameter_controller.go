@@ -118,7 +118,7 @@ func (r *ComponentParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, 
 
 	taskCtx, err := NewTaskContext(reqCtx.Ctx, r.Client, componentParameter, fetcherTask)
 	if err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, errors.Wrap(err, "failed to create task context").Error())
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, errors.Wrap(err, "failed to create task context").Error())
 	}
 	if err := r.runTasks(taskCtx, tasks, fetcherTask); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,

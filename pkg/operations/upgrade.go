@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"errors"
 	"slices"
 	"time"
 
@@ -112,6 +113,12 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	}
 	upgradeSpec := opsRes.OpsRequest.Spec.Upgrade
 	compOpsHelper := newComponentOpsHelper(upgradeSpec.Components)
+	if failure := clusterProvisioningFailure(opsRes); failure != nil && failure.Reason == appsv1.ReasonUnsupportedServiceVersion {
+		if compOpsHelper.targetsCurrentlyRunning(opsRes.Cluster) {
+			return opsv1alpha1.OpsRunningPhase, time.Second, nil
+		}
+		return opsv1alpha1.OpsFailedPhase, 0, errors.New(failure.Message)
+	}
 	return compOpsHelper.reconcileRunningAction(reqCtx, cli, opsRes, "upgrade")
 }
 

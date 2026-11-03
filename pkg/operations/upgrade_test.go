@@ -47,7 +47,6 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	appscontroller "github.com/apecloud/kubeblocks/controllers/apps"
 	clustercontroller "github.com/apecloud/kubeblocks/controllers/apps/cluster"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -1271,7 +1270,7 @@ var _ = Describe("upgrade unsupported service version", func() {
 		cluster.Status.Components = map[string]appsv1.ClusterComponentStatus{"fe": {Phase: appsv1.RunningComponentPhase, ObservedGeneration: 6, UpToDate: true}}
 		return cluster
 	}
-	It("persists a Cluster unsupported-version error and completes the matching Upgrade through the Ops manager", func() {
+	DescribeTable("persists an unsupported target and completes the matching Upgrade", func(unavailable bool) {
 		cluster := newCluster()
 		def := testapps.NewComponentDefinitionFactory("owner-fe").SetServiceVersion("3.3.0").SetRuntime(&corev1.Container{Name: "server", Image: "server:3.3.0"}).GetObject()
 		def.Status.Phase = appsv1.AvailablePhase
@@ -1280,7 +1279,16 @@ var _ = Describe("upgrade unsupported service version", func() {
 		comp.Labels = constant.GetCompLabels(cluster.Name, "fe")
 		comp.Status.Phase = appsv1.RunningComponentPhase
 		ops := newUpgrade(cluster)
-		cli := interceptor.NewClient(newClient(cluster, comp, def, ops), interceptor.Funcs{Get: func(ctx context.Context, inner client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+		objects := []client.Object{cluster, comp, def, ops}
+		diagnostic := "99.99.99"
+		if unavailable {
+			cv := testapps.NewComponentVersionFactory("owner-fe-version").AddRelease("target", "", "99.99.99", map[string]string{"server": "server:99.99.99"}).AddCompatibilityRule([]string{def.Name}, []string{"target"}).GetObject()
+			cv.Labels = map[string]string{def.Name: def.Name}
+			cv.Status.Phase = appsv1.UnavailablePhase
+			objects = append(objects, cv)
+			diagnostic = "unavailable"
+		}
+		cli := interceptor.NewClient(newClient(objects...), interceptor.Funcs{Get: func(ctx context.Context, inner client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 			if _, ok := obj.(*workloads.InstanceSet); ok {
 				return apierrors.NewServiceUnavailable("InstanceSet reads unavailable")
 			}
@@ -1289,7 +1297,7 @@ var _ = Describe("upgrade unsupported service version", func() {
 		reqCtx := requestContext()
 		reconciler := &clustercontroller.ClusterReconciler{Client: cli, Scheme: cli.Scheme(), Recorder: reqCtx.Recorder}
 		_, err := reconciler.Reconcile(reqCtx.Ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})
-		Expect(err).Should(MatchError(ContainSubstring("99.99.99")))
+		Expect(err).Should(MatchError(ContainSubstring(diagnostic)))
 		Expect(cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
 		condition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeProvisioningStarted)
 		Expect(condition).ShouldNot(BeNil())
@@ -1304,8 +1312,8 @@ var _ = Describe("upgrade unsupported service version", func() {
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(ops), ops)).Should(Succeed())
 		Expect(ops.Status.Phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
-		Expect(ops.Status.Conditions).Should(ContainElement(HaveField("Message", ContainSubstring("99.99.99"))))
-	})
+		Expect(ops.Status.Conditions).Should(ContainElement(HaveField("Message", ContainSubstring(diagnostic))))
+	}, Entry("no matching version", false), Entry("unavailable version", true))
 	It("waits on contradictory current Running status and version error", func() {
 		cluster := newCluster()
 		cluster.Status.Components["fe"] = appsv1.ClusterComponentStatus{Phase: appsv1.RunningComponentPhase, ObservedGeneration: cluster.Generation, UpToDate: true}
@@ -1360,94 +1368,5 @@ var _ = Describe("upgrade unsupported service version", func() {
 		Entry("generic load error", "component", int64(7), int64(7), int64(7), metav1.ConditionFalse, "PreCheckFailed", false, opsv1alpha1.OpsRunningPhase),
 		Entry("repaired condition", "component", int64(7), int64(7), int64(7), metav1.ConditionTrue, "PreCheckSucceed", false, opsv1alpha1.OpsRunningPhase),
 		Entry("overwritten target retains legacy retry", "component", int64(7), int64(7), int64(7), metav1.ConditionFalse, "UnsupportedServiceVersion", true, opsv1alpha1.OpsRunningPhase),
-	)
-})
-
-var _ = Describe("upgrade catalog publication", func() {
-	DescribeTable("keeps an upgrade retryable across ComponentVersion publication", func(overlappingRules bool) {
-		ctx := context.Background()
-		scheme := runtime.NewScheme()
-		for _, add := range []func(*runtime.Scheme) error{corev1.AddToScheme, appsv1.AddToScheme, opsv1alpha1.AddToScheme, workloads.AddToScheme} {
-			Expect(add(scheme)).Should(Succeed())
-		}
-		def := testapps.NewComponentDefinitionFactory("audit-def").SetServiceVersion("1.0.0").SetRuntime(&corev1.Container{Name: "server", Image: "server:1.0.0"}).GetObject()
-		def.Generation = 1
-		def.Status.ObservedGeneration = 1
-		def.Status.Phase = appsv1.AvailablePhase
-		cv := testapps.NewComponentVersionFactory("audit-new-catalog").AddRelease("new", "", "2.0.0", map[string]string{"server": "server:2.0.0"}).AddCompatibilityRule([]string{def.Name}, []string{"new"}).GetObject()
-		cv.Generation = 1
-		objects := []client.Object{def, cv}
-		if overlappingRules {
-			exact := def.DeepCopy()
-			exact.Name = "audit"
-			objects = append(objects, exact)
-			cv.Spec.CompatibilityRules = []appsv1.ComponentVersionCompatibilityRule{
-				{CompDefs: []string{exact.Name}, Releases: []string{"new"}},
-				{CompDefs: []string{def.Name}, Releases: []string{"other"}},
-			}
-			cv.Spec.Releases = append(cv.Spec.Releases, appsv1.ComponentVersionRelease{Name: "other", ServiceVersion: "1.0.0", Images: map[string]string{"server": "server:1.0.0"}})
-		}
-		cluster := testapps.NewClusterFactory("default", "audit-catalog", "").AddComponent("db", def.Name).SetServiceVersion("2.0.0").SetReplicas(1).GetObject()
-		cluster.Generation, cluster.UID = 7, "audit-cluster"
-		cluster.Status.Components = map[string]appsv1.ClusterComponentStatus{"db": {Phase: appsv1.RunningComponentPhase, ObservedGeneration: 6, UpToDate: true}}
-		comp := testapps.NewComponentFactory(cluster.Namespace, cluster.Name+"-db", def.Name).SetServiceVersion("1.0.0").GetObject()
-		comp.Labels = constant.GetCompLabels(cluster.Name, "db")
-		comp.Status.Phase = appsv1.RunningComponentPhase
-		ops := &opsv1alpha1.OpsRequest{ObjectMeta: metav1.ObjectMeta{Name: "upgrade", Namespace: cluster.Namespace}, Spec: opsv1alpha1.OpsRequestSpec{ClusterName: cluster.Name, Type: opsv1alpha1.UpgradeType, SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{Upgrade: &opsv1alpha1.Upgrade{Components: []opsv1alpha1.UpgradeComponent{{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "db"}, ServiceVersion: ptr.To("2.0.0")}}}}}, Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsRunningPhase, ClusterGeneration: 7}}
-		objects = append(objects, cluster, comp, ops)
-		base := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&appsv1.Cluster{}, &appsv1.Component{}, &appsv1.ComponentVersion{}, &opsv1alpha1.OpsRequest{}).WithObjects(objects...).Build()
-		recorder := record.NewFakeRecorder(100)
-		publish := func() {
-			publisher := &appscontroller.ComponentVersionReconciler{Client: base, Scheme: scheme, Recorder: recorder}
-			for range 3 {
-				_, err := publisher.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cv)})
-				Expect(err).ShouldNot(HaveOccurred())
-			}
-		}
-		published := false
-		cli := interceptor.NewClient(base, interceptor.Funcs{List: func(ctx context.Context, inner client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
-			err := inner.List(ctx, list, opts...)
-			if _, ok := list.(*appsv1.ComponentVersionList); ok && err == nil && overlappingRules && !published {
-				publish()
-				published = true
-			}
-			return err
-		}})
-		reqCtx := intctrlutil.RequestCtx{Ctx: ctx, Log: logr.Discard(), Recorder: recorder}
-		reconciler := &clustercontroller.ClusterReconciler{Client: cli, Scheme: scheme, Recorder: recorder}
-		reconcile := func() *metav1.Condition {
-			_, _ = reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})
-			Expect(cli.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
-			condition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeProvisioningStarted)
-			Expect(condition).ShouldNot(BeNil())
-			return condition
-		}
-		condition := reconcile()
-		Expect(condition.Reason).Should(Equal("PreCheckFailed"))
-		_, _ = GetOpsManager().Reconcile(reqCtx, cli, &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: recorder})
-		Expect(cli.Get(ctx, client.ObjectKeyFromObject(ops), ops)).Should(Succeed())
-		Expect(ops.Status.Phase).Should(Equal(opsv1alpha1.OpsRunningPhase))
-		if !overlappingRules {
-			Expect(published).Should(BeFalse())
-			publish()
-		} else {
-			Expect(published).Should(BeTrue())
-		}
-		Expect(cli.Get(ctx, client.ObjectKeyFromObject(cv), cv)).Should(Succeed())
-		Expect(cv.Labels[def.Name]).Should(Equal(def.Name))
-		Expect(cv.Status.Phase).Should(Equal(appsv1.AvailablePhase))
-		Expect(cv.Status.ObservedGeneration).Should(Equal(cv.Generation))
-		publishedVersion := cv.DeepCopy()
-		condition = reconcile()
-		Expect(condition.Status).Should(Equal(metav1.ConditionTrue))
-		Expect(cluster.Generation).Should(Equal(int64(7)))
-		_, _ = GetOpsManager().Reconcile(reqCtx, cli, &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: recorder})
-		Expect(cli.Get(ctx, client.ObjectKeyFromObject(ops), ops)).Should(Succeed())
-		Expect(ops.Status.Phase).Should(Equal(opsv1alpha1.OpsRunningPhase))
-		Expect(cli.Get(ctx, client.ObjectKeyFromObject(cv), cv)).Should(Succeed())
-		Expect(cv).Should(Equal(publishedVersion))
-	},
-		Entry("pending catalog then publication", false),
-		Entry("overlapping rules published after the catalog snapshot", true),
 	)
 })

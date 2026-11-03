@@ -49,24 +49,19 @@ func CompatibleCompVersions4Definition(ctx context.Context, cli client.Reader, c
 		return nil, err
 	}
 
-	return SelectCompatibleCompVersions4Definition(compDef, compVersionList.Items)
-}
+	if len(compVersionList.Items) == 0 {
+		return nil, nil
+	}
 
-// SelectCompatibleCompVersions4Definition selects published, available versions for a definition from a catalog snapshot.
-func SelectCompatibleCompVersions4Definition(compDef *appsv1.ComponentDefinition, versions []appsv1.ComponentVersion) ([]*appsv1.ComponentVersion, error) {
-	var compVersions []*appsv1.ComponentVersion
-	for i := range versions {
-		compVersion := &versions[i]
-		if compVersion.Labels[compDef.Name] != compDef.Name {
-			continue
-		}
+	compVersions := make([]*appsv1.ComponentVersion, 0)
+	for i, compVersion := range compVersionList.Items {
 		if compVersion.Generation != compVersion.Status.ObservedGeneration {
-			return nil, fmt.Errorf("the matched ComponentVersion is not up to date: %s", compVersion.Name)
+			return nil, intctrlutil.NewErrorf(intctrlutil.ErrorType(appsv1.ReasonUnsupportedServiceVersion), "the matched ComponentVersion is not up to date: %s", compVersion.Name)
 		}
 		if compVersion.Status.Phase != appsv1.AvailablePhase {
-			return nil, fmt.Errorf("the matched ComponentVersion is unavailable: %s", compVersion.Name)
+			return nil, intctrlutil.NewErrorf(intctrlutil.ErrorType(appsv1.ReasonUnsupportedServiceVersion), "the matched ComponentVersion is unavailable: %s", compVersion.Name)
 		}
-		compVersions = append(compVersions, compVersion)
+		compVersions = append(compVersions, &compVersionList.Items[i])
 	}
 	return compVersions, nil
 }

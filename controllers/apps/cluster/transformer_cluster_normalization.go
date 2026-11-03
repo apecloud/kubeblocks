@@ -824,13 +824,18 @@ func serviceVersionToCompDefinitions(ctx context.Context, cli client.Reader,
 	}
 
 	for _, compDef := range compDefs {
+		compVersions, err := component.CompatibleCompVersions4Definition(compDef, versions.Items)
+		if err != nil {
+			return nil, false, err
+		}
 		serviceVersions := sets.New[string]()
 		// add definition's service version as default, in case there is no component versions provided
 		if compDef.Spec.ServiceVersion != "" {
 			serviceVersions.Insert(compDef.Spec.ServiceVersion)
 		}
-		for _, compVersion := range versions.Items {
-			if compVersion.Labels[compDef.Name] != compDef.Name {
+		for i := range versions.Items {
+			compVersion := &versions.Items[i]
+			if !slices.Contains(compVersions, compVersion) {
 				for _, rule := range compVersion.Spec.CompatibilityRules {
 					for _, pattern := range rule.CompDefs {
 						// Publication selects exact names before patterns, unlike release extraction below.
@@ -843,13 +848,7 @@ func serviceVersionToCompDefinitions(ctx context.Context, cli client.Reader,
 				}
 				continue
 			}
-			if compVersion.Generation != compVersion.Status.ObservedGeneration {
-				return nil, false, fmt.Errorf("the matched ComponentVersion is not up to date: %s", compVersion.Name)
-			}
-			if compVersion.Status.Phase != appsv1.AvailablePhase {
-				return nil, false, fmt.Errorf("the matched ComponentVersion is unavailable: %s", compVersion.Name)
-			}
-			serviceVersions = serviceVersions.Union(compatibleServiceVersions4Definition(compDef, &compVersion))
+			serviceVersions = serviceVersions.Union(compatibleServiceVersions4Definition(compDef, compVersion))
 		}
 
 		completeVersions = completeVersions && len(serviceVersions) > 0 &&

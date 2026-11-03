@@ -39,8 +39,7 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-// CompatibleCompVersions4Definition returns all component versions that are compatible with specified component definition.
-func CompatibleCompVersions4Definition(ctx context.Context, cli client.Reader, compDef *appsv1.ComponentDefinition) ([]*appsv1.ComponentVersion, error) {
+func listCompatibleCompVersions4Definition(ctx context.Context, cli client.Reader, compDef *appsv1.ComponentDefinition) ([]*appsv1.ComponentVersion, error) {
 	compVersionList := &appsv1.ComponentVersionList{}
 	labels := client.MatchingLabels{
 		compDef.Name: compDef.Name,
@@ -49,19 +48,24 @@ func CompatibleCompVersions4Definition(ctx context.Context, cli client.Reader, c
 		return nil, err
 	}
 
-	if len(compVersionList.Items) == 0 {
-		return nil, nil
-	}
+	return CompatibleCompVersions4Definition(compDef, compVersionList.Items)
+}
 
-	compVersions := make([]*appsv1.ComponentVersion, 0)
-	for i, compVersion := range compVersionList.Items {
+// CompatibleCompVersions4Definition selects published, available versions for a definition from a catalog snapshot.
+func CompatibleCompVersions4Definition(compDef *appsv1.ComponentDefinition, versions []appsv1.ComponentVersion) ([]*appsv1.ComponentVersion, error) {
+	var compVersions []*appsv1.ComponentVersion
+	for i := range versions {
+		compVersion := &versions[i]
+		if compVersion.Labels[compDef.Name] != compDef.Name {
+			continue
+		}
 		if compVersion.Generation != compVersion.Status.ObservedGeneration {
 			return nil, fmt.Errorf("the matched ComponentVersion is not up to date: %s", compVersion.Name)
 		}
 		if compVersion.Status.Phase != appsv1.AvailablePhase {
 			return nil, fmt.Errorf("the matched ComponentVersion is unavailable: %s", compVersion.Name)
 		}
-		compVersions = append(compVersions, &compVersionList.Items[i])
+		compVersions = append(compVersions, compVersion)
 	}
 	return compVersions, nil
 }
@@ -94,7 +98,7 @@ func CompareServiceVersion(required, provided string) (bool, error) {
 // UpdateCompDefinitionImages4ServiceVersion resolves and updates images for the component definition.
 func UpdateCompDefinitionImages4ServiceVersion(ctx context.Context, cli client.Reader,
 	compDef *appsv1.ComponentDefinition, serviceVersion string) error {
-	compVersions, err := CompatibleCompVersions4Definition(ctx, cli, compDef)
+	compVersions, err := listCompatibleCompVersions4Definition(ctx, cli, compDef)
 	if err != nil {
 		return err
 	}
@@ -109,7 +113,7 @@ func UpdateCompDefinitionImages4ServiceVersion(ctx context.Context, cli client.R
 // Without a ComponentVersion, action containers inherit the parent synthesized runtime.
 func ResolveInstanceTemplateImages4ServiceVersion(ctx context.Context, cli client.Reader,
 	compDef *appsv1.ComponentDefinition, serviceVersion string, parent *corev1.PodSpec) (map[string]string, error) {
-	compVersions, err := CompatibleCompVersions4Definition(ctx, cli, compDef)
+	compVersions, err := listCompatibleCompVersions4Definition(ctx, cli, compDef)
 	if err != nil {
 		return nil, err
 	}

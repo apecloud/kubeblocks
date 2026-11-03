@@ -741,13 +741,8 @@ func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader
 	var (
 		compDef *appsv1.ComponentDefinition
 	)
-	compDefs, err := listCompDefinitionsWithPattern(ctx, cli, compDefName)
-	if err != nil {
-		return compDef, serviceVersion, err
-	}
-
 	// mapping from <service version> to <[]*appsv1.ComponentDefinition>
-	serviceVersionToCompDefs, completeVersions, err := serviceVersionToCompDefinitions(ctx, cli, compDefs, serviceVersion)
+	serviceVersionToCompDefs, completeVersions, err := serviceVersionToCompDefinitions(ctx, cli, compDefName, serviceVersion)
 	if err != nil {
 		return compDef, serviceVersion, err
 	}
@@ -766,18 +761,8 @@ func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader
 	if len(compatibleCompDefs) == 0 {
 		err := fmt.Errorf(`no matched component definition found with componentDef "%s" and serviceVersion "%s"`, compDefName, serviceVersion)
 		_, versionErr := version.ParseSemantic(requestedServiceVersion)
-		available := len(compDefs) > 0
-		for _, candidate := range compDefs {
-			available = available && candidate.Status.Phase == appsv1.AvailablePhase && candidate.Status.ObservedGeneration == candidate.Generation
-		}
-		if requestedServiceVersion != "" && versionErr == nil && available && completeVersions && len(serviceVersionToCompDefs) == 0 {
-			canReject, discoveryErr := canRejectServiceVersion(ctx, cli, compDefs, requestedServiceVersion)
-			if discoveryErr != nil {
-				return compDef, serviceVersion, discoveryErr
-			}
-			if canReject {
-				return compDef, serviceVersion, controllerutil.NewError(controllerutil.ErrorType(appsv1.ReasonUnsupportedServiceVersion), err.Error())
-			}
+		if requestedServiceVersion != "" && versionErr == nil && completeVersions && len(serviceVersionToCompDefs) == 0 {
+			return compDef, serviceVersion, controllerutil.NewError(controllerutil.ErrorType(appsv1.ReasonUnsupportedServiceVersion), err.Error())
 		}
 		return compDef, serviceVersion, err
 	}
@@ -790,77 +775,37 @@ func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader
 	return compatibleCompDefs[compatibleCompDefName], serviceVersion, nil
 }
 
-func canRejectServiceVersion(ctx context.Context, cli client.Reader, compDefs []*appsv1.ComponentDefinition, requested string) (bool, error) {
-	versions := &appsv1.ComponentVersionList{}
-	if err := cli.List(ctx, versions); err != nil {
-		return false, err
-	}
-	resolvedPatterns := make(map[string]sets.Set[string])
-	for _, compDef := range compDefs {
-		for _, cv := range versions.Items {
-			if cv.Labels[compDef.Name] == compDef.Name {
-				if cv.Status.Phase != appsv1.AvailablePhase || cv.Status.ObservedGeneration != cv.Generation {
-					return false, nil
-				}
-				for serviceVersion := range compatibleServiceVersions4Definition(compDef, &cv) {
-					match, err := component.CompareServiceVersion(requested, serviceVersion)
-					if err != nil || match {
-						return false, err
-					}
-				}
-				continue
-			}
-			for _, rule := range cv.Spec.CompatibilityRules {
-				for _, pattern := range rule.CompDefs {
-					if !component.PrefixOrRegexMatched(compDef.Name, pattern) {
-						continue
-					}
-					names, ok := resolvedPatterns[pattern]
-					if !ok {
-						definitions, err := listCompDefinitionsWithPattern(ctx, cli, pattern)
-						if err != nil {
-							return false, err
-						}
-						names = sets.New[string]()
-						for _, definition := range definitions {
-							names.Insert(definition.Name)
-						}
-						resolvedPatterns[pattern] = names
-					}
-					if names.Has(compDef.Name) {
-						return false, nil
-					}
-				}
-			}
-		}
-	}
-	return true, nil
-}
-
-// listCompDefinitionsWithPattern returns all component definitions whose names match the given pattern
-func listCompDefinitionsWithPattern(ctx context.Context, cli client.Reader, name string) ([]*appsv1.ComponentDefinition, error) {
-	compDefList := &appsv1.ComponentDefinitionList{}
-	if err := cli.List(ctx, compDefList); err != nil {
-		return nil, err
-	}
+// compDefinitionsWithPattern returns all component definitions whose names match the given pattern.
+func compDefinitionsWithPattern(compDefs []appsv1.ComponentDefinition, name string) []*appsv1.ComponentDefinition {
 	compDefsFullyMatched := make([]*appsv1.ComponentDefinition, 0)
 	compDefsPatternMatched := make([]*appsv1.ComponentDefinition, 0)
-	for i, item := range compDefList.Items {
+	for i, item := range compDefs {
 		if item.Name == name {
-			compDefsFullyMatched = append(compDefsFullyMatched, &compDefList.Items[i])
+			compDefsFullyMatched = append(compDefsFullyMatched, &compDefs[i])
 		}
 		if component.PrefixOrRegexMatched(item.Name, name) {
-			compDefsPatternMatched = append(compDefsPatternMatched, &compDefList.Items[i])
+			compDefsPatternMatched = append(compDefsPatternMatched, &compDefs[i])
 		}
 	}
 	if len(compDefsFullyMatched) > 0 {
-		return compDefsFullyMatched, nil
+		return compDefsFullyMatched
 	}
-	return compDefsPatternMatched, nil
+	return compDefsPatternMatched
 }
 
 func serviceVersionToCompDefinitions(ctx context.Context, cli client.Reader,
-	compDefs []*appsv1.ComponentDefinition, serviceVersion string) (map[string]map[string]*appsv1.ComponentDefinition, bool, error) {
+	compDefName, serviceVersion string) (map[string]map[string]*appsv1.ComponentDefinition, bool, error) {
+	definitions := &appsv1.ComponentDefinitionList{}
+	if err := cli.List(ctx, definitions); err != nil {
+		return nil, false, err
+	}
+	compDefs := compDefinitionsWithPattern(definitions.Items, compDefName)
+	versions := &appsv1.ComponentVersionList{}
+	if len(compDefs) > 0 {
+		if err := cli.List(ctx, versions); err != nil {
+			return nil, false, err
+		}
+	}
 	completeVersions := len(compDefs) > 0
 	result := make(map[string]map[string]*appsv1.ComponentDefinition)
 
@@ -880,24 +825,39 @@ func serviceVersionToCompDefinitions(ctx context.Context, cli client.Reader,
 	}
 
 	for _, compDef := range compDefs {
-		compVersions, err := component.CompatibleCompVersions4Definition(ctx, cli, compDef)
-		if err != nil {
-			return nil, false, err
-		}
-
 		serviceVersions := sets.New[string]()
 		// add definition's service version as default, in case there is no component versions provided
 		if compDef.Spec.ServiceVersion != "" {
 			serviceVersions.Insert(compDef.Spec.ServiceVersion)
 		}
-		for _, compVersion := range compVersions {
-			serviceVersions = serviceVersions.Union(compatibleServiceVersions4Definition(compDef, compVersion))
+		for _, compVersion := range versions.Items {
+			if compVersion.Labels[compDef.Name] != compDef.Name {
+				for _, rule := range compVersion.Spec.CompatibilityRules {
+					for _, pattern := range rule.CompDefs {
+						// Publication selects exact names before patterns, unlike release extraction below.
+						if slices.ContainsFunc(compDefinitionsWithPattern(definitions.Items, pattern), func(definition *appsv1.ComponentDefinition) bool {
+							return definition.Name == compDef.Name
+						}) {
+							completeVersions = false
+						}
+					}
+				}
+				continue
+			}
+			if compVersion.Generation != compVersion.Status.ObservedGeneration {
+				return nil, false, fmt.Errorf("the matched ComponentVersion is not up to date: %s", compVersion.Name)
+			}
+			if compVersion.Status.Phase != appsv1.AvailablePhase {
+				return nil, false, fmt.Errorf("the matched ComponentVersion is unavailable: %s", compVersion.Name)
+			}
+			serviceVersions = serviceVersions.Union(compatibleServiceVersions4Definition(compDef, &compVersion))
 		}
 
-		completeVersions = completeVersions && len(serviceVersions) > 0
+		completeVersions = completeVersions && len(serviceVersions) > 0 &&
+			compDef.Status.Phase == appsv1.AvailablePhase && compDef.Status.ObservedGeneration == compDef.Generation
 
 		for version := range serviceVersions {
-			if err = checkedInsert(version, compDef); err != nil {
+			if err := checkedInsert(version, compDef); err != nil {
 				return nil, false, err
 			}
 		}

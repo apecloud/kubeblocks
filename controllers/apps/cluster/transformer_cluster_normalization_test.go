@@ -743,6 +743,7 @@ var _ = Describe("explicit unsupported service version ownership", func() {
 		def.Status.ObservedGeneration = 2
 		def.Status.Phase = appsv1.AvailablePhase
 		requested := "99.99.99"
+		expectedVersion := ""
 		objects := []client.Object{def}
 		switch scenario {
 		case "semantic prefix":
@@ -763,25 +764,46 @@ var _ = Describe("explicit unsupported service version ownership", func() {
 			def.Spec.ServiceVersion = "invalid"
 		case "empty provider":
 			def.Spec.ServiceVersion = ""
-		case "CV-only provider":
-			def.Spec.ServiceVersion = ""
-			cv := testapps.NewComponentVersionFactory("owner-version").AddRelease("release", "", "1.0.0", map[string]string{"server": "server:1.0.0"}).AddCompatibilityRule([]string{def.Name}, []string{"release"}).GetObject()
-			cv.Labels = map[string]string{def.Name: def.Name}
-			cv.Status.Phase = appsv1.AvailablePhase
-			objects = append(objects, cv)
 		case "empty default":
 			requested = ""
 			def.Spec.ServiceVersion = ""
-		case "unavailable version", "stale version":
+		case "CV-only provider", "unavailable version", "stale version", "pending version", "pending default", "pending supported", "unrelated version", "shadowed pattern", "published overlapping rules":
 			cv := testapps.NewComponentVersionFactory("owner-version").AddRelease("release", "", "1.0.0", map[string]string{"server": "server:1.0.0"}).AddCompatibilityRule([]string{def.Name}, []string{"release"}).GetObject()
 			cv.Labels = map[string]string{def.Name: def.Name}
 			cv.Generation = 2
 			cv.Status.ObservedGeneration = 2
 			cv.Status.Phase = appsv1.AvailablePhase
-			if scenario == "unavailable version" {
+			switch scenario {
+			case "CV-only provider":
+				def.Spec.ServiceVersion = ""
+			case "unavailable version":
 				cv.Status.Phase = appsv1.UnavailablePhase
-			} else {
+			case "stale version":
 				cv.Status.ObservedGeneration = 1
+			case "pending version", "pending default", "pending supported", "unrelated version", "shadowed pattern":
+				cv.Labels = nil
+				cv.Status = appsv1.ComponentVersionStatus{}
+				cv.Spec.Releases[0].ServiceVersion = requested
+				switch scenario {
+				case "pending default":
+					requested, expectedVersion = "", def.Spec.ServiceVersion
+				case "pending supported":
+					requested, expectedVersion = def.Spec.ServiceVersion, def.Spec.ServiceVersion
+				case "unrelated version":
+					cv.Spec.CompatibilityRules[0].CompDefs = []string{"unrelated"}
+				case "shadowed pattern":
+					exact := def.DeepCopy()
+					exact.Name = "owner"
+					objects = append(objects, exact)
+					cv.Spec.CompatibilityRules[0].CompDefs = []string{exact.Name}
+				}
+			case "published overlapping rules":
+				exact := def.DeepCopy()
+				exact.Name = "owner"
+				objects = append(objects, exact)
+				cv.Spec.Releases = append(cv.Spec.Releases, appsv1.ComponentVersionRelease{Name: "broad", ServiceVersion: requested})
+				cv.Spec.CompatibilityRules = append(cv.Spec.CompatibilityRules, appsv1.ComponentVersionCompatibilityRule{CompDefs: []string{exact.Name}, Releases: []string{"broad"}})
+				expectedVersion = requested
 			}
 			objects = append(objects, cv)
 		}
@@ -794,8 +816,14 @@ var _ = Describe("explicit unsupported service version ownership", func() {
 			}
 			return cli.List(ctx, list, opts...)
 		}})
-		_, _, err := resolveCompDefinitionNServiceVersion(ctx, reader, def.Name, requested)
-		Expect(err).Should(HaveOccurred())
+		resolvedDef, resolvedVersion, err := resolveCompDefinitionNServiceVersion(ctx, reader, def.Name, requested)
+		if expectedVersion != "" {
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(resolvedDef.Name).Should(Equal(def.Name))
+			Expect(resolvedVersion).Should(Equal(expectedVersion))
+		} else {
+			Expect(err).Should(HaveOccurred())
+		}
 		Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorType("UnsupportedServiceVersion"))).Should(Equal(terminal))
 	},
 		Entry("definite unsupported request", "unsupported", true),
@@ -808,6 +836,12 @@ var _ = Describe("explicit unsupported service version ownership", func() {
 		Entry("missing definition", "missing", false), Entry("unavailable definition", "unavailable", false), Entry("stale definition", "stale", false),
 		Entry("invalid request", "invalid request", false), Entry("invalid provider", "invalid provider", false), Entry("unspecified empty default", "empty default", false),
 		Entry("unavailable ComponentVersion", "unavailable version", false), Entry("stale ComponentVersion", "stale version", false),
+		Entry("unlabelled intended publication remains retryable", "pending version", false),
+		Entry("pending publication preserves the default version", "pending default", false),
+		Entry("pending publication preserves a supported explicit version", "pending supported", false),
+		Entry("unrelated pending publication does not block rejection", "unrelated version", true),
+		Entry("exact definition shadows a pending prefix rule", "shadowed pattern", true),
+		Entry("published labels preserve broad release extraction", "published overlapping rules", false),
 	)
 	DescribeTable("rejects unsupported targets at every normalization entry", func(target string) {
 		scheme := runtime.NewScheme()

@@ -161,8 +161,8 @@ jobs:
         test-type: [ yashandb|weaviate|pgpool|oceanbase|orchestrator|dolphindb|starrocks|mogdb|risingwave|vault|opensearch|greptimedb|victoria-metrics,
                      orioledb|oceanbase-proxy|victoria-logs|minio|foundationdb|rustfs|camellia-redis-proxy|polardb-pg|tidb|loki|rabbitmq|influxdb|zookeeper,
                      milvus|damengdb|kingbase|seaweedfs|etcd|vanilla-pg|greatdb|mssql|nebula|gaussdb|oceanbas-ent|oceanbase-ocp|oceanbase-pingan|tdengine|valkey,
-                     kafka|qdrant|doris|mongodb|starrocks-ent|asmysql|asmysql-orc|asmysql-proxy|asmysql-orc-proxy|clickhouse|selectdb|pulsar|nacos,
-                     hadoop|he3sql|hive|redis|postgresql|redis-cluster|postgresql-etcd|mongodb-shard|apecloud-mysql|rocketmq|oracle|elasticsearch|mariadb ]
+                     kafka|qdrant|doris|starrocks-ent|asmysql|asmysql-orc|asmysql-proxy|asmysql-orc-proxy|clickhouse|selectdb|pulsar|nacos|apecloud-mysql,
+                     hadoop|he3sql|hive|redis|postgresql|redis-cluster|postgresql-etcd|mongodb|mongodb-shard|rocketmq|oracle|elasticsearch|mariadb ]
     with:
       GITHUB_REPO: "apecloud/kubeblocks"
       BRANCH_NAME: "main"

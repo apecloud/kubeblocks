@@ -39,7 +39,8 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-func listCompatibleCompVersions4Definition(ctx context.Context, cli client.Reader, compDef *appsv1.ComponentDefinition) ([]*appsv1.ComponentVersion, error) {
+// CompatibleCompVersions4Definition returns all component versions that are compatible with specified component definition.
+func CompatibleCompVersions4Definition(ctx context.Context, cli client.Reader, compDef *appsv1.ComponentDefinition) ([]*appsv1.ComponentVersion, error) {
 	compVersionList := &appsv1.ComponentVersionList{}
 	labels := client.MatchingLabels{
 		compDef.Name: compDef.Name,
@@ -48,11 +49,11 @@ func listCompatibleCompVersions4Definition(ctx context.Context, cli client.Reade
 		return nil, err
 	}
 
-	return CompatibleCompVersions4Definition(compDef, compVersionList.Items)
+	return SelectCompatibleCompVersions4Definition(compDef, compVersionList.Items)
 }
 
-// CompatibleCompVersions4Definition selects published, available versions for a definition from a catalog snapshot.
-func CompatibleCompVersions4Definition(compDef *appsv1.ComponentDefinition, versions []appsv1.ComponentVersion) ([]*appsv1.ComponentVersion, error) {
+// SelectCompatibleCompVersions4Definition selects published, available versions for a definition from a catalog snapshot.
+func SelectCompatibleCompVersions4Definition(compDef *appsv1.ComponentDefinition, versions []appsv1.ComponentVersion) ([]*appsv1.ComponentVersion, error) {
 	var compVersions []*appsv1.ComponentVersion
 	for i := range versions {
 		compVersion := &versions[i]
@@ -98,7 +99,7 @@ func CompareServiceVersion(required, provided string) (bool, error) {
 // UpdateCompDefinitionImages4ServiceVersion resolves and updates images for the component definition.
 func UpdateCompDefinitionImages4ServiceVersion(ctx context.Context, cli client.Reader,
 	compDef *appsv1.ComponentDefinition, serviceVersion string) error {
-	compVersions, err := listCompatibleCompVersions4Definition(ctx, cli, compDef)
+	compVersions, err := CompatibleCompVersions4Definition(ctx, cli, compDef)
 	if err != nil {
 		return err
 	}
@@ -113,7 +114,7 @@ func UpdateCompDefinitionImages4ServiceVersion(ctx context.Context, cli client.R
 // Without a ComponentVersion, action containers inherit the parent synthesized runtime.
 func ResolveInstanceTemplateImages4ServiceVersion(ctx context.Context, cli client.Reader,
 	compDef *appsv1.ComponentDefinition, serviceVersion string, parent *corev1.PodSpec) (map[string]string, error) {
-	compVersions, err := listCompatibleCompVersions4Definition(ctx, cli, compDef)
+	compVersions, err := CompatibleCompVersions4Definition(ctx, cli, compDef)
 	if err != nil {
 		return nil, err
 	}

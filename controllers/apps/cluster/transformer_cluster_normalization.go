@@ -824,7 +824,7 @@ func serviceVersionToCompDefinitions(ctx context.Context, cli client.Reader,
 	}
 
 	for _, compDef := range compDefs {
-		compVersions, err := component.CompatibleCompVersions4Definition(compDef, versions.Items)
+		compVersions, err := component.SelectCompatibleCompVersions4Definition(compDef, versions.Items)
 		if err != nil {
 			return nil, false, err
 		}

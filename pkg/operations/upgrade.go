@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -125,6 +126,12 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		err           error
 	)
 	compOpsHelper = newComponentOpsHelper(upgradeSpec.Components)
+	if failure := clusterProvisioningFailure(opsRes); failure != nil && failure.Reason == appsv1.ReasonUnsupportedServiceVersion && u.targetsUnchanged(opsRes) {
+		if compOpsHelper.targetsCurrentlyRunning(opsRes.Cluster) {
+			return opsv1alpha1.OpsRunningPhase, time.Second, nil
+		}
+		return opsv1alpha1.OpsFailedPhase, 0, errors.New(failure.Message)
+	}
 	legacyDefinitions := map[string]*appsv1.ComponentDefinition{}
 	for _, target := range upgradeSpec.Components {
 		if len(target.Instances) > 0 || upgradeTargetHasInstanceVersions(opsRes.Cluster, target.ComponentName) {
@@ -203,6 +210,34 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, podApplyCompOps)
 	}
 	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "upgrade", handleUpgradeProgress)
+}
+
+func (u upgradeOpsHandler) targetsUnchanged(opsRes *OpsResource) bool {
+	for _, target := range opsRes.OpsRequest.Spec.Upgrade.Components {
+		spec := getComponentSpecOrShardingTemplate(opsRes.Cluster, target.ComponentName)
+		if spec == nil || u.needUpdateCompDef(target, opsRes.Cluster) && spec.ComponentDef != *target.ComponentDefinitionName ||
+			target.ServiceVersion != nil && spec.ServiceVersion != *target.ServiceVersion {
+			return false
+		}
+		for _, requested := range target.Instances {
+			found := false
+			for _, instance := range spec.Instances {
+				if instance.Name != requested.Name {
+					continue
+				}
+				if requested.ComponentDefinitionName != nil && instance.CompDef != *requested.ComponentDefinitionName ||
+					requested.ServiceVersion != nil && instance.ServiceVersion != *requested.ServiceVersion {
+					return false
+				}
+				found = true
+				break
+			}
+			if !found {
+				return false
+			}
+		}
+	}
+	return len(opsRes.OpsRequest.Spec.Upgrade.Components) > 0
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration

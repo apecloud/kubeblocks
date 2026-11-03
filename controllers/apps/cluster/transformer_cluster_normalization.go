@@ -763,7 +763,12 @@ func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader
 	// component definitions that support the service version
 	compatibleCompDefs := serviceVersionToCompDefs[serviceVersion]
 	if len(compatibleCompDefs) == 0 {
-		return compDef, serviceVersion, fmt.Errorf(`no matched component definition found with componentDef "%s" and serviceVersion "%s"`, compDefName, serviceVersion)
+		err := fmt.Errorf(`no matched component definition found with componentDef "%s" and serviceVersion "%s"`, compDefName, serviceVersion)
+		_, versionErr := version.ParseSemantic(serviceVersion)
+		if serviceVersion != "" && versionErr == nil && len(serviceVersionToCompDefs) == 0 {
+			return compDef, serviceVersion, controllerutil.NewError(controllerutil.ErrorType(appsv1.ReasonUnsupportedServiceVersion), err.Error())
+		}
+		return compDef, serviceVersion, err
 	}
 
 	// choose the latest one

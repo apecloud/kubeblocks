@@ -775,7 +775,6 @@ func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader
 	return compatibleCompDefs[compatibleCompDefName], serviceVersion, nil
 }
 
-// compDefinitionsWithPattern returns all component definitions whose names match the given pattern.
 func compDefinitionsWithPattern(compDefs []appsv1.ComponentDefinition, name string) []*appsv1.ComponentDefinition {
 	compDefsFullyMatched := make([]*appsv1.ComponentDefinition, 0)
 	compDefsPatternMatched := make([]*appsv1.ComponentDefinition, 0)

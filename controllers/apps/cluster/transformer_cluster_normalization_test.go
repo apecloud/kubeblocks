@@ -839,7 +839,7 @@ var _ = Describe("explicit unsupported service version ownership", func() {
 		Entry("unlabelled intended publication remains retryable", "pending version", false),
 		Entry("pending publication preserves the default version", "pending default", false),
 		Entry("pending publication preserves a supported explicit version", "pending supported", false),
-		Entry("unrelated pending publication does not block rejection", "unrelated version", true),
+		Entry("unrelated pending publication does not hide an unsupported version", "unrelated version", true),
 		Entry("exact definition shadows a pending prefix rule", "shadowed pattern", true),
 		Entry("published labels preserve broad release extraction", "published overlapping rules", false),
 	)

@@ -430,23 +430,34 @@ func newTaskContext(ctx context.Context, cli client.Client, componentParameter *
 	if err != nil {
 		return nil, err
 	}
-	taskCtx := &taskContext{ctx: ctx,
+	initialParameters, err := resolveInitialManagedParameters(ctx, cli, componentParameter, cmpd, configDescs, paramsDefs)
+	if err != nil {
+		return nil, err
+	}
+
+	return &taskContext{ctx: ctx,
 		componentParameter: componentParameter,
 		configDescs:        configDescs,
 		component:          synthesizedComp,
 		paramsDefs:         paramsDefs,
+		initialParameters:  initialParameters,
+	}, nil
+}
+
+func resolveInitialManagedParameters(ctx context.Context, cli client.Client,
+	componentParameter *parametersv1alpha1.ComponentParameter,
+	compDef *appsv1.ComponentDefinition,
+	configDescs []parametersv1alpha1.ComponentConfigDescription,
+	paramsDefs []*parametersv1alpha1.ParametersDefinition) (map[string]map[string]*parametersv1alpha1.ParametersInFile, error) {
+	initial := componentParameter.Spec.Initial
+	if initial == nil || (len(initial.Assignments) == 0 && len(initial.Updates) == 0) {
+		return nil, nil
 	}
-	if initial := componentParameter.Spec.Initial; initial != nil && (len(initial.Assignments) != 0 || len(initial.Updates) != 0) {
-		configmaps, err := resolveComponentRefConfigMap(ctx, cli, componentParameter.Namespace, componentParameter.Spec.ClusterName, componentParameter.Spec.ComponentName)
-		if err != nil {
-			return nil, err
-		}
-		taskCtx.initialParameters, err = classifyManagedParameterInputs(initial, cmpd, configmaps, configDescs, paramsDefs)
-		if err != nil {
-			return nil, err
-		}
+	configmaps, err := resolveComponentRefConfigMap(ctx, cli, componentParameter.Namespace, componentParameter.Spec.ClusterName, componentParameter.Spec.ComponentName)
+	if err != nil {
+		return nil, err
 	}
-	return taskCtx, nil
+	return classifyManagedParameterInputs(initial, compDef, configmaps, configDescs, paramsDefs)
 }
 
 func buildTemplateVars(ctx context.Context, cli client.Reader,

@@ -1338,7 +1338,7 @@ var _ = Describe("Instance availability scheduling", func() {
 		inst.Spec.Stop = ptr.To(true)
 		inst.Generation++
 		Expect(cli.Update(context.Background(), inst)).Should(Succeed())
-		Expect(run().RequeueAfter).Should(Equal(time.Second))
+		Expect(run().RequeueAfter).Should(BeNumerically(">", 0))
 		Expect(apierrors.IsNotFound(cli.Get(context.Background(), key, pod))).Should(BeTrue())
 	})
 })

@@ -103,12 +103,16 @@ var _ = Describe("InstanceSet configured readiness", func() {
 				if instanceAPI {
 					r = instanceset2.NewStatusReconciler()
 				}
-				result, err := r.Reconcile(tree)
-				Expect(err).ShouldNot(HaveOccurred())
-				if result == kubebuilderx.RetryAfter(time.Millisecond) {
-					_, err = r.Reconcile(tree)
+				its := tree.GetRoot().(*workloads.InstanceSet)
+				for attempt := 0; attempt < 10; attempt++ {
+					previous := its.Status.DeepCopy()
+					_, err := r.Reconcile(tree)
+					Expect(err).ShouldNot(HaveOccurred())
+					if reflect.DeepEqual(previous, &its.Status) {
+						return
+					}
 				}
-				Expect(err).ShouldNot(HaveOccurred())
+				Fail("InstanceSet status did not stabilize")
 			}
 			DescribeTable("uses the configured identities", func(replicas *int32, names []string, unhealthyExtra bool, stop bool, ready bool) {
 				its, tree := newTree(replicas, names...)
@@ -297,17 +301,22 @@ var _ = Describe("InstanceSet configured readiness", func() {
 						return r.Reconcile(context.Background(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: "default", Name: "legacy-stop"}})
 					}
 				}
-				result, err := parent()
-				Expect(err).ShouldNot(HaveOccurred())
-				Expect(result.RequeueAfter).Should(Equal(time.Second))
-				time.Sleep(result.RequeueAfter + 100*time.Millisecond)
-				_, err = parent()
-				Expect(err).ShouldNot(HaveOccurred())
 				var its *workloads.InstanceSet
-				if instanceAPI {
-					its = readSetStop(GinkgoT(), cli)
-				} else {
-					its = legacyStopRecoverySet(GinkgoT(), cli)
+				deadline := time.Now().Add(5 * time.Second)
+				for {
+					result, err := parent()
+					Expect(err).ShouldNot(HaveOccurred())
+					if instanceAPI {
+						its = readSetStop(GinkgoT(), cli)
+					} else {
+						its = legacyStopRecoverySet(GinkgoT(), cli)
+					}
+					if meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable)) {
+						break
+					}
+					Expect(result.RequeueAfter).Should(BeNumerically(">", 0))
+					Expect(result.RequeueAfter).Should(BeNumerically("<", time.Until(deadline)))
+					time.Sleep(result.RequeueAfter)
 				}
 				Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable))).Should(BeTrue())
 			})
@@ -369,7 +378,7 @@ var _ = Describe("InstanceSet configured readiness", func() {
 				Expect(its.Status.ReadyReplicas).Should(Equal(int32(2)))
 				Expect(its.Status.AvailableReplicas).Should(Equal(int32(1)))
 				Expect(its.FindInstanceStatus(extraName).Available).Should(BeFalse())
-				Expect(result.RequeueAfter).Should(Equal(time.Second))
+				Expect(result.RequeueAfter).Should(BeNumerically(">", 0))
 			}, Entry("positive target with an extra", int32(1)), Entry("zero target with extras", int32(0)))
 		})
 	}

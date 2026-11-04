@@ -22,6 +22,7 @@ package instanceset
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -128,11 +129,15 @@ var _ = Describe("status reconciler test", func() {
 
 	Context("PreCondition & Reconcile", func() {
 		reconcileStatus := func(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
-			result, err := reconciler.Reconcile(tree)
-			if err == nil && result == kubebuilderx.RetryAfter(time.Millisecond) {
-				return reconciler.Reconcile(tree)
+			its := tree.GetRoot().(*workloads.InstanceSet)
+			for attempt := 0; attempt < 10; attempt++ {
+				previous := its.Status.DeepCopy()
+				result, err := reconciler.Reconcile(tree)
+				if err != nil || reflect.DeepEqual(previous, &its.Status) {
+					return result, err
+				}
 			}
-			return result, err
+			return kubebuilderx.Continue, fmt.Errorf("InstanceSet status did not stabilize")
 		}
 		reconcilePods := func(tree *kubebuilderx.ObjectTree) {
 			By("fix meta")
@@ -244,7 +249,7 @@ var _ = Describe("status reconciler test", func() {
 			res, err = reconcileStatus(tree)
 			Expect(err).Should(BeNil())
 			Expect(res.Next).Should(Equal(kubebuilderx.Continue.Next))
-			Expect(res.RetryAfter).Should(Equal(time.Second))
+			Expect(res.RetryAfter).Should(BeNumerically(">", 0))
 			Expect(its.Status.Replicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.ReadyReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(0))

@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"sync"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -96,8 +97,9 @@ var (
 	// TODO:
 	//    EventReconciler.Event
 
-	managedNamespaces    *sets.Set[string]
-	supportedAPIVersions = sets.New[string](
+	managedNamespaces     *sets.Set[string]
+	managedNamespacesOnce sync.Once
+	supportedAPIVersions  = sets.New[string](
 		// ClusterDefinition, ComponentDefinition, ComponentVersion, Cluster, Component
 		appsv1.GroupVersion.String(),
 		// InstanceSet
@@ -134,14 +136,14 @@ func NewControllerManagedBy(mgr manager.Manager) *builder.Builder {
 }
 
 func namespacePredicateFilter(object client.Object) bool {
-	if managedNamespaces == nil {
+	managedNamespacesOnce.Do(func() {
 		set := &sets.Set[string]{}
 		namespaces := viper.GetString(strings.ReplaceAll(constant.ManagedNamespacesFlag, "-", "_"))
 		if len(namespaces) > 0 {
 			set.Insert(strings.Split(namespaces, ",")...)
 		}
 		managedNamespaces = set
-	}
+	})
 	if len(*managedNamespaces) == 0 || len(object.GetNamespace()) == 0 {
 		return true
 	}

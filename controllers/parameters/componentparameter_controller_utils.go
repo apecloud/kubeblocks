@@ -107,25 +107,11 @@ func reconcileParameterValuesIntoSpec(ctx context.Context, cli client.Client, co
 	if err != nil {
 		return false, err
 	}
-	if inputs := compParam.Spec.Initial; inputs != nil {
-		if err := validateCustomTemplate(ctx, cli, inputs.Templates); err != nil {
-			return false, err
-		}
-		if err := applyParameterInputs(specCopy, inputs, initialParameters, initialParameters, false, configmaps, configDescs, paramsDefs); err != nil {
-			return false, err
-		}
+	if err := applyParameterInputs(specCopy, compParam.Spec.Initial, initialParameters, false, ctx, cli, fetchTask, configmaps, configDescs, paramsDefs); err != nil {
+		return false, err
 	}
-	if inputs := compParam.Spec.Desired; inputs != nil {
-		if err := validateCustomTemplate(ctx, cli, inputs.Templates); err != nil {
-			return false, err
-		}
-		desiredParameters, err := classifyManagedParameterInputs(inputs, fetchTask.ComponentDefObj, configmaps, configDescs, paramsDefs)
-		if err != nil {
-			return false, intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "%s", err.Error())
-		}
-		if err := applyParameterInputs(specCopy, inputs, desiredParameters, nil, true, configmaps, configDescs, paramsDefs); err != nil {
-			return false, err
-		}
+	if err := applyParameterInputs(specCopy, compParam.Spec.Desired, nil, true, ctx, cli, fetchTask, configmaps, configDescs, paramsDefs); err != nil {
+		return false, err
 	}
 
 	// Desired replaces the managed overlay for each file it updates. Preserve the
@@ -141,11 +127,22 @@ func reconcileParameterValuesIntoSpec(ctx context.Context, cli client.Client, co
 
 func applyParameterInputs(spec *parametersv1alpha1.ComponentParameterSpec,
 	inputs *parametersv1alpha1.ParameterInputs,
-	classifiedParameters, initialParameters map[string]map[string]*parametersv1alpha1.ParametersInFile,
+	initialParameters map[string]map[string]*parametersv1alpha1.ParametersInFile,
 	override bool,
+	ctx context.Context, cli client.Client, fetchTask *Task,
 	configmaps map[string]*corev1.ConfigMap,
 	configDescs []parametersv1alpha1.ComponentConfigDescription,
 	paramsDefs []*parametersv1alpha1.ParametersDefinition) error {
+	if inputs == nil {
+		return nil
+	}
+	if err := validateCustomTemplate(ctx, cli, inputs.Templates); err != nil {
+		return err
+	}
+	classifiedParameters, err := classifyManagedParameterInputs(inputs, fetchTask.ComponentDefObj, configmaps, configDescs, paramsDefs)
+	if err != nil {
+		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "%s", err.Error())
+	}
 	for templateName, paramsInFile := range classifiedParameters {
 		configDescriptions := parameters.GetComponentConfigDescriptions(configDescs, templateName)
 		if len(configDescriptions) == 0 {

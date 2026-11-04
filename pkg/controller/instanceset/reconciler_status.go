@@ -36,7 +36,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancereadiness"
 	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancestatus"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -64,7 +63,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
-	if instancereadiness.PublicationChanged(previous, its.Status.Conditions) {
+	if instancestatus.ReadinessConditionsChanged(previous, its.Status.Conditions) {
 		return kubebuilderx.RetryAfter(time.Millisecond), nil
 	}
 	result := kubebuilderx.Continue
@@ -76,6 +75,17 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 	_, err = r.reconcileStatus(tree)
 	return result, err
+}
+
+func reconcileReadiness(tree *kubebuilderx.ObjectTree) (bool, error) {
+	its := tree.GetRoot().(*workloads.InstanceSet)
+	assignments, _, err := instancetemplate.BuildAssignments(tree, its)
+	health := make(map[string]instancestatus.Health)
+	for _, object := range tree.List(&corev1.Pod{}) {
+		pod := object.(*corev1.Pod)
+		health[pod.Name] = instancestatus.PodHealth(pod, its.Spec.MinReadySeconds)
+	}
+	return instancestatus.SetReadinessConditions(its, assignments, health, err)
 }
 
 func (r *statusReconciler) reconcileStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
@@ -135,7 +145,7 @@ func (r *statusReconciler) reconcileStatus(tree *kubebuilderx.ObjectTree) (kubeb
 			replicas++
 			template2TemplatesStatus[templateName].Replicas++
 		}
-		health := instancereadiness.Pod(pod, its.Spec.MinReadySeconds)
+		health := instancestatus.PodHealth(pod, its.Spec.MinReadySeconds)
 		if health.Ready {
 			readyReplicas++
 			template2TemplatesStatus[templateName].ReadyReplicas++
@@ -527,7 +537,7 @@ func observePodRuntime(its *workloads.InstanceSet, pod *corev1.Pod, roles map[st
 		return observation, nil
 	}
 
-	health := instancereadiness.Pod(pod, its.Spec.MinReadySeconds)
+	health := instancestatus.PodHealth(pod, its.Spec.MinReadySeconds)
 	observation.Ready = health.Ready
 	observation.Available = health.Available
 	observation.Failed = instancePodFailed(pod)

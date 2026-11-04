@@ -59,7 +59,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancereadiness"
+	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancestatus"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
@@ -3607,7 +3607,7 @@ var _ = Describe("InstanceSet readiness publication", func() {
 		for _, kind := range []string{string(workloads.InstanceReady), string(workloads.InstanceAvailable)} {
 			meta.SetStatusCondition(&its.Status.Conditions, metav1.Condition{Type: kind, Status: metav1.ConditionUnknown, ObservedGeneration: 2, Reason: "AssignmentPending", Message: "current allocation"})
 		}
-		Expect(instancereadiness.PublicationChanged(previous, its.Status.Conditions)).Should(BeFalse())
+		Expect(instancestatus.ReadinessConditionsChanged(previous, its.Status.Conditions)).Should(BeFalse())
 		for _, condition := range previous {
 			Expect(meta.FindStatusCondition(its.Status.Conditions, condition.Type).LastTransitionTime.Equal(&condition.LastTransitionTime)).Should(BeTrue())
 		}

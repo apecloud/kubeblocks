@@ -25,6 +25,8 @@ import (
 	"sort"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -37,7 +39,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
-	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancereadiness"
 	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancestatus"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -64,7 +65,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
-	if instancereadiness.PublicationChanged(previous, its.Status.Conditions) {
+	if instancestatus.ReadinessConditionsChanged(previous, its.Status.Conditions) {
 		return kubebuilderx.RetryAfter(time.Millisecond), nil
 	}
 	result := kubebuilderx.Continue
@@ -76,6 +77,42 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 	_, err = r.reconcileStatus(tree)
 	return result, err
+}
+
+func reconcileReadiness(tree *kubebuilderx.ObjectTree) (bool, error) {
+	its := tree.GetRoot().(*workloads.InstanceSet)
+	assignments, _, err := instancetemplate.BuildAssignments(tree, its)
+	health := make(map[string]instancestatus.Health)
+	for _, object := range tree.List(&workloads.Instance{}) {
+		inst := object.(*workloads.Instance)
+		health[inst.Name] = instanceReadiness(tree, its, inst)
+	}
+	return instancestatus.SetReadinessConditions(its, assignments, health, err)
+}
+
+func instanceReadiness(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, inst *workloads.Instance) instancestatus.Health {
+	if inst.Status.CurrentState != workloads.InstanceCurrentStatePresent || !intctrlutil.IsInstanceReady(inst) {
+		return instancestatus.Health{}
+	}
+	var runtimePod *corev1.Pod
+	for _, object := range tree.List(&corev1.Pod{}) {
+		pod := object.(*corev1.Pod)
+		owner := metav1.GetControllerOf(pod)
+		if inst.UID == "" || owner == nil || owner.UID != inst.UID || owner.Kind != "Instance" ||
+			pod.Labels[appsv1.ControllerRevisionHashLabelKey] != inst.Status.CurrentRevision {
+			continue
+		}
+		if runtimePod != nil {
+			return instancestatus.Health{Pending: true}
+		}
+		runtimePod = pod
+	}
+	if runtimePod == nil {
+		return instancestatus.Health{Pending: true}
+	}
+	health := instancestatus.PodHealth(runtimePod, its.Spec.MinReadySeconds)
+	health.Pending = !health.Ready
+	return health
 }
 
 func (r *statusReconciler) reconcileStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {

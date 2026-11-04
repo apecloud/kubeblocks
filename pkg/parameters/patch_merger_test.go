@@ -63,7 +63,7 @@ func TestDoMergeAppliesUnmanagedUpdatesAfterContentAndParameters(t *testing.T) {
 
 	paramsDefs := paramsDefsWithImmutable([]string{"gtid_mode"})
 
-	got, err := DoMerge(base, patch, paramsDefs, configDescs)
+	got, err := DoMerge(base, patch, nil, paramsDefs, configDescs)
 	if err != nil {
 		t.Fatalf("DoMerge() error = %v", err)
 	}
@@ -96,7 +96,7 @@ func TestDoMergeRejectsUnmanagedUpdateSettingImmutableParameter(t *testing.T) {
 	configDescs := iniConfigDescsForMyCnf()
 	paramsDefs := paramsDefsWithImmutable([]string{"gtid_mode"})
 
-	_, err := DoMerge(base, patch, paramsDefs, configDescs)
+	_, err := DoMerge(base, patch, nil, paramsDefs, configDescs)
 	if err == nil {
 		t.Fatalf("expected immutable parameter modification via unmanaged update to be rejected, got nil error")
 	}
@@ -122,7 +122,7 @@ func TestDoMergeRejectsUnmanagedUpdateRemovingImmutableParameter(t *testing.T) {
 	configDescs := iniConfigDescsForMyCnf()
 	paramsDefs := paramsDefsWithImmutable([]string{"gtid_mode"})
 
-	_, err := DoMerge(base, patch, paramsDefs, configDescs)
+	_, err := DoMerge(base, patch, nil, paramsDefs, configDescs)
 	if err == nil {
 		t.Fatalf("expected immutable parameter removal via unmanaged update to be rejected, got nil error")
 	}
@@ -148,7 +148,7 @@ func TestDoMergeAcceptsUnmanagedUpdateWithImmutableKeyInDifferentSection(t *test
 	configDescs := iniConfigDescsForMyCnf()
 	paramsDefs := paramsDefsWithImmutable([]string{"gtid_mode"})
 
-	got, err := DoMerge(base, patch, paramsDefs, configDescs)
+	got, err := DoMerge(base, patch, nil, paramsDefs, configDescs)
 	if err != nil {
 		t.Fatalf("expected unmanaged update in a different INI section to be accepted, got error %v", err)
 	}
@@ -214,7 +214,7 @@ func TestDoMergeRejectsContentModifyingImmutableParameter(t *testing.T) {
 	configDescs := iniConfigDescsForMyCnf()
 	paramsDefs := paramsDefsWithImmutable([]string{"gtid_mode"})
 
-	_, err := DoMerge(base, patch, paramsDefs, configDescs)
+	_, err := DoMerge(base, patch, nil, paramsDefs, configDescs)
 	if err == nil {
 		t.Fatalf("expected immutable parameter modification via content to be rejected, got nil error")
 	}
@@ -235,7 +235,7 @@ func TestDoMergeRejectsContentAddingImmutableParameter(t *testing.T) {
 	configDescs := iniConfigDescsForMyCnf()
 	paramsDefs := paramsDefsWithImmutable([]string{"gtid_mode"})
 
-	_, err := DoMerge(base, patch, paramsDefs, configDescs)
+	_, err := DoMerge(base, patch, nil, paramsDefs, configDescs)
 	if err == nil {
 		t.Fatalf("expected immutable parameter addition via content to be rejected, got nil error")
 	}
@@ -256,7 +256,7 @@ func TestDoMergeRejectsContentRemovingImmutableParameter(t *testing.T) {
 	configDescs := iniConfigDescsForMyCnf()
 	paramsDefs := paramsDefsWithImmutable([]string{"gtid_mode"})
 
-	_, err := DoMerge(base, patch, paramsDefs, configDescs)
+	_, err := DoMerge(base, patch, nil, paramsDefs, configDescs)
 	if err == nil {
 		t.Fatalf("expected immutable parameter removal via content to be rejected, got nil error")
 	}
@@ -280,7 +280,7 @@ func TestDoMergeAcceptsContentWithOnlyFormatChange(t *testing.T) {
 	configDescs := iniConfigDescsForMyCnf()
 	paramsDefs := paramsDefsWithImmutable([]string{"gtid_mode"})
 
-	if _, err := DoMerge(base, patch, paramsDefs, configDescs); err != nil {
+	if _, err := DoMerge(base, patch, nil, paramsDefs, configDescs); err != nil {
 		t.Fatalf("expected format-only content change to be accepted, got error %v", err)
 	}
 }
@@ -322,7 +322,7 @@ func TestDoMergeAcceptsContentWithMutableChangeAndFormatNoiseWhileImmutableUncha
 	configDescs := iniConfigDescsForMyCnf()
 	paramsDefs := paramsDefsWithImmutable([]string{"gtid_mode"})
 
-	if _, err := DoMerge(base, patch, paramsDefs, configDescs); err != nil {
+	if _, err := DoMerge(base, patch, nil, paramsDefs, configDescs); err != nil {
 		t.Fatalf("expected realistic format/whitespace/comment noise without immutable-parameter change to be accepted, got error %v", err)
 	}
 }
@@ -341,7 +341,7 @@ func TestDoMergeAcceptsContentOnFileWithoutImmutableCandidate(t *testing.T) {
 		},
 	}
 
-	if _, err := DoMerge(base, patch, nil, nil); err != nil {
+	if _, err := DoMerge(base, patch, nil, nil, nil); err != nil {
 		t.Fatalf("expected content update on file without immutable candidate to be accepted even without parser, got error %v", err)
 	}
 }
@@ -364,7 +364,7 @@ func TestDoMergeRejectsContentRemovingEntireSectionContainingImmutableParameter(
 	configDescs := iniConfigDescsForMyCnf()
 	paramsDefs := paramsDefsWithImmutable([]string{"gtid_mode"})
 
-	_, err := DoMerge(base, patch, paramsDefs, configDescs)
+	_, err := DoMerge(base, patch, nil, paramsDefs, configDescs)
 	if err == nil {
 		t.Fatalf("expected immutable parameter removal via whole-section deletion to be rejected, got nil error")
 	}
@@ -387,7 +387,7 @@ func TestDoMergeRejectsContentWhenImmutableDeclaredButFormatMissing(t *testing.T
 	}
 	paramsDefs := paramsDefsWithImmutable([]string{"gtid_mode"})
 
-	_, err := DoMerge(base, patch, paramsDefs, nil)
+	_, err := DoMerge(base, patch, nil, paramsDefs, nil)
 	if err == nil {
 		t.Fatalf("expected fail-safe rejection when immutable parameter declared but file format config is missing, got nil error")
 	}
@@ -417,7 +417,7 @@ func TestInitialImmutableParameters(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			patch := map[string]parametersv1alpha1.ParametersInFile{"my.cnf": {Parameters: tt.patch}}
 			initial := map[string]parametersv1alpha1.ParametersInFile{"my.cnf": {Parameters: tt.initial}}
-			got, err := DoMergeWithInitialParameters(base, patch, initial, defs, descs)
+			got, err := DoMerge(base, patch, initial, defs, descs)
 			if tt.wantErr {
 				if err == nil || !strings.Contains(err.Error(), "immutable parameter gtid_mode") {
 					t.Fatalf("expected immutable rejection, got %v", err)
@@ -442,7 +442,7 @@ func TestInitialImmutableParameterRemoval(t *testing.T) {
 	for _, removal := range []*string{nil, strPtr(parameterRemoveMarker)} {
 		patch := map[string]parametersv1alpha1.ParametersInFile{"config.yaml": {Parameters: map[string]*string{"gtid_mode": removal}}}
 		initial := map[string]parametersv1alpha1.ParametersInFile{"config.yaml": {Parameters: map[string]*string{"gtid_mode": nil}}}
-		got, err := DoMergeWithInitialParameters(base, patch, initial, defs, descs)
+		got, err := DoMerge(base, patch, initial, defs, descs)
 		if err != nil {
 			t.Fatalf("matching initial removal should merge: %v", err)
 		}
@@ -452,16 +452,16 @@ func TestInitialImmutableParameterRemoval(t *testing.T) {
 	}
 }
 
-func TestInitialImmutableParametersKeepStrictEntryPoints(t *testing.T) {
+func TestImmutableParametersWithoutInitial(t *testing.T) {
 	base := map[string]string{"my.cnf": "[mysqld]\ngtid_mode=OFF\n"}
 	defs := paramsDefsWithImmutable([]string{"gtid_mode"})
 	descs := iniConfigDescsForMyCnf()
 	patch := map[string]parametersv1alpha1.ParametersInFile{"my.cnf": {Parameters: map[string]*string{"gtid_mode": strPtr("ON")}}}
-	if _, err := DoMerge(base, patch, defs, descs); err == nil {
-		t.Fatal("DoMerge must reject immutable parameters")
+	if _, err := DoMerge(base, patch, nil, defs, descs); err == nil {
+		t.Fatal("DoMerge without Initial must reject immutable parameters")
 	}
-	if _, err := MergeAndValidateConfigs(base, []core.ParamPairs{{Key: "my.cnf", UpdatedParams: map[string]any{"gtid_mode": "ON"}}}, defs, descs); err == nil {
-		t.Fatal("MergeAndValidateConfigs must reject immutable parameters")
+	if _, err := MergeAndValidateConfigs(base, []core.ParamPairs{{Key: "my.cnf", UpdatedParams: map[string]any{"gtid_mode": "ON"}}}, nil, defs, descs); err == nil {
+		t.Fatal("MergeAndValidateConfigs without Initial must reject immutable parameters")
 	}
 }
 
@@ -484,7 +484,7 @@ func TestInitialImmutableParametersConvertEquivalentValues(t *testing.T) {
 	base := map[string]string{"config.json": `{"replicas":1}`}
 	initial := map[string]parametersv1alpha1.ParametersInFile{"config.json": {Parameters: map[string]*string{"replicas": strPtr("02")}}}
 	patch := map[string]parametersv1alpha1.ParametersInFile{"config.json": {Parameters: map[string]*string{"replicas": strPtr("2")}}}
-	got, err := DoMergeWithInitialParameters(base, patch, initial, defs, descs)
+	got, err := DoMerge(base, patch, initial, defs, descs)
 	if err != nil {
 		t.Fatalf("equivalent converted initial values should merge: %v", err)
 	}
@@ -501,7 +501,7 @@ func TestInitialImmutableParametersStillValidateSchema(t *testing.T) {
 	defs, descs := initialTypedParameterDefinitions()
 	defs[0].Spec.ParametersSchema.CUE = "replicas: int & >=1"
 	patch := map[string]parametersv1alpha1.ParametersInFile{"config.json": {Parameters: map[string]*string{"replicas": strPtr("0")}}}
-	_, err := DoMergeWithInitialParameters(map[string]string{"config.json": `{"replicas":1}`}, patch, patch, defs, descs)
+	_, err := DoMerge(map[string]string{"config.json": `{"replicas":1}`}, patch, patch, defs, descs)
 	if err == nil || !strings.Contains(err.Error(), "validate") {
 		t.Fatalf("initial permit must not bypass schema validation: %v", err)
 	}
@@ -527,7 +527,7 @@ func TestInitialImmutableParametersDoNotPermitOtherUpdateForms(t *testing.T) {
 		{name: "initial unmanaged update grants no managed permit", patch: managed, initial: unmanaged},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := DoMergeWithInitialParameters(base, map[string]parametersv1alpha1.ParametersInFile{"my.cnf": tt.patch}, map[string]parametersv1alpha1.ParametersInFile{"my.cnf": tt.initial}, defs, descs)
+			_, err := DoMerge(base, map[string]parametersv1alpha1.ParametersInFile{"my.cnf": tt.patch}, map[string]parametersv1alpha1.ParametersInFile{"my.cnf": tt.initial}, defs, descs)
 			if err == nil || !strings.Contains(err.Error(), "immutable parameter gtid_mode") {
 				t.Fatalf("expected immutable rejection, got %v", err)
 			}

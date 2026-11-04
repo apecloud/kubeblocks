@@ -66,14 +66,14 @@ func RerenderParametersTemplate(reconcileCtx *render.ReconcileCtx,
 
 func ApplyParameters(item parametersv1alpha1.ConfigTemplateItemDetail,
 	baseConfig *corev1.ConfigMap,
+	initial map[string]parametersv1alpha1.ParametersInFile,
 	configs []parametersv1alpha1.ComponentConfigDescription,
-	paramsDefs []*parametersv1alpha1.ParametersDefinition,
-	initial map[string]parametersv1alpha1.ParametersInFile) (*corev1.ConfigMap, error) {
+	paramsDefs []*parametersv1alpha1.ParametersDefinition) (*corev1.ConfigMap, error) {
 	if len(configs) == 0 {
 		return nil, fmt.Errorf("not support parameter reconfigure")
 	}
 
-	newData, err := DoMergeWithInitialParameters(baseConfig.Data, item.ConfigFileParams, initial, paramsDefs, configs)
+	newData, err := DoMerge(baseConfig.Data, item.ConfigFileParams, initial, paramsDefs, configs)
 	if err != nil {
 		return nil, err
 	}

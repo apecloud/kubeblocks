@@ -105,7 +105,7 @@ func TestReconcileInitialImmutableArray(t *testing.T) {
 			t.Fatal(err)
 		}
 		item := parampkg.GetConfigTemplateItem(&compParam.Spec, configSpec.Name)
-		applied, err := parampkg.ApplyParameters(*item, baseConfig, descs, defs, parampkg.DerefMapValues(initial[configSpec.Name]))
+		applied, err := parampkg.ApplyParameters(*item, baseConfig, parampkg.DerefMapValues(initial[configSpec.Name]), descs, defs)
 		if err != nil {
 			t.Fatalf("apply projected parameters: %v", err)
 		}

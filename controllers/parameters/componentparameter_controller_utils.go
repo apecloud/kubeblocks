@@ -152,7 +152,7 @@ func applyParameterInputs(spec *parametersv1alpha1.ComponentParameterSpec,
 			if !override {
 				initial = patch
 			}
-			if _, err := parameters.DoMergeWithInitialParameters(resolveBaseData(configmaps[templateName], paramsInFile), patch, initial, paramsDefs, configDescriptions); err != nil {
+			if _, err := parameters.DoMerge(resolveBaseData(configmaps[templateName], paramsInFile), patch, initial, paramsDefs, configDescriptions); err != nil {
 				return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "%s", err.Error())
 			}
 			mergeItemParameters(item, parameters.DerefMapValues(paramsInFile), override)
@@ -558,7 +558,7 @@ func syncImpl(taskCtx *taskContext,
 	updatedConfig = baseConfig
 	if len(item.ConfigFileParams) != 0 {
 		initial := parameters.DerefMapValues(taskCtx.initialParameters[item.Name])
-		if updatedConfig, err = parameters.ApplyParameters(item, baseConfig, taskCtx.configDescs, taskCtx.paramsDefs, initial); err != nil {
+		if updatedConfig, err = parameters.ApplyParameters(item, baseConfig, initial, taskCtx.configDescs, taskCtx.paramsDefs); err != nil {
 			return failStatus(err)
 		}
 	}

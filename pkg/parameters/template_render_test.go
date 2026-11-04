@@ -114,7 +114,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 		tplParams, ok := params[configTemplateName]
 		Expect(ok).Should(BeTrue())
 		item.ConfigFileParams = deRef(tplParams)
-		result, err := ApplyParameters(item, cmObj, configDescs, pds, nil)
+		result, err := ApplyParameters(item, cmObj, nil, configDescs, pds)
 		Expect(err).Should(Succeed())
 		configReaders, err := cfgcore.LoadRawConfigObject(result.Data, configdesc.FileFormatConfig, []string{configdesc.Name})
 		Expect(err).Should(Succeed())
@@ -173,7 +173,7 @@ func TestApplyParametersInitialImmutableValue(t *testing.T) {
 	initial := map[string]parametersv1alpha1.ParametersInFile{"my.cnf": {Parameters: map[string]*string{"gtid_mode": strPtr("ON")}}}
 	item := parametersv1alpha1.ConfigTemplateItemDetail{ConfigFileParams: initial}
 	base := &corev1.ConfigMap{Data: map[string]string{"my.cnf": "[mysqld]\ngtid_mode=OFF\n"}}
-	got, err := ApplyParameters(item, base, iniConfigDescsForMyCnf(), defs, initial)
+	got, err := ApplyParameters(item, base, initial, iniConfigDescsForMyCnf(), defs)
 	if err != nil {
 		t.Fatalf("applying initial immutable value: %v", err)
 	}

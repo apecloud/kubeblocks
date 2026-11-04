@@ -28,23 +28,6 @@ import (
 
 func DoMerge(baseData map[string]string,
 	patch map[string]parametersv1alpha1.ParametersInFile,
-	paramsDefs []*parametersv1alpha1.ParametersDefinition,
-	configDescs []parametersv1alpha1.ComponentConfigDescription) (map[string]string, error) {
-	return doMerge(baseData, patch, nil, paramsDefs, configDescs)
-}
-
-// DoMergeWithInitialParameters permits immutable managed parameter updates only
-// when their converted values match the corresponding initial parameters.
-func DoMergeWithInitialParameters(baseData map[string]string,
-	patch map[string]parametersv1alpha1.ParametersInFile,
-	initial map[string]parametersv1alpha1.ParametersInFile,
-	paramsDefs []*parametersv1alpha1.ParametersDefinition,
-	configDescs []parametersv1alpha1.ComponentConfigDescription) (map[string]string, error) {
-	return doMerge(baseData, patch, initial, paramsDefs, configDescs)
-}
-
-func doMerge(baseData map[string]string,
-	patch map[string]parametersv1alpha1.ParametersInFile,
 	initial map[string]parametersv1alpha1.ParametersInFile,
 	paramsDefs []*parametersv1alpha1.ParametersDefinition,
 	configDescs []parametersv1alpha1.ComponentConfigDescription) (map[string]string, error) {
@@ -52,19 +35,12 @@ func doMerge(baseData map[string]string,
 		updatedFiles            = make(map[string]string, len(patch))
 		updatedParams           = make([]core.ParamPairs, 0, len(patch))
 		unmanagedUpdatedByFiles = make(map[string][]parametersv1alpha1.UnmanagedParameterSectionUpdate, len(patch))
-		initialParameters       = make(map[string]map[string]any, len(initial))
 	)
 
 	builder := NewValueManager(paramsDefs, configDescs)
-	for key, params := range initial {
-		if len(params.Parameters) == 0 {
-			continue
-		}
-		converted, err := core.FromStringMap(DecodeParameterOverlay(params.Parameters), builder.BuildValueTransformer(key))
-		if err != nil {
-			return nil, err
-		}
-		initialParameters[key] = converted
+	initialParameters, err := normalizeInitialParameters(initial, builder)
+	if err != nil {
+		return nil, err
 	}
 	for key, params := range patch {
 		if params.Content != nil {
@@ -81,14 +57,30 @@ func doMerge(baseData map[string]string,
 			unmanagedUpdatedByFiles[key] = params.UnmanagedUpdates
 		}
 	}
-	return mergeUpdatedParams(baseData, updatedFiles, updatedParams, unmanagedUpdatedByFiles, initialParameters, paramsDefs, configDescs)
+	return mergeUpdatedParams(baseData, updatedFiles, updatedParams, initialParameters, unmanagedUpdatedByFiles, paramsDefs, configDescs)
+}
+
+func normalizeInitialParameters(initial map[string]parametersv1alpha1.ParametersInFile,
+	builder *valueManager) (map[string]map[string]any, error) {
+	initialParameters := make(map[string]map[string]any, len(initial))
+	for key, params := range initial {
+		if len(params.Parameters) == 0 {
+			continue
+		}
+		converted, err := core.FromStringMap(DecodeParameterOverlay(params.Parameters), builder.BuildValueTransformer(key))
+		if err != nil {
+			return nil, err
+		}
+		initialParameters[key] = converted
+	}
+	return initialParameters, nil
 }
 
 func mergeUpdatedParams(base map[string]string,
 	updatedFiles map[string]string,
 	updatedParams []core.ParamPairs,
-	unmanagedUpdatedByFiles map[string][]parametersv1alpha1.UnmanagedParameterSectionUpdate,
 	initialParameters map[string]map[string]any,
+	unmanagedUpdatedByFiles map[string][]parametersv1alpha1.UnmanagedParameterSectionUpdate,
 	paramsDefs []*parametersv1alpha1.ParametersDefinition,
 	configDescs []parametersv1alpha1.ComponentConfigDescription) (map[string]string, error) {
 	updatedConfig := base
@@ -108,7 +100,7 @@ func mergeUpdatedParams(base map[string]string,
 	if len(configDescs) == 0 {
 		return updatedConfig, nil
 	}
-	updatedConfig, err := mergeAndValidateConfigs(updatedConfig, updatedParams, initialParameters, paramsDefs, configDescs)
+	updatedConfig, err := MergeAndValidateConfigs(updatedConfig, updatedParams, initialParameters, paramsDefs, configDescs)
 	if err != nil {
 		return nil, err
 	}

@@ -158,19 +158,12 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 			}
 			phase = opsv1alpha1.OpsFailedPhase
 			status := opsRequest.Status.Components[target.ComponentName]
+			status.Reason = horizontalScalingFailedReason
 			status.Message = err.Error()
 			opsRequest.Status.Components[target.ComponentName] = status
 			if failureErr == nil {
 				failureErr = err
 			}
-		}
-		if phase == opsv1alpha1.OpsFailedPhase {
-			status := opsRequest.Status.Components[target.ComponentName]
-			status.Reason = horizontalScalingFailedReason
-			if err == nil {
-				status.Message = fmt.Sprintf("Component %s failed while reconciling horizontal scaling", target.ComponentName)
-			}
-			opsRequest.Status.Components[target.ComponentName] = status
 		}
 		expected += progress.expectedCount
 		completed += progress.completedCount

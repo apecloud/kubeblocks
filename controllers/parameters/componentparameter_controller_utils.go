@@ -699,7 +699,8 @@ func prepareReconcileTask(reqCtx intctrlutil.RequestCtx, cli client.Client, comp
 		ClusterName:   componentParameter.Spec.ClusterName,
 		ComponentName: componentParameter.Spec.ComponentName,
 	}, fetcherTask).Cluster().
-		ComponentAndComponentDef().
+		Component().
+		ComponentDefinition().
 		ComponentSpec().
 		Complete()
 	fetcherTask.ComponentParameterObj = componentParameter

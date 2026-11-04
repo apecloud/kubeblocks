@@ -370,7 +370,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 	})
 })
 
-func TestVerticalScalingResultAndProgressConvergeIndependently(t *testing.T) {
+var _ = Describe("VerticalScaling result and progress", func() {
 	target := verticalScalingTestResources("2")
 	component := appsv1.ClusterComponentSpec{
 		Name: "db", Replicas: 2, Resources: target,
@@ -402,14 +402,14 @@ func TestVerticalScalingResultAndProgressConvergeIndependently(t *testing.T) {
 			instances: ready, wantPhase: opsv1alpha1.OpsRunningPhase, progress: "2/2"},
 		{name: "apps target is not up to date", phase: appsv1.RunningComponentPhase, generation: 7, upToDate: false,
 			instances: ready, wantPhase: opsv1alpha1.OpsRunningPhase, progress: "2/2"},
-		{name: "apps result failed", phase: appsv1.FailedComponentPhase, generation: 7, upToDate: true,
-			instances: ready, wantPhase: opsv1alpha1.OpsFailedPhase, progress: "2/2"},
+		{name: "apps health failed with complete progress remains recoverable", phase: appsv1.FailedComponentPhase, generation: 7, upToDate: true,
+			instances: ready, wantPhase: opsv1alpha1.OpsRunningPhase, progress: "2/2"},
 		{name: "workload observation is stale", phase: appsv1.RunningComponentPhase, generation: 7, upToDate: true,
 			instances: ready, staleITS: true, wantPhase: opsv1alpha1.OpsRunningPhase, progress: "2/2"},
 		{name: "current progress is incomplete", phase: appsv1.RunningComponentPhase, generation: 7, upToDate: true,
 			instances: ready[:1], wantPhase: opsv1alpha1.OpsRunningPhase, progress: "1/2"},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
+		It(tc.name, func() {
 			cluster := verticalScalingTestCluster(component, tc.phase, tc.generation, tc.upToDate)
 			ops := verticalScalingTestOps(request)
 			ops.Status.ClusterGeneration = 6
@@ -418,18 +418,27 @@ func TestVerticalScalingResultAndProgressConvergeIndependently(t *testing.T) {
 				its.Generation = 2
 				its.Status.ObservedGeneration = 1
 			}
-			cli := verticalScalingTestClient(t, cluster, ops, its)
+			cli := verticalScalingTestClient(GinkgoT(), cluster, ops, its)
 			phase, _, err := (verticalScalingHandler{}).ReconcileAction(
 				intctrlutil.RequestCtx{Ctx: context.Background()}, cli, verticalScalingTestResourcesBundle(cluster, ops))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if phase != tc.wantPhase || ops.Status.Progress != tc.progress {
-				t.Fatalf("got phase=%s progress=%s, want phase=%s progress=%s", phase, ops.Status.Progress, tc.wantPhase, tc.progress)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(phase).To(Equal(tc.wantPhase))
+			Expect(ops.Status.Progress).To(Equal(tc.progress))
+			if tc.phase == appsv1.FailedComponentPhase {
+				resumed := &opsv1alpha1.OpsRequest{}
+				Expect(cli.Get(context.Background(), client.ObjectKeyFromObject(ops), resumed)).To(Succeed())
+				status := cluster.Status.Components["db"]
+				status.Phase = appsv1.RunningComponentPhase
+				cluster.Status.Components["db"] = status
+				phase, _, err = (verticalScalingHandler{}).ReconcileAction(
+					intctrlutil.RequestCtx{Ctx: context.Background()}, cli, verticalScalingTestResourcesBundle(cluster, resumed))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(phase).To(Equal(opsv1alpha1.OpsSucceedPhase))
+				Expect(resumed.Status.Progress).To(Equal("2/2"))
 			}
 		})
 	}
-}
+})
 
 func TestVerticalScalingProgressUsesOnlySelectedTemplate(t *testing.T) {
 	target := verticalScalingTestResources("2")
@@ -805,7 +814,7 @@ func verticalScalingTestInstanceSet(component appsv1.ClusterComponentSpec,
 	}
 }
 
-func verticalScalingTestClient(t *testing.T, objects ...client.Object) client.Client {
+func verticalScalingTestClient(t GinkgoTInterface, objects ...client.Object) client.Client {
 	t.Helper()
 	scheme := runtime.NewScheme()
 	for _, add := range []func(*runtime.Scheme) error{appsv1.AddToScheme, opsv1alpha1.AddToScheme, workloads.AddToScheme} {

@@ -35,37 +35,37 @@ func TestViperRemoveKey(t *testing.T) {
 		format    parametersv1alpha1.CfgFileFormat
 		content   string
 		key       string
-		preserved map[string]string
+		preserved map[string]any
 	}{
 		{
 			name: "json top level", format: parametersv1alpha1.JSON,
-			content: `{"remove":"old","keep":"unchanged"}`, key: "remove",
-			preserved: map[string]string{"keep": "unchanged"},
+			content: `{"remove":"old","keep":"unchanged","enabled":false,"limit":0,"hosts":["a","b"]}`, key: "remove",
+			preserved: map[string]any{"keep": "unchanged", "enabled": false, "limit": float64(0), "hosts": []any{"a", "b"}},
 		},
 		{
 			name: "json nested", format: parametersv1alpha1.JSON,
 			content: `{"server":{"remove":"old","keep":"unchanged"},"other":"retained"}`, key: "server.remove",
-			preserved: map[string]string{"server.keep": "unchanged", "other": "retained"},
+			preserved: map[string]any{"server.keep": "unchanged", "other": "retained"},
 		},
 		{
 			name: "ini section", format: parametersv1alpha1.Ini,
 			content: "[server]\nremove=old\nkeep=unchanged\n[client]\nremove=retained\n", key: "server.remove",
-			preserved: map[string]string{"server.keep": "unchanged", "client.remove": "retained"},
+			preserved: map[string]any{"server.keep": "unchanged", "client.remove": "retained"},
 		},
 		{
 			name: "toml nested", format: parametersv1alpha1.TOML,
 			content: "[server]\nremove = \"old\"\nkeep = \"unchanged\"\n", key: "server.remove",
-			preserved: map[string]string{"server.keep": "unchanged"},
+			preserved: map[string]any{"server.keep": "unchanged"},
 		},
 		{
 			name: "properties literal dotted key", format: parametersv1alpha1.Properties,
 			content: "server.remove=old\nserver.keep=unchanged\n", key: "server.remove",
-			preserved: map[string]string{"server.keep": "unchanged"},
+			preserved: map[string]any{"server.keep": "unchanged"},
 		},
 		{
 			name: "dotenv literal dotted key", format: parametersv1alpha1.Dotenv,
 			content: "server.remove=old\nserver.keep=unchanged\n", key: "server.remove",
-			preserved: map[string]string{"server.keep": "unchanged"},
+			preserved: map[string]any{"server.keep": "unchanged"},
 		},
 	}
 	for _, tt := range tests {

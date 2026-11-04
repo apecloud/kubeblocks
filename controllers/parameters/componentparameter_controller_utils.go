@@ -107,11 +107,25 @@ func reconcileParameterValuesIntoSpec(ctx context.Context, cli client.Client, co
 	if err != nil {
 		return false, err
 	}
-	if err := applyParameterInputs(specCopy, compParam.Spec.Initial, false, ctx, cli, fetchTask, configmaps, configDescs, paramsDefs); err != nil {
-		return false, err
+	if inputs := compParam.Spec.Initial; inputs != nil {
+		if err := validateCustomTemplate(ctx, cli, inputs.Templates); err != nil {
+			return false, err
+		}
+		if err := applyParameterInputs(specCopy, inputs, initialParameters, initialParameters, false, configmaps, configDescs, paramsDefs); err != nil {
+			return false, err
+		}
 	}
-	if err := applyParameterInputs(specCopy, compParam.Spec.Desired, true, ctx, cli, fetchTask, configmaps, configDescs, paramsDefs); err != nil {
-		return false, err
+	if inputs := compParam.Spec.Desired; inputs != nil {
+		if err := validateCustomTemplate(ctx, cli, inputs.Templates); err != nil {
+			return false, err
+		}
+		desiredParameters, err := classifyManagedParameterInputs(inputs, fetchTask.ComponentDefObj, configmaps, configDescs, paramsDefs)
+		if err != nil {
+			return false, intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "%s", err.Error())
+		}
+		if err := applyParameterInputs(specCopy, inputs, desiredParameters, nil, true, configmaps, configDescs, paramsDefs); err != nil {
+			return false, err
+		}
 	}
 
 	// Desired replaces the managed overlay for each file it updates. Preserve the
@@ -126,41 +140,27 @@ func reconcileParameterValuesIntoSpec(ctx context.Context, cli client.Client, co
 }
 
 func applyParameterInputs(spec *parametersv1alpha1.ComponentParameterSpec,
-	inputs *parametersv1alpha1.ParameterInputs, override bool,
-	ctx context.Context, cli client.Client, fetchTask *Task,
+	inputs *parametersv1alpha1.ParameterInputs,
+	classifiedParameters, initialParameters map[string]map[string]*parametersv1alpha1.ParametersInFile,
+	override bool,
 	configmaps map[string]*corev1.ConfigMap,
 	configDescs []parametersv1alpha1.ComponentConfigDescription,
 	paramsDefs []*parametersv1alpha1.ParametersDefinition) error {
-	if inputs == nil {
-		return nil
-	}
-	if err := validateCustomTemplate(ctx, cli, inputs.Templates); err != nil {
-		return err
-	}
-	classifiedParameters, err := classifyManagedParameterInputs(inputs, fetchTask.ComponentDefObj, configmaps, configDescs, paramsDefs)
-	if err != nil {
-		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "%s", err.Error())
-	}
-	if len(classifiedParameters) != 0 {
-		for templateName, paramsInFile := range classifiedParameters {
-			configDescriptions := parameters.GetComponentConfigDescriptions(configDescs, templateName)
-			if len(configDescriptions) == 0 {
-				return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "not found config description for template: %s", templateName)
-			}
-			item := parameters.GetConfigTemplateItem(spec, templateName)
-			if item == nil {
-				return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "not found config template item: %s", templateName)
-			}
-			patch := parameters.DerefMapValues(paramsInFile)
-			var initial map[string]parametersv1alpha1.ParametersInFile
-			if !override {
-				initial = patch
-			}
-			if _, err := parameters.DoMerge(resolveBaseData(configmaps[templateName], paramsInFile), patch, initial, paramsDefs, configDescriptions); err != nil {
-				return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "%s", err.Error())
-			}
-			mergeItemParameters(item, parameters.DerefMapValues(paramsInFile), override)
+	for templateName, paramsInFile := range classifiedParameters {
+		configDescriptions := parameters.GetComponentConfigDescriptions(configDescs, templateName)
+		if len(configDescriptions) == 0 {
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "not found config description for template: %s", templateName)
 		}
+		item := parameters.GetConfigTemplateItem(spec, templateName)
+		if item == nil {
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "not found config template item: %s", templateName)
+		}
+		patch := parameters.DerefMapValues(paramsInFile)
+		initial := parameters.DerefMapValues(initialParameters[templateName])
+		if _, err := parameters.DoMerge(resolveBaseData(configmaps[templateName], paramsInFile), patch, initial, paramsDefs, configDescriptions); err != nil {
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "%s", err.Error())
+		}
+		mergeItemParameters(item, patch, override)
 	}
 	for templateName, templateExtension := range inputs.Templates {
 		item := parameters.GetConfigTemplateItem(spec, templateName)
@@ -197,23 +197,26 @@ func restoreInitialImmutableParameters(spec *parametersv1alpha1.ComponentParamet
 		item := parameters.GetConfigTemplateItem(spec, templateName)
 		for file, initialParams := range files {
 			paramsDef := resolveParameterDefinition(paramsDefs, file)
-			if paramsDef == nil {
+			if paramsDef == nil || len(paramsDef.Spec.ImmutableParameters) == 0 {
 				continue
 			}
+			merged := item.ConfigFileParams[file]
 			for key, value := range parameters.EncodeParameterOverlay(initialParams.Parameters) {
 				if !slices.Contains(paramsDef.Spec.ImmutableParameters, core.GetValidFieldName(key)) {
 					continue
 				}
-				if item.ConfigFileParams == nil {
-					item.ConfigFileParams = map[string]parametersv1alpha1.ParametersInFile{}
-				}
-				merged := item.ConfigFileParams[file]
 				if merged.Parameters == nil {
 					merged.Parameters = map[string]*string{}
 				}
 				merged.Parameters[key] = value
-				item.ConfigFileParams[file] = merged
 			}
+			if merged.Parameters == nil {
+				continue
+			}
+			if item.ConfigFileParams == nil {
+				item.ConfigFileParams = map[string]parametersv1alpha1.ParametersInFile{}
+			}
+			item.ConfigFileParams[file] = merged
 		}
 	}
 }
@@ -430,22 +433,23 @@ func newTaskContext(ctx context.Context, cli client.Client, componentParameter *
 	if err != nil {
 		return nil, err
 	}
-	configmaps, err := resolveComponentRefConfigMap(ctx, cli, componentParameter.Namespace, componentParameter.Spec.ClusterName, componentParameter.Spec.ComponentName)
-	if err != nil {
-		return nil, err
-	}
-	initialParameters, err := classifyManagedParameterInputs(componentParameter.Spec.Initial, cmpd, configmaps, configDescs, paramsDefs)
-	if err != nil {
-		return nil, err
-	}
-
-	return &taskContext{ctx: ctx,
+	taskCtx := &taskContext{ctx: ctx,
 		componentParameter: componentParameter,
 		configDescs:        configDescs,
 		component:          synthesizedComp,
 		paramsDefs:         paramsDefs,
-		initialParameters:  initialParameters,
-	}, nil
+	}
+	if initial := componentParameter.Spec.Initial; initial != nil && (len(initial.Assignments) != 0 || len(initial.Updates) != 0) {
+		configmaps, err := resolveComponentRefConfigMap(ctx, cli, componentParameter.Namespace, componentParameter.Spec.ClusterName, componentParameter.Spec.ComponentName)
+		if err != nil {
+			return nil, err
+		}
+		taskCtx.initialParameters, err = classifyManagedParameterInputs(initial, cmpd, configmaps, configDescs, paramsDefs)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return taskCtx, nil
 }
 
 func buildTemplateVars(ctx context.Context, cli client.Reader,

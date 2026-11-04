@@ -20,12 +20,102 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package unstructured
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 )
+
+func TestViperRemoveKey(t *testing.T) {
+	tests := []struct {
+		name      string
+		format    parametersv1alpha1.CfgFileFormat
+		content   string
+		key       string
+		preserved map[string]string
+	}{
+		{
+			name: "json top level", format: parametersv1alpha1.JSON,
+			content: `{"remove":"old","keep":"unchanged"}`, key: "remove",
+			preserved: map[string]string{"keep": "unchanged"},
+		},
+		{
+			name: "json nested", format: parametersv1alpha1.JSON,
+			content: `{"server":{"remove":"old","keep":"unchanged"},"other":"retained"}`, key: "server.remove",
+			preserved: map[string]string{"server.keep": "unchanged", "other": "retained"},
+		},
+		{
+			name: "ini section", format: parametersv1alpha1.Ini,
+			content: "[server]\nremove=old\nkeep=unchanged\n[client]\nremove=retained\n", key: "server.remove",
+			preserved: map[string]string{"server.keep": "unchanged", "client.remove": "retained"},
+		},
+		{
+			name: "toml nested", format: parametersv1alpha1.TOML,
+			content: "[server]\nremove = \"old\"\nkeep = \"unchanged\"\n", key: "server.remove",
+			preserved: map[string]string{"server.keep": "unchanged"},
+		},
+		{
+			name: "properties literal dotted key", format: parametersv1alpha1.Properties,
+			content: "server.remove=old\nserver.keep=unchanged\n", key: "server.remove",
+			preserved: map[string]string{"server.keep": "unchanged"},
+		},
+		{
+			name: "dotenv literal dotted key", format: parametersv1alpha1.Dotenv,
+			content: "server.remove=old\nserver.keep=unchanged\n", key: "server.remove",
+			preserved: map[string]string{"server.keep": "unchanged"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config, err := LoadConfig("remove_test", tt.content, tt.format)
+			require.NoError(t, err)
+			require.Equal(t, "old", config.Get(tt.key))
+
+			require.NoError(t, config.RemoveKey(strings.ToUpper(tt.key)))
+			assert.Nil(t, config.Get(tt.key))
+			require.NoError(t, config.RemoveKey(tt.key))
+			require.NoError(t, config.RemoveKey("missing"))
+
+			content, err := config.Marshal()
+			require.NoError(t, err)
+			reloaded, err := LoadConfig("remove_test", content, tt.format)
+			require.NoError(t, err)
+			assert.Nil(t, reloaded.Get(tt.key))
+			for key, value := range tt.preserved {
+				assert.Equal(t, value, config.Get(key))
+				assert.Equal(t, value, reloaded.Get(key))
+			}
+		})
+	}
+}
+
+func TestViperRemoveKeyAfterUpdate(t *testing.T) {
+	config, err := LoadConfig("remove_test", `{"server":{"remove":"old","keep":"unchanged"}}`, parametersv1alpha1.JSON)
+	require.NoError(t, err)
+	require.NoError(t, config.Update("server.remove", "updated"))
+	require.Equal(t, "updated", config.Get("server.remove"))
+
+	require.NoError(t, config.RemoveKey("server.remove"))
+	assert.Nil(t, config.Get("server.remove"))
+	content, err := config.Marshal()
+	require.NoError(t, err)
+	reloaded, err := LoadConfig("remove_test", content, parametersv1alpha1.JSON)
+	require.NoError(t, err)
+	assert.Nil(t, reloaded.Get("server.remove"))
+	assert.Equal(t, "unchanged", reloaded.Get("server.keep"))
+
+	require.NoError(t, config.Update("server.remove", "restored"))
+	assert.Equal(t, "restored", config.Get("server.remove"))
+	content, err = config.Marshal()
+	require.NoError(t, err)
+	reloaded, err = LoadConfig("remove_test", content, parametersv1alpha1.JSON)
+	require.NoError(t, err)
+	assert.Equal(t, "restored", reloaded.Get("server.remove"))
+	assert.Equal(t, "unchanged", reloaded.Get("server.keep"))
+}
 
 func TestIniFormat(t *testing.T) {
 	const iniContext = `

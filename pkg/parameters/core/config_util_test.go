@@ -29,6 +29,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/unstructured"
 )
 
 // import (
@@ -258,6 +259,10 @@ func TestApplyConfigPatch(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, got, "[mysqld]")
 	require.Contains(t, got, "max_connections=200")
+	reloaded, err := unstructured.LoadConfig("mysql.cnf", got, parametersv1alpha1.Ini)
+	require.NoError(t, err)
+	require.Equal(t, "200", reloaded.Get("mysqld.max_connections"))
+	require.Nil(t, reloaded.Get("mysqld.old_value"))
 
 	_, err = ApplyConfigPatch([]byte(":"), map[string]*string{"max_connections": ptr.To("200")}, format, nil)
 	require.Error(t, err)

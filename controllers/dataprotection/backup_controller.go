@@ -97,6 +97,11 @@ func (e *backupNamespaceTerminatingError) Error() string {
 // +kubebuilder:rbac:groups=apps,resources=statefulsets/status,verbs=get
 // +kubebuilder:rbac:groups=apps,resources=statefulsets/finalizers,verbs=update
 
+// deleteBackupFilesRequeueInterval is the interval to check the progress of the backup files
+// deletion. It's a fallback for the cases that can not be observed by the events of the
+// deletion jobs, e.g. a job that can never be started due to a missing secret.
+const deleteBackupFilesRequeueInterval = 30 * time.Second
+
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the backup closer to the desired state.
 func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -217,12 +222,13 @@ func (r *BackupReconciler) parseBackupJob(_ context.Context, object client.Objec
 }
 
 // deleteBackupFiles deletes the backup files stored in backup repository.
-func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
+// It returns true if the backup files are still being deleted.
+func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) (bool, error) {
 	// If the dataprotection finalizer has already been removed, the deletion has succeeded.
 	// Skip creating a new deletion job to avoid a race condition with the garbage collector
 	// during foreground cascading deletion, which would cause an infinite loop of job creation.
 	if !controllerutil.ContainsFinalizer(backup, dptypes.DataProtectionFinalizerName) {
-		return nil
+		return false, nil
 	}
 
 	deleteBackup := func() error {
@@ -244,22 +250,22 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 	status, err := deleter.DeleteBackupFiles(backup)
 	switch status {
 	case dpbackup.DeletionStatusSucceeded:
-		return deleteBackup()
+		return false, deleteBackup()
 	case dpbackup.DeletionStatusFailed:
 		failureReason := err.Error()
 		if backup.Status.DeletionFailureReason == failureReason {
-			return nil
+			return false, nil
 		}
 		backupPatch := client.MergeFrom(backup.DeepCopy())
 		backup.Status.DeletionFailureReason = failureReason
 		r.Recorder.Event(backup, corev1.EventTypeWarning, "DeleteBackupFilesFailed", failureReason)
-		return r.Status().Patch(reqCtx.Ctx, backup, backupPatch)
+		return false, r.Status().Patch(reqCtx.Ctx, backup, backupPatch)
 	case dpbackup.DeletionStatusDeleting,
 		dpbackup.DeletionStatusUnknown:
 		// wait for the deletion job completed
-		return r.recordBackupDeletionBlocker(reqCtx, backup, err)
+		return true, r.recordBackupDeletionBlocker(reqCtx, backup, err)
 	}
-	return err
+	return true, err
 }
 
 func (r *BackupReconciler) recordBackupDeletionBlocker(
@@ -326,8 +332,15 @@ func (r *BackupReconciler) handleDeletingPhase(reqCtx intctrlutil.RequestCtx, ba
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 
-	if err := r.deleteBackupFiles(reqCtx, backup); err != nil {
+	waiting, err := r.deleteBackupFiles(reqCtx, backup)
+	if err != nil {
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+	}
+	if waiting {
+		// the deletion jobs may be stuck, e.g. because the credentials of the target cluster have
+		// been recycled before the jobs were started. Requeue to check and delete them if needed,
+		// since the status of a stuck pod does not trigger a reconciliation of the backup.
+		return intctrlutil.RequeueAfter(deleteBackupFilesRequeueInterval, reqCtx.Log, "wait for the backup files to be deleted")
 	}
 	return intctrlutil.Reconciled()
 }

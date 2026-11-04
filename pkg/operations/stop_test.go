@@ -276,20 +276,18 @@ func TestStopReconcilesCurrentInstanceStatus(t *testing.T) {
 	check("2/2", 2, opsv1alpha1.OpsSucceedPhase)
 }
 
-func TestStopWaitsForAppsResult(t *testing.T) {
+var _ = Describe("Stop component recovery", func() {
 	for _, replicas := range []int32{0, 1} {
-		t.Run(fmt.Sprintf("replicas=%d", replicas), func(t *testing.T) {
+		It(fmt.Sprintf("replicas=%d", replicas), func() {
 			scheme := runtime.NewScheme()
 			for _, add := range []func(*runtime.Scheme) error{appsv1.AddToScheme, opsv1alpha1.AddToScheme, workloads.AddToScheme} {
-				if err := add(scheme); err != nil {
-					t.Fatal(err)
-				}
+				Expect(add(scheme)).To(Succeed())
 			}
 			cluster := &appsv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{Name: "cluster", Namespace: "default", Generation: 1},
 				Spec:       appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "mysql", Replicas: replicas, Stop: ptr.To(true)}}},
 				Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{
-					"mysql": {Phase: appsv1.StoppedComponentPhase, ObservedGeneration: 1, UpToDate: true},
+					"mysql": {Phase: appsv1.FailedComponentPhase, ObservedGeneration: 1, UpToDate: true},
 				}},
 			}
 			ops := &opsv1alpha1.OpsRequest{
@@ -301,27 +299,18 @@ func TestStopWaitsForAppsResult(t *testing.T) {
 				WithStatusSubresource(cluster, ops).Build()
 			ctx := context.Background()
 			check := func(wantPhase opsv1alpha1.OpsPhase, wantProgress string) {
-				t.Helper()
+				GinkgoHelper()
 				currentCluster, currentOps := &appsv1.Cluster{}, &opsv1alpha1.OpsRequest{}
-				if err := cli.Get(ctx, client.ObjectKeyFromObject(cluster), currentCluster); err != nil {
-					t.Fatal(err)
-				}
-				if err := cli.Get(ctx, client.ObjectKeyFromObject(ops), currentOps); err != nil {
-					t.Fatal(err)
-				}
+				Expect(cli.Get(ctx, client.ObjectKeyFromObject(cluster), currentCluster)).To(Succeed())
+				Expect(cli.Get(ctx, client.ObjectKeyFromObject(ops), currentOps)).To(Succeed())
 				res := &OpsResource{Cluster: currentCluster, OpsRequest: currentOps, Recorder: record.NewFakeRecorder(16)}
 				delay, err := GetOpsManager().Reconcile(intctrlutil.RequestCtx{Ctx: ctx}, cli, res)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err := cli.Get(ctx, client.ObjectKeyFromObject(ops), currentOps); err != nil {
-					t.Fatal(err)
-				}
-				if currentOps.Status.Phase != wantPhase || currentOps.Status.Progress != wantProgress {
-					t.Fatalf("phase=%s progress=%s, want %s %s", currentOps.Status.Phase, currentOps.Status.Progress, wantPhase, wantProgress)
-				}
-				if wantPhase == opsv1alpha1.OpsRunningPhase && delay <= 0 {
-					t.Fatal("Stop has no retry while observations disagree")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cli.Get(ctx, client.ObjectKeyFromObject(ops), currentOps)).To(Succeed())
+				Expect(currentOps.Status.Phase).To(Equal(wantPhase))
+				Expect(currentOps.Status.Progress).To(Equal(wantProgress))
+				if wantPhase == opsv1alpha1.OpsRunningPhase {
+					Expect(delay).To(BeNumerically(">", 0))
 				}
 			}
 			check(opsv1alpha1.OpsRunningPhase, fmt.Sprintf("0/%d", replicas))
@@ -332,30 +321,22 @@ func TestStopWaitsForAppsResult(t *testing.T) {
 			if replicas > 0 {
 				its.Status.InstanceStatus = []workloads.InstanceStatus{{PodName: "mysql-0", DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStateAbsent}}
 			}
-			if err := cli.Create(ctx, its); err != nil {
-				t.Fatal(err)
-			}
+			Expect(cli.Create(ctx, its)).To(Succeed())
 			check(opsv1alpha1.OpsRunningPhase, fmt.Sprintf("%d/%d", replicas, replicas))
-			cluster.Status.Components["mysql"] = appsv1.ClusterComponentStatus{Phase: appsv1.StoppingComponentPhase, ObservedGeneration: 1, UpToDate: true}
-			if err := cli.Status().Update(ctx, cluster); err != nil {
-				t.Fatal(err)
-			}
+			cluster.Status.Components["mysql"] = appsv1.ClusterComponentStatus{Phase: appsv1.FailedComponentPhase, ObservedGeneration: 1, UpToDate: true}
+			Expect(cli.Status().Update(ctx, cluster)).To(Succeed())
 			its.Spec.Stop = ptr.To(true)
 			for i := range its.Status.InstanceStatus {
 				its.Status.InstanceStatus[i].DesiredState = workloads.InstanceDesiredStateOffline
 			}
-			if err := cli.Update(ctx, its); err != nil {
-				t.Fatal(err)
-			}
+			Expect(cli.Update(ctx, its)).To(Succeed())
 			check(opsv1alpha1.OpsRunningPhase, fmt.Sprintf("%d/%d", replicas, replicas))
 			cluster.Status.Components["mysql"] = appsv1.ClusterComponentStatus{Phase: appsv1.StoppedComponentPhase, ObservedGeneration: 1, UpToDate: true}
-			if err := cli.Status().Update(ctx, cluster); err != nil {
-				t.Fatal(err)
-			}
+			Expect(cli.Status().Update(ctx, cluster)).To(Succeed())
 			check(opsv1alpha1.OpsSucceedPhase, fmt.Sprintf("%d/%d", replicas, replicas))
 		})
 	}
-}
+})
 
 func TestStopAllTargetsComplete(t *testing.T) {
 	const (

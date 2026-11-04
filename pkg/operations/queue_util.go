@@ -119,7 +119,7 @@ func enqueueOpsRequestToClusterAnnotation(ctx context.Context, cli client.Client
 		if opsRes.OpsRequest.Force() && !opsRes.OpsRequest.Spec.EnqueueOnForce {
 			return false
 		}
-		return existOtherRunningOps(opsRequestSlice, opsRes.OpsRequest.Spec.Type, opsBehaviour)
+		return existOtherRunningOps(opsRequestSlice, opsRes.OpsRequest, opsBehaviour)
 	}
 
 	switch index {
@@ -144,21 +144,25 @@ func enqueueOpsRequestToClusterAnnotation(ctx context.Context, cli client.Client
 		var doSwap bool
 		opsRequestSlice, doSwap = swapOpsWithDependentBefore(opsRequestSlice, index, opsRes)
 		// check if dependent ops are after current ops in the slice, if so swap positions and update the queue in the cluster annotation.
-		if !doSwap {
-			if !opsRecorder.InQueue {
-				// the opsRequest is already running.
-				return &opsRecorder, nil
-			}
-			if hasStopQueueConflict(opsRequestSlice, index, opsRes.OpsRequest.Spec.Type, opsBehaviour.QueueWithStop) {
-				return &opsRecorder, nil
-			}
-			if !opsRes.OpsRequest.Spec.Force && existOtherRunningOps(opsRequestSlice, opsRecorder.Type, opsBehaviour) {
-				// if exists other running opsRequest, return.
-				return &opsRecorder, nil
-			}
-			// mark to handle the next opsRequest
-			opsRequestSlice[index].InQueue = false
+		if doSwap {
+			// the opsRequest has been moved behind its dependent opsRequests and put back into the queue by
+			// swapOpsWithDependentBefore, so it can not be handled now.
+			_, opsRecorder = GetOpsRecorderFromSlice(opsRequestSlice, opsRes.OpsRequest.Name)
+			return &opsRecorder, opsutil.UpdateClusterOpsAnnotations(ctx, cli, opsRes.Cluster, opsRequestSlice)
 		}
+		if !opsRecorder.InQueue {
+			// the opsRequest is already running.
+			return &opsRecorder, nil
+		}
+		if hasStopQueueConflict(opsRequestSlice, index, opsRes.OpsRequest.Spec.Type, opsBehaviour.QueueWithStop) {
+			return &opsRecorder, nil
+		}
+		if !opsRes.OpsRequest.Spec.Force && existOtherRunningOps(opsRequestSlice, opsRes.OpsRequest, opsBehaviour) {
+			// if exists other running opsRequest, return.
+			return &opsRecorder, nil
+		}
+		// mark to handle the next opsRequest
+		opsRequestSlice[index].InQueue = false
 	}
 	return &opsRecorder, opsutil.UpdateClusterOpsAnnotations(ctx, cli, opsRes.Cluster, opsRequestSlice)
 }
@@ -198,19 +202,49 @@ func swapOpsWithDependentBefore(opsRequestSlice []opsv1alpha1.OpsRecorder, curre
 			doSwap = true
 		}
 	}
+	if doSwap {
+		// the opsRequest has been moved behind its dependent opsRequests, and the opsRequests before it
+		// are waiting for the queue lock. It must be put back into the queue (InQueue=true) instead of
+		// keeping holding the queue lock, otherwise the opsRequests before it can never be handled
+		// while it is waiting for them to succeed, which deadlocks the queue.
+		opsRequestSlice[currentIndex].InQueue = true
+	}
 	return opsRequestSlice, doSwap
 }
 
 // existOtherRunningOps checks if exists other running opsRequest.
-func existOtherRunningOps(opsRecorderSlice []opsv1alpha1.OpsRecorder, opsType opsv1alpha1.OpsType, opsBehaviour OpsBehaviour) bool {
+func existOtherRunningOps(opsRecorderSlice []opsv1alpha1.OpsRecorder, opsRequest *opsv1alpha1.OpsRequest, opsBehaviour OpsBehaviour) bool {
+	// the dependent opsRequests of the current one are still in the queue, so it can not acquire
+	// the queue lock now, otherwise it holds the lock while waiting for the opsRequests in front
+	// of it, and the queue is deadlocked.
+	if anyDependentOpsInQueue(opsRecorderSlice, opsRequest) {
+		return true
+	}
 	for i := range opsRecorderSlice {
 		if opsBehaviour.QueueByCluster && opsRecorderSlice[i].QueueBySelf {
 			continue
 		}
-		if opsBehaviour.QueueBySelf && opsRecorderSlice[i].Type != opsType {
+		if opsBehaviour.QueueBySelf && opsRecorderSlice[i].Type != opsRequest.Spec.Type {
 			continue
 		}
 		if !opsRecorderSlice[i].InQueue {
+			return true
+		}
+	}
+	return false
+}
+
+// anyDependentOpsInQueue checks whether any dependent opsRequest of the current one is still in the
+// queue. An opsRequest is removed from the queue once it is completed, so an opsRequest in the queue
+// means it has not succeeded yet.
+func anyDependentOpsInQueue(opsRecorderSlice []opsv1alpha1.OpsRecorder, opsRequest *opsv1alpha1.OpsRequest) bool {
+	dependentOpsStr := opsRequest.Annotations[constant.OpsDependentOnSuccessfulOpsAnnoKey]
+	if dependentOpsStr == "" {
+		return false
+	}
+	dependentOps := strings.Split(dependentOpsStr, ",")
+	for i := range opsRecorderSlice {
+		if slices.Contains(dependentOps, opsRecorderSlice[i].Name) {
 			return true
 		}
 	}

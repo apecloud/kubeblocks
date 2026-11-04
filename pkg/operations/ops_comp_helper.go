@@ -28,6 +28,8 @@ import (
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -55,6 +57,35 @@ func newComponentOpsHelper[T ComponentOpsInterface](compOpsList []T) componentOp
 		compOpsHelper.componentOpsSet[compOps.GetComponentName()] = compOps
 	}
 	return compOpsHelper
+}
+
+func clusterProvisioningFailure(opsRes *OpsResource) *metav1.Condition {
+	generation := opsRes.OpsRequest.Status.ClusterGeneration
+	if opsRes.OpsRequest.Status.Phase != opsv1alpha1.OpsRunningPhase || generation <= 0 || opsRes.Cluster.Generation != generation {
+		return nil
+	}
+	condition := meta.FindStatusCondition(opsRes.Cluster.Status.Conditions, appsv1.ConditionTypeProvisioningStarted)
+	if condition != nil && condition.Status == metav1.ConditionFalse && condition.ObservedGeneration == generation {
+		return condition
+	}
+	return nil
+}
+
+func (c componentOpsHelper) targetsCurrentlyRunning(cluster *appsv1.Cluster) bool {
+	for name := range c.componentOpsSet {
+		if status, ok := cluster.Status.Components[name]; ok {
+			if status.ObservedGeneration != cluster.Generation || !status.UpToDate || status.Phase != appsv1.RunningComponentPhase {
+				return false
+			}
+		} else if status, ok := cluster.Status.Shardings[name]; ok {
+			if status.ObservedGeneration != cluster.Generation || !status.UpToDate || status.Phase != appsv1.RunningComponentPhase {
+				return false
+			}
+		} else {
+			return false
+		}
+	}
+	return len(c.componentOpsSet) > 0
 }
 
 func (c componentOpsHelper) updateClusterComponentsAndShardings(cluster *appsv1.Cluster,
@@ -280,32 +311,19 @@ func (c componentOpsHelper) emptyInstanceProgress(opsRes *OpsResource) map[strin
 	return progress
 }
 
-func (c componentOpsHelper) componentActionPhase(opsRes *OpsResource, terminalPhase appsv1.ComponentPhase) opsv1alpha1.OpsPhase {
+func (c componentOpsHelper) componentActionPhase(opsRes *OpsResource, completionPhase appsv1.ComponentPhase) opsv1alpha1.OpsPhase {
 	if opsRes.Cluster.Generation < opsRes.OpsRequest.Status.ClusterGeneration {
 		return opsv1alpha1.OpsRunningPhase
 	}
 	actionPhase := opsv1alpha1.OpsSucceedPhase
 	matched := 0
-	setProcessing := func() {
-		if actionPhase != opsv1alpha1.OpsFailedPhase {
-			actionPhase = opsv1alpha1.OpsRunningPhase
-		}
-	}
 	checkTarget := func(name string, componentPhase appsv1.ComponentPhase, observedGeneration int64, upToDate bool) {
 		matched++
 		compStatus := opsRes.OpsRequest.Status.Components[name]
 		compStatus.Phase = componentPhase
 		opsRes.OpsRequest.Status.Components[name] = compStatus
-		if observedGeneration != opsRes.Cluster.Generation || !upToDate {
-			setProcessing()
-			return
-		}
-		if componentPhase == appsv1.FailedComponentPhase {
-			actionPhase = opsv1alpha1.OpsFailedPhase
-			return
-		}
-		if componentPhase != terminalPhase {
-			setProcessing()
+		if observedGeneration != opsRes.Cluster.Generation || !upToDate || componentPhase != completionPhase {
+			actionPhase = opsv1alpha1.OpsRunningPhase
 		}
 	}
 	for i := range opsRes.Cluster.Spec.ComponentSpecs {
@@ -323,7 +341,7 @@ func (c componentOpsHelper) componentActionPhase(opsRes *OpsResource, terminalPh
 		}
 	}
 	if len(c.componentOpsSet) > 0 && matched != len(c.componentOpsSet) {
-		setProcessing()
+		actionPhase = opsv1alpha1.OpsRunningPhase
 	}
 	return actionPhase
 }

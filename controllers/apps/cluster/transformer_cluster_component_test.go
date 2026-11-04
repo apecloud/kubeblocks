@@ -3859,3 +3859,193 @@ var _ = Describe("cluster component transformer test", func() {
 		})
 	})
 })
+
+var _ = Describe("cluster config execution targets", func() {
+	newConfig := func(source, hash string) appsv1.ClusterComponentConfig {
+		return appsv1.ClusterComponentConfig{
+			Name: ptr.To("config"), ConfigHash: ptr.To(hash), Restart: ptr.To(false), Reconfigure: ptr.To(false),
+			ExternalManaged: ptr.To(true),
+			ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{Name: source},
+			}},
+		}
+	}
+	setExecution := func(config *appsv1.ClusterComponentConfig, hash string) {
+		config.ConfigHash = ptr.To(hash)
+		config.Restart = ptr.To(true)
+		config.Reconfigure = ptr.To(true)
+		config.ReconfigureAction = &appsv1.Action{Exec: &appsv1.ExecAction{Command: []string{"reload-" + hash}}}
+		config.ReconfigureArgs = [][]string{{"key", hash}}
+		config.Variables = map[string]string{"KB_CONFIG_FILES_UPDATED": "checksum-" + hash}
+	}
+
+	DescribeTable("applies ordinary Component parent execution updates", func(parentSource bool) {
+		running := &appsv1.Component{}
+		running.Spec.Configs = []appsv1.ClusterComponentConfig{newConfig("external", "H1")}
+		expected := running.DeepCopy()
+		setExecution(&expected.Spec.Configs[0], "H2")
+		expected.Spec.Configs[0].Variables["user"] = "parent"
+		if !parentSource {
+			expected.Spec.Configs[0].ConfigMap = nil
+		}
+		want := expected.DeepCopy()
+		want.Spec.Configs[0].ConfigMap = running.Spec.Configs[0].ConfigMap.DeepCopy()
+
+		got := copyAndMergeComponent(running, expected)
+		Expect(got).NotTo(BeNil())
+		Expect(got.Spec.Configs).To(Equal(want.Spec.Configs))
+		Expect(copyAndMergeComponent(got, expected)).To(BeNil())
+	}, Entry("with an explicit parent source", true), Entry("with source supplementation", false))
+
+	DescribeTable("uses the whole explicit shard parent config", func(source string, clearedParent bool) {
+		running := &appsv1.Component{}
+		running.Spec.Configs = []appsv1.ClusterComponentConfig{newConfig("external", "H1")}
+		setExecution(&running.Spec.Configs[0], "H1")
+		expected := running.DeepCopy()
+		expected.Spec.Configs[0] = newConfig(source, "H2")
+		setExecution(&expected.Spec.Configs[0], "H2")
+		expected.Spec.Configs[0].ConfigMap.Items = []corev1.KeyToPath{{Key: "settings.conf", Path: "projected.conf"}}
+		expected.Spec.Configs[0].ConfigMap.Optional = ptr.To(true)
+		expected.Spec.Configs[0].ConfigMap.DefaultMode = ptr.To(int32(0600))
+		expected.Spec.Configs[0].ExternalManaged = ptr.To(false)
+		expected.Spec.Configs[0].Variables["user"] = "parent"
+		if clearedParent {
+			expected.Spec.Configs[0].ConfigHash = nil
+			expected.Spec.Configs[0].Restart = nil
+			expected.Spec.Configs[0].Reconfigure = ptr.To(false)
+			expected.Spec.Configs[0].ReconfigureAction = nil
+			expected.Spec.Configs[0].ReconfigureArgs = nil
+			expected.Spec.Configs[0].ExternalManaged = nil
+			expected.Spec.Configs[0].Variables = nil
+		}
+		runningBefore, expectedBefore := running.DeepCopy(), expected.DeepCopy()
+
+		got := copyAndMergeShardComponent(running, expected)
+		Expect(got).NotTo(BeNil())
+		Expect(got.Spec.Configs).To(Equal(expected.Spec.Configs))
+		Expect(copyAndMergeShardComponent(got, expected)).To(BeNil())
+		got.Spec.Configs[0].ConfigMap.Items[0].Path = "changed"
+		if !clearedParent {
+			got.Spec.Configs[0].Variables["user"] = "changed"
+			got.Spec.Configs[0].ReconfigureAction.Exec.Command[0] = "changed"
+			got.Spec.Configs[0].ReconfigureArgs[0][0] = "changed"
+		}
+		Expect(running).To(Equal(runningBefore))
+		Expect(expected).To(Equal(expectedBefore))
+	}, Entry("with the same ConfigMap name", "external", false),
+		Entry("with a different ConfigMap name", "replacement", false),
+		Entry("with an empty name left for source validation", "", false),
+		Entry("with cleared fields and the same ConfigMap name", "external", true))
+
+	DescribeTable("inherits each whole shard config when parent source is absent", func(staleParent, clearedChild bool) {
+		parent := newConfig("", "")
+		if staleParent {
+			setExecution(&parent, "legacy-shared")
+		}
+		parent.ConfigMap = nil
+		parent.ExternalManaged = ptr.To(true)
+		parent.Variables = map[string]string{"user": "parent", "new-user": "applied", "KB_CONFIG_FILES_UPDATED": "stale-checksum"}
+		expected := &appsv1.Component{}
+		expected.Spec.Configs = []appsv1.ClusterComponentConfig{parent}
+		expected.Spec.Replicas = 5
+		expectedBefore := expected.DeepCopy()
+		for i := range 2 {
+			local := newConfig(fmt.Sprintf("shard-%d-config", i), "")
+			if clearedChild {
+				local.ConfigHash = nil
+				local.Restart = nil
+				local.Reconfigure = nil
+				local.ExternalManaged = nil
+				if i == 1 {
+					local.ConfigHash = ptr.To("")
+					local.Restart = ptr.To(false)
+					local.Reconfigure = ptr.To(false)
+					local.ExternalManaged = ptr.To(false)
+					local.Variables = map[string]string{}
+				}
+			} else {
+				setExecution(&local, fmt.Sprintf("shard-%d", i))
+				local.ExternalManaged = ptr.To(false)
+				local.Variables["user"] = "child"
+				local.Variables["old-user"] = "retained"
+			}
+			local.ConfigMap.Items = []corev1.KeyToPath{{Key: "local.conf", Path: "local.conf"}}
+			local.ConfigMap.Optional = ptr.To(false)
+			local.ConfigMap.DefaultMode = ptr.To(int32(0400))
+			running := &appsv1.Component{}
+			running.Spec.Configs = []appsv1.ClusterComponentConfig{local}
+			runningBefore := running.DeepCopy()
+			want := *local.DeepCopy()
+
+			got := copyAndMergeShardComponent(running, expected)
+			Expect(got).NotTo(BeNil())
+			Expect(got.Spec.Replicas).To(Equal(int32(5)))
+			Expect(got.Spec.Configs).To(Equal([]appsv1.ClusterComponentConfig{want}))
+			Expect(copyAndMergeShardComponent(got, expected)).To(BeNil())
+			Expect(running).To(Equal(runningBefore))
+			Expect(expected).To(Equal(expectedBefore))
+
+			got.Spec.Configs[0].ConfigMap.Items[0].Path = "changed"
+			if !clearedChild {
+				got.Spec.Configs[0].Variables["user"] = "changed"
+				got.Spec.Configs[0].ReconfigureAction.Exec.Command[0] = "changed"
+				got.Spec.Configs[0].ReconfigureArgs[0][0] = "changed"
+			}
+			Expect(running).To(Equal(runningBefore))
+			Expect(expected).To(Equal(expectedBefore))
+		}
+	}, Entry("with no parent execution", false, false),
+		Entry("with stale shared parent execution", true, false),
+		Entry("with cleared child execution", false, true),
+		Entry("with stale parent execution and cleared child execution", true, true))
+
+	It("inherits the whole child config for a name-only parent entry", func() {
+		local := newConfig("shard-config", "H1")
+		setExecution(&local, "H1")
+		local.Variables["user"] = "child"
+		running := &appsv1.Component{}
+		running.Spec.Configs = []appsv1.ClusterComponentConfig{local}
+		expected := &appsv1.Component{}
+		expected.Spec.Configs = []appsv1.ClusterComponentConfig{{Name: ptr.To("config")}}
+		expected.Spec.Replicas = 5
+		want := *local.DeepCopy()
+
+		got := copyAndMergeShardComponent(running, expected)
+		Expect(got).NotTo(BeNil())
+		Expect(got.Spec.Configs).To(Equal([]appsv1.ClusterComponentConfig{want}))
+		Expect(expected.Spec.Configs[0].Variables).To(BeNil())
+		Expect(copyAndMergeShardComponent(got, expected)).To(BeNil())
+	})
+
+	It("applies the expected config when neither side has a source", func() {
+		running := &appsv1.Component{}
+		running.Spec.Configs = []appsv1.ClusterComponentConfig{newConfig("", "H1")}
+		running.Spec.Configs[0].ConfigMap = nil
+		setExecution(&running.Spec.Configs[0], "H1")
+		expected := running.DeepCopy()
+		expected.Spec.Configs[0] = appsv1.ClusterComponentConfig{
+			Name: ptr.To("config"), Variables: map[string]string{"user": "parent"}, ExternalManaged: ptr.To(false),
+		}
+
+		got := copyAndMergeShardComponent(running, expected)
+		Expect(got).NotTo(BeNil())
+		Expect(got.Spec.Configs).To(Equal(expected.Spec.Configs))
+		Expect(copyAndMergeShardComponent(got, expected)).To(BeNil())
+	})
+
+	It("keeps the whole local config when the parent entry is absent", func() {
+		running := &appsv1.Component{}
+		local := newConfig("shard-config", "H1")
+		setExecution(&local, "H1")
+		local.Variables["user"] = "local"
+		running.Spec.Configs = []appsv1.ClusterComponentConfig{local}
+		expected := &appsv1.Component{}
+		expected.Spec.Replicas = 5
+
+		got := copyAndMergeShardComponent(running, expected)
+		Expect(got).NotTo(BeNil())
+		Expect(got.Spec.Replicas).To(Equal(int32(5)))
+		Expect(got.Spec.Configs).To(Equal(running.Spec.Configs))
+		Expect(copyAndMergeShardComponent(got, expected)).To(BeNil())
+	})
+})

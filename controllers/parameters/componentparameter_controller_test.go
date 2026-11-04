@@ -21,6 +21,7 @@ package parameters
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -43,6 +44,7 @@ import (
 	cfgutil "github.com/apecloud/kubeblocks/pkg/parameters/util"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
+	"github.com/apecloud/kubeblocks/pkg/unstructured"
 )
 
 var _ = Describe("ComponentParameter Controller", func() {
@@ -240,7 +242,7 @@ var _ = Describe("ComponentParameter Controller", func() {
 		})
 
 		It("should let explicit desired remove override assignments", func() {
-			_, _, _, _, _ = mockReconcileResource()
+			_, _, comp, _, _ := mockReconcileResource()
 
 			cfgKey := client.ObjectKey{
 				Namespace: testCtx.DefaultNamespace,
@@ -265,6 +267,24 @@ var _ = Describe("ComponentParameter Controller", func() {
 				decoded := parameters.DecodeParameterOverlay(item.ConfigFileParams["my.cnf"].Parameters)
 				g.Expect(decoded).Should(HaveKey("max_connections"))
 				g.Expect(decoded["max_connections"]).Should(BeNil())
+			})).Should(Succeed())
+
+			configKey := client.ObjectKey{Namespace: comp.Namespace, Name: core.GetComponentCfgName(clusterName, defaultCompName, configSpecName)}
+			checkRemoval := func(g Gomega, cm *corev1.ConfigMap) {
+				config, err := unstructured.LoadConfig(testparameters.MysqlConfigFile, cm.Data[testparameters.MysqlConfigFile], parametersv1alpha1.Ini)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(config.Get("mysqld.max_connections")).Should(BeNil())
+				g.Expect(config.Get("mysqld.gtid_mode")).Should(Equal("OFF"))
+			}
+			Eventually(testapps.CheckObj(&testCtx, configKey, checkRemoval)).Should(Succeed())
+
+			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(comp), func(obj *appsv1.Component) {
+				obj.Spec.Replicas = 2
+			})).Should(Succeed())
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(comp), comp)).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, configKey, func(g Gomega, cm *corev1.ConfigMap) {
+				g.Expect(cm.Annotations[constant.ParametersAppliedComponentGenerationKey]).Should(Equal(strconv.FormatInt(comp.Generation, 10)))
+				checkRemoval(g, cm)
 			})).Should(Succeed())
 		})
 
@@ -310,6 +330,14 @@ var _ = Describe("ComponentParameter Controller", func() {
 				g.Expect(fileParams.UnmanagedUpdates[0].Section).Should(Equal(cfgutil.ToPointer("mysqld")))
 				g.Expect(fileParams.UnmanagedUpdates[0].Updates).Should(HaveLen(2))
 				g.Expect(fileParams.Parameters).Should(HaveKeyWithValue("max_connections", cfgutil.ToPointer("2000")))
+			})).Should(Succeed())
+			configKey := client.ObjectKey{Namespace: testCtx.DefaultNamespace, Name: core.GetComponentCfgName(clusterName, defaultCompName, configSpecName)}
+			Eventually(testapps.CheckObj(&testCtx, configKey, func(g Gomega, cm *corev1.ConfigMap) {
+				config, err := unstructured.LoadConfig(testparameters.MysqlConfigFile, cm.Data[testparameters.MysqlConfigFile], parametersv1alpha1.Ini)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(config.Get("mysqld.gtid_mode")).Should(BeNil())
+				g.Expect(config.Get("mysqld.custom_local")).Should(Equal("on"))
+				g.Expect(config.Get("mysqld.max_connections")).Should(Equal("2000"))
 			})).Should(Succeed())
 		})
 

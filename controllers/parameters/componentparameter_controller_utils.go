@@ -113,7 +113,11 @@ func reconcileParameterValuesIntoSpec(ctx context.Context, cli client.Client, co
 	if err := applyParameterInputs(specCopy, compParam.Spec.Desired, true, ctx, cli, fetchTask, configmaps, configDescs, paramsDefs); err != nil {
 		return false, err
 	}
+
+	// Desired replaces the managed overlay for each file it updates. Preserve the
+	// immutable Initial entries that must survive that replacement.
 	restoreInitialImmutableParameters(specCopy, initialParameters, paramsDefs)
+
 	if reflect.DeepEqual(compParam.Spec, *specCopy) {
 		return false, nil
 	}

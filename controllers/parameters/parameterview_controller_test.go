@@ -1972,18 +1972,14 @@ var _ = Describe("ParameterView Controller", func() {
 	AfterEach(cleanEnv)
 
 	It("resolves helper state for parameter value maps and failure messages", func() {
-		By("cloning parameter value maps without sharing value pointers")
-		Expect(cloneParameterValueMap(nil)).Should(BeNil())
 		source := map[string]*string{
 			"keep":   ptr.To("1"),
 			"delete": nil,
 		}
-		cloned := cloneParameterValueMap(source)
-		Expect(cloned).Should(Equal(source))
-		Expect(cloned["keep"]).ShouldNot(BeIdenticalTo(source["keep"]))
+		equalValues := map[string]*string{"keep": ptr.To("1"), "delete": nil}
 
 		By("comparing desired parameter maps with nil-aware semantics")
-		Expect(equalParameterValueMap(source, cloned)).Should(BeTrue())
+		Expect(equalParameterValueMap(source, equalValues)).Should(BeTrue())
 		Expect(equalParameterValueMap(source, map[string]*string{"keep": ptr.To("1")})).Should(BeFalse())
 		Expect(equalParameterValueMap(source, map[string]*string{"keep": ptr.To("2"), "delete": nil})).Should(BeFalse())
 		Expect(equalParameterValueMap(source, map[string]*string{"keep": nil, "delete": nil})).Should(BeFalse())
@@ -1992,7 +1988,7 @@ var _ = Describe("ParameterView Controller", func() {
 		Expect(desiredParametersContain(nil, source)).Should(BeFalse())
 		Expect(desiredParametersContain(&parametersv1alpha1.ParameterInputs{}, source)).Should(BeFalse())
 		Expect(desiredParametersContain(&parametersv1alpha1.ParameterInputs{Assignments: source}, nil)).Should(BeFalse())
-		Expect(desiredParametersContain(&parametersv1alpha1.ParameterInputs{Assignments: source}, cloned)).Should(BeTrue())
+		Expect(desiredParametersContain(&parametersv1alpha1.ParameterInputs{Assignments: source}, equalValues)).Should(BeTrue())
 		Expect(desiredParametersContain(&parametersv1alpha1.ParameterInputs{Assignments: source}, map[string]*string{"keep": ptr.To("2")})).Should(BeFalse())
 		Expect(desiredParametersContain(&parametersv1alpha1.ParameterInputs{Assignments: source}, map[string]*string{"missing": ptr.To("1")})).Should(BeFalse())
 

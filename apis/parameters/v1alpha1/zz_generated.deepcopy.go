@@ -917,6 +917,13 @@ func (in *ParameterViewSubmission) DeepCopyInto(out *ParameterViewSubmission) {
 			(*out)[key] = outVal
 		}
 	}
+	if in.Updates != nil {
+		in, out := &in.Updates, &out.Updates
+		*out = make([]ParameterUpdate, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	in.Result.DeepCopyInto(&out.Result)
 }
 

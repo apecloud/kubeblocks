@@ -289,8 +289,9 @@ spec:
                     assignments:
                       additionalProperties:
                         type: string
-                      description: Assignments contains the desired simple parameter
-                        assignments submitted from the view.
+                      description: |-
+                        Assignments contains the Set parameter values submitted from the view.
+                        Removed parameters are recorded in Updates, not as null assignments.
                       type: object
                     result:
                       description: |-
@@ -334,10 +335,35 @@ spec:
                           type: string
                       type: object
                     submittedAt:
-                      description: SubmittedAt records when the submission entry was
-                        created or last refreshed.
+                      description: |-
+                        SubmittedAt records when this submission was first recorded.
+                        Repeated submissions with the same revision, content hash, and parameter
+                        operations preserve this timestamp.
                       format: date-time
                       type: string
+                    updates:
+                      description: |-
+                        Updates records the explicit parameter removals submitted from the view.
+                        The controller records Remove operations here and Set values in Assignments.
+                        Each removed key appears once, with no Value.
+                      items:
+                        description: ParameterUpdate is an explicit parameter update.
+                        properties:
+                          key:
+                            description: Key is the logical parameter key defined
+                              in ParametersDefinition.
+                            type: string
+                          type:
+                            description: Type defines the update type.
+                            type: string
+                          value:
+                            description: Value is used by set/update style operations.
+                            type: string
+                        required:
+                        - key
+                        - type
+                        type: object
+                      type: array
                   type: object
                 type: array
             type: object

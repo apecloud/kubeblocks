@@ -424,52 +424,67 @@ func TestParameterViewReconcileWritesPlainTextToComponentParameter(t *testing.T)
 func TestParameterViewReconcilePersistsRemoval(t *testing.T) {
 	const original = "max_connections=1000\nsync_binlog=1\n"
 	const edited = "sync_binlog=1\n"
-	view := &parametersv1alpha1.ParameterView{
-		ObjectMeta: metav1.ObjectMeta{Name: parameterViewName, Namespace: parameterViewNamespace, Generation: 2},
-		Spec: parametersv1alpha1.ParameterViewSpec{
-			ParameterRef: corev1.LocalObjectReference{Name: componentParameterName}, TemplateName: templateName, FileName: fileName,
-			Content: parametersv1alpha1.ParameterViewContent{Type: parametersv1alpha1.PlainTextParameterViewContentType, Text: edited},
-		},
-		Status: parametersv1alpha1.ParameterViewStatus{
-			FileFormat: parametersv1alpha1.Ini,
-			Base:       parametersv1alpha1.ParameterViewRevision{Revision: fmt.Sprint(componentParameterGeneration), ContentHash: hashContent(original)},
-			Latest:     parametersv1alpha1.ParameterViewRevision{Revision: fmt.Sprint(componentParameterGeneration), ContentHash: hashContent(original)},
-		},
-	}
-	reconciler, cli := newParameterViewTestReconciler(t, newParameterViewTestObjects(original, view)...)
-	request := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(view)}
-	if _, err := reconciler.Reconcile(context.Background(), request); err != nil {
-		t.Fatal(err)
-	}
-	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(view), view); err != nil {
-		t.Fatal(err)
-	}
-	if view.Status.Phase != parametersv1alpha1.ParameterViewApplyingPhase {
-		t.Fatalf("expected Applying after removal, got %s: %s", view.Status.Phase, view.Status.Message)
-	}
-	cp := &parametersv1alpha1.ComponentParameter{}
-	if err := cli.Get(context.Background(), client.ObjectKey{Namespace: parameterViewNamespace, Name: componentParameterName}, cp); err != nil {
-		t.Fatal(err)
-	}
-	expected := []parametersv1alpha1.ParameterUpdate{{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "default.max_connections"}}
-	if cp.Spec.Desired == nil || !reflect.DeepEqual(cp.Spec.Desired.Updates, expected) {
-		t.Fatalf("persisted removal = %#v, want %#v", cp.Spec.Desired, expected)
-	}
-	if _, ok := cp.Spec.Desired.Assignments["default.max_connections"]; ok {
-		t.Fatal("removed key remained in assignments")
-	}
-	if !desiredParametersContain(cp.Spec.Desired, map[string]*string{"default.max_connections": nil}) {
-		t.Fatal("persisted removal does not match the submitted draft")
-	}
-	before := cp.Spec.Desired.DeepCopy()
-	if _, err := reconciler.Reconcile(context.Background(), request); err != nil {
-		t.Fatal(err)
-	}
-	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(cp), cp); err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(before, cp.Spec.Desired) {
-		t.Fatalf("repeat submission changed desired inputs: %#v", cp.Spec.Desired)
+	for _, immutable := range []bool{false, true} {
+		t.Run(fmt.Sprintf("immutable=%t", immutable), func(t *testing.T) {
+			view := &parametersv1alpha1.ParameterView{
+				ObjectMeta: metav1.ObjectMeta{Name: parameterViewName, Namespace: parameterViewNamespace, Generation: 2},
+				Spec: parametersv1alpha1.ParameterViewSpec{
+					ParameterRef: corev1.LocalObjectReference{Name: componentParameterName}, TemplateName: templateName, FileName: fileName,
+					Content: parametersv1alpha1.ParameterViewContent{Type: parametersv1alpha1.PlainTextParameterViewContentType, Text: edited},
+				},
+				Status: parametersv1alpha1.ParameterViewStatus{
+					FileFormat: parametersv1alpha1.Ini,
+					Base:       parametersv1alpha1.ParameterViewRevision{Revision: fmt.Sprint(componentParameterGeneration), ContentHash: hashContent(original)},
+					Latest:     parametersv1alpha1.ParameterViewRevision{Revision: fmt.Sprint(componentParameterGeneration), ContentHash: hashContent(original)},
+				},
+			}
+			opts := parameterViewTestOptions{runtimeContent: original, view: view}
+			if immutable {
+				opts.immutableParameters = []string{"default.max_connections"}
+			}
+			reconciler, cli := newParameterViewTestReconciler(t, newParameterViewTestObjectsWithOptions(opts)...)
+			request := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(view)}
+			if _, err := reconciler.Reconcile(context.Background(), request); err != nil {
+				t.Fatal(err)
+			}
+			if err := cli.Get(context.Background(), client.ObjectKeyFromObject(view), view); err != nil {
+				t.Fatal(err)
+			}
+			if immutable {
+				if view.Status.Phase != parametersv1alpha1.ParameterViewInvalidPhase || !strings.Contains(view.Status.Message, "immutable parameter") {
+					t.Fatalf("immutable removal was not rejected: %s: %s", view.Status.Phase, view.Status.Message)
+				}
+				assertParameterViewConditionReason(t, view, parameterViewReasonSchemaValidationFailed)
+				return
+			}
+			if view.Status.Phase != parametersv1alpha1.ParameterViewApplyingPhase {
+				t.Fatalf("expected Applying after removal, got %s: %s", view.Status.Phase, view.Status.Message)
+			}
+			cp := &parametersv1alpha1.ComponentParameter{}
+			if err := cli.Get(context.Background(), client.ObjectKey{Namespace: parameterViewNamespace, Name: componentParameterName}, cp); err != nil {
+				t.Fatal(err)
+			}
+			expected := []parametersv1alpha1.ParameterUpdate{{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "default.max_connections"}}
+			if cp.Spec.Desired == nil || !reflect.DeepEqual(cp.Spec.Desired.Updates, expected) {
+				t.Fatalf("persisted removal = %#v, want %#v", cp.Spec.Desired, expected)
+			}
+			if _, ok := cp.Spec.Desired.Assignments["default.max_connections"]; ok {
+				t.Fatal("removed key remained in assignments")
+			}
+			if !desiredParametersContain(cp.Spec.Desired, map[string]*string{"default.max_connections": nil}) {
+				t.Fatal("persisted removal does not match the submitted draft")
+			}
+			before := cp.Spec.Desired.DeepCopy()
+			if _, err := reconciler.Reconcile(context.Background(), request); err != nil {
+				t.Fatal(err)
+			}
+			if err := cli.Get(context.Background(), client.ObjectKeyFromObject(cp), cp); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(before, cp.Spec.Desired) {
+				t.Fatalf("repeat submission changed desired inputs: %#v", cp.Spec.Desired)
+			}
+		})
 	}
 }
 
@@ -2098,7 +2113,7 @@ var _ = Describe("ParameterView Controller", func() {
 			config, err := unstructured.LoadConfig(testparameters.MysqlConfigFile, cm.Data[testparameters.MysqlConfigFile], parametersv1alpha1.Ini)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect(config.Get("mysqld.gtid_mode")).Should(BeNil())
-			g.Expect(config.Get("mysqld.max_connections")).ShouldNot(BeNil())
+			g.Expect(config.Get("mysqld.server-id")).Should(Equal("1"))
 		})).Should(Succeed())
 	})
 

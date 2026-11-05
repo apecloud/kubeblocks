@@ -281,8 +281,9 @@ var _ = Describe("ComponentParameter Controller", func() {
 			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(comp), func(obj *appsv1.Component) {
 				obj.Spec.Replicas = 2
 			})).Should(Succeed())
-			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(comp), comp)).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, configKey, func(g Gomega, cm *corev1.ConfigMap) {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(comp), comp)).Should(Succeed())
+				g.Expect(comp.Spec.Replicas).Should(Equal(int32(2)))
 				g.Expect(cm.Annotations[constant.ParametersAppliedComponentGenerationKey]).Should(Equal(strconv.FormatInt(comp.Generation, 10)))
 				checkRemoval(g, cm)
 			})).Should(Succeed())

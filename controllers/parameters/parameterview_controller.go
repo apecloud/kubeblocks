@@ -864,7 +864,7 @@ func (r *ParameterViewReconciler) resolveDesiredParameterPatch(ctx context.Conte
 	mergedData, err := parameters.MergeAndValidateConfigs(baseData, []parameterscore.ParamPairs{{
 		Key:           view.Spec.FileName,
 		UpdatedParams: updatedParams,
-	}}, cfgCtx.paramsDefs, descs)
+	}}, nil, cfgCtx.paramsDefs, descs)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", parameterViewReasonSchemaValidationFailed, err)
 	}

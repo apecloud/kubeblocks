@@ -22,6 +22,7 @@ package parameters
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -300,7 +301,7 @@ func TestParameterViewReconcileRejectsUnsupportedContentType(t *testing.T) {
 	assertParameterViewConditionReason(t, view, parameterViewReasonUnsupportedContentType)
 }
 
-func TestParameterViewReconcileReappliesDraftWhenSourceDriftIsExpressible(t *testing.T) {
+func TestParameterViewReconcilePreservesStaleDraftEvenWhenDesiredContainsDiff(t *testing.T) {
 	reconciler, cli := newParameterViewTestReconciler(t, newParameterViewTestObjects(
 		"max_connections=2000\n",
 		&parametersv1alpha1.ParameterView{
@@ -329,6 +330,17 @@ func TestParameterViewReconcileReappliesDraftWhenSourceDriftIsExpressible(t *tes
 		},
 	)...)
 
+	compParam := &parametersv1alpha1.ComponentParameter{}
+	compParamKey := types.NamespacedName{Namespace: parameterViewNamespace, Name: componentParameterName}
+	if err := cli.Get(context.Background(), compParamKey, compParam); err != nil {
+		t.Fatalf("get component parameter failed: %v", err)
+	}
+	compParam.Spec.Desired = &parametersv1alpha1.ParameterInputs{Assignments: map[string]*string{"default.max_connections": ptr.To("1500")}}
+	if err := cli.Update(context.Background(), compParam); err != nil {
+		t.Fatalf("set existing desired parameters failed: %v", err)
+	}
+	desired := compParam.DeepCopy().Spec.Desired
+
 	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{
 		NamespacedName: types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName},
 	})
@@ -340,20 +352,24 @@ func TestParameterViewReconcileReappliesDraftWhenSourceDriftIsExpressible(t *tes
 	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName}, view); err != nil {
 		t.Fatalf("get view failed: %v", err)
 	}
-	if view.Status.Phase != parametersv1alpha1.ParameterViewApplyingPhase {
-		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewApplyingPhase, view.Status.Phase)
+	if view.Status.Phase != parametersv1alpha1.ParameterViewConflictPhase {
+		t.Fatalf("expected Conflict, got %q with message %q", view.Status.Phase, view.Status.Message)
 	}
-	assertParameterViewConditionReason(t, view, parameterViewReasonApplying)
-	assertParameterViewLastSubmission(t, view, fmt.Sprint(componentParameterGeneration), "max_connections=1500\n", map[string]*string{
-		"default.max_connections": ptr.To("1500"),
-	})
-
-	compParam := &parametersv1alpha1.ComponentParameter{}
-	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: componentParameterName}, compParam); err != nil {
+	assertParameterViewConditionReason(t, view, parameterViewReasonDraftOutdated)
+	if view.Spec.Content != (parametersv1alpha1.ParameterViewContent{Type: parametersv1alpha1.PlainTextParameterViewContentType, Text: "max_connections=1500\n"}) {
+		t.Fatalf("expected draft to remain unchanged, got %#v", view.Spec.Content)
+	}
+	if view.Status.Base != (parametersv1alpha1.ParameterViewRevision{Revision: "1", ContentHash: hashContent("max_connections=1000\n")}) {
+		t.Fatalf("expected original base to remain unchanged, got %#v", view.Status.Base)
+	}
+	if len(view.Status.Submissions) != 0 {
+		t.Fatalf("expected no stale draft submission, got %#v", view.Status.Submissions)
+	}
+	if err := cli.Get(context.Background(), compParamKey, compParam); err != nil {
 		t.Fatalf("get component parameter failed: %v", err)
 	}
-	if got := compParam.Spec.Desired.Assignments["default.max_connections"]; got == nil || *got != "1500" {
-		t.Fatalf("expected desired default.max_connections=1500, got %#v", got)
+	if !reflect.DeepEqual(compParam.Spec.Desired, desired) {
+		t.Fatalf("expected desired parameters to remain unchanged, got %#v", compParam.Spec.Desired)
 	}
 }
 
@@ -1094,7 +1110,7 @@ func TestParameterViewReconcileRefreshesLegacyConflictWhenRuntimeSemanticsMatch(
 	assertParameterViewConditionReason(t, view, parameterViewReasonResolved)
 }
 
-func TestParameterViewReconcileRetriesDraftReplayWhileInConflict(t *testing.T) {
+func TestParameterViewReconcilePreservesEditedDraftWhileInConflict(t *testing.T) {
 	reconciler, cli := newParameterViewTestReconciler(t, newParameterViewTestObjects(
 		"max_connections=1100\n",
 		&parametersv1alpha1.ParameterView{
@@ -1129,6 +1145,13 @@ func TestParameterViewReconcileRetriesDraftReplayWhileInConflict(t *testing.T) {
 		},
 	)...)
 
+	compParam := &parametersv1alpha1.ComponentParameter{}
+	compParamKey := types.NamespacedName{Namespace: parameterViewNamespace, Name: componentParameterName}
+	if err := cli.Get(context.Background(), compParamKey, compParam); err != nil {
+		t.Fatalf("get component parameter failed: %v", err)
+	}
+	desired := compParam.DeepCopy().Spec.Desired
+
 	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{
 		NamespacedName: types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName},
 	})
@@ -1140,29 +1163,24 @@ func TestParameterViewReconcileRetriesDraftReplayWhileInConflict(t *testing.T) {
 	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName}, view); err != nil {
 		t.Fatalf("get view failed: %v", err)
 	}
-	if view.Status.Phase != parametersv1alpha1.ParameterViewApplyingPhase {
-		t.Fatalf("expected phase %q, got %q with message %q", parametersv1alpha1.ParameterViewApplyingPhase, view.Status.Phase, view.Status.Message)
+	if view.Status.Phase != parametersv1alpha1.ParameterViewConflictPhase {
+		t.Fatalf("expected Conflict, got %q with message %q", view.Status.Phase, view.Status.Message)
 	}
-	assertParameterViewLastSubmission(t, view, fmt.Sprint(componentParameterGeneration), "max_connections=1200\n", map[string]*string{
-		"default.max_connections": ptr.To("1200"),
-	})
-	assertParameterViewConditionReason(t, view, parameterViewReasonApplying)
-	if view.Status.Base.Revision != fmt.Sprint(componentParameterGeneration) {
-		t.Fatalf("expected base revision %q, got %q", fmt.Sprint(componentParameterGeneration), view.Status.Base.Revision)
+	assertParameterViewConditionReason(t, view, parameterViewReasonDraftOutdated)
+	if view.Spec.Content != (parametersv1alpha1.ParameterViewContent{Type: parametersv1alpha1.PlainTextParameterViewContentType, Text: "max_connections=1200\n"}) {
+		t.Fatalf("expected draft to remain unchanged, got %#v", view.Spec.Content)
 	}
-	if view.Status.Base.ContentHash != hashContent("max_connections=1100\n") {
-		t.Fatalf("expected base content hash %q, got %q", hashContent("max_connections=1100\n"), view.Status.Base.ContentHash)
+	if view.Status.Base != (parametersv1alpha1.ParameterViewRevision{Revision: fmt.Sprint(componentParameterGeneration - 1), ContentHash: hashContent("max_connections=1000\n")}) {
+		t.Fatalf("expected original base to remain unchanged, got %#v", view.Status.Base)
 	}
-
-	compParam := &parametersv1alpha1.ComponentParameter{}
-	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: componentParameterName}, compParam); err != nil {
+	if len(view.Status.Submissions) != 0 {
+		t.Fatalf("expected no stale draft submission, got %#v", view.Status.Submissions)
+	}
+	if err := cli.Get(context.Background(), compParamKey, compParam); err != nil {
 		t.Fatalf("get component parameter failed: %v", err)
 	}
-	if compParam.Spec.Desired == nil || compParam.Spec.Desired.Assignments == nil {
-		t.Fatalf("expected desired parameters to be written")
-	}
-	if got := compParam.Spec.Desired.Assignments["default.max_connections"]; got == nil || *got != "1200" {
-		t.Fatalf("expected desired default.max_connections=1200, got %#v", got)
+	if !reflect.DeepEqual(compParam.Spec.Desired, desired) {
+		t.Fatalf("expected desired parameters to remain unchanged, got %#v", compParam.Spec.Desired)
 	}
 }
 

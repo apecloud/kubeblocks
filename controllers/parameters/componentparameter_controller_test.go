@@ -41,10 +41,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
+	"github.com/apecloud/kubeblocks/pkg/parameters/unstructured"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/parameters/util"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
-	"github.com/apecloud/kubeblocks/pkg/unstructured"
 )
 
 var _ = Describe("ComponentParameter Controller", func() {

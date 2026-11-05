@@ -28,7 +28,7 @@ import (
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/parameters/util"
-	"github.com/apecloud/kubeblocks/pkg/unstructured"
+	"github.com/apecloud/kubeblocks/pkg/parameters/unstructured"
 )
 
 // CreateConfigPatch creates a patch for configuration files with different version.

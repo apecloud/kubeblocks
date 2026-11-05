@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/unstructured"
+	"github.com/apecloud/kubeblocks/pkg/parameters/unstructured"
 )
 
 func TestDoMergeRemovesParameters(t *testing.T) {

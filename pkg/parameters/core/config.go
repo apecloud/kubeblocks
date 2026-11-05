@@ -29,7 +29,7 @@ import (
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/parameters/util"
-	"github.com/apecloud/kubeblocks/pkg/unstructured"
+	"github.com/apecloud/kubeblocks/pkg/parameters/unstructured"
 )
 
 type ConfigLoaderProvider func(option CfgOption) (*cfgWrapper, error)

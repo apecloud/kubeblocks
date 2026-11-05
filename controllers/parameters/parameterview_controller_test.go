@@ -46,9 +46,9 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
 	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
+	"github.com/apecloud/kubeblocks/pkg/parameters/unstructured"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
-	"github.com/apecloud/kubeblocks/pkg/unstructured"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 

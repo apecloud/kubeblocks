@@ -118,7 +118,7 @@ func isHostNetworkEnabled(ctx context.Context, cli client.Reader, synthesizedCom
 	if err := cli.Get(ctx, compKey, comp, inDataContext()); err != nil {
 		return false, err
 	}
-	if !hasHostNetworkEnabled(comp.Annotations, compName) {
+	if !(comp.Spec.Network != nil && comp.Spec.Network.HostNetwork) && !hasHostNetworkEnabled(comp.Annotations, compName) {
 		return false, nil
 	}
 

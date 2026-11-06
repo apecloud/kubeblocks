@@ -48,6 +48,7 @@ type SynthesizedComponent struct {
 	PVCRetentionPolicy               kbappsv1.PersistentVolumeClaimRetentionPolicy
 	FileTemplates                    []SynthesizedFileTemplate
 	LogConfigs                       []kbappsv1.LogConfig                   `json:"logConfigs,omitempty"`
+	Network                          *kbappsv1.ComponentNetwork             `json:"network,omitempty"`
 	TLSConfig                        *kbappsv1.TLSConfig                    `json:"tlsConfig"`
 	ServiceReferences                map[string]*kbappsv1.ServiceDescriptor `json:"serviceReferences,omitempty"`
 	Labels                           map[string]string                      `json:"labels,omitempty"`

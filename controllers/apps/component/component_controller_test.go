@@ -1857,6 +1857,35 @@ var _ = Describe("Component Controller", func() {
 			cleanEnv()
 		})
 
+		It("persists network creation, changes and removal in InstanceSet", func() {
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compDefObj), func(definition *kbappsv1.ComponentDefinition) {
+				definition.Spec.Runtime.DNSPolicy = corev1.DNSDefault
+			})()).Should(Succeed())
+			network := &kbappsv1.ComponentNetwork{DNSPolicy: ptr.To(corev1.DNSNone),
+				HostAliases: []corev1.HostAlias{{IP: "10.0.0.1", Hostnames: []string{"custom"}}},
+				DNSConfig:   &corev1.PodDNSConfig{Nameservers: []string{"10.0.0.2"}}}
+			createCompObj(defaultCompName, compDefObj.Name, func(f *testapps.MockComponentFactory) {
+				f.GetObject().Spec.Network = network
+			})
+			checkNetwork := func(policy corev1.DNSPolicy, aliases []corev1.HostAlias, config *corev1.PodDNSConfig) {
+				Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, its *workloads.InstanceSet) {
+					g.Expect(its.Spec.Template.Spec.HostNetwork).Should(BeFalse())
+					g.Expect(its.Spec.Template.Spec.HostAliases).Should(Equal(aliases))
+					g.Expect(its.Spec.Template.Spec.DNSPolicy).Should(Equal(policy))
+					g.Expect(its.Spec.Template.Spec.DNSConfig).Should(Equal(config))
+				})).Should(Succeed())
+			}
+			checkNetwork(corev1.DNSNone, network.HostAliases, network.DNSConfig)
+			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+				comp.Spec.Network = &kbappsv1.ComponentNetwork{}
+			})()).Should(Succeed())
+			checkNetwork(corev1.DNSClusterFirst, nil, nil)
+			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+				comp.Spec.Network = nil
+			})()).Should(Succeed())
+			checkNetwork(corev1.DNSDefault, nil, nil)
+		})
+
 		It("component finalizers and labels", func() {
 			testCompFinalizerNLabel(defaultCompName, compDefObj.Name)
 		})

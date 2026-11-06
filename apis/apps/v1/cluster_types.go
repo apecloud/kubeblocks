@@ -390,6 +390,12 @@ type ClusterComponentSpec struct {
 	// +optional
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
+	// Specifies network settings for the Component. When set, these settings replace the
+	// hostNetwork, hostAliases, dnsPolicy, and dnsConfig fields in the ComponentDefinition runtime.
+	//
+	// +optional
+	Network *ComponentNetwork `json:"network,omitempty"`
+
 	// Overrides services defined in referenced ComponentDefinition.
 	//
 	// +optional

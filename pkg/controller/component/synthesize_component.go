@@ -106,6 +106,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		Replicas:                         comp.Spec.Replicas,
 		Resources:                        comp.Spec.Resources,
 		TLSConfig:                        comp.Spec.TLSConfig,
+		Network:                          comp.Spec.Network,
 		Instances:                        comp.Spec.Instances,
 		InstanceImages:                   make(map[string]map[string]string),
 		OfflineInstances:                 comp.Spec.OfflineInstances,
@@ -118,6 +119,8 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		UpdateStrategy:                   compDef.Spec.UpdateStrategy,
 		InstanceUpdateStrategy:           comp.Spec.InstanceUpdateStrategy,
 	}
+
+	mergeNetworkSetting(synthesizeComp, comp)
 
 	// build scheduling policy for workload
 	scheduling.ApplySchedulingPolicyToPodSpec(synthesizeComp.PodSpec, comp.Spec.SchedulingPolicy)
@@ -510,4 +513,21 @@ func getPodUpgradePolicy(comp *appsv1.Component, compDef *appsv1.ComponentDefini
 		return *policy
 	}
 	return appsv1.PreferInPlacePodUpdatePolicyType // default
+}
+
+func mergeNetworkSetting(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) {
+	if comp.Spec.Network != nil {
+		synthesizedComp.PodSpec.HostNetwork = comp.Spec.Network.HostNetwork
+		synthesizedComp.PodSpec.HostAliases = comp.Spec.Network.HostAliases
+		if comp.Spec.Network.DNSPolicy == nil {
+			if synthesizedComp.PodSpec.HostNetwork {
+				synthesizedComp.PodSpec.DNSPolicy = corev1.DNSClusterFirstWithHostNet
+			} else {
+				synthesizedComp.PodSpec.DNSPolicy = corev1.DNSClusterFirst
+			}
+		} else {
+			synthesizedComp.PodSpec.DNSPolicy = *comp.Spec.Network.DNSPolicy
+		}
+		synthesizedComp.PodSpec.DNSConfig = comp.Spec.Network.DNSConfig
+	}
 }

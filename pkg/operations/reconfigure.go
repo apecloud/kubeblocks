@@ -33,6 +33,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
 	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
@@ -140,18 +141,12 @@ func (r *reconfigureAction) applyReconfigureToParameters(reqCtx intctrlutil.Requ
 	if err != nil {
 		return err
 	}
-	patch := client.MergeFrom(compParam.DeepCopy())
-	if compParam.Spec.Desired == nil {
-		compParam.Spec.Desired = &parametersv1alpha1.ParameterInputs{}
+	patch := client.MergeFromWithOptions(compParam.DeepCopy(), client.MergeFromWithOptimisticLock{})
+	assignments := make(map[string]*string, len(reconfigure.Parameters))
+	for _, param := range reconfigure.Parameters {
+		assignments[param.Key] = param.Value
 	}
-	if len(reconfigure.Parameters) != 0 {
-		if compParam.Spec.Desired.Assignments == nil {
-			compParam.Spec.Desired.Assignments = map[string]*string{}
-		}
-		for _, param := range reconfigure.Parameters {
-			compParam.Spec.Desired.Assignments[param.Key] = param.Value
-		}
-	}
+	compParam.Spec.Desired = parameters.MergeManagedParameterInputs(compParam.Spec.Desired, assignments)
 	return cli.Patch(reqCtx.Ctx, compParam, patch)
 }
 

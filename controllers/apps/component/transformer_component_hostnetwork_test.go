@@ -25,6 +25,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
@@ -131,6 +132,25 @@ var _ = Describe("component hostnetwork transformer test", func() {
 	})
 
 	AfterEach(func() {})
+
+	DescribeTable("managed host network preserves explicit DNS policy", func(enabled bool, policy *corev1.DNSPolicy, expected corev1.DNSPolicy) {
+		transCtx.SynthesizeComponent.HostNetwork.ContainerPorts = nil
+		transCtx.SynthesizeComponent.Network = &appsv1.ComponentNetwork{HostNetwork: enabled, DNSPolicy: policy}
+		transCtx.Component.Spec.Network = transCtx.SynthesizeComponent.Network
+		transCtx.SynthesizeComponent.PodSpec.HostNetwork = enabled
+		transCtx.SynthesizeComponent.Annotations = transCtx.Component.Annotations
+		if enabled {
+			transCtx.SynthesizeComponent.Annotations = nil
+		}
+		if policy != nil {
+			transCtx.SynthesizeComponent.PodSpec.DNSPolicy = *policy
+		}
+		Expect((&componentHostNetworkTransformer{}).Transform(transCtx, dag)).Should(Succeed())
+		Expect(transCtx.SynthesizeComponent.PodSpec.HostNetwork).Should(BeTrue())
+		Expect(transCtx.SynthesizeComponent.PodSpec.DNSPolicy).Should(Equal(expected))
+	}, Entry("field enablement", true, ptr.To(corev1.DNSDefault), corev1.DNSDefault),
+		Entry("annotation enables host network despite false field", false, ptr.To(corev1.DNSNone), corev1.DNSNone),
+		Entry("annotation defaults DNS", false, nil, corev1.DNSClusterFirstWithHostNet))
 
 	Context("allocate host network success ", func() {
 		It("disabled", func() {

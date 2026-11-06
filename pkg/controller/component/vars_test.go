@@ -294,6 +294,29 @@ var _ = Describe("vars", func() {
 			})
 		})
 
+		It("resolves another component's host-network port enabled by network settings", func() {
+			synthesizedComp.Comp2CompDefs = map[string]string{"other": "other-definition"}
+			definition := &appsv1.ComponentDefinition{ObjectMeta: metav1.ObjectMeta{Name: "other-definition"},
+				Spec: appsv1.ComponentDefinitionSpec{HostNetwork: &appsv1.HostNetwork{}}}
+			other := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{Name: "test-cluster-other", Namespace: synthesizedComp.Namespace},
+				Spec: appsv1.ComponentSpec{CompDef: definition.Name, Network: &appsv1.ComponentNetwork{HostNetwork: true}}}
+			reader := &mockReader{cli: testCtx.Cli, objs: []client.Object{other, definition}}
+			vars := []appsv1.EnvVar{{Name: "other-port", ValueFrom: &appsv1.VarSource{HostNetworkVarRef: &appsv1.HostNetworkVarSelector{
+				ClusterObjectReference: appsv1.ClusterObjectReference{CompDef: definition.Name, Optional: required()},
+				HostNetworkVars: appsv1.HostNetworkVars{Container: &appsv1.ContainerVars{Name: "default",
+					Port: &appsv1.NamedVar{Name: "default", Option: &appsv1.VarRequired}}},
+			}}}}
+			portCtx := mockHostNetworkPort(ctx, reader, synthesizedComp.ClusterName, "other", "default", "default", 30002)
+			templateVars, envVars, err := ResolveTemplateNEnvVars(portCtx, reader, synthesizedComp, vars)
+			Expect(err).Should(Succeed())
+			Expect(templateVars).Should(HaveKeyWithValue("other-port", "30002"))
+			checkEnvVarWithValue(envVars, "other-port", "30002")
+			definition.Spec.HostNetwork = nil
+			_, _, err = ResolveTemplateNEnvVars(portCtx, reader, synthesizedComp, vars)
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("has no HostNetwork"))
+		})
+
 		It("host-network vars", func() {
 			vars := []appsv1.EnvVar{
 				{

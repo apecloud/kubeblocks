@@ -55,6 +55,34 @@ var _ = Describe("synthesized component", func() {
 		cleanEnv()
 	})
 
+	DescribeTable("network settings replace Runtime as a whole", func(network *appsv1.ComponentNetwork, expected corev1.PodSpec) {
+		definition := &appsv1.ComponentDefinition{Spec: appsv1.ComponentDefinitionSpec{Runtime: corev1.PodSpec{
+			HostNetwork: true, HostAliases: []corev1.HostAlias{{IP: "10.0.0.1", Hostnames: []string{"runtime"}}},
+			DNSPolicy: corev1.DNSDefault, DNSConfig: &corev1.PodDNSConfig{Nameservers: []string{"10.0.0.2"}},
+		}}}
+		component := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{Name: "cluster-comp",
+			Labels:      map[string]string{constant.AppInstanceLabelKey: "cluster"},
+			Annotations: map[string]string{constant.KBAppClusterUIDKey: "uid"}}, Spec: appsv1.ComponentSpec{Network: network}}
+		synthesized, err := BuildSynthesizedComponent(ctx, nil, definition, component)
+		Expect(err).Should(Succeed())
+		Expect(synthesized.PodSpec.HostNetwork).Should(Equal(expected.HostNetwork))
+		Expect(synthesized.PodSpec.HostAliases).Should(Equal(expected.HostAliases))
+		Expect(synthesized.PodSpec.DNSPolicy).Should(Equal(expected.DNSPolicy))
+		Expect(synthesized.PodSpec.DNSConfig).Should(Equal(expected.DNSConfig))
+		Expect(IsHostNetworkEnabled(synthesized)).Should(BeFalse())
+	},
+		Entry("nil inherits Runtime", nil, corev1.PodSpec{HostNetwork: true,
+			HostAliases: []corev1.HostAlias{{IP: "10.0.0.1", Hostnames: []string{"runtime"}}},
+			DNSPolicy:   corev1.DNSDefault, DNSConfig: &corev1.PodDNSConfig{Nameservers: []string{"10.0.0.2"}}}),
+		Entry("empty replaces omitted fields", &appsv1.ComponentNetwork{}, corev1.PodSpec{DNSPolicy: corev1.DNSClusterFirst}),
+		Entry("host network defaults DNS", &appsv1.ComponentNetwork{HostNetwork: true}, corev1.PodSpec{HostNetwork: true, DNSPolicy: corev1.DNSClusterFirstWithHostNet}),
+		Entry("aliases and explicit DNS need no managed host-network capability", &appsv1.ComponentNetwork{
+			HostAliases: []corev1.HostAlias{{IP: "10.0.0.3", Hostnames: []string{"custom"}}}, DNSPolicy: ptr.To(corev1.DNSNone),
+			DNSConfig: &corev1.PodDNSConfig{Nameservers: []string{"10.0.0.4"}}}, corev1.PodSpec{
+			HostAliases: []corev1.HostAlias{{IP: "10.0.0.3", Hostnames: []string{"custom"}}}, DNSPolicy: corev1.DNSNone,
+			DNSConfig: &corev1.PodDNSConfig{Nameservers: []string{"10.0.0.4"}}}),
+	)
+
 	Context("file templates", func() {
 		BeforeEach(func() {
 			compDef = &appsv1.ComponentDefinition{

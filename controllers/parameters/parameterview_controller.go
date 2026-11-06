@@ -390,22 +390,6 @@ func syncBaseRevision(view *parametersv1alpha1.ParameterView, source *parameterV
 	return changed
 }
 
-func cloneParameterValueMap(src map[string]*string) map[string]*string {
-	if len(src) == 0 {
-		return nil
-	}
-	dst := make(map[string]*string, len(src))
-	for key, value := range src {
-		if value == nil {
-			dst[key] = nil
-			continue
-		}
-		copied := *value
-		dst[key] = &copied
-	}
-	return dst
-}
-
 func equalParameterValueMap(a, b map[string]*string) bool {
 	if len(a) != len(b) {
 		return false
@@ -443,16 +427,18 @@ func updateBaseAndLatestStatus(source *parameterViewSource) func(*parametersv1al
 	}
 }
 
-func updateSubmissionStatus(revision, content string, parameters map[string]*string) func(*parametersv1alpha1.ParameterViewStatus) {
+func updateSubmissionStatus(revision, content string, desired map[string]*string) func(*parametersv1alpha1.ParameterViewStatus) {
 	return func(status *parametersv1alpha1.ParameterViewStatus) {
 		now := metav1.Now()
+		inputs := parameters.MergeManagedParameterInputs(nil, desired)
 		submission := parametersv1alpha1.ParameterViewSubmission{
 			Revision: parametersv1alpha1.ParameterViewRevision{
 				Revision:    revision,
 				ContentHash: hashContent(content),
 			},
 			SubmittedAt: &now,
-			Assignments: cloneParameterValueMap(parameters),
+			Assignments: inputs.Assignments,
+			Updates:     inputs.Updates,
 			Result: parametersv1alpha1.ParameterViewSubmissionResult{
 				Phase:     parametersv1alpha1.ParameterViewSubmissionProcessingPhase,
 				Reason:    parameterViewSubmissionReasonProcessing,
@@ -487,9 +473,7 @@ func prependSubmission(existing []parametersv1alpha1.ParameterViewSubmission, su
 	}
 	result = append(result, submission)
 	for _, item := range existing {
-		if item.Revision.Revision == submission.Revision.Revision &&
-			item.Revision.ContentHash == submission.Revision.ContentHash &&
-			equalParameterValueMap(item.Assignments, submission.Assignments) {
+		if equalSubmission(item, submission) {
 			continue
 		}
 		result = append(result, item)
@@ -500,13 +484,23 @@ func prependSubmission(existing []parametersv1alpha1.ParameterViewSubmission, su
 func findSubmission(existing []parametersv1alpha1.ParameterViewSubmission, target parametersv1alpha1.ParameterViewSubmission) *parametersv1alpha1.ParameterViewSubmission {
 	for i := range existing {
 		item := &existing[i]
-		if item.Revision.Revision == target.Revision.Revision &&
-			item.Revision.ContentHash == target.Revision.ContentHash &&
-			equalParameterValueMap(item.Assignments, target.Assignments) {
+		if equalSubmission(*item, target) {
 			return item
 		}
 	}
 	return nil
+}
+
+func equalSubmission(a, b parametersv1alpha1.ParameterViewSubmission) bool {
+	if a.Revision != b.Revision {
+		return false
+	}
+	aValues, err := normalizeManagedParameterInputs(&parametersv1alpha1.ParameterInputs{Assignments: a.Assignments, Updates: a.Updates})
+	if err != nil {
+		return false
+	}
+	bValues, err := normalizeManagedParameterInputs(&parametersv1alpha1.ParameterInputs{Assignments: b.Assignments, Updates: b.Updates})
+	return err == nil && equalParameterValueMap(aValues, bValues)
 }
 
 func compactSubmissions(submissions []parametersv1alpha1.ParameterViewSubmission) []parametersv1alpha1.ParameterViewSubmission {

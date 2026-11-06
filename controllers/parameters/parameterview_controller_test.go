@@ -22,9 +22,11 @@ package parameters
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -32,6 +34,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apiunstructured "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -40,6 +43,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/envtest"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
@@ -2187,18 +2191,14 @@ var _ = Describe("ParameterView Controller", func() {
 	AfterEach(cleanEnv)
 
 	It("resolves helper state for parameter value maps and failure messages", func() {
-		By("cloning parameter value maps without sharing value pointers")
-		Expect(cloneParameterValueMap(nil)).Should(BeNil())
 		source := map[string]*string{
 			"keep":   ptr.To("1"),
 			"delete": nil,
 		}
-		cloned := cloneParameterValueMap(source)
-		Expect(cloned).Should(Equal(source))
-		Expect(cloned["keep"]).ShouldNot(BeIdenticalTo(source["keep"]))
+		equalValues := map[string]*string{"keep": ptr.To("1"), "delete": nil}
 
 		By("comparing desired parameter maps with nil-aware semantics")
-		Expect(equalParameterValueMap(source, cloned)).Should(BeTrue())
+		Expect(equalParameterValueMap(source, equalValues)).Should(BeTrue())
 		Expect(equalParameterValueMap(source, map[string]*string{"keep": ptr.To("1")})).Should(BeFalse())
 		Expect(equalParameterValueMap(source, map[string]*string{"keep": ptr.To("2"), "delete": nil})).Should(BeFalse())
 		Expect(equalParameterValueMap(source, map[string]*string{"keep": nil, "delete": nil})).Should(BeFalse())
@@ -2207,7 +2207,7 @@ var _ = Describe("ParameterView Controller", func() {
 		Expect(desiredParametersContain(nil, source)).Should(BeFalse())
 		Expect(desiredParametersContain(&parametersv1alpha1.ParameterInputs{}, source)).Should(BeFalse())
 		Expect(desiredParametersContain(&parametersv1alpha1.ParameterInputs{Assignments: source}, nil)).Should(BeFalse())
-		Expect(desiredParametersContain(&parametersv1alpha1.ParameterInputs{Assignments: source}, cloned)).Should(BeTrue())
+		Expect(desiredParametersContain(&parametersv1alpha1.ParameterInputs{Assignments: source}, equalValues)).Should(BeTrue())
 		Expect(desiredParametersContain(&parametersv1alpha1.ParameterInputs{Assignments: source}, map[string]*string{"keep": ptr.To("2")})).Should(BeFalse())
 		Expect(desiredParametersContain(&parametersv1alpha1.ParameterInputs{Assignments: source}, map[string]*string{"missing": ptr.To("1")})).Should(BeFalse())
 
@@ -2600,3 +2600,300 @@ var _ = Describe("ParameterView Controller", func() {
 		})).Should(Succeed())
 	})
 })
+
+func TestParameterViewSubmissionReplayPreservesRemovalIdentity(t *testing.T) {
+	value := "0"
+	desired := map[string]*string{
+		"default.sync_binlog":     &value,
+		"default.max_connections": nil,
+		"default.read_only":       nil,
+	}
+	status := &parametersv1alpha1.ParameterViewStatus{}
+	submit := updateSubmissionStatus("1", "sync_binlog=0\n", desired)
+	submit(status)
+	originalTime := metav1.NewTime(time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC))
+	originalResult := status.Submissions[0].Result
+	originalResult.UpdatedAt = &originalTime
+	status.Submissions[0].SubmittedAt = &originalTime
+	status.Submissions[0].Result = originalResult
+	updates := status.Submissions[0].Updates
+	updates[0], updates[1] = updates[1], updates[0]
+
+	submit(status)
+	if len(status.Submissions) != 1 {
+		t.Fatalf("reordered removals created duplicate history: %#v", status.Submissions)
+	}
+	got := status.Submissions[0]
+	if !got.SubmittedAt.Equal(&originalTime) || !reflect.DeepEqual(got.Result, originalResult) {
+		t.Fatalf("reordered removals changed submission time/result: %#v", got)
+	}
+	wantUpdates := []parametersv1alpha1.ParameterUpdate{
+		{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "default.max_connections"},
+		{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "default.read_only"},
+	}
+	if !reflect.DeepEqual(got.Updates, wantUpdates) {
+		t.Fatalf("replay did not retain canonical removals: %#v", got.Updates)
+	}
+
+	delete(desired, "default.read_only")
+	submit(status)
+	if len(status.Submissions) != 2 {
+		t.Fatalf("different removal keys did not create a distinct submission: %#v", status.Submissions)
+	}
+}
+
+func TestParameterViewSubmissionReplayRespectsUpdateOrder(t *testing.T) {
+	value := "0"
+	status := &parametersv1alpha1.ParameterViewStatus{}
+	submit := updateSubmissionStatus("1", "sync_binlog=0\n", map[string]*string{
+		"default.sync_binlog":     &value,
+		"default.max_connections": nil,
+	})
+	submit(status)
+	originalTime := metav1.NewTime(time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC))
+	originalResult := status.Submissions[0].Result
+	originalResult.UpdatedAt = &originalTime
+	status.Submissions[0].SubmittedAt = &originalTime
+	status.Submissions[0].Result = originalResult
+	status.Submissions[0].Assignments = nil
+	status.Submissions[0].Updates = []parametersv1alpha1.ParameterUpdate{
+		{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "default.sync_binlog"},
+		{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "default.max_connections"},
+		{Type: parametersv1alpha1.ParameterUpdateSet, Key: "default.sync_binlog", Value: &value},
+	}
+	submit(status)
+	if len(status.Submissions) != 1 {
+		t.Fatalf("equivalent ordered updates created duplicate history: %#v", status.Submissions)
+	}
+	if !status.Submissions[0].SubmittedAt.Equal(&originalTime) || !reflect.DeepEqual(status.Submissions[0].Result, originalResult) {
+		t.Fatalf("equivalent ordered updates changed submission time/result: %#v", status.Submissions[0])
+	}
+	status.Submissions[0].Assignments = nil
+	status.Submissions[0].Updates = []parametersv1alpha1.ParameterUpdate{
+		{Type: parametersv1alpha1.ParameterUpdateSet, Key: "default.sync_binlog", Value: &value},
+		{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "default.max_connections"},
+		{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "default.sync_binlog"},
+	}
+	submit(status)
+	if len(status.Submissions) != 2 {
+		t.Fatalf("updates ending in Remove did not create a distinct submission: %#v", status.Submissions)
+	}
+}
+
+func TestParameterViewSubmissionHistoryAPI(t *testing.T) {
+	environment := &envtest.Environment{
+		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
+		ErrorIfCRDPathMissing: true,
+	}
+	config, err := environment.Start()
+	if err != nil {
+		t.Fatalf("start API server: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := environment.Stop(); err != nil {
+			t.Errorf("stop API server: %v", err)
+		}
+	})
+	scheme := runtime.NewScheme()
+	for _, add := range []func(*runtime.Scheme) error{clientgoscheme.AddToScheme, appsv1.AddToScheme, parametersv1alpha1.AddToScheme} {
+		if err := add(scheme); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cli, err := client.New(config, client.Options{Scheme: scheme})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reconciler := &ParameterViewReconciler{Client: cli, Scheme: scheme}
+	ctx := context.Background()
+	const original = "max_connections=1000\nsync_binlog=1\n"
+	for _, tc := range []struct {
+		name              string
+		edited            string
+		removal           bool
+		explicitSetUpdate bool
+	}{
+		{name: "mixed-set-remove", edited: "sync_binlog=0\n", removal: true},
+		{name: "legacy-set-only", edited: "max_connections=1500\nsync_binlog=1\n"},
+		{name: "explicit-set-update", edited: "max_connections=1500\nsync_binlog=1\n", explicitSetUpdate: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			namespace := "history-" + tc.name
+			if err := cli.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}); err != nil {
+				t.Fatal(err)
+			}
+			view := &parametersv1alpha1.ParameterView{
+				ObjectMeta: metav1.ObjectMeta{Name: parameterViewName, Namespace: namespace},
+				Spec: parametersv1alpha1.ParameterViewSpec{
+					ParameterRef: corev1.LocalObjectReference{Name: componentParameterName},
+					TemplateName: templateName,
+					FileName:     fileName,
+				},
+			}
+			objects := newParameterViewTestObjects(original, view)
+			for _, resource := range objects {
+				obj := resource.(client.Object)
+				if obj.GetNamespace() != "" {
+					obj.SetNamespace(namespace)
+				}
+				switch obj := obj.(type) {
+				case *parametersv1alpha1.ComponentParameter:
+					obj.Generation = 0
+					obj.Spec.ConfigItemDetails[0].ConfigSpec.Namespace = namespace
+				case *appsv1.Cluster:
+					obj.Spec.TerminationPolicy = appsv1.Delete
+				case *appsv1.Component:
+					obj.Spec.CompDef += "-" + tc.name
+					obj.Spec.Replicas = 1
+					obj.Spec.TerminationPolicy = appsv1.Delete
+				case *appsv1.ComponentDefinition:
+					obj.Name += "-" + tc.name
+					obj.Spec.Configs[0].Namespace = namespace
+					obj.Spec.Runtime.Containers = []corev1.Container{{Name: "mysql", Image: "mysql:8.0"}}
+				case *parametersv1alpha1.ParametersDefinition:
+					obj.Name += "-" + tc.name
+					obj.Spec.ComponentDef += "-" + tc.name
+				case *corev1.ConfigMap:
+					if obj.Name != templateConfigMapName {
+						obj.Annotations = map[string]string{constant.ConfigurationRevision: "1"}
+					}
+				}
+				if err := cli.Create(ctx, obj); err != nil {
+					t.Fatalf("create %T %s: %v", obj, obj.GetName(), err)
+				}
+				switch obj := obj.(type) {
+				case *appsv1.ComponentDefinition:
+					obj.Status.Phase = appsv1.AvailablePhase
+					if err := cli.Status().Update(ctx, obj); err != nil {
+						t.Fatal(err)
+					}
+				case *parametersv1alpha1.ParametersDefinition:
+					obj.Status.Phase = parametersv1alpha1.PDAvailablePhase
+					if err := cli.Status().Update(ctx, obj); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			request := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(view)}
+			reconcile := func() {
+				t.Helper()
+				if _, err := reconciler.Reconcile(ctx, request); err != nil {
+					t.Fatalf("reconcile: %v", err)
+				}
+				if err := cli.Get(ctx, request.NamespacedName, view); err != nil {
+					t.Fatal(err)
+				}
+			}
+			reconcile()
+			if view.Status.Phase != parametersv1alpha1.ParameterViewSyncedPhase || view.Spec.Content.Text != original {
+				t.Fatalf("view did not initialize from effective config: %#v", view)
+			}
+			view.Spec.Content.Text = tc.edited
+			if err := cli.Update(ctx, view); err != nil {
+				t.Fatal(err)
+			}
+			reconcile()
+			if view.Status.Phase != parametersv1alpha1.ParameterViewApplyingPhase || len(view.Status.Submissions) != 1 {
+				t.Fatalf("expected one pending submission: %#v", view.Status)
+			}
+			if view.Status.Submissions[0].Result.Phase != parametersv1alpha1.ParameterViewSubmissionProcessingPhase {
+				t.Fatalf("expected pending execution result: %#v", view.Status.Submissions[0].Result)
+			}
+			cp := &parametersv1alpha1.ComponentParameter{}
+			if err := cli.Get(ctx, client.ObjectKey{Namespace: namespace, Name: componentParameterName}, cp); err != nil {
+				t.Fatal(err)
+			}
+			wantAssignments := map[string]*string{}
+			var wantUpdates []parametersv1alpha1.ParameterUpdate
+			if tc.removal {
+				value := "0"
+				wantAssignments["default.sync_binlog"] = &value
+				wantUpdates = []parametersv1alpha1.ParameterUpdate{{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "default.max_connections"}}
+			} else {
+				value := "1500"
+				wantAssignments["default.max_connections"] = &value
+			}
+			if cp.Spec.Desired == nil || !reflect.DeepEqual(cp.Spec.Desired.Assignments, wantAssignments) || !reflect.DeepEqual(cp.Spec.Desired.Updates, wantUpdates) {
+				t.Fatalf("desired operations were not persisted: %#v", cp.Spec.Desired)
+			}
+			persisted := &apiunstructured.Unstructured{}
+			persisted.SetGroupVersionKind(parametersv1alpha1.GroupVersion.WithKind("ParameterView"))
+			if err := cli.Get(ctx, request.NamespacedName, persisted); err != nil {
+				t.Fatal(err)
+			}
+			submissions, _, err := apiunstructured.NestedSlice(persisted.Object, "status", "submissions")
+			if err != nil || len(submissions) != 1 {
+				t.Fatalf("read persisted submissions: %v: %#v", err, submissions)
+			}
+			submission := submissions[0].(map[string]interface{})
+			assignments := submission["assignments"].(map[string]interface{})
+			if tc.removal {
+				want := []interface{}{map[string]interface{}{"type": "Remove", "key": "default.max_connections"}}
+				if !reflect.DeepEqual(submission["updates"], want) {
+					t.Errorf("persisted history lost removal operation: updates = %#v, want %#v", submission["updates"], want)
+				}
+				if _, found := assignments["default.max_connections"]; found {
+					t.Errorf("removed key remained in history assignments: %#v", assignments)
+				}
+			} else if _, found := submission["updates"]; found {
+				t.Fatalf("legacy Set-only submission unexpectedly has updates: %#v", submission)
+			}
+			for key, value := range wantAssignments {
+				if assignments[key] != *value {
+					t.Errorf("history assignment %s = %#v, want %s", key, assignments[key], *value)
+				}
+			}
+			if tc.explicitSetUpdate {
+				delete(submission, "assignments")
+				submission["updates"] = []interface{}{map[string]interface{}{
+					"type": "Set", "key": "default.max_connections", "value": "1500",
+				}}
+			}
+			submittedAt := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC).Format(time.RFC3339)
+			updatedAt := time.Date(2025, 1, 2, 3, 5, 6, 0, time.UTC).Format(time.RFC3339)
+			submission["submittedAt"] = submittedAt
+			result := submission["result"].(map[string]interface{})
+			result["updatedAt"] = updatedAt
+			wantResult := runtime.DeepCopyJSONValue(result)
+			if err := apiunstructured.SetNestedSlice(persisted.Object, submissions, "status", "submissions"); err != nil {
+				t.Fatal(err)
+			}
+			if err := cli.Status().Update(ctx, persisted); err != nil {
+				t.Fatal(err)
+			}
+			if err := cli.Get(ctx, request.NamespacedName, persisted); err != nil {
+				t.Fatal(err)
+			}
+			submissions, _, err = apiunstructured.NestedSlice(persisted.Object, "status", "submissions")
+			if err != nil || len(submissions) != 1 {
+				t.Fatalf("read seeded history: %v: %#v", err, submissions)
+			}
+			submission = submissions[0].(map[string]interface{})
+			if submission["submittedAt"] != submittedAt || !reflect.DeepEqual(submission["result"], wantResult) {
+				t.Fatalf("submission time/result were not persisted before retry: %#v", submission)
+			}
+			if tc.explicitSetUpdate {
+				if err := cli.Get(ctx, request.NamespacedName, view); err != nil {
+					t.Fatal(err)
+				}
+				value := "1500"
+				want := []parametersv1alpha1.ParameterUpdate{{Type: parametersv1alpha1.ParameterUpdateSet, Key: "default.max_connections", Value: &value}}
+				if len(view.Status.Submissions[0].Assignments) != 0 || !reflect.DeepEqual(view.Status.Submissions[0].Updates, want) {
+					t.Fatalf("explicit Set update was not preserved by API round trip: %#v", view.Status.Submissions[0])
+				}
+			}
+			reconcile()
+			if err := cli.Get(ctx, request.NamespacedName, persisted); err != nil {
+				t.Fatal(err)
+			}
+			submissions, _, err = apiunstructured.NestedSlice(persisted.Object, "status", "submissions")
+			if err != nil || len(submissions) != 1 {
+				t.Fatalf("repeated pending reconcile created duplicate history: %v: %#v", err, submissions)
+			}
+			submission = submissions[0].(map[string]interface{})
+			if submission["submittedAt"] != submittedAt || !reflect.DeepEqual(submission["result"], wantResult) {
+				t.Errorf("repeat changed original submission time/result: %#v", submission)
+			}
+		})
+	}
+}

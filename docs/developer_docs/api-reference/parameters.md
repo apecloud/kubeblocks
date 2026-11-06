@@ -2170,7 +2170,7 @@ updated by the API Server.</p>
 <h3 id="parameters.kubeblocks.io/v1alpha1.ParameterUpdate">ParameterUpdate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterInputs">ParameterInputs</a>, <a href="#parameters.kubeblocks.io/v1alpha1.UnmanagedParameterSectionUpdate">UnmanagedParameterSectionUpdate</a>)
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterInputs">ParameterInputs</a>, <a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewSubmission">ParameterViewSubmission</a>, <a href="#parameters.kubeblocks.io/v1alpha1.UnmanagedParameterSectionUpdate">UnmanagedParameterSectionUpdate</a>)
 </p>
 <div>
 <p>ParameterUpdate is an explicit parameter update.</p>
@@ -2728,7 +2728,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>SubmittedAt records when the submission entry was created or last refreshed.</p>
+<p>SubmittedAt records the time of the original submission.</p>
 </td>
 </tr>
 <tr>
@@ -2740,7 +2740,21 @@ map[string]*string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Assignments contains the desired simple parameter assignments submitted from the view.</p>
+<p>Assignments contains the parameter values assigned by this submission.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updates</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterUpdate">
+[]ParameterUpdate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Updates contains the explicit parameter updates in this submission.</p>
 </td>
 </tr>
 <tr>

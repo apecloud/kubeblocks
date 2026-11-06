@@ -217,6 +217,8 @@ var newLifecycleAction = func(its *workloads.InstanceSet, tree *kubebuilderx.Obj
 		compName         = its.Labels[constant.KBAppComponentLabelKey]
 		lifecycleActions = &kbappsv1.ComponentLifecycleActions{
 			Switchover:  its.Spec.LifecycleActions.Switchover,
+			MemberJoin:  its.Spec.LifecycleActions.MemberJoin,
+			MemberLeave: its.Spec.LifecycleActions.MemberLeave,
 			Reconfigure: its.Spec.LifecycleActions.Reconfigure,
 		}
 	)

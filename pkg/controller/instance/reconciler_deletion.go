@@ -21,6 +21,7 @@ package instance
 
 import (
 	"maps"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,10 +49,17 @@ type deletionReconciler struct {
 var _ kubebuilderx.Reconciler = &deletionReconciler{}
 
 func (r *deletionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
-	if tree.GetRoot() == nil || !model.IsObjectDeleting(tree.GetRoot()) {
+	root := tree.GetRoot()
+	if root == nil {
 		return kubebuilderx.ConditionUnsatisfied
 	}
-	if model.IsReconciliationPaused(tree.GetRoot()) {
+	inst := root.(*workloads.Instance)
+	deleting := model.IsObjectDeleting(inst)
+	scaledDown := ptr.Deref(inst.Spec.ScaledDown, false)
+	if !deleting && !scaledDown {
+		return kubebuilderx.ConditionUnsatisfied
+	}
+	if model.IsReconciliationPaused(inst) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
 	return kubebuilderx.ConditionSatisfied
@@ -59,6 +67,11 @@ func (r *deletionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebu
 
 func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	inst, _ := tree.GetRoot().(*workloads.Instance)
+	scaledDown := ptr.Deref(inst.Spec.ScaledDown, false)
+	deleting := model.IsObjectDeleting(inst)
+	if scaledDown && (!deleting || !scaledDownObserved(inst)) {
+		return r.reconcileScaledDown(tree, inst)
+	}
 	if err := r.reconcileDeletingRuntime(tree, inst); err != nil {
 		return kubebuilderx.Continue, err
 	}
@@ -242,4 +255,64 @@ func assistantObjectKey(assistantObj workloads.InstanceAssistantObject) (client.
 		return nil, nil, err
 	}
 	return obj, name, nil
+}
+
+func (r *deletionReconciler) reconcileScaledDown(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) (kubebuilderx.Result, error) {
+	if err := r.reconcileDeletingRuntime(tree, inst); err != nil {
+		return kubebuilderx.Continue, err
+	}
+	if ptr.Deref(inst.Spec.Stop, false) && !model.IsObjectDeleting(inst) {
+		_, result, err := reconcilePod(tree, inst)
+		inst.Status.ObservedGeneration = inst.Generation
+		if err != nil || result != kubebuilderx.Continue {
+			return result, err
+		}
+		return kubebuilderx.RetryAfter(time.Second), nil
+	}
+	if scaledDownObserved(inst) {
+		return kubebuilderx.RetryAfter(time.Second), nil
+	}
+	obj, err := tree.Get(podObj(inst))
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	var pod *corev1.Pod
+	if obj != nil {
+		pod = obj.(*corev1.Pod)
+		inst.Status.Provisioned = true
+	}
+	if memberActionsEnabled(inst) {
+		if needsMemberLeave(inst) {
+			if pod == nil || isTerminating(pod) {
+				if model.IsObjectDeleting(inst) {
+					return kubebuilderx.RetryAfter(time.Second), nil
+				}
+				if _, _, err := reconcilePod(tree, inst); err != nil {
+					return kubebuilderx.Continue, err
+				}
+				return kubebuilderx.RetryAfter(time.Second), nil
+			}
+			result, err := reconcileMember(tree, inst, pod, false)
+			if err != nil {
+				return result, err
+			}
+			if inst.Status.MemberJoined == nil || *inst.Status.MemberJoined {
+				return result, nil
+			}
+		}
+		inst.Status.MemberJoined = ptr.To(false)
+	}
+	// This generation acknowledges retirement only together with its membership result.
+	inst.Status.ObservedGeneration = inst.Generation
+	return kubebuilderx.RetryAfter(time.Second), nil
+}
+
+func scaledDownObserved(inst *workloads.Instance) bool {
+	if inst.Status.ObservedGeneration != inst.Generation {
+		return false
+	}
+	if !memberActionsEnabled(inst) {
+		return true
+	}
+	return inst.Status.MemberJoined != nil && !*inst.Status.MemberJoined
 }

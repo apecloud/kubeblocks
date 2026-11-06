@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -365,5 +366,43 @@ func assertCondition(t *testing.T, inst *workloads.Instance, conditionType workl
 	}
 	if condition.Status != wantStatus || condition.Message != message || condition.ObservedGeneration != inst.Generation {
 		t.Fatalf("unexpected condition %q: %#v", conditionType, condition)
+	}
+}
+
+func TestStatusReconcilerRecordsProvisioningAndPreservesMembership(t *testing.T) {
+	for _, member := range []*bool{nil, ptr.To(false), ptr.To(true)} {
+		for _, stopped := range []bool{false, true} {
+			inst := &workloads.Instance{ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Namespace: "default"}, Spec: workloads.InstanceSpec{Stop: ptr.To(stopped)}}
+			inst.Status.MemberJoined = member
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(inst)
+			if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			if inst.Status.Provisioned {
+				t.Fatal("child object without Pod invented provisioning")
+			}
+			pod := currentPod("current", corev1.PodPending)
+			pod.Name = inst.Name
+			pod.Namespace = inst.Namespace
+			if err := tree.Add(pod); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			if !inst.Status.Provisioned || inst.Status.MemberJoined != member {
+				t.Fatalf("runtime observation lost owned facts: %#v", inst.Status)
+			}
+			if err := tree.Delete(pod); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			if !inst.Status.Provisioned || inst.Status.MemberJoined != member {
+				t.Fatalf("runtime removal erased historical facts: %#v", inst.Status)
+			}
+		}
 	}
 }

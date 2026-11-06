@@ -21,9 +21,11 @@ package instance
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"slices"
 	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -36,8 +38,10 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -446,9 +450,82 @@ var newLifecycleAction = func(inst *workloads.Instance, pods []*corev1.Pod, pod 
 		compName         = inst.Labels[constant.KBAppComponentLabelKey]
 		lifecycleActions = &kbappsv1.ComponentLifecycleActions{
 			Switchover:  inst.Spec.LifecycleActions.Switchover,
+			MemberJoin:  inst.Spec.LifecycleActions.MemberJoin,
+			MemberLeave: inst.Spec.LifecycleActions.MemberLeave,
 			Reconfigure: inst.Spec.LifecycleActions.Reconfigure,
 		}
 	)
 	return lifecycle.New(inst.Namespace, clusterName, compName,
 		lifecycleActions, inst.Spec.LifecycleActions.TemplateVars, pod, pods)
+}
+
+func memberActionsEnabled(inst *workloads.Instance) bool {
+	a := inst.Spec.LifecycleActions
+	return a != nil && (a.MemberJoin != nil || a.MemberLeave != nil)
+}
+
+func needsMemberJoin(inst *workloads.Instance) bool {
+	actions := inst.Spec.LifecycleActions
+	if actions == nil || actions.MemberJoin == nil {
+		return false
+	}
+	return inst.Status.MemberJoined != nil && !*inst.Status.MemberJoined
+}
+
+func needsMemberLeave(inst *workloads.Instance) bool {
+	actions := inst.Spec.LifecycleActions
+	if actions == nil || actions.MemberLeave == nil {
+		return false
+	}
+	if inst.Status.MemberJoined != nil {
+		return *inst.Status.MemberJoined
+	}
+	return inst.Status.Provisioned
+}
+
+func reconcileMember(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod, join bool) (kubebuilderx.Result, error) {
+	wait := func(err error) (kubebuilderx.Result, error) {
+		tree.Logger.Error(err, "Instance membership is waiting", "instance", inst.Name)
+		return kubebuilderx.RetryAfter(time.Second), nil
+	}
+	if pod == nil {
+		return wait(fmt.Errorf("waiting for Instance %s Pod", inst.Name))
+	}
+	pods := []*corev1.Pod{pod}
+	action := inst.Spec.LifecycleActions.MemberJoin
+	if !join {
+		action = inst.Spec.LifecycleActions.MemberLeave
+	}
+	opts, err := workloadlifecycle.ValidateExecution(action, pod, pods)
+	if err != nil {
+		return wait(err)
+	}
+	lfa, err := newLifecycleAction(inst, pods, pod)
+	if err != nil {
+		return wait(err)
+	}
+	if !join && inst.Spec.LifecycleActions.Switchover != nil {
+		for _, role := range inst.Spec.Roles {
+			if role.IsExclusive && role.Name == pod.Labels[constant.RoleLabelKey] {
+				opts, err := workloadlifecycle.ValidateExecution(inst.Spec.LifecycleActions.Switchover, pod, pods)
+				if err != nil {
+					return wait(err)
+				}
+				if err = lfa.Switchover(tree.Context, nil, opts, ""); err != nil {
+					return wait(err)
+				}
+				return wait(fmt.Errorf("waiting for %s to relinquish its exclusive role", pod.Name))
+			}
+		}
+	}
+	if join {
+		err = lfa.MemberJoin(tree.Context, nil, opts)
+	} else {
+		err = lfa.MemberLeave(tree.Context, nil, opts)
+	}
+	if err != nil {
+		return wait(err)
+	}
+	inst.Status.MemberJoined = ptr.To(join)
+	return kubebuilderx.RetryAfter(time.Second), nil
 }

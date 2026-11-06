@@ -185,22 +185,17 @@ type ParameterViewSubmission struct {
 	// +optional
 	Revision ParameterViewRevision `json:"revision,omitempty"`
 
-	// SubmittedAt records when this submission was first recorded.
-	// Repeated submissions with the same revision, content hash, and parameter
-	// operations preserve this timestamp.
+	// SubmittedAt records the time of the original submission.
 	//
 	// +optional
 	SubmittedAt *metav1.Time `json:"submittedAt,omitempty"`
 
-	// Assignments contains the Set parameter values submitted from the view.
-	// Removed parameters are recorded in Updates, not as null assignments.
+	// Assignments contains the parameter values assigned by this submission.
 	//
 	// +optional
 	Assignments map[string]*string `json:"assignments,omitempty"`
 
-	// Updates records the explicit parameter removals submitted from the view.
-	// The controller records Remove operations here and Set values in Assignments.
-	// Each removed key appears once, with no Value.
+	// Updates contains the explicit parameter updates in this submission.
 	//
 	// +optional
 	Updates []ParameterUpdate `json:"updates,omitempty"`

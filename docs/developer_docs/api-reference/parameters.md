@@ -2728,9 +2728,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>SubmittedAt records when this submission was first recorded.
-Repeated submissions with the same revision, content hash, and parameter
-operations preserve this timestamp.</p>
+<p>SubmittedAt records the time of the original submission.</p>
 </td>
 </tr>
 <tr>
@@ -2742,8 +2740,7 @@ map[string]*string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Assignments contains the Set parameter values submitted from the view.
-Removed parameters are recorded in Updates, not as null assignments.</p>
+<p>Assignments contains the parameter values assigned by this submission.</p>
 </td>
 </tr>
 <tr>
@@ -2757,9 +2754,7 @@ Removed parameters are recorded in Updates, not as null assignments.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Updates records the explicit parameter removals submitted from the view.
-The controller records Remove operations here and Set values in Assignments.
-Each removed key appears once, with no Value.</p>
+<p>Updates contains the explicit parameter updates in this submission.</p>
 </td>
 </tr>
 <tr>

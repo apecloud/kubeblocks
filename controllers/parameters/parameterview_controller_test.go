@@ -2642,6 +2642,44 @@ func TestParameterViewSubmissionReplayPreservesRemovalIdentity(t *testing.T) {
 	}
 }
 
+func TestParameterViewSubmissionReplayRespectsUpdateOrder(t *testing.T) {
+	value := "0"
+	status := &parametersv1alpha1.ParameterViewStatus{}
+	submit := updateSubmissionStatus("1", "sync_binlog=0\n", map[string]*string{
+		"default.sync_binlog":     &value,
+		"default.max_connections": nil,
+	})
+	submit(status)
+	originalTime := metav1.NewTime(time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC))
+	originalResult := status.Submissions[0].Result
+	originalResult.UpdatedAt = &originalTime
+	status.Submissions[0].SubmittedAt = &originalTime
+	status.Submissions[0].Result = originalResult
+	status.Submissions[0].Assignments = nil
+	status.Submissions[0].Updates = []parametersv1alpha1.ParameterUpdate{
+		{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "default.sync_binlog"},
+		{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "default.max_connections"},
+		{Type: parametersv1alpha1.ParameterUpdateSet, Key: "default.sync_binlog", Value: &value},
+	}
+	submit(status)
+	if len(status.Submissions) != 1 {
+		t.Fatalf("equivalent ordered updates created duplicate history: %#v", status.Submissions)
+	}
+	if !status.Submissions[0].SubmittedAt.Equal(&originalTime) || !reflect.DeepEqual(status.Submissions[0].Result, originalResult) {
+		t.Fatalf("equivalent ordered updates changed submission time/result: %#v", status.Submissions[0])
+	}
+	status.Submissions[0].Assignments = nil
+	status.Submissions[0].Updates = []parametersv1alpha1.ParameterUpdate{
+		{Type: parametersv1alpha1.ParameterUpdateSet, Key: "default.sync_binlog", Value: &value},
+		{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "default.max_connections"},
+		{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "default.sync_binlog"},
+	}
+	submit(status)
+	if len(status.Submissions) != 2 {
+		t.Fatalf("updates ending in Remove did not create a distinct submission: %#v", status.Submissions)
+	}
+}
+
 func TestParameterViewSubmissionHistoryAPI(t *testing.T) {
 	environment := &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
@@ -2670,12 +2708,14 @@ func TestParameterViewSubmissionHistoryAPI(t *testing.T) {
 	ctx := context.Background()
 	const original = "max_connections=1000\nsync_binlog=1\n"
 	for _, tc := range []struct {
-		name    string
-		edited  string
-		removal bool
+		name              string
+		edited            string
+		removal           bool
+		explicitSetUpdate bool
 	}{
 		{name: "mixed-set-remove", edited: "sync_binlog=0\n", removal: true},
 		{name: "legacy-set-only", edited: "max_connections=1500\nsync_binlog=1\n"},
+		{name: "explicit-set-update", edited: "max_connections=1500\nsync_binlog=1\n", explicitSetUpdate: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			namespace := "history-" + tc.name
@@ -2803,6 +2843,12 @@ func TestParameterViewSubmissionHistoryAPI(t *testing.T) {
 					t.Errorf("history assignment %s = %#v, want %s", key, assignments[key], *value)
 				}
 			}
+			if tc.explicitSetUpdate {
+				delete(submission, "assignments")
+				submission["updates"] = []interface{}{map[string]interface{}{
+					"type": "Set", "key": "default.max_connections", "value": "1500",
+				}}
+			}
 			submittedAt := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC).Format(time.RFC3339)
 			updatedAt := time.Date(2025, 1, 2, 3, 5, 6, 0, time.UTC).Format(time.RFC3339)
 			submission["submittedAt"] = submittedAt
@@ -2825,6 +2871,16 @@ func TestParameterViewSubmissionHistoryAPI(t *testing.T) {
 			submission = submissions[0].(map[string]interface{})
 			if submission["submittedAt"] != submittedAt || !reflect.DeepEqual(submission["result"], wantResult) {
 				t.Fatalf("submission time/result were not persisted before retry: %#v", submission)
+			}
+			if tc.explicitSetUpdate {
+				if err := cli.Get(ctx, request.NamespacedName, view); err != nil {
+					t.Fatal(err)
+				}
+				value := "1500"
+				want := []parametersv1alpha1.ParameterUpdate{{Type: parametersv1alpha1.ParameterUpdateSet, Key: "default.max_connections", Value: &value}}
+				if len(view.Status.Submissions[0].Assignments) != 0 || !reflect.DeepEqual(view.Status.Submissions[0].Updates, want) {
+					t.Fatalf("explicit Set update was not preserved by API round trip: %#v", view.Status.Submissions[0])
+				}
 			}
 			reconcile()
 			if err := cli.Get(ctx, request.NamespacedName, persisted); err != nil {

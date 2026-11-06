@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -493,23 +492,15 @@ func findSubmission(existing []parametersv1alpha1.ParameterViewSubmission, targe
 }
 
 func equalSubmission(a, b parametersv1alpha1.ParameterViewSubmission) bool {
-	if a.Revision != b.Revision || !equalParameterValueMap(a.Assignments, b.Assignments) {
+	if a.Revision != b.Revision {
 		return false
 	}
-	aKeys, aValid := submissionRemovalKeys(a.Updates)
-	bKeys, bValid := submissionRemovalKeys(b.Updates)
-	return aValid && bValid && aKeys.Equal(bKeys)
-}
-
-func submissionRemovalKeys(updates []parametersv1alpha1.ParameterUpdate) (sets.Set[string], bool) {
-	keys := sets.New[string]()
-	for _, update := range updates {
-		if update.Type != parametersv1alpha1.ParameterUpdateRemove || update.Value != nil {
-			return nil, false
-		}
-		keys.Insert(update.Key)
+	aValues, err := normalizeManagedParameterInputs(&parametersv1alpha1.ParameterInputs{Assignments: a.Assignments, Updates: a.Updates})
+	if err != nil {
+		return false
 	}
-	return keys, true
+	bValues, err := normalizeManagedParameterInputs(&parametersv1alpha1.ParameterInputs{Assignments: b.Assignments, Updates: b.Updates})
+	return err == nil && equalParameterValueMap(aValues, bValues)
 }
 
 func compactSubmissions(submissions []parametersv1alpha1.ParameterViewSubmission) []parametersv1alpha1.ParameterViewSubmission {

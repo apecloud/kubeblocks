@@ -21,6 +21,7 @@ package instanceset2
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -31,6 +32,9 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
+	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
 func TestStatusPreconditionWaitsForRevisionUpdate(t *testing.T) {
@@ -285,4 +289,36 @@ func TestRevisionUpdateInvalidatesUnobservedITS2InstanceHandoff(t *testing.T) {
 	}
 	assertITS2UpToDate(t, its, "demo-0", false)
 	assertITS2UpToDate(t, its, "demo-1", true)
+}
+
+func TestDataTaskRevisionFilteringDoesNotMutateTemplate(t *testing.T) {
+	task := proto.Task{Instance: "demo", Task: "newReplica", UID: "demo-1", Replicas: "demo-1", NewReplica: &proto.NewReplicaTask{Remote: "source", Replicas: "demo-1"}}
+	env, err := kbagent.BuildEnv4Worker([]proto.Task{task, {Task: "caller-owned", Replicas: "demo-1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	template := corev1.PodTemplateSpec{Spec: corev1.PodSpec{InitContainers: []corev1.Container{{Name: kbagent.ContainerName4Worker, Image: "agent:v1", Env: []corev1.EnvVar{*env, {Name: "USER_CONFIG", Value: "v1"}}}}}}
+	original := template.DeepCopy()
+	intent := buildPodTemplateRevisionIntent(template)
+	if !reflect.DeepEqual(&template, original) {
+		t.Fatal("hashing mutated the live desired template")
+	}
+	cleaned := template.DeepCopy()
+	if _, err := workloadlifecycle.CleanTask(&cleaned.Spec, "demo-1"); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(intent, buildPodTemplateRevisionIntent(*cleaned)) {
+		t.Fatal("generated task changed revision intent")
+	}
+	for _, mutate := range []func(*corev1.Container){
+		func(c *corev1.Container) { c.Image = "agent:v2" },
+		func(c *corev1.Container) { c.Env[1].Value = "v2" },
+		func(c *corev1.Container) { c.Env[0].Value = `[{"task":"different-caller-task"}]` },
+	} {
+		changed := template.DeepCopy()
+		mutate(&changed.Spec.InitContainers[0])
+		if reflect.DeepEqual(intent, buildPodTemplateRevisionIntent(*changed)) {
+			t.Fatal("meaningful worker input disappeared from revision intent")
+		}
+	}
 }

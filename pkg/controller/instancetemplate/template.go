@@ -58,6 +58,19 @@ func BuildInstanceTemplateExt(itsExt *InstanceSetExt) []*InstanceTemplateExt {
 	return templates
 }
 
+// ResolveTemplateByName resolves an existing template without requiring a current allocation.
+// The root template remains available even when named templates use every replica.
+func ResolveTemplateByName(itsExt *InstanceSetExt, name string) (*InstanceTemplateExt, bool) {
+	template := itsExt.InstanceTemplates[name]
+	if name == "" {
+		template = &workloads.InstanceTemplate{}
+	}
+	if template == nil {
+		return nil, false
+	}
+	return buildInstanceTemplateExt(template, itsExt.InstanceSet), true
+}
+
 // buildInstanceTemplates builds a complete instance template list,
 // i.e. append a pseudo template (which equals to `.spec.template`)
 // to the end of the list, to fill up the replica count.

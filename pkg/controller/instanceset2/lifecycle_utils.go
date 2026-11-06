@@ -31,6 +31,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 )
 
@@ -63,11 +64,19 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 			runtimeNames.Insert(inst.Name)
 		}
 	}
+	if claimsByInstance, ok := tree.Context.Value(lifecyclePVCsKey{}).(map[string][]*corev1.PersistentVolumeClaim); ok {
+		for name := range claimsByInstance {
+			resourceNames.Insert(name)
+		}
+	}
 	registered := workloadlifecycle.Register(its, assignments, runtimeNames, resourceNames)
 	previous := its.DeepCopy().Status.InstanceStatus
 	for _, inst := range instances {
 		if status := its.FindInstanceStatus(inst.Name); status != nil {
 			status.Provisioned = status.Provisioned || inst.Status.Provisioned || runtimeNames.Has(inst.Name)
+			if inst.Status.DataLoaded != nil {
+				status.DataLoaded = ptr.To(*inst.Status.DataLoaded)
+			}
 			if inst.Status.MemberJoined != nil {
 				status.MemberJoined = ptr.To(*inst.Status.MemberJoined)
 			}
@@ -95,9 +104,53 @@ func lifecyclePods(tree *kubebuilderx.ObjectTree) []*corev1.Pod {
 	}
 	return pods
 }
+func refreshInstanceData(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, inst *workloads.Instance) error {
+	applied := its.DeepCopy()
+	applied.Spec.LifecycleActions = inst.Spec.LifecycleActions
+	return lifecycleCreateInstance(tree, applied, inst)
+}
+
 func configureInstance(its *workloads.InstanceSet, inst *workloads.Instance) error {
 	pod := &corev1.Pod{ObjectMeta: inst.ObjectMeta, Spec: inst.Spec.Template.Spec}
 	if err := workloadlifecycle.ConfigurePod(its, pod); err != nil {
+		return err
+	}
+	if _, err := workloadlifecycle.CleanTask(&pod.Spec, inst.Name); err != nil {
+		return err
+	}
+	inst.Spec.Template.Spec = pod.Spec
+	return nil
+}
+
+func lifecycleCreateInstance(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, inst *workloads.Instance) error {
+	if !workloadlifecycle.HasData(its) {
+		return nil
+	}
+	status := its.FindInstanceStatus(inst.Name)
+	completed := status == nil || status.DataLoaded == nil || *status.DataLoaded
+	currentSpec := &inst.Spec.Template.Spec
+	if current, err := tree.Get(inst); err != nil {
+		return err
+	} else if current != nil {
+		child := current.(*workloads.Instance)
+		completed = ptr.Deref(child.Status.DataLoaded, completed)
+		currentSpec = &child.Spec.Template.Spec
+	}
+	if completed {
+		if _, err := workloadlifecycle.CleanTask(&inst.Spec.Template.Spec, inst.Name); err != nil {
+			return err
+		}
+		return nil
+	}
+	if ptr.Deref(its.Spec.Stop, false) {
+		return nil
+	}
+	pod := &corev1.Pod{ObjectMeta: inst.ObjectMeta, Spec: inst.Spec.Template.Spec}
+	source, err := workloadlifecycle.SourcePod(its, lifecyclePods(tree), inst.Name, currentSpec)
+	if err != nil {
+		return err
+	}
+	if err := workloadlifecycle.ConfigureDataTask(its, pod, source); err != nil {
 		return err
 	}
 	inst.Spec.Template.Spec = pod.Spec
@@ -122,4 +175,28 @@ func needsRetirementObservation(its *workloads.InstanceSet, inst *workloads.Inst
 func instanceMemberActionsEnabled(inst *workloads.Instance) bool {
 	members := inst.Spec.LifecycleActions
 	return members != nil && (members.MemberJoin != nil || members.MemberLeave != nil)
+}
+
+func restoreRequiredDataSources(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) (bool, error) {
+	for _, status := range its.Status.InstanceStatus {
+		if status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive || !workloadlifecycle.DataSourceRequired(its, &status) {
+			continue
+		}
+		key := &workloads.Instance{ObjectMeta: metav1.ObjectMeta{Namespace: its.Namespace, Name: status.PodName}}
+		obj, err := tree.Get(key)
+		if err != nil {
+			return false, err
+		}
+		if obj == nil || model.IsObjectDeleting(obj) {
+			continue
+		}
+		inst := obj.(*workloads.Instance)
+		if !ptr.Deref(inst.Spec.Stop, false) || !ptr.Deref(inst.Status.DataLoaded, true) || !ptr.Deref(inst.Status.MemberJoined, true) {
+			continue
+		}
+		instCopy := inst.DeepCopy()
+		instCopy.Spec.Stop = ptr.To(false)
+		return true, tree.Update(instCopy)
+	}
+	return false, nil
 }

@@ -75,6 +75,12 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		return kubebuilderx.Continue, err
 	}
 
+	if changed, err := restoreRequiredDataSources(tree, its, itsExt); err != nil {
+		return lifecycleWait(tree, its, err)
+	} else if changed {
+		return kubebuilderx.RetryAfter(time.Second), nil
+	}
+
 	// 2. find the create and delete set
 	newNameSet := sets.New[string]()
 	if !isStopRequested(its) {
@@ -110,6 +116,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	baseSort(newNameList, func(i int) (string, int) {
 		return parseParentNameAndOrdinal(newNameList[i])
 	}, nil, true)
+	workloadlifecycle.SortDataSourcesFirst(its, newNameList)
 	getPredecessor := func(i int) *corev1.Pod {
 		if i <= 0 {
 			return nil
@@ -221,7 +228,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		independentNames := sets.New[string]()
 		for name := range retirementNames {
 			status := its.FindInstanceStatus(name)
-			if status != nil && !workloadlifecycle.NeedsLeave(its, status) && (status.MemberJoined != nil && !*status.MemberJoined) {
+			if status != nil && !workloadlifecycle.NeedsLeave(its, status) && ((status.MemberJoined != nil && !*status.MemberJoined) || (status.DataLoaded != nil && !*status.DataLoaded)) {
 				independentNames.Insert(name)
 			}
 		}
@@ -236,6 +243,11 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	for i, name := range newNameList {
 		if _, ok := createNameSet[name]; !ok {
 			pod := oldInstanceMap[name]
+			if changed, err := recreatePendingDataPod(tree, its, pod); err != nil {
+				return lifecycleWait(tree, its, err)
+			} else if changed {
+				return kubebuilderx.RetryAfter(time.Second), nil
+			}
 			if !runtimeChanged && !memberWaiting {
 				if result, err := reconcileMember(tree, its, pod, true, r.reader); err != nil || result != kubebuilderx.Continue {
 					if status := its.FindInstanceStatus(name); err == nil && status != nil && status.MemberJoined != nil && !*status.MemberJoined {
@@ -260,6 +272,9 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 			return kubebuilderx.Continue, err
 		}
 
+		if err := lifecycleCreatePod(tree, its, newPod); err != nil {
+			return lifecycleWait(tree, its, err)
+		}
 		if err := tree.Add(newPod); err != nil {
 			return kubebuilderx.Continue, err
 		}
@@ -322,3 +337,33 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 }
 
 var _ kubebuilderx.Reconciler = &instanceAlignmentReconciler{}
+
+func recreatePendingDataPod(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
+	status := its.FindInstanceStatus(pod.Name)
+	if !workloadlifecycle.HasData(its) || status == nil || status.DataLoaded == nil || pod.Status.Phase != corev1.PodPending || model.IsObjectDeleting(pod) {
+		return false, nil
+	}
+	if *status.DataLoaded && workloadlifecycle.DataWorkerSucceeded(pod) {
+		return false, nil
+	}
+
+	actual, err := workloadlifecycle.DataTask(&pod.Spec, pod.Name)
+	if err != nil {
+		return false, err
+	}
+	desired := pod.DeepCopy()
+	if err := lifecycleCreatePod(tree, its, desired); err != nil {
+		return false, err
+	}
+	expected, err := workloadlifecycle.DataTask(&desired.Spec, pod.Name)
+	if err != nil {
+		return false, err
+	}
+	if equality.Semantic.DeepEqual(actual, expected) {
+		return false, nil
+	}
+	if err := tree.Delete(pod); err != nil {
+		return false, err
+	}
+	return true, nil
+}

@@ -54,6 +54,10 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 		}
 		return kubebuilderx.Continue, err
 	}
+	desired := sets.New[string]()
+	for _, a := range assignments {
+		desired.Insert(a.InstanceName)
+	}
 	pods := make([]*corev1.Pod, 0)
 	names := sets.New[string]()
 	resources := sets.New[string]()
@@ -75,6 +79,22 @@ func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result,
 			}
 		}
 	}
+	for _, pod := range pods {
+		status := its.FindInstanceStatus(pod.Name)
+		if workloadlifecycle.HasData(its) && desired.Has(pod.Name) && pod.DeletionTimestamp.IsZero() {
+			task, err := workloadlifecycle.DataTask(&pod.Spec, pod.Name)
+			if err != nil {
+				return kubebuilderx.Continue, err
+			}
+			if status != nil && status.DataLoaded == nil && task == nil {
+				status.DataLoaded = ptr.To(true)
+			}
+			if _, err := workloadlifecycle.ObserveData(status, pod); err != nil {
+				return kubebuilderx.Continue, err
+			}
+		}
+	}
+
 	if !model.IsObjectStatusUpdating(its) && (registered || workloadlifecycle.CriticalStatusChanged(previous, its.Status.InstanceStatus)) {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
@@ -98,7 +118,7 @@ func reconcileMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, 
 			pods = append(pods, obj.(*corev1.Pod))
 		}
 		leave := !join
-		if join && (!pod.DeletionTimestamp.IsZero() || !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds)) {
+		if join && (!pod.DeletionTimestamp.IsZero() || (workloadlifecycle.HasData(its) && status.DataLoaded != nil && !*status.DataLoaded) || !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds)) {
 			return kubebuilderx.Continue, nil
 		}
 		action := its.Spec.LifecycleActions.MemberJoin
@@ -152,4 +172,70 @@ func lifecycleWait(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, er
 	}
 	meta.SetStatusCondition(&its.Status.Conditions, metav1.Condition{Type: "InstanceLifecycle", Status: metav1.ConditionFalse, ObservedGeneration: its.Generation, Reason: "Waiting", Message: err.Error()})
 	return kubebuilderx.RetryAfter(2 * time.Second), nil
+}
+
+func lifecycleCreatePod(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod) error {
+	status := its.FindInstanceStatus(pod.Name)
+	if status == nil || status.DataLoaded == nil || !workloadlifecycle.HasData(its) {
+		return nil
+	}
+	if *status.DataLoaded {
+		_, err := workloadlifecycle.CleanTask(&pod.Spec, pod.Name)
+		return err
+	}
+	var pods []*corev1.Pod
+	for _, obj := range tree.List(&corev1.Pod{}) {
+		pods = append(pods, obj.(*corev1.Pod))
+	}
+	source, err := workloadlifecycle.SourcePod(its, pods, pod.Name, &pod.Spec)
+	if err != nil {
+		return err
+	}
+	return workloadlifecycle.ConfigureDataTask(its, pod, source)
+}
+
+func restoreRequiredDataSources(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, itsExt *instancetemplate.InstanceSetExt) (bool, error) {
+	if isStopRequested(its) {
+		return false, nil
+	}
+	for _, status := range its.Status.InstanceStatus {
+		if status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive || status.TemplateName == nil || !workloadlifecycle.DataSourceRequired(its, &status) {
+			continue
+		}
+		podKey := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: its.Namespace, Name: status.PodName}}
+		if existing, err := tree.Get(podKey); err != nil {
+			return false, err
+		} else if existing != nil {
+			continue
+		}
+		template, found := instancetemplate.ResolveTemplateByName(itsExt, *status.TemplateName)
+		if !found {
+			continue
+		}
+		pod, err := buildInstancePodByTemplate(status.PodName, template, its, "")
+		if err != nil {
+			return false, err
+		}
+		claimsPresent := true
+		for _, volume := range pod.Spec.Volumes {
+			if volume.PersistentVolumeClaim == nil {
+				continue
+			}
+			claim := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Namespace: its.Namespace, Name: volume.PersistentVolumeClaim.ClaimName}}
+			if existing, err := tree.Get(claim); err != nil {
+				return false, err
+			} else if existing == nil || model.IsObjectDeleting(existing) {
+				claimsPresent = false
+				break
+			}
+		}
+		if !claimsPresent {
+			continue
+		}
+		if err := lifecycleCreatePod(tree, its, pod); err != nil {
+			return false, err
+		}
+		return true, tree.Add(pod)
+	}
+	return false, nil
 }

@@ -25,7 +25,7 @@ import (
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
-	"github.com/apecloud/kubeblocks/pkg/unstructured"
+	"github.com/apecloud/kubeblocks/pkg/parameters/unstructured"
 )
 
 // CueType defines cue type

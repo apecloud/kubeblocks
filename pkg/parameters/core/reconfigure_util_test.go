@@ -245,30 +245,6 @@ func TestHasDynamicParameterUpdate(t *testing.T) {
 	}
 }
 
-func TestValidateConfigPatch(t *testing.T) {
-	configs := []parametersv1alpha1.ComponentConfigDescription{{
-		Name: "mysql.cnf",
-		FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
-			Format: parametersv1alpha1.Ini,
-			FormatterAction: parametersv1alpha1.FormatterAction{
-				IniConfig: &parametersv1alpha1.IniConfig{SectionName: "mysqld"},
-			},
-		},
-	}}
-
-	require.NoError(t, ValidateConfigPatch(&ConfigPatchInfo{}, configs))
-	require.NoError(t, ValidateConfigPatch(&ConfigPatchInfo{
-		IsModify:     true,
-		UpdateConfig: map[string][]byte{"mysql.cnf": []byte(`{"mysqld":{"max_connections":"200"}}`)},
-	}, configs))
-
-	err := ValidateConfigPatch(&ConfigPatchInfo{
-		IsModify:     true,
-		UpdateConfig: map[string][]byte{"mysql.cnf": []byte(`{"mysqld":{"max_connections":null}}`)},
-	}, configs)
-	require.ErrorContains(t, err, "delete config parameter [max_connections] is not support")
-}
-
 func TestIsUpdateDynamicParameters(t *testing.T) {
 	config := &parametersv1alpha1.FileFormatConfig{
 		Format: parametersv1alpha1.Ini,

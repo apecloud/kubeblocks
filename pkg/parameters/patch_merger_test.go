@@ -24,12 +24,58 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 	"github.com/apecloud/kubeblocks/pkg/parameters/openapi"
+	"github.com/apecloud/kubeblocks/pkg/parameters/unstructured"
 )
+
+func TestDoMergeRemovesParameters(t *testing.T) {
+	tests := []struct {
+		name    string
+		patch   parametersv1alpha1.ParametersInFile
+		removed string
+		kept    string
+	}{
+		{
+			name: "managed parameter",
+			patch: parametersv1alpha1.ParametersInFile{
+				Parameters: map[string]*string{"custom_local": nil},
+			},
+			removed: "mysqld.custom_local", kept: "client.custom_local",
+		},
+		{
+			name: "unmanaged parameter in another section",
+			patch: parametersv1alpha1.ParametersInFile{
+				UnmanagedUpdates: []parametersv1alpha1.UnmanagedParameterSectionUpdate{{
+					Section: strPtr("client"),
+					Updates: []parametersv1alpha1.ParameterUpdate{{
+						Type: parametersv1alpha1.ParameterUpdateRemove, Key: "custom_local",
+					}},
+				}},
+			},
+			removed: "client.custom_local", kept: "mysqld.custom_local",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			base := map[string]string{
+				"my.cnf": "[mysqld]\ncustom_local=keep\nmax_connections=1000\n[client]\ncustom_local=keep\nport=3306\n",
+			}
+			got, err := DoMerge(base, map[string]parametersv1alpha1.ParametersInFile{"my.cnf": tt.patch}, nil, nil, iniConfigDescsForMyCnf())
+			require.NoError(t, err)
+			reloaded, err := unstructured.LoadConfig("my.cnf", got["my.cnf"], parametersv1alpha1.Ini)
+			require.NoError(t, err)
+			require.Nil(t, reloaded.Get(tt.removed))
+			require.Equal(t, "keep", reloaded.Get(tt.kept))
+			require.Equal(t, "1000", reloaded.Get("mysqld.max_connections"))
+			require.Equal(t, "3306", reloaded.Get("client.port"))
+		})
+	}
+}
 
 func TestDoMergeAppliesUnmanagedUpdatesAfterContentAndParameters(t *testing.T) {
 	base := map[string]string{

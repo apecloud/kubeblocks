@@ -35,10 +35,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/parameters/core"
+	"github.com/apecloud/kubeblocks/pkg/parameters/unstructured"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
-	"github.com/apecloud/kubeblocks/pkg/unstructured"
 )
 
 var _ = Describe("ToolsImageBuilderTest", func() {

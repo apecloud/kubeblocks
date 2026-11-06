@@ -231,41 +231,11 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 				}
 				return r.markReady(reqCtx, view, composeStatusUpdates(updateBaseAndLatestStatus(source), submissionResultUpdate))
 			}
-			desiredPatch, err := r.resolveDesiredParameterPatch(reqCtx.Ctx, compParam, view, source.content, currentContent)
-			if err == nil {
-				if syncBaseRevision(view, source) {
-					statusChanged = true
-				}
-				if desiredParametersContain(compParam.Spec.Desired, desiredPatch) {
-					if err := r.patchView(reqCtx, view, specPatch, statusPatch, specChanged, statusChanged); err != nil {
-						return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view")
-					}
-					return r.markApplying(reqCtx, view, "parameter view update is pending apply", composeStatusUpdates(
-						updateBaseAndLatestStatus(source),
-						updateSubmissionAndResultStatus(compParam, view.Spec.TemplateName, source, currentContent, desiredPatch),
-						submissionResultUpdate,
-					))
-				}
-				if err := r.patchComponentParameterDesired(reqCtx.Ctx, compParam, desiredPatch); err != nil {
-					if errors.IsConflict(err) {
-						return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update desired parameters")
-					}
-					return r.markInvalid(reqCtx, view, parameterViewReasonDiffFailed, err.Error(), composeStatusUpdates(updateLatestStatus(source), submissionResultUpdate))
-				}
-				if err := r.patchView(reqCtx, view, specPatch, statusPatch, specChanged, statusChanged); err != nil {
-					return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view")
-				}
-				return r.markApplying(reqCtx, view, "parameter view update has been submitted", composeStatusUpdates(
-					updateBaseAndLatestStatus(source),
-					updateSubmissionAndResultStatus(compParam, view.Spec.TemplateName, source, currentContent, desiredPatch),
-					submissionResultUpdate,
-				))
-			}
 			if err := r.patchView(reqCtx, view, specPatch, statusPatch, specChanged, statusChanged); err != nil {
 				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view")
 			}
 			return r.markConflict(reqCtx, view,
-				fmt.Sprintf("draft is based on an outdated revision for %s/%s; continue editing to retry replay or set resetToLatest=true to discard the draft",
+				fmt.Sprintf("draft is based on an outdated revision for %s/%s; save your edits, set resetToLatest=true, then reapply the edits to the refreshed content",
 					view.Spec.TemplateName, view.Spec.FileName),
 				composeStatusUpdates(updateLatestStatus(source), submissionResultUpdate))
 		default:

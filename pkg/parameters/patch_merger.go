@@ -28,6 +28,7 @@ import (
 
 func DoMerge(baseData map[string]string,
 	patch map[string]parametersv1alpha1.ParametersInFile,
+	initial map[string]parametersv1alpha1.ParametersInFile,
 	paramsDefs []*parametersv1alpha1.ParametersDefinition,
 	configDescs []parametersv1alpha1.ComponentConfigDescription) (map[string]string, error) {
 	var (
@@ -37,6 +38,10 @@ func DoMerge(baseData map[string]string,
 	)
 
 	builder := NewValueManager(paramsDefs, configDescs)
+	initialParameters, err := normalizeInitialParameters(initial, builder)
+	if err != nil {
+		return nil, err
+	}
 	for key, params := range patch {
 		if params.Content != nil {
 			updatedFiles[key] = *params.Content
@@ -52,12 +57,29 @@ func DoMerge(baseData map[string]string,
 			unmanagedUpdatedByFiles[key] = params.UnmanagedUpdates
 		}
 	}
-	return mergeUpdatedParams(baseData, updatedFiles, updatedParams, unmanagedUpdatedByFiles, paramsDefs, configDescs)
+	return mergeUpdatedParams(baseData, updatedFiles, updatedParams, initialParameters, unmanagedUpdatedByFiles, paramsDefs, configDescs)
+}
+
+func normalizeInitialParameters(initial map[string]parametersv1alpha1.ParametersInFile,
+	builder *valueManager) (map[string]map[string]any, error) {
+	initialParameters := make(map[string]map[string]any, len(initial))
+	for key, params := range initial {
+		if len(params.Parameters) == 0 {
+			continue
+		}
+		converted, err := core.FromStringMap(DecodeParameterOverlay(params.Parameters), builder.BuildValueTransformer(key))
+		if err != nil {
+			return nil, err
+		}
+		initialParameters[key] = converted
+	}
+	return initialParameters, nil
 }
 
 func mergeUpdatedParams(base map[string]string,
 	updatedFiles map[string]string,
 	updatedParams []core.ParamPairs,
+	initialParameters map[string]map[string]any,
 	unmanagedUpdatedByFiles map[string][]parametersv1alpha1.UnmanagedParameterSectionUpdate,
 	paramsDefs []*parametersv1alpha1.ParametersDefinition,
 	configDescs []parametersv1alpha1.ComponentConfigDescription) (map[string]string, error) {
@@ -78,7 +100,7 @@ func mergeUpdatedParams(base map[string]string,
 	if len(configDescs) == 0 {
 		return updatedConfig, nil
 	}
-	updatedConfig, err := MergeAndValidateConfigs(updatedConfig, updatedParams, paramsDefs, configDescs)
+	updatedConfig, err := MergeAndValidateConfigs(updatedConfig, updatedParams, initialParameters, paramsDefs, configDescs)
 	if err != nil {
 		return nil, err
 	}

@@ -131,7 +131,9 @@ ParameterInputs
 </td>
 <td>
 <em>(Optional)</em>
-<p>Initial provides the initial parameter inputs used when the managed runtime configuration is created.</p>
+<p>Initial provides the initial parameter inputs used when the managed runtime configuration is created.
+It can only be supplied at creation and cannot be changed or removed afterward.
+Managed assignments and updates may specify immutable parameters.</p>
 </td>
 </tr>
 <tr>
@@ -540,9 +542,10 @@ ParameterViewContent
 3. when status.latest advances and Content is still only a projection of
    status.base, the controller may auto-refresh Content and move status.base
    forward to status.latest;
-4. when Content has diverged into a real user draft, the controller preserves
-   it and uses status.base as the draft base when replaying the draft onto
-status.latest or surfacing a conflict.</p>
+4. when the effective content changes after status.base and an edited ReadWrite
+   draft differs semantically from the latest effective content, the controller
+   reports Conflict and preserves Content and status.base until the draft is
+resolved or resetToLatest is set.</p>
 </td>
 </tr>
 </tbody>
@@ -820,7 +823,8 @@ HTTP and gRPC reconfigure actions are not currently supported for parameter upda
 <td>
 <em>(Optional)</em>
 <p>Lists the parameters that cannot be modified once set.
-Attempts to change any of these parameters are rejected during configuration merge and surface as a merge failure.</p>
+These parameters may be specified by managed assignments and updates in ComponentParameter.spec.initial at creation.
+Subsequent managed parameter updates are rejected during configuration merge and surface as a merge failure.</p>
 </td>
 </tr>
 </tbody>
@@ -1060,7 +1064,9 @@ ParameterInputs
 </td>
 <td>
 <em>(Optional)</em>
-<p>Initial provides the initial parameter inputs used when the managed runtime configuration is created.</p>
+<p>Initial provides the initial parameter inputs used when the managed runtime configuration is created.
+It can only be supplied at creation and cannot be changed or removed afterward.
+Managed assignments and updates may specify immutable parameters.</p>
 </td>
 </tr>
 <tr>
@@ -2164,7 +2170,7 @@ updated by the API Server.</p>
 <h3 id="parameters.kubeblocks.io/v1alpha1.ParameterUpdate">ParameterUpdate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterInputs">ParameterInputs</a>, <a href="#parameters.kubeblocks.io/v1alpha1.UnmanagedParameterSectionUpdate">UnmanagedParameterSectionUpdate</a>)
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterInputs">ParameterInputs</a>, <a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewSubmission">ParameterViewSubmission</a>, <a href="#parameters.kubeblocks.io/v1alpha1.UnmanagedParameterSectionUpdate">UnmanagedParameterSectionUpdate</a>)
 </p>
 <div>
 <p>ParameterUpdate is an explicit parameter update.</p>
@@ -2537,9 +2543,10 @@ ParameterViewContent
 3. when status.latest advances and Content is still only a projection of
    status.base, the controller may auto-refresh Content and move status.base
    forward to status.latest;
-4. when Content has diverged into a real user draft, the controller preserves
-   it and uses status.base as the draft base when replaying the draft onto
-status.latest or surfacing a conflict.</p>
+4. when the effective content changes after status.base and an edited ReadWrite
+   draft differs semantically from the latest effective content, the controller
+   reports Conflict and preserves Content and status.base until the draft is
+resolved or resetToLatest is set.</p>
 </td>
 </tr>
 </tbody>
@@ -2656,9 +2663,10 @@ ParameterViewRevision
 <em>(Optional)</em>
 <p>Latest records the latest effective content revision observed by the controller.
 When Base and Latest are equal, spec.content is based on the current latest
-effective revision. When they differ, spec.content is either waiting to
-auto-refresh because no real draft exists, or waiting for the controller to
-replay or reject a preserved user draft against the newer latest revision.</p>
+effective revision. When their content hashes differ, unedited content can
+auto-refresh. An edited ReadWrite draft that differs semantically from the
+latest effective content enters Conflict, preserving spec.content and Base
+until resolved or reset.</p>
 </td>
 </tr>
 <tr>
@@ -2720,7 +2728,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>SubmittedAt records when the submission entry was created or last refreshed.</p>
+<p>SubmittedAt records the time of the original submission.</p>
 </td>
 </tr>
 <tr>
@@ -2732,7 +2740,21 @@ map[string]*string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Assignments contains the desired simple parameter assignments submitted from the view.</p>
+<p>Assignments contains the parameter values assigned by this submission.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updates</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterUpdate">
+[]ParameterUpdate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Updates contains the explicit parameter updates in this submission.</p>
 </td>
 </tr>
 <tr>
@@ -3069,7 +3091,8 @@ HTTP and gRPC reconfigure actions are not currently supported for parameter upda
 <td>
 <em>(Optional)</em>
 <p>Lists the parameters that cannot be modified once set.
-Attempts to change any of these parameters are rejected during configuration merge and surface as a merge failure.</p>
+These parameters may be specified by managed assignments and updates in ComponentParameter.spec.initial at creation.
+Subsequent managed parameter updates are rejected during configuration merge and surface as a merge failure.</p>
 </td>
 </tr>
 </tbody>

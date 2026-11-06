@@ -20,13 +20,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"context"
+	"reflect"
+	"testing"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
@@ -157,9 +164,8 @@ parameter: {
 					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
 					Parameters: []opsv1alpha1.ParameterPair{
 						{
-							Key:   "max_connections",
-							Value: pointer.String("200"),
-						},
+							Key: "max_connections", Value: pointer.String("200"),
+						}, {Key: "gtid_mode", Value: nil},
 					},
 				},
 			}
@@ -184,6 +190,7 @@ parameter: {
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
 				g.Expect(cp.Spec.Desired).ShouldNot(BeNil())
 				g.Expect(cp.Spec.Desired.Assignments).Should(HaveKeyWithValue("max_connections", pointer.String("200")))
+				g.Expect(cp.Spec.Desired.Updates).Should(ContainElement(parametersv1alpha1.ParameterUpdate{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "gtid_mode"}))
 			})).Should(Succeed())
 
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
@@ -266,3 +273,58 @@ parameter: {
 		})
 	})
 })
+
+func TestReconfigurePersistsRemoveAndReplacesStaleUpdates(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		initial *parametersv1alpha1.ParameterInputs
+		pairs   []opsv1alpha1.ParameterPair
+		want    *parametersv1alpha1.ParameterInputs
+	}{
+		{
+			name:  "remove",
+			pairs: []opsv1alpha1.ParameterPair{{Key: "mode", Value: nil}},
+			want:  &parametersv1alpha1.ParameterInputs{Updates: []parametersv1alpha1.ParameterUpdate{{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "mode"}}},
+		}, {
+			name: "set replaces remove",
+			initial: &parametersv1alpha1.ParameterInputs{
+				Assignments: map[string]*string{"keep": pointer.String("1")},
+				Updates: []parametersv1alpha1.ParameterUpdate{
+					{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "mode"},
+					{Type: parametersv1alpha1.ParameterUpdateSet, Key: "mode", Value: pointer.String("old")},
+					{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "other"},
+				},
+			},
+			pairs: []opsv1alpha1.ParameterPair{{Key: "mode", Value: nil}, {Key: "mode", Value: pointer.String("new")}},
+			want: &parametersv1alpha1.ParameterInputs{
+				Assignments: map[string]*string{"keep": pointer.String("1"), "mode": pointer.String("new")},
+				Updates:     []parametersv1alpha1.ParameterUpdate{{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "other"}},
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			if err := parametersv1alpha1.AddToScheme(scheme); err != nil {
+				t.Fatal(err)
+			}
+			cp := &parametersv1alpha1.ComponentParameter{
+				ObjectMeta: metav1.ObjectMeta{Name: parameterscore.GenerateComponentConfigurationName("cluster", "component"), Namespace: "default"},
+				Spec:       parametersv1alpha1.ComponentParameterSpec{ClusterName: "cluster", ComponentName: "component", Desired: tt.initial},
+			}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cp).Build()
+			cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster", Namespace: "default"}}
+			action := &reconfigureAction{}
+			for range 2 {
+				if err := action.applyReconfigureToParameters(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, cluster, "component", opsv1alpha1.Reconfigure{Parameters: tt.pairs}); err != nil {
+					t.Fatal(err)
+				}
+				if err := cli.Get(context.Background(), client.ObjectKeyFromObject(cp), cp); err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(cp.Spec.Desired, tt.want) {
+					t.Fatalf("persisted desired = %#v, want %#v", cp.Spec.Desired, tt.want)
+				}
+			}
+		})
+	}
+}

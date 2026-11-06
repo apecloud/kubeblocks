@@ -231,38 +231,11 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 				}
 				return r.markReady(reqCtx, view, composeStatusUpdates(updateBaseAndLatestStatus(source), submissionResultUpdate))
 			}
-			desiredPatch, err := r.resolveDesiredParameterPatch(reqCtx.Ctx, compParam, view, source.content, currentContent)
-			if err == nil {
-				if syncBaseRevision(view, source) {
-					statusChanged = true
-				}
-				if desiredParametersContain(compParam.Spec.Desired, desiredPatch) {
-					if err := r.patchView(reqCtx, view, specPatch, statusPatch, specChanged, statusChanged); err != nil {
-						return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view")
-					}
-					return r.markApplying(reqCtx, view, "parameter view update is pending apply", composeStatusUpdates(
-						updateBaseAndLatestStatus(source),
-						updateSubmissionAndResultStatus(compParam, view.Spec.TemplateName, source, currentContent, desiredPatch),
-						submissionResultUpdate,
-					))
-				}
-				if err := r.patchComponentParameterDesired(reqCtx.Ctx, compParam, desiredPatch); err != nil {
-					return r.markInvalid(reqCtx, view, parameterViewReasonDiffFailed, err.Error(), composeStatusUpdates(updateLatestStatus(source), submissionResultUpdate))
-				}
-				if err := r.patchView(reqCtx, view, specPatch, statusPatch, specChanged, statusChanged); err != nil {
-					return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view")
-				}
-				return r.markApplying(reqCtx, view, "parameter view update has been submitted", composeStatusUpdates(
-					updateBaseAndLatestStatus(source),
-					updateSubmissionAndResultStatus(compParam, view.Spec.TemplateName, source, currentContent, desiredPatch),
-					submissionResultUpdate,
-				))
-			}
 			if err := r.patchView(reqCtx, view, specPatch, statusPatch, specChanged, statusChanged); err != nil {
 				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view")
 			}
 			return r.markConflict(reqCtx, view,
-				fmt.Sprintf("draft is based on an outdated revision for %s/%s; continue editing to retry replay or set resetToLatest=true to discard the draft",
+				fmt.Sprintf("draft is based on an outdated revision for %s/%s; save your edits, set resetToLatest=true, then reapply the edits to the refreshed content",
 					view.Spec.TemplateName, view.Spec.FileName),
 				composeStatusUpdates(updateLatestStatus(source), submissionResultUpdate))
 		default:
@@ -284,6 +257,9 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 				))
 			}
 			if err := r.patchComponentParameterDesired(reqCtx.Ctx, compParam, desiredPatch); err != nil {
+				if errors.IsConflict(err) {
+					return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update desired parameters")
+				}
 				return r.markInvalid(reqCtx, view, parameterViewReasonDiffFailed, err.Error(), composeStatusUpdates(updateLatestStatus(source), submissionResultUpdate))
 			}
 			if syncBaseRevision(view, source) {
@@ -414,22 +390,6 @@ func syncBaseRevision(view *parametersv1alpha1.ParameterView, source *parameterV
 	return changed
 }
 
-func cloneParameterValueMap(src map[string]*string) map[string]*string {
-	if len(src) == 0 {
-		return nil
-	}
-	dst := make(map[string]*string, len(src))
-	for key, value := range src {
-		if value == nil {
-			dst[key] = nil
-			continue
-		}
-		copied := *value
-		dst[key] = &copied
-	}
-	return dst
-}
-
 func equalParameterValueMap(a, b map[string]*string) bool {
 	if len(a) != len(b) {
 		return false
@@ -467,16 +427,18 @@ func updateBaseAndLatestStatus(source *parameterViewSource) func(*parametersv1al
 	}
 }
 
-func updateSubmissionStatus(revision, content string, parameters map[string]*string) func(*parametersv1alpha1.ParameterViewStatus) {
+func updateSubmissionStatus(revision, content string, desired map[string]*string) func(*parametersv1alpha1.ParameterViewStatus) {
 	return func(status *parametersv1alpha1.ParameterViewStatus) {
 		now := metav1.Now()
+		inputs := parameters.MergeManagedParameterInputs(nil, desired)
 		submission := parametersv1alpha1.ParameterViewSubmission{
 			Revision: parametersv1alpha1.ParameterViewRevision{
 				Revision:    revision,
 				ContentHash: hashContent(content),
 			},
 			SubmittedAt: &now,
-			Assignments: cloneParameterValueMap(parameters),
+			Assignments: inputs.Assignments,
+			Updates:     inputs.Updates,
 			Result: parametersv1alpha1.ParameterViewSubmissionResult{
 				Phase:     parametersv1alpha1.ParameterViewSubmissionProcessingPhase,
 				Reason:    parameterViewSubmissionReasonProcessing,
@@ -511,9 +473,7 @@ func prependSubmission(existing []parametersv1alpha1.ParameterViewSubmission, su
 	}
 	result = append(result, submission)
 	for _, item := range existing {
-		if item.Revision.Revision == submission.Revision.Revision &&
-			item.Revision.ContentHash == submission.Revision.ContentHash &&
-			equalParameterValueMap(item.Assignments, submission.Assignments) {
+		if equalSubmission(item, submission) {
 			continue
 		}
 		result = append(result, item)
@@ -524,13 +484,23 @@ func prependSubmission(existing []parametersv1alpha1.ParameterViewSubmission, su
 func findSubmission(existing []parametersv1alpha1.ParameterViewSubmission, target parametersv1alpha1.ParameterViewSubmission) *parametersv1alpha1.ParameterViewSubmission {
 	for i := range existing {
 		item := &existing[i]
-		if item.Revision.Revision == target.Revision.Revision &&
-			item.Revision.ContentHash == target.Revision.ContentHash &&
-			equalParameterValueMap(item.Assignments, target.Assignments) {
+		if equalSubmission(*item, target) {
 			return item
 		}
 	}
 	return nil
+}
+
+func equalSubmission(a, b parametersv1alpha1.ParameterViewSubmission) bool {
+	if a.Revision != b.Revision {
+		return false
+	}
+	aValues, err := normalizeManagedParameterInputs(&parametersv1alpha1.ParameterInputs{Assignments: a.Assignments, Updates: a.Updates})
+	if err != nil {
+		return false
+	}
+	bValues, err := normalizeManagedParameterInputs(&parametersv1alpha1.ParameterInputs{Assignments: b.Assignments, Updates: b.Updates})
+	return err == nil && equalParameterValueMap(aValues, bValues)
 }
 
 func compactSubmissions(submissions []parametersv1alpha1.ParameterViewSubmission) []parametersv1alpha1.ParameterViewSubmission {
@@ -828,10 +798,6 @@ func (r *ParameterViewReconciler) resolveDesiredParameterPatch(ctx context.Conte
 	if !patch.IsModify {
 		return nil, fmt.Errorf("%s: edited content cannot be represented as desired parameter updates", parameterViewReasonUnsupportedContentChanges)
 	}
-	if err := parameterscore.ValidateConfigPatch(patch, descs); err != nil {
-		return nil, fmt.Errorf("%s: %w", parameterViewReasonSchemaValidationFailed, err)
-	}
-
 	desiredPatch := make(map[string]*string)
 	for _, filePatch := range parameterscore.GenerateVisualizedParamsList(patch, descs) {
 		if filePatch.Key != view.Spec.FileName {
@@ -862,7 +828,7 @@ func (r *ParameterViewReconciler) resolveDesiredParameterPatch(ctx context.Conte
 	mergedData, err := parameters.MergeAndValidateConfigs(baseData, []parameterscore.ParamPairs{{
 		Key:           view.Spec.FileName,
 		UpdatedParams: updatedParams,
-	}}, cfgCtx.paramsDefs, descs)
+	}}, nil, cfgCtx.paramsDefs, descs)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", parameterViewReasonSchemaValidationFailed, err)
 	}
@@ -962,11 +928,12 @@ func trimReasonPrefix(message, reason string) string {
 }
 
 func desiredParametersContain(inputs *parametersv1alpha1.ParameterInputs, patch map[string]*string) bool {
-	if inputs == nil || len(inputs.Assignments) == 0 || len(patch) == 0 {
+	normalized, err := normalizeManagedParameterInputs(inputs)
+	if err != nil || len(normalized) == 0 || len(patch) == 0 {
 		return false
 	}
 	for key, expected := range patch {
-		actual, ok := inputs.Assignments[key]
+		actual, ok := normalized[key]
 		if !ok {
 			return false
 		}
@@ -985,16 +952,8 @@ func (r *ParameterViewReconciler) patchComponentParameterDesired(ctx context.Con
 	if len(patchValues) == 0 {
 		return nil
 	}
-	patch := client.MergeFrom(compParam.DeepCopy())
-	if compParam.Spec.Desired == nil {
-		compParam.Spec.Desired = &parametersv1alpha1.ParameterInputs{}
-	}
-	if compParam.Spec.Desired.Assignments == nil {
-		compParam.Spec.Desired.Assignments = map[string]*string{}
-	}
-	for key, value := range patchValues {
-		compParam.Spec.Desired.Assignments[key] = value
-	}
+	patch := client.MergeFromWithOptions(compParam.DeepCopy(), client.MergeFromWithOptimisticLock{})
+	compParam.Spec.Desired = parameters.MergeManagedParameterInputs(compParam.Spec.Desired, patchValues)
 	return r.Client.Patch(ctx, compParam, patch)
 }
 

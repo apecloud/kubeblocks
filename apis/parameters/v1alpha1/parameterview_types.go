@@ -102,9 +102,10 @@ type ParameterViewSpec struct {
 	// 3. when status.latest advances and Content is still only a projection of
 	//    status.base, the controller may auto-refresh Content and move status.base
 	//    forward to status.latest;
-	// 4. when Content has diverged into a real user draft, the controller preserves
-	//    it and uses status.base as the draft base when replaying the draft onto
-	//    status.latest or surfacing a conflict.
+	// 4. when the effective content changes after status.base and an edited ReadWrite
+	//    draft differs semantically from the latest effective content, the controller
+	//    reports Conflict and preserves Content and status.base until the draft is
+	//    resolved or resetToLatest is set.
 	//
 	// +optional
 	Content ParameterViewContent `json:"content,omitempty"`
@@ -147,9 +148,10 @@ type ParameterViewStatus struct {
 
 	// Latest records the latest effective content revision observed by the controller.
 	// When Base and Latest are equal, spec.content is based on the current latest
-	// effective revision. When they differ, spec.content is either waiting to
-	// auto-refresh because no real draft exists, or waiting for the controller to
-	// replay or reject a preserved user draft against the newer latest revision.
+	// effective revision. When their content hashes differ, unedited content can
+	// auto-refresh. An edited ReadWrite draft that differs semantically from the
+	// latest effective content enters Conflict, preserving spec.content and Base
+	// until resolved or reset.
 	//
 	// +optional
 	Latest ParameterViewRevision `json:"latest,omitempty"`
@@ -183,15 +185,20 @@ type ParameterViewSubmission struct {
 	// +optional
 	Revision ParameterViewRevision `json:"revision,omitempty"`
 
-	// SubmittedAt records when the submission entry was created or last refreshed.
+	// SubmittedAt records the time of the original submission.
 	//
 	// +optional
 	SubmittedAt *metav1.Time `json:"submittedAt,omitempty"`
 
-	// Assignments contains the desired simple parameter assignments submitted from the view.
+	// Assignments contains the parameter values assigned by this submission.
 	//
 	// +optional
 	Assignments map[string]*string `json:"assignments,omitempty"`
+
+	// Updates contains the explicit parameter updates in this submission.
+	//
+	// +optional
+	Updates []ParameterUpdate `json:"updates,omitempty"`
 
 	// Result records the current observed outcome of this submission after it has
 	// been handed off to the ComponentParameter controller.

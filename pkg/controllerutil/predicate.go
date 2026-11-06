@@ -21,6 +21,7 @@ package controllerutil
 
 import (
 	"strings"
+	"sync"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -34,7 +35,8 @@ import (
 )
 
 var (
-	managedNamespaces *sets.Set[string]
+	managedNamespaces     *sets.Set[string]
+	managedNamespacesOnce sync.Once
 )
 
 func NewControllerManagedBy(mgr manager.Manager) *builder.Builder {
@@ -44,14 +46,14 @@ func NewControllerManagedBy(mgr manager.Manager) *builder.Builder {
 }
 
 func namespacePredicateFilter(object client.Object) bool {
-	if managedNamespaces == nil {
+	managedNamespacesOnce.Do(func() {
 		set := &sets.Set[string]{}
 		namespaces := viper.GetString(strings.ReplaceAll(constant.ManagedNamespacesFlag, "-", "_"))
 		if len(namespaces) > 0 {
 			set.Insert(strings.Split(namespaces, ",")...)
 		}
 		managedNamespaces = set
-	}
+	})
 	if len(*managedNamespaces) == 0 || len(object.GetNamespace()) == 0 {
 		return true
 	}

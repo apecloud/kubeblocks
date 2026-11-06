@@ -459,13 +459,15 @@ const (
 	// StoppedComponentPhase indicates the component is stopped.
 	StoppedComponentPhase ComponentPhase = "Stopped"
 
-	// FailedComponentPhase indicates that there are some pods of the component not in a 'Running' state.
+	// FailedComponentPhase indicates that the component failed to reach its desired state, for example because of a
+	// workload or initial restore failure.
 	FailedComponentPhase ComponentPhase = "Failed"
 )
 
 // component condition types
 const (
-	// ComponentConditionProgressing indicates component controller is applying updates, or workload resource is being updated.
+	// ComponentConditionProgressing indicates the component is applying updates, its workload is being updated, or its
+	// initial restore is running.
 	ComponentConditionProgressing = "Progressing"
 
 	// ComponentConditionHealthy indicates its workload resource is running and ready.

@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	"strings"
+	"testing"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -32,10 +35,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/parameters/core"
+	"github.com/apecloud/kubeblocks/pkg/parameters/unstructured"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
-	"github.com/apecloud/kubeblocks/pkg/unstructured"
 )
 
 var _ = Describe("ToolsImageBuilderTest", func() {
@@ -111,7 +114,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 		tplParams, ok := params[configTemplateName]
 		Expect(ok).Should(BeTrue())
 		item.ConfigFileParams = deRef(tplParams)
-		result, err := ApplyParameters(item, cmObj, configDescs, pds)
+		result, err := ApplyParameters(item, cmObj, nil, configDescs, pds)
 		Expect(err).Should(Succeed())
 		configReaders, err := cfgcore.LoadRawConfigObject(result.Data, configdesc.FileFormatConfig, []string{configdesc.Name})
 		Expect(err).Should(Succeed())
@@ -164,3 +167,17 @@ gtid_mode=OFF
 		})
 	})
 })
+
+func TestApplyParametersInitialImmutableValue(t *testing.T) {
+	defs := paramsDefsWithImmutable([]string{"gtid_mode"})
+	initial := map[string]parametersv1alpha1.ParametersInFile{"my.cnf": {Parameters: map[string]*string{"gtid_mode": strPtr("ON")}}}
+	item := parametersv1alpha1.ConfigTemplateItemDetail{ConfigFileParams: initial}
+	base := &corev1.ConfigMap{Data: map[string]string{"my.cnf": "[mysqld]\ngtid_mode=OFF\n"}}
+	got, err := ApplyParameters(item, base, initial, iniConfigDescsForMyCnf(), defs)
+	if err != nil {
+		t.Fatalf("applying initial immutable value: %v", err)
+	}
+	if !strings.Contains(got.Data["my.cnf"], "gtid_mode=ON") || strings.Contains(base.Data["my.cnf"], "gtid_mode=ON") {
+		t.Fatalf("expected updated copy and unchanged base, got base=%v updated=%v", base.Data, got.Data)
+	}
+}

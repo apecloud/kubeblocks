@@ -33,6 +33,39 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/parameters/openapi"
 )
 
+func MergeManagedParameterInputs(inputs *parametersv1alpha1.ParameterInputs, patch map[string]*string) *parametersv1alpha1.ParameterInputs {
+	merged := inputs.DeepCopy()
+	if merged == nil {
+		merged = &parametersv1alpha1.ParameterInputs{}
+	}
+	updates := merged.Updates[:0]
+	for _, update := range merged.Updates {
+		if _, touched := patch[update.Key]; !touched {
+			updates = append(updates, update)
+		}
+	}
+	merged.Updates = updates
+	keys := make([]string, 0, len(patch))
+	for key := range patch {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	for _, key := range keys {
+		value := patch[key]
+		if value == nil {
+			delete(merged.Assignments, key)
+			merged.Updates = append(merged.Updates, parametersv1alpha1.ParameterUpdate{Type: parametersv1alpha1.ParameterUpdateRemove, Key: key})
+			continue
+		}
+		if merged.Assignments == nil {
+			merged.Assignments = make(map[string]*string)
+		}
+		copied := *value
+		merged.Assignments[key] = &copied
+	}
+	return merged
+}
+
 func ClassifyParamsFromConfigTemplate(params parametersv1alpha1.ComponentParameters,
 	cmpd *appsv1.ComponentDefinition,
 	paramsDefs []*parametersv1alpha1.ParametersDefinition,

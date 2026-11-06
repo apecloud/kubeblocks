@@ -57,7 +57,27 @@ func (v *viperWrap) GetAllParameters() map[string]interface{} {
 }
 
 func (v *viperWrap) RemoveKey(key string) error {
-	// TODO viper does not support remove key
+	settings := v.AllSettings()
+	path := strings.Split(strings.ToLower(key), cfgKeyDelimiter(v.format))
+	parent := settings
+	for _, part := range path[:len(path)-1] {
+		child, ok := parent[part].(map[string]interface{})
+		if !ok {
+			return nil
+		}
+		parent = child
+	}
+	leaf := path[len(path)-1]
+	if _, ok := parent[leaf]; !ok {
+		return nil
+	}
+	delete(parent, leaf)
+
+	updated := newCfgViper(v.format)
+	if err := updated.MergeConfigMap(settings); err != nil {
+		return err
+	}
+	v.Viper = updated
 	return nil
 }
 
@@ -110,17 +130,20 @@ func (v *viperWrap) Unmarshal(str string) error {
 }
 
 func newCfgViper(cfgType parametersv1alpha1.CfgFileFormat) *oviper.Viper {
-	defaultKeySep := DelimiterDot
-	if cfgType == parametersv1alpha1.Properties || cfgType == parametersv1alpha1.Dotenv {
-		defaultKeySep = CfgDelimiterPlaceholder
-	}
 	// TODO config constraint support LoadOptions
-	v := oviper.NewWithOptions(oviper.KeyDelimiter(defaultKeySep), oviper.IniLoadOptions(ini.LoadOptions{
+	v := oviper.NewWithOptions(oviper.KeyDelimiter(cfgKeyDelimiter(cfgType)), oviper.IniLoadOptions(ini.LoadOptions{
 		SpaceBeforeInlineComment: true,
 		PreserveSurroundedQuote:  true,
 	}))
 	v.SetConfigType(strings.ToLower(string(cfgType)))
 	return v
+}
+
+func cfgKeyDelimiter(cfgType parametersv1alpha1.CfgFileFormat) string {
+	if cfgType == parametersv1alpha1.Properties || cfgType == parametersv1alpha1.Dotenv {
+		return CfgDelimiterPlaceholder
+	}
+	return DelimiterDot
 }
 
 func createViper(format parametersv1alpha1.CfgFileFormat) ConfigObjectCreator {

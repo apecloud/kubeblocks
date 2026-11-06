@@ -27,8 +27,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/parameters/unstructured"
 	"github.com/apecloud/kubeblocks/pkg/parameters/util"
-	"github.com/apecloud/kubeblocks/pkg/unstructured"
 )
 
 // CreateConfigPatch creates a patch for configuration files with different version.

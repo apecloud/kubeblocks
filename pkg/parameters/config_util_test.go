@@ -729,7 +729,7 @@ var _ = Describe("config_util", func() {
 				wantErr: true,
 			}}
 			for _, tt := range tests {
-				got, err := MergeAndValidateConfigs(tt.args.baseCfg, tt.args.updatedParams, []*parametersv1alpha1.ParametersDefinition{&tt.args.parametersDef}, tt.args.configs)
+				got, err := MergeAndValidateConfigs(tt.args.baseCfg, tt.args.updatedParams, nil, []*parametersv1alpha1.ParametersDefinition{&tt.args.parametersDef}, tt.args.configs)
 				Expect(err != nil).Should(BeEquivalentTo(tt.wantErr))
 				if tt.wantErr {
 					continue
@@ -805,7 +805,7 @@ func Test_filterImmutableParameters(t *testing.T) {
 					ImmutableParameters: tt.args.immutableParams,
 				},
 			}}
-			got, err := filterImmutableParameters(tt.args.parameters, "test", paramsDefs)
+			got, err := filterImmutableParameters(tt.args.parameters, nil, "test", paramsDefs)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("filterImmutableParameters() error = %v, wantErr %v", err, tt.wantErr)
 				return

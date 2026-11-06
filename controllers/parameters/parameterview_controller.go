@@ -257,6 +257,9 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 				))
 			}
 			if err := r.patchComponentParameterDesired(reqCtx.Ctx, compParam, desiredPatch); err != nil {
+				if errors.IsConflict(err) {
+					return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update desired parameters")
+				}
 				return r.markInvalid(reqCtx, view, parameterViewReasonDiffFailed, err.Error(), composeStatusUpdates(updateLatestStatus(source), submissionResultUpdate))
 			}
 			if syncBaseRevision(view, source) {
@@ -801,10 +804,6 @@ func (r *ParameterViewReconciler) resolveDesiredParameterPatch(ctx context.Conte
 	if !patch.IsModify {
 		return nil, fmt.Errorf("%s: edited content cannot be represented as desired parameter updates", parameterViewReasonUnsupportedContentChanges)
 	}
-	if err := parameterscore.ValidateConfigPatch(patch, descs); err != nil {
-		return nil, fmt.Errorf("%s: %w", parameterViewReasonSchemaValidationFailed, err)
-	}
-
 	desiredPatch := make(map[string]*string)
 	for _, filePatch := range parameterscore.GenerateVisualizedParamsList(patch, descs) {
 		if filePatch.Key != view.Spec.FileName {
@@ -835,7 +834,7 @@ func (r *ParameterViewReconciler) resolveDesiredParameterPatch(ctx context.Conte
 	mergedData, err := parameters.MergeAndValidateConfigs(baseData, []parameterscore.ParamPairs{{
 		Key:           view.Spec.FileName,
 		UpdatedParams: updatedParams,
-	}}, cfgCtx.paramsDefs, descs)
+	}}, nil, cfgCtx.paramsDefs, descs)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", parameterViewReasonSchemaValidationFailed, err)
 	}
@@ -935,11 +934,12 @@ func trimReasonPrefix(message, reason string) string {
 }
 
 func desiredParametersContain(inputs *parametersv1alpha1.ParameterInputs, patch map[string]*string) bool {
-	if inputs == nil || len(inputs.Assignments) == 0 || len(patch) == 0 {
+	normalized, err := normalizeManagedParameterInputs(inputs)
+	if err != nil || len(normalized) == 0 || len(patch) == 0 {
 		return false
 	}
 	for key, expected := range patch {
-		actual, ok := inputs.Assignments[key]
+		actual, ok := normalized[key]
 		if !ok {
 			return false
 		}
@@ -958,16 +958,8 @@ func (r *ParameterViewReconciler) patchComponentParameterDesired(ctx context.Con
 	if len(patchValues) == 0 {
 		return nil
 	}
-	patch := client.MergeFrom(compParam.DeepCopy())
-	if compParam.Spec.Desired == nil {
-		compParam.Spec.Desired = &parametersv1alpha1.ParameterInputs{}
-	}
-	if compParam.Spec.Desired.Assignments == nil {
-		compParam.Spec.Desired.Assignments = map[string]*string{}
-	}
-	for key, value := range patchValues {
-		compParam.Spec.Desired.Assignments[key] = value
-	}
+	patch := client.MergeFromWithOptions(compParam.DeepCopy(), client.MergeFromWithOptimisticLock{})
+	compParam.Spec.Desired = parameters.MergeManagedParameterInputs(compParam.Spec.Desired, patchValues)
 	return r.Client.Patch(ctx, compParam, patch)
 }
 

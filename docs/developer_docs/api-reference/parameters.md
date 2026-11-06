@@ -542,9 +542,10 @@ ParameterViewContent
 3. when status.latest advances and Content is still only a projection of
    status.base, the controller may auto-refresh Content and move status.base
    forward to status.latest;
-4. when Content has diverged into a real user draft, the controller preserves
-   it and uses status.base as the draft base when replaying the draft onto
-status.latest or surfacing a conflict.</p>
+4. when the effective content changes after status.base and an edited ReadWrite
+   draft differs semantically from the latest effective content, the controller
+   reports Conflict and preserves Content and status.base until the draft is
+resolved or resetToLatest is set.</p>
 </td>
 </tr>
 </tbody>
@@ -2542,9 +2543,10 @@ ParameterViewContent
 3. when status.latest advances and Content is still only a projection of
    status.base, the controller may auto-refresh Content and move status.base
    forward to status.latest;
-4. when Content has diverged into a real user draft, the controller preserves
-   it and uses status.base as the draft base when replaying the draft onto
-status.latest or surfacing a conflict.</p>
+4. when the effective content changes after status.base and an edited ReadWrite
+   draft differs semantically from the latest effective content, the controller
+   reports Conflict and preserves Content and status.base until the draft is
+resolved or resetToLatest is set.</p>
 </td>
 </tr>
 </tbody>
@@ -2661,9 +2663,10 @@ ParameterViewRevision
 <em>(Optional)</em>
 <p>Latest records the latest effective content revision observed by the controller.
 When Base and Latest are equal, spec.content is based on the current latest
-effective revision. When they differ, spec.content is either waiting to
-auto-refresh because no real draft exists, or waiting for the controller to
-replay or reject a preserved user draft against the newer latest revision.</p>
+effective revision. When their content hashes differ, unedited content can
+auto-refresh. An edited ReadWrite draft that differs semantically from the
+latest effective content enters Conflict, preserving spec.content and Base
+until resolved or reset.</p>
 </td>
 </tr>
 <tr>

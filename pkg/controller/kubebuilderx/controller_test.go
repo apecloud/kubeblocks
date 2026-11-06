@@ -44,6 +44,35 @@ var _ = Describe("controller test", func() {
 	)
 
 	Context("Dummy Controller", func() {
+		DescribeTable("retains retries through the remaining computation and commit", func(first, second Result, delay time.Duration, calls int) {
+			ctx := context.Background()
+			cli := fake.NewFakeClient()
+			root := builder.NewPodBuilder(namespace, name).GetObject()
+			Expect(cli.Create(ctx, root)).Should(Succeed())
+			tree := NewObjectTree()
+			tree.SetRoot(root)
+			tree.EventRecorder = record.NewFakeRecorder(100)
+			called := 0
+			res, err := NewController(ctx, cli, ctrl.Request{}, record.NewFakeRecorder(100), log.FromContext(ctx)).
+				Prepare(&dummyLoader{tree: tree}).
+				Do(&dummyReconciler{res: first, calls: &called}).
+				Do(&dummyReconciler{res: second, calls: &called}).Commit()
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(called).Should(Equal(calls))
+			Expect(res.Requeue).Should(BeTrue())
+			Expect(res.RequeueAfter).Should(Equal(delay))
+			if calls == 2 {
+				Expect(cli.Get(ctx, client.ObjectKey{Namespace: "hello", Name: "world"}, builder.NewConfigMapBuilder("hello", "world").GetObject())).Should(Succeed())
+			}
+		},
+			Entry("later Continue", Result{Next: cntn, RetryAfter: time.Second}, Continue, time.Second, 2),
+			Entry("later Commit", Result{Next: cntn, RetryAfter: time.Second}, Commit, time.Second, 2),
+			Entry("later longer retry", Result{Next: cntn, RetryAfter: time.Second}, RetryAfter(2*time.Second), time.Second, 2),
+			Entry("later shorter retry", Result{Next: cntn, RetryAfter: time.Second}, RetryAfter(time.Millisecond), time.Millisecond, 2),
+			Entry("later immediate retry", Result{Next: cntn, RetryAfter: time.Second}, RetryAfter(0), time.Duration(0), 2),
+			Entry("publication barrier", RetryAfter(time.Millisecond), Continue, time.Millisecond, 1),
+		)
+
 		It("should work well", func() {
 			ctx := context.Background()
 			cli := fake.NewFakeClient()
@@ -140,6 +169,7 @@ func (d *dummyLoader) Load(ctx context.Context, reader client.Reader, request ct
 var _ TreeLoader = &dummyLoader{}
 
 type dummyReconciler struct {
+	calls       *int
 	preErr      error
 	unsatisfied bool
 	res         Result
@@ -157,6 +187,9 @@ func (d *dummyReconciler) PreCondition(tree *ObjectTree) *CheckResult {
 }
 
 func (d *dummyReconciler) Reconcile(tree *ObjectTree) (Result, error) {
+	if d.calls != nil {
+		*d.calls++
+	}
 	if d.err != nil || d.res.Next != cntn {
 		return d.res, d.err
 	}

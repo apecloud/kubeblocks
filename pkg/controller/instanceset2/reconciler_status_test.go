@@ -21,11 +21,14 @@ package instanceset2
 
 import (
 	"testing"
+	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -127,7 +130,7 @@ func TestSetInstanceStatusReadsCurrentStateFromInstance(t *testing.T) {
 	tree := kubebuilderx.NewObjectTree()
 	tree.SetRoot(its)
 	inst := &workloads.Instance{
-		ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Generation: 1},
+		ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Namespace: its.Namespace, Generation: 1},
 		Spec:       workloads.InstanceSpec{InstanceTemplateName: ""},
 		Status: workloads.InstanceStatus2{
 			ObservedGeneration: 1,
@@ -169,10 +172,11 @@ func TestSetInstanceStatusReadsCurrentStateFromInstance(t *testing.T) {
 	inst.Status.Ready = true
 	inst.Status.Available = true
 	inst.Status.Conditions = []metav1.Condition{
-		{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue},
-		{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue},
-		{Type: string(workloads.InstanceFailure), Status: metav1.ConditionTrue},
+		{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue, ObservedGeneration: inst.Generation},
+		{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue, ObservedGeneration: inst.Generation},
+		{Type: string(workloads.InstanceFailure), Status: metav1.ConditionTrue, ObservedGeneration: inst.Generation},
 	}
+	addITS2RuntimePodFixture(t, tree, inst)
 	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
 		t.Fatal(err)
 	}
@@ -269,7 +273,7 @@ func TestSetInstanceStatusKeepsRuntimeStateIndependentFromConvergence(t *testing
 	tree := kubebuilderx.NewObjectTree()
 	tree.SetRoot(its)
 	inst := &workloads.Instance{
-		ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Generation: 2},
+		ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Namespace: its.Namespace, Generation: 2},
 		Status: workloads.InstanceStatus2{
 			ObservedGeneration: 1,
 			CurrentState:       workloads.InstanceCurrentStatePresent,
@@ -279,9 +283,10 @@ func TestSetInstanceStatusKeepsRuntimeStateIndependentFromConvergence(t *testing
 			Ready:              true,
 			Available:          true,
 			Role:               "leader",
-			Conditions: []metav1.Condition{{
-				Type: string(workloads.InstanceFailure), Status: metav1.ConditionTrue,
-			}},
+			Conditions: []metav1.Condition{
+				{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue, ObservedGeneration: 1},
+				{Type: string(workloads.InstanceFailure), Status: metav1.ConditionTrue, ObservedGeneration: 1},
+			},
 		},
 	}
 	desiredInstances, _, err := buildDesiredInstancesByName(tree, its)
@@ -293,13 +298,25 @@ func TestSetInstanceStatusKeepsRuntimeStateIndependentFromConvergence(t *testing
 		t.Fatal(err)
 	}
 
+	addITS2RuntimePodFixture(t, tree, inst)
 	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
 		t.Fatal(err)
 	}
 	status := its.FindInstanceStatus(inst.Name)
 	if status == nil || status.CurrentRevision != "current" || status.UpdateRevision != desiredPodRevision || status.UpToDate ||
+		status.Ready || status.Available || !status.Failed || status.Role != "leader" {
+		t.Fatalf("stale child generation provided trusted health or lost observed runtime state: %#v", status)
+	}
+
+	inst.Status.ObservedGeneration = inst.Generation
+	meta.FindStatusCondition(inst.Status.Conditions, string(workloads.InstanceReady)).ObservedGeneration = inst.Generation
+	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
+		t.Fatal(err)
+	}
+	status = its.FindInstanceStatus(inst.Name)
+	if status == nil || status.CurrentRevision != "current" || status.UpdateRevision != desiredPodRevision || status.UpToDate ||
 		!status.Ready || !status.Available || !status.Failed || status.Role != "leader" {
-		t.Fatalf("runtime state was coupled to stale desired-state convergence: %#v", status)
+		t.Fatalf("current runtime health was coupled to desired-state convergence: %#v", status)
 	}
 }
 
@@ -734,15 +751,16 @@ func TestStatusReconcilerReadsCurrentRevisionFromInstanceStatus(t *testing.T) {
 		Ready:              true,
 		Available:          true,
 		Conditions: []metav1.Condition{
-			{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue},
-			{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue},
+			{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue, ObservedGeneration: inst.Generation},
+			{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue, ObservedGeneration: inst.Generation},
 		},
 	}
 
+	addITS2RuntimePodFixture(t, tree, inst)
 	if err := tree.Add(inst); err != nil {
 		t.Fatalf("add instance: %v", err)
 	}
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+	if _, err := (&statusReconciler{}).reconcileStatus(tree); err != nil {
 		t.Fatalf("reconcile status: %v", err)
 	}
 
@@ -775,7 +793,7 @@ func TestStatusReconcilerReadsCurrentRevisionFromInstanceStatus(t *testing.T) {
 	// Dynamic config and PVC convergence are represented by UpToDate, but do not make a
 	// healthy runtime unready or unavailable.
 	inst.Status.UpToDate = false
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+	if _, err := (&statusReconciler{}).reconcileStatus(tree); err != nil {
 		t.Fatalf("reconcile non-converged runtime status: %v", err)
 	}
 	got = tree.GetRoot().(*workloads.InstanceSet)
@@ -849,7 +867,7 @@ func TestStatusReconcilerDoesNotDependOnRevisionAnnotationForCurrentRevision(t *
 	if err := tree.Add(inst); err != nil {
 		t.Fatalf("add instance: %v", err)
 	}
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+	if _, err := (&statusReconciler{}).reconcileStatus(tree); err != nil {
 		t.Fatalf("reconcile status: %v", err)
 	}
 
@@ -902,7 +920,7 @@ func TestStatusReconcilerPublishesTransferredFlatAllocation(t *testing.T) {
 	tree := kubebuilderx.NewObjectTree()
 	tree.SetRoot(its)
 
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+	if _, err := (&statusReconciler{}).reconcileStatus(tree); err != nil {
 		t.Fatal(err)
 	}
 	if its.Status.ReadyReplicas != 0 || len(its.Status.InstanceStatus) != 2 {
@@ -963,7 +981,7 @@ func TestITS2AllocationChangesStayInDesiredAndCurrentState(t *testing.T) {
 	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+	if _, err := (&statusReconciler{}).reconcileStatus(tree); err != nil {
 		t.Fatal(err)
 	}
 	added := its.FindInstanceStatus("demo-2")
@@ -976,7 +994,7 @@ func TestITS2AllocationChangesStayInDesiredAndCurrentState(t *testing.T) {
 	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+	if _, err := (&statusReconciler{}).reconcileStatus(tree); err != nil {
 		t.Fatal(err)
 	}
 	released := its.FindInstanceStatus("demo-1")
@@ -989,7 +1007,7 @@ func TestITS2AllocationChangesStayInDesiredAndCurrentState(t *testing.T) {
 	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+	if _, err := (&statusReconciler{}).reconcileStatus(tree); err != nil {
 		t.Fatal(err)
 	}
 	offline := its.FindInstanceStatus("demo-0")
@@ -1035,7 +1053,7 @@ func newITS2InstanceStatusFixtureFromSet(t *testing.T, its *workloads.InstanceSe
 		}
 		instances[name] = inst
 	}
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+	if _, err := (&statusReconciler{}).reconcileStatus(tree); err != nil {
 		t.Fatal(err)
 	}
 	assertITS2UpToDate(t, its, "demo-0", true)
@@ -1067,5 +1085,31 @@ func assertITS2UpToDate(t *testing.T, its *workloads.InstanceSet, name string, w
 	status := its.FindInstanceStatus(name)
 	if status == nil || status.UpToDate != want {
 		t.Fatalf("instance %s UpToDate = %#v, want %v", name, status, want)
+	}
+}
+
+func addITS2RuntimePodFixture(t *testing.T, tree *kubebuilderx.ObjectTree, inst *workloads.Instance) {
+	t.Helper()
+	inst.UID = types.UID(inst.Name)
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: inst.Name, Namespace: inst.Namespace,
+			Labels: map[string]string{appsv1.ControllerRevisionHashLabelKey: inst.Status.CurrentRevision},
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion: workloads.GroupVersion.String(), Kind: "Instance", Name: inst.Name,
+				UID: inst.UID, Controller: ptr.To(true),
+			}},
+		},
+		Spec: *inst.Spec.Template.Spec.DeepCopy(),
+		Status: corev1.PodStatus{
+			Phase:      corev1.PodRunning,
+			Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: metav1.NewTime(time.Now().Add(-time.Hour))}},
+		},
+	}
+	for _, container := range pod.Spec.Containers {
+		pod.Status.ContainerStatuses = append(pod.Status.ContainerStatuses, corev1.ContainerStatus{Name: container.Name, Image: container.Image, Ready: true})
+	}
+	if err := tree.Add(pod); err != nil {
+		t.Fatal(err)
 	}
 }

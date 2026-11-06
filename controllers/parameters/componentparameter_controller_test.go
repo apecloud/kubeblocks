@@ -20,20 +20,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	"context"
+	"encoding/json"
+	"strconv"
 	"strings"
+	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
+	"github.com/apecloud/kubeblocks/pkg/parameters/unstructured"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/parameters/util"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
@@ -206,18 +216,17 @@ var _ = Describe("ComponentParameter Controller", func() {
 		})
 
 		It("should project init first and let desired override it", func() {
-			_, _, _, _, _ = mockReconcileResource()
+			_, _, _, _, _ = mockReconcileResourceWithInitial(&parametersv1alpha1.ParameterInputs{
+				Assignments: map[string]*string{
+					"max_connections": cfgutil.ToPointer("1000"),
+				},
+			})
 
 			cfgKey := client.ObjectKey{
 				Namespace: testCtx.DefaultNamespace,
 				Name:      core.GenerateComponentConfigurationName(clusterName, defaultCompName),
 			}
 			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *parametersv1alpha1.ComponentParameter) {
-				cfg.Spec.Initial = &parametersv1alpha1.ParameterInputs{
-					Assignments: map[string]*string{
-						"max_connections": cfgutil.ToPointer("1000"),
-					},
-				}
 				cfg.Spec.Desired = &parametersv1alpha1.ParameterInputs{
 					Assignments: map[string]*string{
 						"max_connections": cfgutil.ToPointer("2000"),
@@ -234,7 +243,7 @@ var _ = Describe("ComponentParameter Controller", func() {
 		})
 
 		It("should let explicit desired remove override assignments", func() {
-			_, _, _, _, _ = mockReconcileResource()
+			_, _, comp, _, _ := mockReconcileResource()
 
 			cfgKey := client.ObjectKey{
 				Namespace: testCtx.DefaultNamespace,
@@ -259,6 +268,25 @@ var _ = Describe("ComponentParameter Controller", func() {
 				decoded := parameters.DecodeParameterOverlay(item.ConfigFileParams["my.cnf"].Parameters)
 				g.Expect(decoded).Should(HaveKey("max_connections"))
 				g.Expect(decoded["max_connections"]).Should(BeNil())
+			})).Should(Succeed())
+
+			configKey := client.ObjectKey{Namespace: comp.Namespace, Name: core.GetComponentCfgName(clusterName, defaultCompName, configSpecName)}
+			checkRemoval := func(g Gomega, cm *corev1.ConfigMap) {
+				config, err := unstructured.LoadConfig(testparameters.MysqlConfigFile, cm.Data[testparameters.MysqlConfigFile], parametersv1alpha1.Ini)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(config.Get("mysqld.max_connections")).Should(BeNil())
+				g.Expect(config.Get("mysqld.gtid_mode")).Should(Equal("OFF"))
+			}
+			Eventually(testapps.CheckObj(&testCtx, configKey, checkRemoval)).Should(Succeed())
+
+			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(comp), func(obj *appsv1.Component) {
+				obj.Spec.Replicas = 2
+			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, configKey, func(g Gomega, cm *corev1.ConfigMap) {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(comp), comp)).Should(Succeed())
+				g.Expect(comp.Spec.Replicas).Should(Equal(int32(2)))
+				g.Expect(cm.Annotations[constant.ParametersAppliedComponentGenerationKey]).Should(Equal(strconv.FormatInt(comp.Generation, 10)))
+				checkRemoval(g, cm)
 			})).Should(Succeed())
 		})
 
@@ -304,6 +332,14 @@ var _ = Describe("ComponentParameter Controller", func() {
 				g.Expect(fileParams.UnmanagedUpdates[0].Section).Should(Equal(cfgutil.ToPointer("mysqld")))
 				g.Expect(fileParams.UnmanagedUpdates[0].Updates).Should(HaveLen(2))
 				g.Expect(fileParams.Parameters).Should(HaveKeyWithValue("max_connections", cfgutil.ToPointer("2000")))
+			})).Should(Succeed())
+			configKey := client.ObjectKey{Namespace: testCtx.DefaultNamespace, Name: core.GetComponentCfgName(clusterName, defaultCompName, configSpecName)}
+			Eventually(testapps.CheckObj(&testCtx, configKey, func(g Gomega, cm *corev1.ConfigMap) {
+				config, err := unstructured.LoadConfig(testparameters.MysqlConfigFile, cm.Data[testparameters.MysqlConfigFile], parametersv1alpha1.Ini)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(config.Get("mysqld.gtid_mode")).Should(BeNil())
+				g.Expect(config.Get("mysqld.custom_local")).Should(Equal("on"))
+				g.Expect(config.Get("mysqld.max_connections")).Should(Equal("2000"))
 			})).Should(Succeed())
 		})
 
@@ -377,3 +413,248 @@ var _ = Describe("ComponentParameter Controller", func() {
 		})
 	})
 })
+
+var _ = Describe("Initial immutable parameters", func() {
+	BeforeEach(cleanEnv)
+	AfterEach(cleanEnv)
+
+	initialInputs := func() *parametersv1alpha1.ParameterInputs {
+		return &parametersv1alpha1.ParameterInputs{
+			Assignments: map[string]*string{"max_connections": cfgutil.ToPointer("1000")},
+		}
+	}
+	parameterKey := func() client.ObjectKey {
+		return client.ObjectKey{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      core.GenerateComponentConfigurationName(clusterName, defaultCompName),
+		}
+	}
+	configKey := func() client.ObjectKey {
+		return client.ObjectKey{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      core.GetComponentCfgName(clusterName, defaultCompName, configSpecName),
+		}
+	}
+	createInitial := func() (*appsv1.Component, string) {
+		_, _, comp, _, its := mockReconcileResourceWithInitial(initialInputs(), func(_ *corev1.ConfigMap, _ *appsv1.ComponentDefinition) {
+			key := client.ObjectKey{Name: paramsDefName}
+			Eventually(testapps.GetAndChangeObj(&testCtx, key, func(pd *parametersv1alpha1.ParametersDefinition) {
+				pd.Spec.ImmutableParameters = []string{"max_connections"}
+			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pd *parametersv1alpha1.ParametersDefinition) {
+				g.Expect(pd.Spec.ImmutableParameters).Should(ConsistOf("max_connections"))
+			})).Should(Succeed())
+		})
+		Eventually(testapps.CheckObj(&testCtx, parameterKey(), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+			g.Expect(cp.Spec.Initial).Should(Equal(initialInputs()))
+			g.Expect(cp.Status.Phase).Should(Equal(parametersv1alpha1.CFinishedPhase))
+		})).Should(Succeed())
+		waitRenderedConfigHash(comp.Namespace, clusterName, defaultCompName, configSpecName, "max_connections=1000")
+		return comp, its.Name
+	}
+
+	It("accepts an initial immutable value and preserves it across rerender and ConfigMap recreation", func() {
+		comp, _ := createInitial()
+		By("rerender the same initial inputs for successive component generations")
+		for _, replicas := range []int32{2, 3} {
+			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(comp), func(obj *appsv1.Component) {
+				obj.Spec.Replicas = replicas
+			})).Should(Succeed())
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(comp), comp)).Should(Succeed())
+			generation := strconv.FormatInt(comp.Generation, 10)
+			Eventually(testapps.CheckObj(&testCtx, configKey(), func(g Gomega, cm *corev1.ConfigMap) {
+				g.Expect(cm.Annotations[constant.ParametersAppliedComponentGenerationKey]).Should(Equal(generation))
+				g.Expect(cm.Data[testparameters.MysqlConfigFile]).Should(ContainSubstring("max_connections=1000"))
+			})).Should(Succeed())
+		}
+
+		By("recreate a deleted managed ConfigMap with the same initial immutable value")
+		cm := &corev1.ConfigMap{}
+		Expect(k8sClient.Get(ctx, configKey(), cm)).Should(Succeed())
+		oldUID := cm.UID
+		Expect(k8sClient.Delete(ctx, cm)).Should(Succeed())
+		By("complete ConfigMap removal to exercise recovery from a missing rendered resource")
+		Eventually(testapps.GetAndChangeObj(&testCtx, configKey(), func(deleting *corev1.ConfigMap) {
+			deleting.Finalizers = nil
+		})).Should(Succeed())
+		Eventually(testapps.CheckObj(&testCtx, configKey(), func(g Gomega, recreated *corev1.ConfigMap) {
+			g.Expect(recreated.UID).ShouldNot(Equal(oldUID))
+			g.Expect(recreated.Data[testparameters.MysqlConfigFile]).Should(ContainSubstring("max_connections=1000"))
+		})).Should(Succeed())
+	})
+
+	It("preserves initial immutable values when desired updates another parameter in the same file", func() {
+		comp, itsName := createInitial()
+		for _, value := range []string{"ON", "OFF"} {
+			Eventually(testapps.GetAndChangeObj(&testCtx, parameterKey(), func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Spec.Desired = &parametersv1alpha1.ParameterInputs{
+					Assignments: map[string]*string{"gtid_mode": cfgutil.ToPointer(value)},
+				}
+			})).Should(Succeed())
+			hash := waitRenderedConfigHash(comp.Namespace, clusterName, defaultCompName, configSpecName,
+				"max_connections=1000", "gtid_mode="+value)
+			mockReconfigureDone(comp.Namespace, itsName, configSpecName, hash)
+			Eventually(testapps.CheckObj(&testCtx, parameterKey(), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+				g.Expect(cp.Status.ObservedGeneration).Should(Equal(cp.Generation))
+				g.Expect(cp.Status.Phase).Should(Equal(parametersv1alpha1.CFinishedPhase))
+			})).Should(Succeed())
+		}
+	})
+
+	It("rejects desired set, remove, and same-value writes to an initial immutable parameter", func() {
+		createInitial()
+		for _, desired := range []*parametersv1alpha1.ParameterInputs{
+			{Assignments: map[string]*string{"max_connections": cfgutil.ToPointer("2000")}},
+			{Updates: []parametersv1alpha1.ParameterUpdate{{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "max_connections"}}},
+			{Assignments: map[string]*string{"max_connections": cfgutil.ToPointer("1000")}},
+		} {
+			Eventually(testapps.GetAndChangeObj(&testCtx, parameterKey(), func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Spec.Desired = desired
+			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, parameterKey(), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+				g.Expect(cp.Status.ObservedGeneration).Should(Equal(cp.Generation))
+				g.Expect(cp.Status.Phase).Should(Equal(parametersv1alpha1.CMergeFailedPhase))
+				g.Expect(cp.Status.Message).Should(ContainSubstring("max_connections"))
+				g.Expect(cp.Status.Message).Should(ContainSubstring("immutable"))
+			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, configKey(), func(g Gomega, cm *corev1.ConfigMap) {
+				g.Expect(cm.Data[testparameters.MysqlConfigFile]).Should(ContainSubstring("max_connections=1000"))
+				g.Expect(cm.Data[testparameters.MysqlConfigFile]).ShouldNot(ContainSubstring("max_connections=2000"))
+			})).Should(Succeed())
+		}
+	})
+
+	It("rejects adding, changing, or removing Initial after ComponentParameter creation at the API", func() {
+		for _, tc := range []struct {
+			name    string
+			initial *parametersv1alpha1.ParameterInputs
+			next    *parametersv1alpha1.ParameterInputs
+		}{
+			{name: "add", next: initialInputs()},
+			{name: "add-empty", next: &parametersv1alpha1.ParameterInputs{}},
+			{name: "change", initial: initialInputs(), next: &parametersv1alpha1.ParameterInputs{
+				Assignments: map[string]*string{"max_connections": cfgutil.ToPointer("2000")},
+			}},
+			{name: "remove", initial: initialInputs()},
+			{name: "clear", initial: initialInputs(), next: &parametersv1alpha1.ParameterInputs{}},
+		} {
+			cp := &parametersv1alpha1.ComponentParameter{
+				ObjectMeta: metav1.ObjectMeta{Name: "initial-validation-" + tc.name, Namespace: testCtx.DefaultNamespace},
+				Spec: parametersv1alpha1.ComponentParameterSpec{
+					ComponentName: "unbound-component", Initial: tc.initial,
+				},
+			}
+			Expect(k8sClient.Create(ctx, cp)).Should(Succeed())
+			patch, err := json.Marshal([]map[string]any{{"op": "add", "path": "/spec/initial", "value": tc.next}})
+			Expect(err).ShouldNot(HaveOccurred())
+			err = k8sClient.Patch(ctx, cp, client.RawPatch(types.JSONPatchType, patch))
+			Expect(apierrors.IsInvalid(err)).Should(BeTrue(), "Initial %s must be rejected by API validation, got: %v", tc.name, err)
+		}
+	})
+})
+
+func TestComponentParameterReconcileRetriesMissingService(t *testing.T) {
+	const namespace = "service-retry"
+	template := testparameters.NewComponentTemplateFactory(configSpecName, namespace).
+		AddConfigFile(testparameters.MysqlConfigFile, "[mysqld]\netcd_host={{ $.component.serviceReferences.etcd.spec.host.value }}\n").
+		GetObject()
+	compDef := testapps.NewComponentDefinitionFactory(compDefName).
+		SetDefaultSpec().
+		AddConfigTemplate(configSpecName, template.Name, namespace, configVolumeName, true).
+		AddServiceRef("etcd", "etcd", "3.5").
+		GetObject()
+	compDef.Status.Phase = appsv1.AvailablePhase
+	paramsDef := testparameters.NewParametersDefinitionFactory(paramsDefName).
+		SetComponentDefinition(compDef.Name).
+		SetTemplateName(configSpecName).
+		GetObject()
+	paramsDef.Status.Phase = parametersv1alpha1.PDAvailablePhase
+	serviceRef := appsv1.ServiceRef{
+		Name: "etcd",
+		ClusterServiceSelector: &appsv1.ServiceRefClusterSelector{
+			Cluster: "etcd",
+			Service: &appsv1.ServiceRefServiceSelector{Service: "client", Port: "client"},
+		},
+	}
+	cluster := testapps.NewClusterFactory(namespace, clusterName, "").
+		AddComponent(defaultCompName, compDef.Name).
+		SetReplicas(1).
+		SetServiceRefs([]appsv1.ServiceRef{serviceRef}).
+		GetObject()
+	comp := testapps.NewComponentFactory(namespace, constant.GenerateClusterComponentName(clusterName, defaultCompName), compDef.Name).
+		AddLabels(constant.AppInstanceLabelKey, clusterName).
+		AddAnnotations(constant.KBAppClusterUIDKey, "cluster-uid").
+		SetReplicas(1).
+		GetObject()
+	comp.Spec.ServiceRefs = []appsv1.ServiceRef{serviceRef}
+	compParam := &parametersv1alpha1.ComponentParameter{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       core.GenerateComponentConfigurationName(clusterName, defaultCompName),
+			Namespace:  namespace,
+			UID:        "parameter-uid",
+			Generation: 1,
+		},
+		Spec: parametersv1alpha1.ComponentParameterSpec{ClusterName: clusterName, ComponentName: defaultCompName},
+	}
+	reconciler := newComponentParameterRetryReconciler(t, template, compDef, paramsDef, cluster, comp, compParam)
+	ctx := context.Background()
+	req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(compParam)}
+	if _, err := reconciler.Reconcile(ctx, req); err != nil {
+		t.Fatalf("initialize config items: %v", err)
+	}
+	if err := reconciler.Get(ctx, req.NamespacedName, compParam); err != nil {
+		t.Fatal(err)
+	}
+	if len(compParam.Spec.ConfigItemDetails) != 1 {
+		t.Fatalf("expected initialized config item, got %#v", compParam.Spec.ConfigItemDetails)
+	}
+	_, err := reconciler.Reconcile(ctx, req)
+	if !apierrors.IsNotFound(err) {
+		t.Errorf("expected missing referenced Service to return a retryable NotFound error, got %v", err)
+	}
+	configKey := client.ObjectKey{Namespace: namespace, Name: core.GetComponentCfgName(clusterName, defaultCompName, configSpecName)}
+	if err := reconciler.Get(ctx, configKey, &corev1.ConfigMap{}); !apierrors.IsNotFound(err) {
+		t.Fatalf("expected no rendered config before the referenced Service exists, got %v", err)
+	}
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: constant.GenerateClusterServiceName("etcd", "client")},
+		Spec:       corev1.ServiceSpec{Ports: []corev1.ServicePort{{Name: "client", Port: 2379}}},
+	}
+	if err := reconciler.Create(ctx, service); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := reconciler.Reconcile(ctx, req); err != nil {
+		t.Fatalf("retry after referenced Service creation: %v", err)
+	}
+	rendered := &corev1.ConfigMap{}
+	if err := reconciler.Get(ctx, configKey, rendered); err != nil {
+		t.Fatalf("get rendered config after retry: %v", err)
+	}
+	if got, want := rendered.Data[testparameters.MysqlConfigFile], "[mysqld]\netcd_host=etcd-client\n"; got != want {
+		t.Fatalf("rendered config = %q, want %q", got, want)
+	}
+}
+
+func TestComponentParameterReconcileMissingTarget(t *testing.T) {
+	reconciler := newComponentParameterRetryReconciler(t)
+	result, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: client.ObjectKey{Namespace: "service-retry", Name: "deleted-component-parameter"},
+	})
+	if err != nil || result != (ctrl.Result{}) {
+		t.Fatalf("missing ComponentParameter should not retry, got result %v and error %v", result, err)
+	}
+}
+
+func newComponentParameterRetryReconciler(t *testing.T, objects ...client.Object) *ComponentParameterReconciler {
+	t.Helper()
+	scheme := runtime.NewScheme()
+	for _, addToScheme := range []func(*runtime.Scheme) error{corev1.AddToScheme, appsv1.AddToScheme, parametersv1alpha1.AddToScheme} {
+		if err := addToScheme(scheme); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).
+		WithStatusSubresource(&parametersv1alpha1.ComponentParameter{}).
+		WithObjects(objects...).Build()
+	return &ComponentParameterReconciler{Client: cli, Scheme: scheme}
+}

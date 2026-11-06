@@ -160,7 +160,8 @@ type ParametersDefinitionSpec struct {
 	DynamicParameters []string `json:"dynamicParameters,omitempty"`
 
 	// Lists the parameters that cannot be modified once set.
-	// Attempts to change any of these parameters are rejected during configuration merge and surface as a merge failure.
+	// These parameters may be specified by managed assignments and updates in ComponentParameter.spec.initial at creation.
+	// Subsequent managed parameter updates are rejected during configuration merge and surface as a merge failure.
 	//
 	// +listType=set
 	// +optional

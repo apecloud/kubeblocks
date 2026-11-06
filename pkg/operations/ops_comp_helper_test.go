@@ -23,6 +23,9 @@ import (
 	"testing"
 	"time"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/pointer"
@@ -32,68 +35,58 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
-func TestComponentActionPhase(t *testing.T) {
-	cluster := &appsv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{Generation: 8},
-		Spec: appsv1.ClusterSpec{
-			ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "mysql"}},
-			Shardings:      []appsv1.ClusterSharding{{Name: "shard"}},
-		},
-		Status: appsv1.ClusterStatus{
-			Components: map[string]appsv1.ClusterComponentStatus{
-				"mysql": {Phase: appsv1.RunningComponentPhase, ObservedGeneration: 7, UpToDate: true},
+var _ = Describe("Component action phase", func() {
+	It("waits for the current target phase after a recoverable failure", func() {
+		cluster := &appsv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Generation: 8},
+			Spec: appsv1.ClusterSpec{
+				ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "mysql"}},
+				Shardings:      []appsv1.ClusterSharding{{Name: "shard"}},
 			},
-			Shardings: map[string]appsv1.ClusterShardingStatus{
-				"shard": {Phase: appsv1.RunningComponentPhase, ObservedGeneration: 8, UpToDate: true},
+			Status: appsv1.ClusterStatus{
+				Components: map[string]appsv1.ClusterComponentStatus{
+					"mysql": {Phase: appsv1.RunningComponentPhase, ObservedGeneration: 7, UpToDate: true},
+				},
+				Shardings: map[string]appsv1.ClusterShardingStatus{
+					"shard": {Phase: appsv1.RunningComponentPhase, ObservedGeneration: 8, UpToDate: true},
+				},
 			},
-		},
-	}
-	ops := &opsv1alpha1.OpsRequest{Status: opsv1alpha1.OpsRequestStatus{
-		ClusterGeneration: 8,
-		Components:        map[string]opsv1alpha1.OpsRequestComponentStatus{},
-	}}
-	opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops}
-	helper := newComponentOpsHelper([]opsv1alpha1.ComponentOps{{ComponentName: "mysql"}, {ComponentName: "shard"}})
+		}
+		ops := &opsv1alpha1.OpsRequest{Status: opsv1alpha1.OpsRequestStatus{
+			ClusterGeneration: 8,
+			Components:        map[string]opsv1alpha1.OpsRequestComponentStatus{},
+		}}
+		opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops}
+		helper := newComponentOpsHelper([]opsv1alpha1.ComponentOps{{ComponentName: "mysql"}, {ComponentName: "shard"}})
 
-	ops.Status.ClusterGeneration = 9
-	phase := helper.componentActionPhase(opsRes, appsv1.RunningComponentPhase)
-	if phase != opsv1alpha1.OpsRunningPhase {
-		t.Fatalf("generation before action phase=%s, want Running", phase)
-	}
-	ops.Status.ClusterGeneration = 8
-	phase = helper.componentActionPhase(opsRes, appsv1.RunningComponentPhase)
-	if phase != opsv1alpha1.OpsRunningPhase {
-		t.Fatalf("stale status phase=%s, want Running", phase)
-	}
+		ops.Status.ClusterGeneration = 9
+		phase := helper.componentActionPhase(opsRes, appsv1.RunningComponentPhase)
+		Expect(phase).To(Equal(opsv1alpha1.OpsRunningPhase))
+		ops.Status.ClusterGeneration = 8
+		phase = helper.componentActionPhase(opsRes, appsv1.RunningComponentPhase)
+		Expect(phase).To(Equal(opsv1alpha1.OpsRunningPhase))
 
-	status := cluster.Status.Components["mysql"]
-	status.ObservedGeneration = cluster.Generation
-	status.UpToDate = false
-	status.Phase = appsv1.FailedComponentPhase
-	cluster.Status.Components["mysql"] = status
-	phase = helper.componentActionPhase(opsRes, appsv1.RunningComponentPhase)
-	if phase != opsv1alpha1.OpsRunningPhase {
-		t.Fatalf("non-current failure phase=%s, want Running", phase)
-	}
+		status := cluster.Status.Components["mysql"]
+		status.ObservedGeneration = cluster.Generation
+		status.UpToDate = false
+		status.Phase = appsv1.FailedComponentPhase
+		cluster.Status.Components["mysql"] = status
+		phase = helper.componentActionPhase(opsRes, appsv1.RunningComponentPhase)
+		Expect(phase).To(Equal(opsv1alpha1.OpsRunningPhase))
 
-	status.UpToDate = true
-	cluster.Status.Components["mysql"] = status
-	phase = helper.componentActionPhase(opsRes, appsv1.RunningComponentPhase)
-	if phase != opsv1alpha1.OpsFailedPhase {
-		t.Fatalf("current failure phase=%s, want Failed", phase)
-	}
+		status.UpToDate = true
+		cluster.Status.Components["mysql"] = status
+		phase = helper.componentActionPhase(opsRes, appsv1.RunningComponentPhase)
+		Expect(phase).To(Equal(opsv1alpha1.OpsRunningPhase))
 
-	status.Phase = appsv1.RunningComponentPhase
-	cluster.Status.Components["mysql"] = status
-	phase = helper.componentActionPhase(opsRes, appsv1.RunningComponentPhase)
-	if phase != opsv1alpha1.OpsSucceedPhase {
-		t.Fatalf("current running status phase=%s, want Succeed", phase)
-	}
-	phase = helper.componentActionPhase(opsRes, appsv1.StoppedComponentPhase)
-	if phase != opsv1alpha1.OpsRunningPhase {
-		t.Fatalf("running status phase=%s, want Running while stopping", phase)
-	}
-}
+		status.Phase = appsv1.RunningComponentPhase
+		cluster.Status.Components["mysql"] = status
+		phase = helper.componentActionPhase(opsRes, appsv1.RunningComponentPhase)
+		Expect(phase).To(Equal(opsv1alpha1.OpsSucceedPhase))
+		phase = helper.componentActionPhase(opsRes, appsv1.StoppedComponentPhase)
+		Expect(phase).To(Equal(opsv1alpha1.OpsRunningPhase))
+	})
+})
 
 func TestSyncCurrentProgressDetails(t *testing.T) {
 	newDetail := func(objectKey string) opsv1alpha1.ProgressStatusDetail {

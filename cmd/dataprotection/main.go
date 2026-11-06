@@ -26,6 +26,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -40,6 +41,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	discoverycli "k8s.io/client-go/discovery"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
@@ -78,12 +80,61 @@ const (
 	leaderElectFlagKey   flagName = "leader-elect"
 	leaderElectIDFlagKey flagName = "leader-elect-id"
 
+	leaderElectLeaseDurationFlagKey flagName = "leader-elect-lease-duration"
+	leaderElectRenewDeadlineFlagKey flagName = "leader-elect-renew-deadline"
+	leaderElectRetryPeriodFlagKey   flagName = "leader-elect-retry-period"
+
 	multiClusterKubeConfigFlagKey       flagName = "multi-cluster-kubeconfig"
 	multiClusterContextsFlagKey         flagName = "multi-cluster-contexts"
 	multiClusterContextsDisabledFlagKey flagName = "multi-cluster-contexts-disabled"
 
 	userAgentFlagKey flagName = "user-agent"
 )
+
+const (
+	// Leader election timings, in seconds.
+	// They mirror the defaults of the main manager (see cmd/manager/main.go), so both deployments
+	// tolerate the same API server stall before giving up leadership.
+	defaultLeaderElectLeaseDuration = 30
+	defaultLeaderElectRenewDeadline = 25
+	defaultLeaderElectRetryPeriod   = 5
+
+	// leaderElectionJitterFactor mirrors leaderelection.JitterFactor, which client-go uses to
+	// validate renewDeadline against retryPeriod.
+	leaderElectionJitterFactor = 1.2
+)
+
+// validateLeaderElectionTiming checks the timings against the constraints enforced by client-go's
+// leaderelection package, so an invalid combination is reported at startup with a clear message
+// instead of failing later during leader election:
+//
+//	leaseDuration > renewDeadline
+//	renewDeadline > 1.2 * retryPeriod
+//
+// NOTE: renewDeadline is a total retry budget rather than a fixed retry count or an independent
+// per-request timeout. Raising it makes the controller tolerate a longer API server stall before
+// giving up leadership, at the cost of a slower leadership takeover. It does not address the
+// underlying API connectivity or latency issue.
+func validateLeaderElectionTiming(leaseDuration, renewDeadline, retryPeriod int) error {
+	if leaseDuration <= 0 {
+		return fmt.Errorf("leader-elect-lease-duration must be greater than zero, got %d", leaseDuration)
+	}
+	if renewDeadline <= 0 {
+		return fmt.Errorf("leader-elect-renew-deadline must be greater than zero, got %d", renewDeadline)
+	}
+	if retryPeriod <= 0 {
+		return fmt.Errorf("leader-elect-retry-period must be greater than zero, got %d", retryPeriod)
+	}
+	if leaseDuration <= renewDeadline {
+		return fmt.Errorf("leader-elect-lease-duration (%d) must be greater than leader-elect-renew-deadline (%d), both in seconds",
+			leaseDuration, renewDeadline)
+	}
+	if float64(renewDeadline) <= leaderElectionJitterFactor*float64(retryPeriod) {
+		return fmt.Errorf("leader-elect-renew-deadline (%d) must be greater than %v * leader-elect-retry-period (%d) = %.1f, all in seconds",
+			renewDeadline, leaderElectionJitterFactor, retryPeriod, leaderElectionJitterFactor*float64(retryPeriod))
+	}
+	return nil
+}
 
 var (
 	scheme   = k8sruntime.NewScheme()
@@ -144,6 +195,13 @@ func main() {
 	flag.String(leaderElectIDFlagKey.String(), "abd03fda",
 		"The leader election ID prefix for controller manager. "+
 			"This ID must be unique to controller manager.")
+
+	flag.Int(leaderElectLeaseDurationFlagKey.String(), defaultLeaderElectLeaseDuration,
+		"The duration (in seconds) that non-leader candidates will wait to force acquire leadership.")
+	flag.Int(leaderElectRenewDeadlineFlagKey.String(), defaultLeaderElectRenewDeadline,
+		"The duration (in seconds) that the acting control plane will retry refreshing leadership before giving up.")
+	flag.Int(leaderElectRetryPeriodFlagKey.String(), defaultLeaderElectRetryPeriod,
+		"The duration (in seconds) the LeaderElector clients should wait between tries of actions.")
 
 	flag.String(multiClusterKubeConfigFlagKey.String(), "", "Paths to the kubeconfig for multi-cluster accessing.")
 	flag.String(multiClusterContextsFlagKey.String(), "", "Kube contexts the manager will talk to.")
@@ -241,6 +299,9 @@ func main() {
 		// if you are doing or intending to do any operation such as performing cleanups
 		// after the manager stops then its usage might be unsafe.
 		LeaderElectionReleaseOnCancel: true,
+		LeaseDuration:                 ptr.To(time.Duration(viper.GetInt(leaderElectLeaseDurationFlagKey.viperName())) * time.Second),
+		RenewDeadline:                 ptr.To(time.Duration(viper.GetInt(leaderElectRenewDeadlineFlagKey.viperName())) * time.Second),
+		RetryPeriod:                   ptr.To(time.Duration(viper.GetInt(leaderElectRetryPeriodFlagKey.viperName())) * time.Second),
 
 		Client: client.Options{
 			Cache: &client.CacheOptions{
@@ -480,6 +541,19 @@ func validateRequiredToParseConfigs() error {
 	if imagePullSecrets := viper.GetString(constant.KBImagePullSecrets); imagePullSecrets != "" {
 		secrets := make([]corev1.LocalObjectReference, 0)
 		if err := json.Unmarshal([]byte(imagePullSecrets), &secrets); err != nil {
+			return err
+		}
+	}
+
+	// Validate the leader election timings at startup so an invalid combination fails fast with a
+	// clear message, instead of surfacing later as an opaque "leader election lost" error. The
+	// timings are only consumed when leader election is enabled.
+	if viper.GetBool(leaderElectFlagKey.viperName()) {
+		if err := validateLeaderElectionTiming(
+			viper.GetInt(leaderElectLeaseDurationFlagKey.viperName()),
+			viper.GetInt(leaderElectRenewDeadlineFlagKey.viperName()),
+			viper.GetInt(leaderElectRetryPeriodFlagKey.viperName()),
+		); err != nil {
 			return err
 		}
 	}

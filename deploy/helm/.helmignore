@@ -30,3 +30,6 @@ dashboards/
 
 # crds, need to separate installation
 crds/
+
+# chart rendering tests, not part of the packaged chart
+*_test.go

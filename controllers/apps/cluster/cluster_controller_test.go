@@ -828,6 +828,38 @@ var _ = Describe("Cluster Controller", func() {
 			testClusterComponentWithTopology(defaultTopology.Name, defaultCompName, setServiceVersion, compDefObj.Name, defaultServiceVersion)
 		})
 
+		DescribeTable("persists network through Cluster reconciliation", func(sharded bool) {
+			network := &appsv1.ComponentNetwork{HostAliases: []corev1.HostAlias{{IP: "10.0.0.1", Hostnames: []string{"custom"}}}}
+			createClusterObjNoWait("", func(f *testapps.MockClusterFactory) {
+				spec := appsv1.ClusterComponentSpec{Name: defaultCompName, ComponentDef: compDefObj.Name, Replicas: 1, Network: network}
+				if sharded {
+					f.Get().Spec.Shardings = []appsv1.ClusterSharding{{Name: defaultCompName, Shards: 1, Template: spec}}
+				} else {
+					f.Get().Spec.ComponentSpecs = []appsv1.ClusterComponentSpec{spec}
+				}
+			})
+			checkNetwork := func(expected *appsv1.ComponentNetwork) {
+				Eventually(func(g Gomega) {
+					components := &appsv1.ComponentList{}
+					g.Expect(testCtx.Cli.List(testCtx.Ctx, components, client.InNamespace(clusterKey.Namespace),
+						client.MatchingLabels{constant.AppInstanceLabelKey: clusterKey.Name})).Should(Succeed())
+					g.Expect(components.Items).Should(HaveLen(1))
+					g.Expect(components.Items[0].Spec.Network).Should(Equal(expected))
+				}).Should(Succeed())
+			}
+			checkNetwork(network)
+			for _, desired := range []*appsv1.ComponentNetwork{{HostNetwork: true}, nil} {
+				Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1.Cluster) {
+					if sharded {
+						cluster.Spec.Shardings[0].Template.Network = desired
+					} else {
+						cluster.Spec.ComponentSpecs[0].Network = desired
+					}
+				})()).Should(Succeed())
+				checkNetwork(desired)
+			}
+		}, Entry("component", false), Entry("sharding", true))
+
 		DescribeTable("persists instance template service versions through Cluster reconciliation", func(sharded bool) {
 			createClusterObjNoWait("", func(f *testapps.MockClusterFactory) {
 				spec := appsv1.ClusterComponentSpec{Name: defaultCompName, ComponentDef: compDefObj.Name,

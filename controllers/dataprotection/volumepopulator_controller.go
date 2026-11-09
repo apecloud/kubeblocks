@@ -444,7 +444,7 @@ func pvcRestorePolicyError(ctx context.Context, cli client.Reader, pvc *corev1.P
 	if err != nil {
 		return intctrlutil.NewFatalError(err.Error())
 	}
-	if err := dptypes.ValidateVolumeRestorePolicy(parameters[dptypes.VolumeRestorePolicyParameterKey],
+	if err := dprestore.ValidateVolumeRestorePolicy(parameters[dptypes.VolumeRestorePolicyParameterKey],
 		"PVC restore parameters["+dptypes.VolumeRestorePolicyParameterKey+"]"); err != nil {
 		return intctrlutil.NewFatalError(err.Error())
 	}
@@ -454,7 +454,7 @@ func pvcRestorePolicyError(ctx context.Context, cli client.Reader, pvc *corev1.P
 			return err
 		}
 		if config := source.Spec.PrepareDataConfig; config != nil {
-			if err := dptypes.ValidateVolumeRestorePolicy(string(config.VolumeClaimRestorePolicy), "spec.prepareDataConfig.volumeClaimRestorePolicy"); err != nil {
+			if err := dprestore.ValidateVolumeRestorePolicy(string(config.VolumeClaimRestorePolicy), "spec.prepareDataConfig.volumeClaimRestorePolicy"); err != nil {
 				return intctrlutil.NewFatalError(err.Error())
 			}
 		}

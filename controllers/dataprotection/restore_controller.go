@@ -222,7 +222,7 @@ func (r *RestoreReconciler) newAction(reqCtx intctrlutil.RequestCtx, restore *dp
 	oldRestore := restore.DeepCopy()
 	patch := client.MergeFrom(oldRestore)
 	if config := restore.Spec.PrepareDataConfig; config != nil {
-		if err := dptypes.ValidateVolumeRestorePolicy(string(config.VolumeClaimRestorePolicy), "spec.prepareDataConfig.volumeClaimRestorePolicy"); err != nil {
+		if err := dprestore.ValidateVolumeRestorePolicy(string(config.VolumeClaimRestorePolicy), "spec.prepareDataConfig.volumeClaimRestorePolicy"); err != nil {
 			dprestore.SetRestoreValidationCondition(restore, dprestore.ReasonValidateFailed, err.Error())
 			restore.Status.Phase = dpv1alpha1.RestorePhaseFailed
 			restore.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}

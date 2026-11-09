@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -521,4 +522,14 @@ func TestRestoreManagerStopsManagerContainer(t *testing.T) {
 	assert.Equal(t, "true", got.Annotations[DataProtectionStopRestoreManagerAnnotationKey])
 	assert.NoError(t, mgr.StopManagerContainer(got))
 	assert.NoError(t, mgr.StopManagerContainerByJob(job))
+}
+
+func TestValidateVolumeRestorePolicy(t *testing.T) {
+	for _, policy := range []string{"", "Parallel"} {
+		require.NoError(t, ValidateVolumeRestorePolicy(policy, dptypes.VolumeRestorePolicyParameterKey))
+	}
+	err := ValidateVolumeRestorePolicy("Serial", dptypes.VolumeRestorePolicyParameterKey)
+	require.ErrorContains(t, err, "Serial is no longer supported")
+	err = ValidateVolumeRestorePolicy("invalid", dptypes.VolumeRestorePolicyParameterKey)
+	require.ErrorContains(t, err, "invalid volume restore policy")
 }

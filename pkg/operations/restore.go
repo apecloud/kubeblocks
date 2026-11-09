@@ -390,12 +390,12 @@ func (r RestoreOpsHandler) rebuildShardAccountSecrets(cluster *appsv1.Cluster) {
 }
 
 func validateRestorePolicy(spec *opsv1alpha1.Restore) error {
-	if err := dptypes.ValidateVolumeRestorePolicy(spec.VolumeRestorePolicy, "spec.restore.volumeRestorePolicy"); err != nil {
+	if err := restore.ValidateVolumeRestorePolicy(spec.VolumeRestorePolicy, "spec.restore.volumeRestorePolicy"); err != nil {
 		return err
 	}
 	for _, parameter := range spec.Parameters {
 		if parameter.Name == dptypes.VolumeRestorePolicyParameterKey {
-			if err := dptypes.ValidateVolumeRestorePolicy(parameter.Value, "spec.restore.parameters["+parameter.Name+"]"); err != nil {
+			if err := restore.ValidateVolumeRestorePolicy(parameter.Value, "spec.restore.parameters["+parameter.Name+"]"); err != nil {
 				return err
 			}
 		}

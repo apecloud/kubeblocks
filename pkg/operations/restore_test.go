@@ -72,7 +72,7 @@ var _ = Describe("Restore OpsRequest", func() {
 		Expect(cluster.Spec.Restore.Source.Namespace).Should(Equal(opsRequest.Namespace))
 		Expect(cluster.Spec.Restore.PITR).Should(Equal("2026-05-04T08:00:00Z"))
 		Expect(cluster.Spec.Restore.Parameters).Should(HaveKeyWithValue("restore-param", "restore-value"))
-		Expect(cluster.Spec.Restore.Parameters).Should(HaveKeyWithValue(dptypes.VolumeRestorePolicyParameterKey, string(dpv1alpha1.VolumeClaimRestorePolicySerial)))
+		Expect(cluster.Spec.Restore.Parameters).Should(HaveKeyWithValue(dptypes.VolumeRestorePolicyParameterKey, string(dpv1alpha1.VolumeClaimRestorePolicyParallel)))
 		Expect(cluster.Spec.Restore.Parameters).Should(HaveKeyWithValue(dptypes.DeferPostReadyUntilClusterRunningParameterKey, "true"))
 		var restoreEnv []corev1.EnvVar
 		Expect(json.Unmarshal([]byte(cluster.Spec.Restore.Parameters[dptypes.RestoreEnvParameterKey]), &restoreEnv)).Should(Succeed())
@@ -426,7 +426,7 @@ func createRestoreOpsObj(clusterName, restoreOpsName, backupName string) *opsv1a
 				Restore: &opsv1alpha1.Restore{
 					BackupName:          backupName,
 					RestorePointInTime:  "2026-05-04T08:00:00Z",
-					VolumeRestorePolicy: string(dpv1alpha1.VolumeClaimRestorePolicySerial),
+					VolumeRestorePolicy: string(dpv1alpha1.VolumeClaimRestorePolicyParallel),
 					Env:                 []corev1.EnvVar{{Name: "RESTORE_ENV", Value: "true"}},
 					Parameters:          []dpv1alpha1.ParameterPair{{Name: "restore-param", Value: "restore-value"}},
 				},
@@ -495,7 +495,7 @@ func newRestoreTargetClusterWithoutRestoreCondition(namespace, name string, phas
 				PITR: "2026-05-04T08:00:00Z",
 				Parameters: map[string]string{
 					"restore-param":                                       "restore-value",
-					dptypes.VolumeRestorePolicyParameterKey:               string(dpv1alpha1.VolumeClaimRestorePolicySerial),
+					dptypes.VolumeRestorePolicyParameterKey:               string(dpv1alpha1.VolumeClaimRestorePolicyParallel),
 					dptypes.RestoreEnvParameterKey:                        `[{"name":"RESTORE_ENV","value":"true"}]`,
 					dptypes.DeferPostReadyUntilClusterRunningParameterKey: "true",
 				},

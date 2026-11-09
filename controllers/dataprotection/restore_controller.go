@@ -87,6 +87,15 @@ func (r *RestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return *res, err
 	}
 
+	if restore.Status.Phase != dpv1alpha1.RestorePhaseCompleted && restore.Status.Phase != dpv1alpha1.RestorePhaseFailed {
+		if err := executionRestorePolicyError(reqCtx.Ctx, r.Client, restore); err != nil {
+			if isInvalidRestorePolicy(err) {
+				return r.rejectRestorePolicy(reqCtx, restore, err)
+			}
+			return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+		}
+	}
+
 	switch restore.Status.Phase {
 	case "":
 		return r.newAction(reqCtx, restore)
@@ -517,10 +526,6 @@ func (r *RestoreReconciler) handleBackupActionSet(reqCtx intctrlutil.RequestCtx,
 	allActionsFinished, existFailedAction, err = restoreMgr.CheckJobsDone(stage, actionName, backupSet, jobs)
 	if err != nil {
 		return false, err
-	}
-	if stage == dpv1alpha1.PrepareData {
-		// recalculation whether all actions have been completed.
-		restoreMgr.Recalculation(backupSet.Backup.Name, actionName, &allActionsFinished, &existFailedAction)
 	}
 	return checkIsCompleted(allActionsFinished, existFailedAction)
 }

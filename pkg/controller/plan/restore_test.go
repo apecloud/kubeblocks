@@ -42,11 +42,10 @@ func newRestoreManagerForTest() *RestoreManager {
 				UID:       types.UID("12345678-1234-1234-1234-1234567890ab"),
 			},
 		},
-		namespace:           "default",
-		replicas:            2,
-		startingIndex:       1,
-		volumeRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicyParallel,
-		restoreLabels:       map[string]string{"restore": "true"},
+		namespace:     "default",
+		replicas:      2,
+		startingIndex: 1,
+		restoreLabels: map[string]string{"restore": "true"},
 	}
 }
 

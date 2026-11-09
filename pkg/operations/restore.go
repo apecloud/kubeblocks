@@ -65,6 +65,15 @@ func (r RestoreOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx,
 
 // Action implements the restore action.
 func (r RestoreOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
+	if spec := opsRes.OpsRequest.Spec.GetRestore(); spec != nil && validateRestorePolicy(spec) != nil {
+		// Cluster creation can precede recording Running. Resume rejection of
+		// that existing operation instead of abandoning its execution resources.
+		phase, _, err := r.ReconcileAction(reqCtx, cli, opsRes)
+		if phase == opsv1alpha1.OpsRunningPhase {
+			return intctrlutil.NewError(intctrlutil.ErrorTypeNeedWaiting, err.Error())
+		}
+		return intctrlutil.NewFatalError(err.Error())
+	}
 	var cluster *appsv1.Cluster
 	var err error
 
@@ -139,12 +148,22 @@ func validateRestoreClusterOpsUID(cluster *appsv1.Cluster, opsRequest *opsv1alph
 
 // ReconcileAction implements the restore action.
 func (r RestoreOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
+	var policyErr error
+	if spec := opsRes.OpsRequest.Spec.GetRestore(); spec != nil {
+		policyErr = validateRestorePolicy(spec)
+	}
 	opsRequest := opsRes.OpsRequest
 	cluster := &appsv1.Cluster{}
 	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{
 		Namespace: opsRequest.Namespace,
 		Name:      opsRequest.Spec.GetClusterName(),
 	}, cluster); err != nil {
+		if policyErr != nil {
+			if apierrors.IsNotFound(err) {
+				return opsv1alpha1.OpsFailedPhase, 0, policyErr
+			}
+			return opsv1alpha1.OpsRunningPhase, 0, err
+		}
 		if apierrors.IsNotFound(err) {
 			if opsRes.Cluster != nil {
 				_ = PatchClusterNotFound(reqCtx.Ctx, cli, opsRes)
@@ -156,6 +175,16 @@ func (r RestoreOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 
 	if err := validateRestoreClusterOpsUID(cluster, opsRequest); err != nil {
 		return opsv1alpha1.OpsFailedPhase, 0, err
+	}
+	if policyErr != nil {
+		pending, err := pendingClusterRestoreExecutions(reqCtx, cli, cluster)
+		if err != nil {
+			return opsv1alpha1.OpsRunningPhase, 0, err
+		}
+		if pending {
+			return opsv1alpha1.OpsRunningPhase, time.Second, fmt.Errorf("%w; waiting for existing restore executions to finish", policyErr)
+		}
+		return opsv1alpha1.OpsFailedPhase, 0, policyErr
 	}
 	if cluster.Spec.Restore == nil {
 		return opsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("restore failed: target cluster %s/%s has no restore intent", cluster.Namespace, cluster.Name)
@@ -179,6 +208,22 @@ func (r RestoreOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	return opsv1alpha1.OpsSucceedPhase, 0, nil
 }
 
+func pendingClusterRestoreExecutions(reqCtx intctrlutil.RequestCtx, cli client.Reader, cluster *appsv1.Cluster) (bool, error) {
+	restores := &dpv1alpha1.RestoreList{}
+	if err := cli.List(reqCtx.Ctx, restores, client.InNamespace(cluster.Namespace), client.MatchingLabels{
+		constant.AppInstanceLabelKey: cluster.Name,
+		dptypes.ClusterUIDLabelKey:   string(cluster.UID),
+	}); err != nil {
+		return false, err
+	}
+	for _, restore := range restores.Items {
+		if restore.Status.Phase != dpv1alpha1.RestorePhaseCompleted && restore.Status.Phase != dpv1alpha1.RestorePhaseFailed {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // SaveLastConfiguration saves last configuration to the OpsRequest.status.lastConfiguration
 func (r RestoreOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsResource *OpsResource) error {
 	return nil
@@ -188,6 +233,9 @@ func (r RestoreOpsHandler) restoreClusterFromBackup(reqCtx intctrlutil.RequestCt
 	restoreSpec := opsRequest.Spec.GetRestore()
 	if restoreSpec == nil {
 		return nil, intctrlutil.NewFatalError("spec.restore can not be empty")
+	}
+	if err := validateRestorePolicy(restoreSpec); err != nil {
+		return nil, intctrlutil.NewFatalError(err.Error())
 	}
 	backupName := restoreSpec.BackupName
 	backupNamespace := restoreSpec.BackupNamespace
@@ -382,4 +430,18 @@ func (r RestoreOpsHandler) rebuildShardAccountSecrets(cluster *appsv1.Cluster) {
 			account.SecretRef = nil
 		}
 	}
+}
+
+func validateRestorePolicy(spec *opsv1alpha1.Restore) error {
+	if err := dptypes.ValidateVolumeRestorePolicy(spec.VolumeRestorePolicy, "spec.restore.volumeRestorePolicy"); err != nil {
+		return err
+	}
+	for _, parameter := range spec.Parameters {
+		if parameter.Name == dptypes.VolumeRestorePolicyParameterKey {
+			if err := dptypes.ValidateVolumeRestorePolicy(parameter.Value, "spec.restore.parameters["+parameter.Name+"]"); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

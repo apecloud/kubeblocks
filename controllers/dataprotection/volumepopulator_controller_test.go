@@ -839,16 +839,13 @@ func TestRestoreParametersKeepRuntimeSettingsOutOfActionParameters(t *testing.T)
 	parameters := map[string]string{
 		"restore-param":                                       "restore-value",
 		dptypes.SourceTargetPodNameAnnotationKey:              "source-mysql-0",
-		dptypes.VolumeRestorePolicyParameterKey:               string(dpv1alpha1.VolumeClaimRestorePolicySerial),
+		dptypes.VolumeRestorePolicyParameterKey:               string(dpv1alpha1.VolumeClaimRestorePolicyParallel),
 		dptypes.DeferPostReadyUntilClusterRunningParameterKey: "true",
 	}
 
 	actionParameters := restoreActionParameters(parameters)
 
 	require.Equal(t, map[string]string{"restore-param": "restore-value"}, actionParameters)
-	policy, err := volumeRestorePolicyFromParameters(parameters)
-	require.NoError(t, err)
-	require.Equal(t, dpv1alpha1.VolumeClaimRestorePolicySerial, policy)
 }
 
 func TestRestoreEnvFromParameters(t *testing.T) {
@@ -1825,7 +1822,7 @@ func TestPopulateCreatesExecutionRestoreAndPolls(t *testing.T) {
 				RequiredPolicyForAllPodSelection: &dpv1alpha1.RequiredPolicyForAllPodSelection{
 					DataRestorePolicy: dpv1alpha1.OneToOneRestorePolicy,
 				},
-				VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicySerial,
+				VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicyParallel,
 			},
 		},
 	}
@@ -1888,7 +1885,7 @@ func TestPopulateCreatesExecutionRestoreAndPolls(t *testing.T) {
 	require.Equal(t, restore.Spec.Parameters, executionRestore.Spec.Parameters)
 	require.Equal(t, restore.Spec.PrepareDataConfig.RequiredPolicyForAllPodSelection,
 		executionRestore.Spec.PrepareDataConfig.RequiredPolicyForAllPodSelection)
-	require.Equal(t, restore.Spec.PrepareDataConfig.VolumeClaimRestorePolicy,
+	require.Equal(t, dpv1alpha1.VolumeClaimRestorePolicyParallel,
 		executionRestore.Spec.PrepareDataConfig.VolumeClaimRestorePolicy)
 	require.Equal(t, []corev1.Toleration{{Operator: corev1.TolerationOpExists}},
 		executionRestore.Spec.PrepareDataConfig.SchedulingSpec.Tolerations)
@@ -2808,82 +2805,6 @@ func TestEnsureExecutionRestoreRejectsSpecMutation(t *testing.T) {
 	require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err.Error())
 }
 
-func TestWaitForSerialPredecessorsWaitsForEarlierUnboundPVC(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(scheme))
-	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
-	apiGroup := dptypes.DataprotectionAPIGroup
-	previous := newRestorePVCForSerialTest("data-target-0", "")
-	current := newRestorePVCForSerialTest("data-target-1", "")
-	backup := newBackupForRestoreDecision([]string{"data"}, nil)
-	reconciler := &VolumePopulatorReconciler{
-		Client:   fake.NewClientBuilder().WithScheme(scheme).WithObjects(previous, current, backup).Build(),
-		Recorder: record.NewFakeRecorder(10),
-	}
-	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{
-		Spec: dpv1alpha1.RestoreSpec{
-			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
-				VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicySerial,
-			},
-		},
-	}, nil, scheme, reconciler.Client)
-	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(current), current))
-	current.Spec.DataSourceRef.APIGroup = &apiGroup
-
-	err := reconciler.waitForSerialPredecessors(intctrlutil.RequestCtx{Ctx: context.Background()}, current, restoreMgr)
-
-	require.Error(t, err)
-	require.True(t, intctrlutil.IsRequeueError(err), err.Error())
-}
-
-func TestWaitForSerialPredecessorsAllowsAfterEarlierBoundPVC(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(scheme))
-	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
-	previous := newRestorePVCForSerialTest("data-target-0", "pv-0")
-	previous.Annotations[volume.AnnBindCompleted] = "yes"
-	current := newRestorePVCForSerialTest("data-target-1", "")
-	backup := newBackupForRestoreDecision([]string{"data"}, nil)
-	reconciler := &VolumePopulatorReconciler{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(previous, current, backup).Build()}
-	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{
-		Spec: dpv1alpha1.RestoreSpec{
-			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
-				VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicySerial,
-			},
-		},
-	}, nil, scheme, reconciler.Client)
-
-	err := reconciler.waitForSerialPredecessors(intctrlutil.RequestCtx{Ctx: context.Background()}, current, restoreMgr)
-
-	require.NoError(t, err)
-}
-
-func TestWaitForSerialPredecessorsAllowsAfterEarlierReleasedPVC(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(scheme))
-	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
-	previous := newRestorePVCForSerialTest("data-target-0", "pv-0")
-	previous.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
-		Type:   PersistentVolumeClaimPopulating,
-		Status: corev1.ConditionTrue,
-		Reason: ReasonPopulatingSucceed,
-	}}
-	current := newRestorePVCForSerialTest("data-target-1", "")
-	backup := newBackupForRestoreDecision([]string{"data"}, nil)
-	reconciler := &VolumePopulatorReconciler{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(previous, current, backup).Build()}
-	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{
-		Spec: dpv1alpha1.RestoreSpec{
-			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
-				VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicySerial,
-			},
-		},
-	}, nil, scheme, reconciler.Client)
-
-	err := reconciler.waitForSerialPredecessors(intctrlutil.RequestCtx{Ctx: context.Background()}, current, restoreMgr)
-
-	require.NoError(t, err)
-}
-
 func TestRestorePVCAggregationAllowsReleasedPVCWithoutBindingAnnotation(t *testing.T) {
 	for _, reason := range []string{ReasonPopulatingSucceed, ReasonPopulatingProvisioned} {
 		t.Run(reason, func(t *testing.T) {
@@ -2909,59 +2830,6 @@ func TestRestorePVCAggregationAllowsReleasedPVCWithoutBindingAnnotation(t *testi
 			require.NoError(t, err)
 			require.True(t, clusterReady)
 		})
-	}
-}
-
-func TestWaitForSerialPredecessorsSkipsProvisionOnlyPVC(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(scheme))
-	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
-	previous := newRestorePVCForSerialTest("logs-target-0", "")
-	previous.Labels[constant.VolumeClaimTemplateNameLabelKey] = "logs"
-	previous.Annotations[constant.RestoreVolumeTemplateAnnotationKey] = "logs"
-	current := newRestorePVCForSerialTest("data-target-1", "")
-	backup := newBackupForRestoreDecision([]string{"data"}, nil)
-	reconciler := &VolumePopulatorReconciler{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(previous, current, backup).Build()}
-	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{
-		Spec: dpv1alpha1.RestoreSpec{
-			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
-				VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicySerial,
-			},
-		},
-	}, nil, scheme, reconciler.Client)
-
-	err := reconciler.waitForSerialPredecessors(intctrlutil.RequestCtx{Ctx: context.Background()}, current, restoreMgr)
-
-	require.NoError(t, err)
-}
-
-func newRestorePVCForSerialTest(name, volumeName string) *corev1.PersistentVolumeClaim {
-	apiGroup := dptypes.DataprotectionAPIGroup
-	return &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default",
-			Name:      name,
-			UID:       types.UID(name + "-uid"),
-			Labels: map[string]string{
-				constant.AppManagedByLabelKey:            constant.AppName,
-				constant.AppInstanceLabelKey:             "cluster",
-				constant.KBAppComponentLabelKey:          "mysql",
-				constant.KBAppPodNameLabelKey:            name,
-				constant.VolumeClaimTemplateNameLabelKey: "data",
-			},
-			Annotations: map[string]string{
-				constant.RestoreSourceKindAnnotationKey:      dptypes.BackupKind,
-				constant.RestoreSourceNamespaceAnnotationKey: "default",
-			},
-		},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			VolumeName: volumeName,
-			DataSourceRef: &corev1.TypedObjectReference{
-				APIGroup: &apiGroup,
-				Kind:     dptypes.BackupKind,
-				Name:     "backup",
-			},
-		},
 	}
 }
 

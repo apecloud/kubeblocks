@@ -31,7 +31,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	testclocks "k8s.io/utils/clock/testing"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -39,7 +38,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
-	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
@@ -270,7 +268,7 @@ var _ = Describe("Restore Controller test", func() {
 		Context("with restore fails", func() {
 			It("test restore is Failed when backup is not completed", func() {
 				By("expect for restore is Failed ")
-				initResourcesAndWaitRestore(false, false, true, "", dpv1alpha1.RestorePhaseFailed,
+				initResourcesAndWaitRestore(false, false, false, "", dpv1alpha1.RestorePhaseFailed,
 					func(f *testdp.MockRestoreFactory) {
 						f.SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
 							testdp.DataVolumeMountPath, "", int32(3), int32(0), nil)
@@ -279,7 +277,7 @@ var _ = Describe("Restore Controller test", func() {
 
 			It("test restore is failed when check failed in new action", func() {
 				By("expect for restore is Failed")
-				restore := initResourcesAndWaitRestore(true, false, true, "", dpv1alpha1.RestorePhaseFailed,
+				restore := initResourcesAndWaitRestore(true, false, false, "", dpv1alpha1.RestorePhaseFailed,
 					func(f *testdp.MockRestoreFactory) {
 						f.Get().Spec.Backup.Name = "wrongBackup"
 					}, nil)
@@ -292,7 +290,7 @@ var _ = Describe("Restore Controller test", func() {
 
 			It("test restore is failed when validate failed in new action", func() {
 				By("expect for restore is Failed")
-				restore := initResourcesAndWaitRestore(false, false, true, "", dpv1alpha1.RestorePhaseFailed, func(f *testdp.MockRestoreFactory) {
+				restore := initResourcesAndWaitRestore(false, false, false, "", dpv1alpha1.RestorePhaseFailed, func(f *testdp.MockRestoreFactory) {
 					f.SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
 						testdp.DataVolumeMountPath, "", int32(3), int32(0), nil)
 				}, nil)
@@ -303,16 +301,16 @@ var _ = Describe("Restore Controller test", func() {
 				})).Should(Succeed())
 			})
 
-			It("test restore is Failed when restore job is not Failed", func() {
+			It("fails the restore when the parallel recovery Jobs fail", func() {
 				By("expect for restore is Failed ")
-				restore := initResourcesAndWaitRestore(true, false, true, "", dpv1alpha1.RestorePhaseRunning,
+				restore := initResourcesAndWaitRestore(true, false, false, "", dpv1alpha1.RestorePhaseRunning,
 					func(f *testdp.MockRestoreFactory) {
 						f.SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
 							testdp.DataVolumeMountPath, "", int32(3), int32(0), nil)
 					}, nil)
 
-				By("wait for creating first job and pvc")
-				checkJobAndPVCSCount(restore, 1, 1, 0)
+				By("wait for all parallel Jobs and PVCs")
+				checkJobAndPVCSCount(restore, 3, 3, 0)
 
 				By("mock restore job is Failed")
 				jobList := &batchv1.JobList{}
@@ -357,48 +355,17 @@ var _ = Describe("Restore Controller test", func() {
 				By("expect parameters env in restore jobs")
 				checkJobParametersEnv(restore)
 			})
-			It("test volumeClaimsTemplate when volumeClaimRestorePolicy is Serial", func() {
-				replicas := 2
-				startingIndex := 1
-				restore := initResourcesAndWaitRestore(true, false, true, "", dpv1alpha1.RestorePhaseRunning,
+			It("rejects Serial before creating recovery Jobs or target PVCs", func() {
+				restore := initResourcesAndWaitRestore(true, false, true, "", dpv1alpha1.RestorePhaseFailed,
 					func(f *testdp.MockRestoreFactory) {
 						f.SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
-							testdp.DataVolumeMountPath, "", int32(replicas), int32(startingIndex), nil)
+							testdp.DataVolumeMountPath, "", 2, 1, nil)
 					}, nil)
-
-				By("wait for creating first job and pvc")
-				checkJobAndPVCSCount(restore, 1, 1, startingIndex)
-
-				By("mock jobs are completed")
-				mockRestoreJobsCompleted(restore)
-
-				var firstJobName string
-				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(restore), func(g Gomega, r *dpv1alpha1.Restore) {
-					g.Expect(r.Status.Actions.PrepareData).ShouldNot(BeEmpty())
-					g.Expect(r.Status.Actions.PrepareData[0].Status).Should(Equal(dpv1alpha1.RestoreActionCompleted))
-					firstJobName = strings.ReplaceAll(r.Status.Actions.PrepareData[0].ObjectKey, "Job/", "")
-				})).Should(Succeed())
-
-				By("wait for deleted first job")
-				Eventually(testapps.CheckObjExists(&testCtx,
-					types.NamespacedName{Name: firstJobName, Namespace: testCtx.DefaultNamespace}, &batchv1.Job{}, false)).Should(Succeed())
-
-				By("after the first job is completed, next job will be created")
-				checkJobAndPVCSCount(restore, 1, replicas, startingIndex)
-
-				jobList := &batchv1.JobList{}
-				Expect(k8sClient.List(ctx, jobList,
-					client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
-					client.InNamespace(testCtx.DefaultNamespace))).Should(Succeed())
-
-				for _, v := range jobList.Items {
-					Expect(v.Labels[constant.AppManagedByLabelKey]).Should(Equal(dptypes.AppName))
-					finished, _, _ := dputils.IsJobFinished(&v)
-					Expect(finished).Should(BeFalse())
-				}
-
-				By("mock jobs are completed and wait for restore is completed")
-				mockAndCheckRestoreCompleted(restore)
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(restore), restore)).Should(Succeed())
+				condition := meta.FindStatusCondition(restore.Status.Conditions, dprestore.ConditionTypeRestoreValidationPassed)
+				Expect(condition).ShouldNot(BeNil())
+				Expect(condition.Message).Should(ContainSubstring("Serial is no longer supported"))
+				checkJobAndPVCSCount(restore, 0, 0, 1)
 			})
 
 			It("test dataSourceRef", func() {
@@ -670,7 +637,7 @@ var _ = Describe("Restore Controller test", func() {
 		Context("test cross namespace", func() {
 			It("should wait for preparation of backup repo", func() {
 				By("creating a restore in a different namespace from backup")
-				initResourcesAndWaitRestore(true, false, true, "", dpv1alpha1.RestorePhaseRunning,
+				initResourcesAndWaitRestore(true, false, false, "", dpv1alpha1.RestorePhaseRunning,
 					func(f *testdp.MockRestoreFactory) {
 						f.SetNamespace(namespace2)
 					}, nil)

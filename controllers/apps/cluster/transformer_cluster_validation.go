@@ -24,7 +24,11 @@ import (
 	"slices"
 
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
@@ -49,6 +53,17 @@ func (t *clusterValidationTransformer) Transform(ctx graph.TransformContext, dag
 			setProvisioningStartedCondition(&cluster.Status.Conditions, cluster.Name, cluster.Generation, err)
 		}
 	}()
+
+	if !cluster.IsDeleting() && cluster.Spec.Restore != nil && !isClusterRestoreCompleted(cluster) {
+		if err = dptypes.ValidateVolumeRestorePolicy(cluster.Spec.Restore.Parameters[dptypes.VolumeRestorePolicyParameterKey],
+			"spec.restore.parameters["+dptypes.VolumeRestorePolicyParameterKey+"]"); err != nil {
+			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+				Type: appsv1.ConditionTypeRestore, Status: metav1.ConditionFalse,
+				Reason: ReasonRestoreFailed, Message: err.Error(), ObservedGeneration: cluster.Generation,
+			})
+			return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
+		}
+	}
 
 	if err = t.apiValidation(cluster); err != nil {
 		return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())

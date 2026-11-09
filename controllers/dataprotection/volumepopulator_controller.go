@@ -417,6 +417,12 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 	if pvc.Spec.VolumeName != "" && pvc.DeletionTimestamp.IsZero() && pvcRestoreTerminal(pvc) {
 		return nil
 	}
+	if err := pvcRestorePolicyError(reqCtx.Ctx, r.Client, pvc); err != nil {
+		if isInvalidRestorePolicy(err) {
+			return r.rejectPVCPolicy(reqCtx, pvc, err)
+		}
+		return err
+	}
 	var restoreCtx *pvcRestoreContext
 	if pvc.Spec.DataSourceRef.Kind == dptypes.RestoreKind {
 		restoreCtx, err = r.validateRestoreRefAndBuildMGR(reqCtx, pvc)
@@ -830,9 +836,6 @@ func (r *VolumePopulatorReconciler) dispatchUnboundPVC(reqCtx intctrlutil.Reques
 				"backup matched targetVolumes for PVC %s/%s but ActionSet has no restore actions (neither prepareData nor postReady)",
 				pvc.Namespace, pvc.Name))
 		}
-		if err := r.waitForSerialPredecessors(reqCtx, pvc, restoreCtx.restoreMgr); err != nil {
-			return err
-		}
 		return r.Populate(reqCtx, pvc, restoreCtx)
 	}
 	return r.ProvisionOnly(reqCtx, pvc, restoreCtx)
@@ -886,8 +889,7 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 	if err != nil {
 		return nil, intctrlutil.NewFatalError(err.Error())
 	}
-	volumeRestorePolicy, err := volumeRestorePolicyFromParameters(parameters)
-	if err != nil {
+	if err := dptypes.ValidateVolumeRestorePolicy(parameters[dptypes.VolumeRestorePolicyParameterKey], dptypes.VolumeRestorePolicyParameterKey); err != nil {
 		return nil, intctrlutil.NewFatalError(err.Error())
 	}
 	decision, err := r.decidePVCRestore(reqCtx, pvc, backup, parameters)
@@ -915,7 +917,7 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 				DataSourceRef: &dpv1alpha1.VolumeConfig{
 					VolumeSource: pvc.Annotations[constant.RestoreVolumeTemplateAnnotationKey],
 				},
-				VolumeClaimRestorePolicy: volumeRestorePolicy,
+				VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicyParallel,
 			},
 			Env:        env,
 			Parameters: restoreParametersToPairs(restoreActionParameters(parameters)),
@@ -1434,7 +1436,7 @@ func buildExecutionRestore(pvc, populatePVC *corev1.PersistentVolumeClaim, sourc
 					VolumeClaimSpec: claimSpec,
 					VolumeConfig:    *prepareDataConfig.DataSourceRef,
 				}},
-				VolumeClaimRestorePolicy: prepareDataConfig.VolumeClaimRestorePolicy,
+				VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicyParallel,
 				SchedulingSpec:           prepareDataConfig.SchedulingSpec,
 			},
 		},
@@ -1479,19 +1481,6 @@ func restoreEnvFromParameters(parameters map[string]string) ([]corev1.EnvVar, er
 		return nil, fmt.Errorf("invalid restore env parameter %s: %w", dptypes.RestoreEnvParameterKey, err)
 	}
 	return env, nil
-}
-
-func volumeRestorePolicyFromParameters(parameters map[string]string) (dpv1alpha1.VolumeClaimRestorePolicy, error) {
-	policy := parameters[dptypes.VolumeRestorePolicyParameterKey]
-	if policy == "" {
-		return dpv1alpha1.VolumeClaimRestorePolicyParallel, nil
-	}
-	switch dpv1alpha1.VolumeClaimRestorePolicy(policy) {
-	case dpv1alpha1.VolumeClaimRestorePolicyParallel, dpv1alpha1.VolumeClaimRestorePolicySerial:
-		return dpv1alpha1.VolumeClaimRestorePolicy(policy), nil
-	default:
-		return "", fmt.Errorf("invalid volume restore policy %q", policy)
-	}
 }
 
 func restoreActionParameters(parameters map[string]string) map[string]string {
@@ -1730,80 +1719,6 @@ func (r *VolumePopulatorReconciler) validateBoundTargetPV(reqCtx intctrlutil.Req
 			pvc.Namespace, pvc.Name, pv.Name, AnnPopulateFrom, expectedSource))
 	}
 	return nil
-}
-
-func (r *VolumePopulatorReconciler) waitForSerialPredecessors(reqCtx intctrlutil.RequestCtx,
-	pvc *corev1.PersistentVolumeClaim,
-	restoreMgr *dprestore.RestoreManager) error {
-	if restoreMgr.Restore.Spec.PrepareDataConfig == nil ||
-		restoreMgr.Restore.Spec.PrepareDataConfig.VolumeClaimRestorePolicy != dpv1alpha1.VolumeClaimRestorePolicySerial {
-		return nil
-	}
-	pvcs, err := r.listRestorePVCsForComponent(reqCtx, pvc)
-	if err != nil {
-		return err
-	}
-	slices.SortFunc(pvcs, func(a, b corev1.PersistentVolumeClaim) int {
-		if a.Name < b.Name {
-			return -1
-		}
-		if a.Name > b.Name {
-			return 1
-		}
-		return 0
-	})
-	for i := range pvcs {
-		item := &pvcs[i]
-		if item.UID == pvc.UID {
-			return nil
-		}
-		restoreData, err := r.pvcNeedsDataRestore(reqCtx, item)
-		if err != nil {
-			return err
-		}
-		if !restoreData {
-			continue
-		}
-		cond := findPVCConditionByType(item, appsv1.ConditionTypeRestore)
-		if cond != nil && cond.Status == corev1.ConditionFalse {
-			return intctrlutil.NewFatalError(fmt.Sprintf("previous restore PVC %s/%s failed: %s", item.Namespace, item.Name, cond.Message))
-		}
-		if pvcReadyForRestoreProgression(item) {
-			continue
-		}
-		if err = r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingProcessing,
-			fmt.Sprintf("Waiting for previous restore PVC %s to finish prepareData", item.Name)); err != nil {
-			return err
-		}
-		return intctrlutil.NewRequeueError(reconcileInterval, "waiting for previous restore PVC")
-	}
-	return nil
-}
-
-func (r *VolumePopulatorReconciler) pvcNeedsDataRestore(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) (bool, error) {
-	if pvc.Spec.DataSourceRef == nil {
-		return false, nil
-	}
-	backupNamespace, err := r.authorizedBackupNamespaceFromPVC(reqCtx, pvc)
-	if err != nil {
-		return false, intctrlutil.NewFatalError(err.Error())
-	}
-	backup := &dpv1alpha1.Backup{}
-	if err = r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: backupNamespace, Name: pvc.Spec.DataSourceRef.Name}, backup); err != nil {
-		return false, err
-	}
-	if backup.Status.BackupMethod == nil {
-		return false, intctrlutil.NewFatalError(fmt.Sprintf(`status.backupMethod of backup "%s" can not be empty`, backup.Name))
-	}
-	parameters, err := restoreParametersMapFromPVC(pvc)
-	if err != nil {
-		return false, intctrlutil.NewFatalError(err.Error())
-	}
-	decision, err := r.decidePVCRestore(reqCtx, pvc, backup, parameters)
-	if err != nil {
-		return false, err
-	}
-	return decision.mode == pvcRestoreModeRestoreData, nil
 }
 
 func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intctrlutil.RequestCtx,

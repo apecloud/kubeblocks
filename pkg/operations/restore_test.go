@@ -27,6 +27,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -522,12 +523,15 @@ func newRestoreOpsFakeClient(objects ...client.Object) client.Client {
 	return fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
 }
 
-func TestRestoreActionRejectsSerialBeforeCreatingCluster(t *testing.T) {
+func TestRestoreOpsValidatesPolicyBeforeCreating(t *testing.T) {
 	for _, tc := range []struct {
-		name string
-		spec opsv1alpha1.Restore
+		name  string
+		spec  opsv1alpha1.Restore
+		valid bool
 	}{
-		{name: "field", spec: opsv1alpha1.Restore{VolumeRestorePolicy: "Serial"}},
+		{name: "omitted", valid: true},
+		{name: "parallel", spec: opsv1alpha1.Restore{VolumeRestorePolicy: "Parallel"}, valid: true},
+		{name: "serial field", spec: opsv1alpha1.Restore{VolumeRestorePolicy: "Serial"}},
 		{name: "parameter hidden by default field", spec: opsv1alpha1.Restore{VolumeRestorePolicy: "Parallel", Parameters: []dpv1alpha1.ParameterPair{{Name: dptypes.VolumeRestorePolicyParameterKey, Value: "Serial"}}}},
 		{name: "duplicate parameter", spec: opsv1alpha1.Restore{Parameters: []dpv1alpha1.ParameterPair{
 			{Name: dptypes.VolumeRestorePolicyParameterKey, Value: "Serial"},
@@ -535,16 +539,34 @@ func TestRestoreActionRejectsSerialBeforeCreatingCluster(t *testing.T) {
 		}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
 			scheme := runtime.NewScheme()
 			require.NoError(t, appsv1.AddToScheme(scheme))
-			cli := fake.NewClientBuilder().WithScheme(scheme).Build()
+			require.NoError(t, opsv1alpha1.AddToScheme(scheme))
 			ops := &opsv1alpha1.OpsRequest{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: "default"},
-				Spec: opsv1alpha1.OpsRequestSpec{SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{Restore: &tc.spec}}}
-			err := (RestoreOpsHandler{}).Action(intctrlutil.RequestCtx{Ctx: context.Background()}, cli,
-				&OpsResource{OpsRequest: ops, Recorder: record.NewFakeRecorder(10)})
-			require.ErrorContains(t, err, "Serial is no longer supported")
+				Spec: opsv1alpha1.OpsRequestSpec{Type: opsv1alpha1.RestoreType, ClusterName: "target",
+					SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{Restore: &tc.spec}},
+				Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsPendingPhase}}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(ops).WithObjects(ops).Build()
+			res := &OpsResource{OpsRequest: ops, Recorder: record.NewFakeRecorder(10),
+				Cluster: &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: ops.Spec.GetClusterName(), Namespace: ops.Namespace}}}
+			_, err := GetOpsManager().Do(intctrlutil.RequestCtx{Ctx: ctx}, cli, res)
+			require.NoError(t, err)
+			require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(ops), ops))
+			condition := meta.FindStatusCondition(ops.Status.Conditions, opsv1alpha1.ConditionTypeValidated)
+			require.NotNil(t, condition)
+			if tc.valid {
+				require.Equal(t, opsv1alpha1.OpsCreatingPhase, ops.Status.Phase)
+				require.Equal(t, metav1.ConditionTrue, condition.Status)
+			} else {
+				require.Equal(t, opsv1alpha1.OpsFailedPhase, ops.Status.Phase)
+				require.Equal(t, metav1.ConditionFalse, condition.Status)
+				require.Equal(t, opsv1alpha1.ReasonValidateFailed, condition.Reason)
+				require.Contains(t, condition.Message, "Serial is no longer supported")
+				require.True(t, ops.Status.StartTimestamp.IsZero(), "reject before entering Creating")
+			}
 			clusters := &appsv1.ClusterList{}
-			require.NoError(t, cli.List(context.Background(), clusters))
+			require.NoError(t, cli.List(ctx, clusters))
 			require.Empty(t, clusters.Items)
 		})
 	}

@@ -65,11 +65,6 @@ func (r RestoreOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx,
 
 // Action implements the restore action.
 func (r RestoreOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	if spec := opsRes.OpsRequest.Spec.GetRestore(); spec != nil {
-		if err := validateRestorePolicy(spec); err != nil {
-			return intctrlutil.NewFatalError(err.Error())
-		}
-	}
 	var cluster *appsv1.Cluster
 	var err error
 
@@ -387,18 +382,4 @@ func (r RestoreOpsHandler) rebuildShardAccountSecrets(cluster *appsv1.Cluster) {
 			account.SecretRef = nil
 		}
 	}
-}
-
-func validateRestorePolicy(spec *opsv1alpha1.Restore) error {
-	if err := restore.ValidateVolumeRestorePolicy(spec.VolumeRestorePolicy, "spec.restore.volumeRestorePolicy"); err != nil {
-		return err
-	}
-	for _, parameter := range spec.Parameters {
-		if parameter.Name == dptypes.VolumeRestorePolicyParameterKey {
-			if err := restore.ValidateVolumeRestorePolicy(parameter.Value, "spec.restore.parameters["+parameter.Name+"]"); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }

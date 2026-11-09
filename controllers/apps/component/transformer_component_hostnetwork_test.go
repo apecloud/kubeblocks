@@ -33,6 +33,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 var _ = Describe("component hostnetwork transformer test", func() {
@@ -147,6 +148,36 @@ var _ = Describe("component hostnetwork transformer test", func() {
 	}, Entry("field enablement", true, ptr.To(corev1.DNSDefault), corev1.DNSDefault),
 		Entry("annotation enables host network despite false field", false, ptr.To(corev1.DNSNone), corev1.DNSNone),
 		Entry("annotation defaults DNS", false, nil, corev1.DNSClusterFirstWithHostNet))
+
+	It("applies explicit host-network ports and rejects missing application mappings", func() {
+		network := &appsv1.ComponentNetwork{HostNetwork: true, HostPorts: []appsv1.HostPort{
+			{Name: "mysql", Port: 31001}, {Name: "http", Port: 31002}, {Name: "streaming", Port: 31003},
+		}}
+		transCtx.Component.Spec.Network = network
+		transCtx.SynthesizeComponent.Network = network
+		transformer := &componentHostNetworkTransformer{}
+		Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
+		Expect(transCtx.SynthesizeComponent.PodSpec.Containers[0].Ports[0].ContainerPort).Should(Equal(int32(31001)))
+		Expect(transCtx.SynthesizeComponent.PodSpec.Containers[1].Ports[0].ContainerPort).Should(Equal(int32(31002)))
+		Expect(transCtx.SynthesizeComponent.PodSpec.Containers[1].Ports[1].ContainerPort).Should(Equal(int32(31003)))
+		network.HostPorts = network.HostPorts[1:]
+		Expect(transformer.Transform(transCtx, dag)).Should(MatchError(ContainSubstring("no available port: mysql")))
+	})
+
+	It("releases automatic config-manager port with explicit kbagent ports", func() {
+		manager := intctrlutil.GetPortManager(nil)
+		oldKey := manager.PortKey(clusterName, compName, constant.ConfigSidecarName, constant.ConfigManagerPortName)
+		Expect(manager.UsePort(oldKey, 45004)).Should(Succeed())
+		transCtx.Component.Spec.Network = &appsv1.ComponentNetwork{HostNetwork: true, HostPorts: []appsv1.HostPort{
+			{Name: "mysql", Port: 31001}, {Name: "http", Port: 31002}, {Name: "streaming", Port: 31003},
+		}}
+		transCtx.Component.DeletionTimestamp = ptr.To(metav1.Now())
+		transCtx.Component.Status.Phase = appsv1.DeletingComponentPhase
+		Expect((&componentDeletionTransformer{}).Transform(transCtx, dag)).Should(Equal(graph.ErrPrematureStop))
+		port, err := manager.GetPort(oldKey)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(port).Should(BeZero())
+	})
 
 	Context("allocate host network success ", func() {
 		It("disabled", func() {

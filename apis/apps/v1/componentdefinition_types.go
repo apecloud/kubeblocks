@@ -270,10 +270,11 @@ type ComponentDefinitionSpec struct {
 	// due to port conflicts.
 	//
 	// The DNSPolicy field in the Pod spec determines how containers within the Pod perform DNS resolution.
-	// When using hostNetwork, the operator defaults DNSPolicy to 'ClusterFirstWithHostNet',
-	// unless the Component explicitly specifies network.dnsPolicy.
+	// When using hostNetwork, the operator will set the DNSPolicy to 'ClusterFirstWithHostNet'.
 	// With this policy, DNS queries will first go through the K8s cluster's DNS service.
 	// If the query fails, it will fall back to the host's DNS settings.
+	//
+	// If set, the DNS policy will be automatically set to "ClusterFirstWithHostNet".
 	//
 	// This field is immutable.
 	//

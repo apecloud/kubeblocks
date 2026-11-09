@@ -2283,9 +2283,7 @@ spec:
                   PVCs, Account & TLS Secrets, Services Owned by Component.
                 type: object
               network:
-                description: |-
-                  Specifies network settings for the Component. When set, these settings replace the
-                  hostNetwork, hostAliases, dnsPolicy, and dnsConfig fields in the ComponentDefinition runtime.
+                description: Defines the network configuration for the Component.
                 properties:
                   dnsConfig:
                     description: Specifies the DNS parameters of the pod.

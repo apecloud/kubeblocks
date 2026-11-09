@@ -647,8 +647,7 @@ ComponentNetwork
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies network settings for the Component. When set, these settings replace the
-hostNetwork, hostAliases, dnsPolicy, and dnsConfig fields in the ComponentDefinition runtime.</p>
+<p>Defines the network configuration for the Component.</p>
 </td>
 </tr>
 <tr>
@@ -1273,10 +1272,10 @@ the host&rsquo;s network interfaces.
 This means that if multiple Pods need to use the same port, they cannot run on the same host simultaneously
 due to port conflicts.</p>
 <p>The DNSPolicy field in the Pod spec determines how containers within the Pod perform DNS resolution.
-When using hostNetwork, the operator defaults DNSPolicy to &lsquo;ClusterFirstWithHostNet&rsquo;,
-unless the Component explicitly specifies network.dnsPolicy.
+When using hostNetwork, the operator will set the DNSPolicy to &lsquo;ClusterFirstWithHostNet&rsquo;.
 With this policy, DNS queries will first go through the K8s cluster&rsquo;s DNS service.
 If the query fails, it will fall back to the host&rsquo;s DNS settings.</p>
+<p>If set, the DNS policy will be automatically set to &ldquo;ClusterFirstWithHostNet&rdquo;.</p>
 <p>This field is immutable.</p>
 </td>
 </tr>
@@ -3212,8 +3211,7 @@ ComponentNetwork
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies network settings for the Component. When set, these settings replace the
-hostNetwork, hostAliases, dnsPolicy, and dnsConfig fields in the ComponentDefinition runtime.</p>
+<p>Defines the network configuration for the Component.</p>
 </td>
 </tr>
 <tr>
@@ -5311,10 +5309,10 @@ the host&rsquo;s network interfaces.
 This means that if multiple Pods need to use the same port, they cannot run on the same host simultaneously
 due to port conflicts.</p>
 <p>The DNSPolicy field in the Pod spec determines how containers within the Pod perform DNS resolution.
-When using hostNetwork, the operator defaults DNSPolicy to &lsquo;ClusterFirstWithHostNet&rsquo;,
-unless the Component explicitly specifies network.dnsPolicy.
+When using hostNetwork, the operator will set the DNSPolicy to &lsquo;ClusterFirstWithHostNet&rsquo;.
 With this policy, DNS queries will first go through the K8s cluster&rsquo;s DNS service.
 If the query fails, it will fall back to the host&rsquo;s DNS settings.</p>
+<p>If set, the DNS policy will be automatically set to &ldquo;ClusterFirstWithHostNet&rdquo;.</p>
 <p>This field is immutable.</p>
 </td>
 </tr>
@@ -6592,8 +6590,7 @@ ComponentNetwork
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies network settings for the Component. When set, these settings replace the
-hostNetwork, hostAliases, dnsPolicy, and dnsConfig fields in the ComponentDefinition runtime.</p>
+<p>Defines the network configuration for the Component.</p>
 </td>
 </tr>
 <tr>

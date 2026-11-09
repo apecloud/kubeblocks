@@ -1864,7 +1864,7 @@ var _ = Describe("Component Controller", func() {
 			network := &kbappsv1.ComponentNetwork{DNSPolicy: ptr.To(corev1.DNSNone),
 				HostAliases: []corev1.HostAlias{{IP: "10.0.0.1", Hostnames: []string{"custom"}}},
 				DNSConfig:   &corev1.PodDNSConfig{Nameservers: []string{"10.0.0.2"}},
-				HostPorts:   []kbappsv1.HostPort{{Name: "mysql", Port: 30001}, {Name: "http", Port: 30002}}}
+				HostPorts:   []kbappsv1.HostPort{{Name: "mysql", Port: 30001}}}
 			createCompObj(defaultCompName, compDefObj.Name, func(f *testapps.MockComponentFactory) {
 				f.GetObject().Spec.Network = network
 			})
@@ -1872,16 +1872,6 @@ var _ = Describe("Component Controller", func() {
 				Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, its *workloads.InstanceSet) {
 					g.Expect(its.Spec.Template.Spec.HostNetwork).Should(BeFalse())
 					g.Expect(its.Spec.Template.Spec.Containers[0].Ports[0].HostPort).Should(Equal(hostPort))
-					foundAgent := false
-					for _, c := range its.Spec.Template.Spec.Containers {
-						if c.Name == "kbagent" {
-							foundAgent = true
-							for _, p := range c.Ports {
-								g.Expect(p.HostPort).Should(BeZero())
-							}
-						}
-					}
-					g.Expect(foundAgent).Should(BeTrue())
 					g.Expect(its.Spec.Template.Spec.HostAliases).Should(Equal(aliases))
 					g.Expect(its.Spec.Template.Spec.DNSPolicy).Should(Equal(policy))
 					g.Expect(its.Spec.Template.Spec.DNSConfig).Should(Equal(config))

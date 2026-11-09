@@ -21,23 +21,13 @@ package types
 
 import "fmt"
 
-// InvalidRestorePolicyError identifies a rejected legacy policy setting.
-type InvalidRestorePolicyError struct {
-	Path   string
-	Policy string
-}
-
-func (e *InvalidRestorePolicyError) Error() string {
-	if e.Policy == "Serial" {
-		return fmt.Sprintf("%s: Serial is no longer supported; omit this setting or use Parallel", e.Path)
-	}
-	return fmt.Sprintf("%s: invalid volume restore policy %q; omit this setting or use Parallel", e.Path, e.Policy)
-}
-
 // ValidateVolumeRestorePolicy accepts omitted and legacy Parallel settings.
 func ValidateVolumeRestorePolicy(policy, path string) error {
 	if policy == "" || policy == "Parallel" {
 		return nil
 	}
-	return &InvalidRestorePolicyError{Path: path, Policy: policy}
+	if policy == "Serial" {
+		return fmt.Errorf("%s: Serial is no longer supported; omit this setting or use Parallel", path)
+	}
+	return fmt.Errorf("%s: invalid volume restore policy %q; omit this setting or use Parallel", path, policy)
 }

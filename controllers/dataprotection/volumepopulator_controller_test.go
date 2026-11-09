@@ -5258,48 +5258,6 @@ func TestPVCRejectsSerialForBackupAndRestoreSources(t *testing.T) {
 	}
 }
 
-func TestRejectedPVCWaitsForExecutionAndPreservesHelperData(t *testing.T) {
-	ctx := context.Background()
-	scheme := policyTestScheme(t)
-	source := serialRestore()
-	source.Spec.PrepareDataConfig.DataSourceRef = &dpv1alpha1.VolumeConfig{VolumeSource: "data"}
-	apiGroup := dptypes.DataprotectionAPIGroup
-	pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
-		Name: "target", Namespace: "default", UID: "target-uid", Finalizers: []string{dptypes.DataProtectionFinalizerName},
-	}, Spec: corev1.PersistentVolumeClaimSpec{DataSourceRef: &corev1.TypedObjectReference{APIGroup: &apiGroup, Kind: dptypes.RestoreKind, Name: source.Name}}}
-	helper := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
-		Name: getPopulatePVCName(pvc.UID), Namespace: pvc.Namespace,
-		Labels: map[string]string{dprestore.DataProtectionPopulatePVCLabelKey: getPopulatePVCName(pvc.UID)},
-	}, Spec: corev1.PersistentVolumeClaimSpec{VolumeName: "helper-pv"}}
-	pv := &corev1.PersistentVolume{ObjectMeta: metav1.ObjectMeta{Name: "helper-pv"},
-		Spec: corev1.PersistentVolumeSpec{ClaimRef: &corev1.ObjectReference{Name: helper.Name, Namespace: helper.Namespace}}}
-	child := buildExecutionRestore(pvc, helper, source)
-	child.UID = "execution-uid"
-	child.Finalizers = []string{dptypes.DataProtectionFinalizerName}
-	child.OwnerReferences = []metav1.OwnerReference{{APIVersion: "v1", Kind: "PersistentVolumeClaim", Name: pvc.Name, UID: pvc.UID}}
-	child.Status.Phase = dpv1alpha1.RestorePhaseRunning
-	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(pvc, child).
-		WithObjects(source, pvc, helper, pv, child).Build()
-	r := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(20)}
-	request := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(pvc)}
-	result, err := r.Reconcile(ctx, request)
-	require.NoError(t, err)
-	require.Positive(t, result.RequeueAfter)
-	require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(pvc), pvc))
-	require.Contains(t, pvc.Finalizers, dptypes.DataProtectionFinalizerName)
-	childReconciler := &RestoreReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(20)}
-	_, err = childReconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(child)})
-	require.NoError(t, err)
-	_, err = r.Reconcile(ctx, request)
-	require.NoError(t, err)
-	require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(pvc), pvc))
-	require.NotContains(t, pvc.Finalizers, dptypes.DataProtectionFinalizerName)
-	require.Equal(t, corev1.ConditionFalse, findPVCConditionByType(pvc, kbappsv1.ConditionTypeRestore).Status)
-	require.Empty(t, pvc.Spec.VolumeName, "do not hand incomplete data to a business consumer")
-	require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(helper), helper))
-	require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(pv), pv))
-}
-
 func TestVolumePopulatorRejectsClusterSerialParameters(t *testing.T) {
 	ctx := context.Background()
 	scheme, cluster, component, its, pvc := parentRestoreObjects(t)
@@ -5311,13 +5269,10 @@ func TestVolumePopulatorRejectsClusterSerialParameters(t *testing.T) {
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(pvc).
 		WithObjects(cluster, component, its, pvc).Build()
 	r := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(20)}
-	for range 3 {
+	for range 2 {
 		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(pvc)})
 		require.NoError(t, err)
 		require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(pvc), pvc))
-		if condition := findPVCConditionByType(pvc, kbappsv1.ConditionTypeRestore); condition != nil && condition.Status == corev1.ConditionFalse {
-			break
-		}
 	}
 	condition := findPVCConditionByType(pvc, kbappsv1.ConditionTypeRestore)
 	require.NotNil(t, condition)

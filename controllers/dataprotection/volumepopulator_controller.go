@@ -418,9 +418,6 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 		return nil
 	}
 	if err := pvcRestorePolicyError(reqCtx.Ctx, r.Client, pvc); err != nil {
-		if isInvalidRestorePolicy(err) {
-			return r.rejectPVCPolicy(reqCtx, pvc, err)
-		}
 		return err
 	}
 	var restoreCtx *pvcRestoreContext
@@ -438,6 +435,29 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 	}
 	if err = r.completeBoundPVCIfNeeded(reqCtx, pvc, restoreCtx); err != nil {
 		return err
+	}
+	return nil
+}
+
+func pvcRestorePolicyError(ctx context.Context, cli client.Reader, pvc *corev1.PersistentVolumeClaim) error {
+	parameters, err := restoreParametersMapFromPVC(pvc)
+	if err != nil {
+		return intctrlutil.NewFatalError(err.Error())
+	}
+	if err := dptypes.ValidateVolumeRestorePolicy(parameters[dptypes.VolumeRestorePolicyParameterKey],
+		"PVC restore parameters["+dptypes.VolumeRestorePolicyParameterKey+"]"); err != nil {
+		return intctrlutil.NewFatalError(err.Error())
+	}
+	if pvc.Spec.DataSourceRef.Kind == dptypes.RestoreKind {
+		source := &dpv1alpha1.Restore{}
+		if err := cli.Get(ctx, types.NamespacedName{Namespace: pvc.Namespace, Name: pvc.Spec.DataSourceRef.Name}, source); err != nil {
+			return err
+		}
+		if config := source.Spec.PrepareDataConfig; config != nil {
+			if err := dptypes.ValidateVolumeRestorePolicy(string(config.VolumeClaimRestorePolicy), "spec.prepareDataConfig.volumeClaimRestorePolicy"); err != nil {
+				return intctrlutil.NewFatalError(err.Error())
+			}
+		}
 	}
 	return nil
 }

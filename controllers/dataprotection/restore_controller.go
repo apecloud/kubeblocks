@@ -87,15 +87,6 @@ func (r *RestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return *res, err
 	}
 
-	if restore.Status.Phase != dpv1alpha1.RestorePhaseCompleted && restore.Status.Phase != dpv1alpha1.RestorePhaseFailed {
-		if err := executionRestorePolicyError(reqCtx.Ctx, r.Client, restore); err != nil {
-			if isInvalidRestorePolicy(err) {
-				return r.rejectRestorePolicy(reqCtx, restore, err)
-			}
-			return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
-		}
-	}
-
 	switch restore.Status.Phase {
 	case "":
 		return r.newAction(reqCtx, restore)
@@ -230,6 +221,18 @@ func CheckBackupRepoForRestore(reqCtx intctrlutil.RequestCtx, cli client.Client,
 func (r *RestoreReconciler) newAction(reqCtx intctrlutil.RequestCtx, restore *dpv1alpha1.Restore) (ctrl.Result, error) {
 	oldRestore := restore.DeepCopy()
 	patch := client.MergeFrom(oldRestore)
+	if config := restore.Spec.PrepareDataConfig; config != nil {
+		if err := dptypes.ValidateVolumeRestorePolicy(string(config.VolumeClaimRestorePolicy), "spec.prepareDataConfig.volumeClaimRestorePolicy"); err != nil {
+			dprestore.SetRestoreValidationCondition(restore, dprestore.ReasonValidateFailed, err.Error())
+			restore.Status.Phase = dpv1alpha1.RestorePhaseFailed
+			restore.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
+			if patchErr := r.Client.Status().Patch(reqCtx.Ctx, restore, patch); patchErr != nil {
+				return intctrlutil.CheckedRequeueWithError(patchErr, reqCtx.Log, "")
+			}
+			r.Recorder.Event(restore, corev1.EventTypeWarning, dprestore.ReasonValidateFailed, err.Error())
+			return intctrlutil.Reconciled()
+		}
+	}
 	// patch metaObject
 	if restore.Labels == nil {
 		restore.Labels = map[string]string{}

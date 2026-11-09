@@ -522,13 +522,3 @@ type RestoreList struct {
 func init() {
 	SchemeBuilder.Register(&Restore{}, &RestoreList{})
 }
-
-// IsSerialPolicy reports whether the legacy Serial value is configured.
-//
-// Deprecated: Serial execution is no longer supported.
-func (p *PrepareDataConfig) IsSerialPolicy() bool {
-	if p == nil {
-		return false
-	}
-	return p.VolumeClaimRestorePolicy == VolumeClaimRestorePolicySerial
-}

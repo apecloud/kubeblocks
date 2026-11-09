@@ -260,7 +260,7 @@ func ResolveReloadServerGRPCPort(containers []corev1.Container) (int32, error) {
 }
 
 func allocConfigManagerHostPort(comp *component.SynthesizedComponent) (int32, error) {
-	pm := intctrlutil.GetPortManager(nil)
+	pm := intctrlutil.GetPortManager(comp.Network)
 	portKey := pm.PortKey(comp.ClusterName, comp.Name, constant.ConfigSidecarName, constant.ConfigManagerPortName)
 	port, err := pm.AllocatePort(portKey)
 	if err != nil {

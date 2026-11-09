@@ -371,21 +371,21 @@ type definedPortManager struct {
 }
 
 func (m *definedPortManager) PortKey(clusterName, compName, containerName, portName string) string {
-	if m.isKBAgentPortNNotDefined(containerName, portName) {
+	if m.isInternalPortNNotDefined(containerName, portName) {
 		return m.defaultPortManager.PortKey(clusterName, compName, containerName, portName)
 	}
 	return portName
 }
 
 func (m *definedPortManager) GetPort(key string) (int32, error) {
-	if m.isKBAgentPortNNotDefinedInKey(key) {
+	if m.isInternalPortNNotDefinedInKey(key) {
 		return m.defaultPortManager.GetPort(key)
 	}
 	return m.hostPorts[key], nil
 }
 
 func (m *definedPortManager) UsePort(key string, port int32) error {
-	if m.isKBAgentPortNNotDefinedInKey(key) {
+	if m.isInternalPortNNotDefinedInKey(key) {
 		return m.defaultPortManager.UsePort(key, port)
 	}
 	return nil
@@ -396,7 +396,7 @@ func (m *definedPortManager) AllocatePort(key string) (int32, error) {
 	if ok {
 		return port, nil
 	}
-	if m.isKBAgentPortNNotDefinedInKey(key) {
+	if m.isInternalPortNNotDefinedInKey(key) {
 		return m.defaultPortManager.AllocatePort(key)
 	}
 	return 0, fmt.Errorf("no available port: %s", key)
@@ -404,33 +404,38 @@ func (m *definedPortManager) AllocatePort(key string) (int32, error) {
 }
 
 func (m *definedPortManager) ReleaseByPrefix(prefix string) error {
-	if m.hasKBAgentPortDefined() {
+	if m.hasAllInternalPortsDefined() {
 		return nil
 	}
 	return m.defaultPortManager.ReleaseByPrefix(prefix)
 }
 
-func (m *definedPortManager) isKBAgentPort(containerName, portName string) bool {
-	return containerName == kbagent.ContainerName && (portName == kbagent.DefaultHTTPPortName || portName == kbagent.DefaultStreamingPortName)
+func (m *definedPortManager) isInternalPort(containerName, portName string) bool {
+	return (containerName == kbagent.ContainerName && (portName == kbagent.DefaultHTTPPortName || portName == kbagent.DefaultStreamingPortName)) ||
+		(containerName == constant.ConfigSidecarName && portName == constant.ConfigManagerPortName)
 }
 
-func (m *definedPortManager) hasKBAgentPortDefined() bool {
+func (m *definedPortManager) hasAllInternalPortsDefined() bool {
 	_, http := m.hostPorts[kbagent.DefaultHTTPPortName]
 	_, stream := m.hostPorts[kbagent.DefaultStreamingPortName]
-	return http && stream
+	_, configManager := m.hostPorts[constant.ConfigManagerPortName]
+	return http && stream && configManager
 }
 
-func (m *definedPortManager) isKBAgentPortNNotDefined(containerName, portName string) bool {
+func (m *definedPortManager) isInternalPortNNotDefined(containerName, portName string) bool {
 	_, defined := m.hostPorts[portName]
-	return m.isKBAgentPort(containerName, portName) && !defined
+	return m.isInternalPort(containerName, portName) && !defined
 }
 
-func (m *definedPortManager) isKBAgentPortNNotDefinedInKey(key string) bool {
+func (m *definedPortManager) isInternalPortNNotDefinedInKey(key string) bool {
+	if strings.HasSuffix(key, "-"+constant.ConfigSidecarName+"-"+constant.ConfigManagerPortName) {
+		return m.isInternalPortNNotDefined(constant.ConfigSidecarName, constant.ConfigManagerPortName)
+	}
 	subs := strings.Split(key, "-")
 	if len(subs) < 4 {
 		return false
 	}
-	return m.isKBAgentPortNNotDefined(subs[len(subs)-2], subs[len(subs)-1])
+	return m.isInternalPortNNotDefined(subs[len(subs)-2], subs[len(subs)-1])
 }
 
 func newDefinedPortManager(defaultPortManager *portManager, hostPorts []appsv1.HostPort) *definedPortManager {

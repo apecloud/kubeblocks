@@ -162,25 +162,12 @@ func hasHostNetworkEnabled(synthesizedComp *SynthesizedComponent,
 	return slices.Index(strings.Split(comps, ","), compName) >= 0
 }
 
-func getHostNetworkPort(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	compName, cName, pName string) (int32, error) {
-	network := synthesizedComp.Network
-	if compName != synthesizedComp.Name {
-		comp := &appsv1.Component{}
-		compKey := types.NamespacedName{
-			Namespace: synthesizedComp.Namespace,
-			Name:      constant.GenerateClusterComponentName(synthesizedComp.ClusterName, compName),
-		}
-		if err := cli.Get(ctx, compKey, comp, inDataContext()); err != nil {
-			return 0, err
-		}
-		network = comp.Spec.Network
-	}
-	pm := intctrlutil.GetPortManager(network)
+func getHostNetworkPort(synthesizedComp *SynthesizedComponent, clusterName, compName, cName, pName string) (int32, error) {
+	pm := intctrlutil.GetPortManager(synthesizedComp.Network)
 	if pm == nil {
 		return 0, nil
 	}
-	key := pm.PortKey(synthesizedComp.ClusterName, compName, cName, pName)
+	key := pm.PortKey(clusterName, compName, cName, pName)
 	return pm.GetPort(key)
 }
 

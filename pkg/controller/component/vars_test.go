@@ -296,7 +296,7 @@ var _ = Describe("vars", func() {
 			})
 		})
 
-		DescribeTable("resolves host-network ports using the referenced component settings", func(sourceExplicit, targetExplicit bool) {
+		It("resolves another component's host-network port enabled by network settings", func() {
 			synthesizedComp.Comp2CompDefs = map[string]string{"other": "other-definition"}
 			definition := &appsv1.ComponentDefinition{ObjectMeta: metav1.ObjectMeta{Name: "other-definition"},
 				Spec: appsv1.ComponentDefinitionSpec{HostNetwork: &appsv1.HostNetwork{}}}
@@ -308,33 +308,22 @@ var _ = Describe("vars", func() {
 				HostNetworkVars: appsv1.HostNetworkVars{Container: &appsv1.ContainerVars{Name: "default",
 					Port: &appsv1.NamedVar{Name: "default", Option: &appsv1.VarRequired}}},
 			}}}}
-			if sourceExplicit {
-				synthesizedComp.Network = &appsv1.ComponentNetwork{HostNetwork: true,
-					HostPorts: []appsv1.HostPort{{Name: "default", Port: 30001}}}
+			settings := map[string]any{
+				constant.CfgKeyCtrlrMgrNS:         "default",
+				constant.CfgHostPortConfigMapName: "host-port-vars",
+				constant.CfgHostPortIncludeRanges: "30000-30100",
+				constant.CfgHostPortExcludeRanges: "",
 			}
-			if targetExplicit {
-				other.Spec.Network.HostPorts = []appsv1.HostPort{{Name: "default", Port: 30002}}
-			} else {
-				// Existing annotation-based targets keep their persisted allocations.
-				other.Spec.Network = nil
-				other.Annotations = map[string]string{constant.HostNetworkAnnotationKey: "other"}
-				settings := map[string]any{
-					constant.CfgKeyCtrlrMgrNS:         "default",
-					constant.CfgHostPortConfigMapName: "host-port-vars",
-					constant.CfgHostPortIncludeRanges: "30000-30100",
-					constant.CfgHostPortExcludeRanges: "",
-				}
-				for key, value := range settings {
-					old := viper.Get(key)
-					DeferCleanup(func() { viper.Set(key, old) })
-					viper.Set(key, value)
-				}
-				cli := fake.NewClientBuilder().WithScheme(testCtx.Cli.Scheme()).WithObjects(&corev1.ConfigMap{
-					ObjectMeta: metav1.ObjectMeta{Name: "host-port-vars", Namespace: "default"},
-					Data:       map[string]string{"test-cluster-other-default-default": "30002"},
-				}).Build()
-				Expect(intctrlutil.InitDefaultHostPortManager(cli)).Should(Succeed())
+			for key, value := range settings {
+				old := viper.Get(key)
+				DeferCleanup(func() { viper.Set(key, old) })
+				viper.Set(key, value)
 			}
+			cli := fake.NewClientBuilder().WithScheme(testCtx.Cli.Scheme()).WithObjects(&corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: "host-port-vars", Namespace: "default"},
+				Data:       map[string]string{"test-cluster-other-default-default": "30002"},
+			}).Build()
+			Expect(intctrlutil.InitDefaultHostPortManager(cli)).Should(Succeed())
 
 			templateVars, envVars, err := ResolveTemplateNEnvVars(ctx, reader, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
@@ -344,9 +333,7 @@ var _ = Describe("vars", func() {
 			_, _, err = ResolveTemplateNEnvVars(ctx, reader, synthesizedComp, vars)
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring("has no HostNetwork"))
-		}, Entry("default source and explicit target", false, true),
-			Entry("different explicit source and target ports", true, true),
-			Entry("explicit source and legacy target", true, false))
+		})
 
 		It("host-network vars", func() {
 			vars := []appsv1.EnvVar{

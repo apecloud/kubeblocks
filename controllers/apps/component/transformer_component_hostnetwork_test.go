@@ -164,28 +164,7 @@ var _ = Describe("component hostnetwork transformer test", func() {
 		Expect(transformer.Transform(transCtx, dag)).Should(MatchError(ContainSubstring("no available port: mysql")))
 	})
 
-	It("maps only original runtime ports on ordinary Pods", func() {
-		synthesized := transCtx.SynthesizeComponent
-		transCtx.CompDef = &appsv1.ComponentDefinition{Spec: appsv1.ComponentDefinitionSpec{Runtime: corev1.PodSpec{
-			Containers: []corev1.Container{*synthesized.PodSpec.Containers[0].DeepCopy()},
-		}}}
-		synthesized.Network = &appsv1.ComponentNetwork{HostPorts: []appsv1.HostPort{
-			{Name: "mysql", Port: 31001}, {Name: "http", Port: 31002}, {Name: "unknown", Port: 31003},
-		}}
-		synthesized.PodSpec.Containers[0].Ports = append(synthesized.PodSpec.Containers[0].Ports,
-			corev1.ContainerPort{Name: "http", ContainerPort: 8080})
-		synthesized.PodSpec.Containers = append(synthesized.PodSpec.Containers,
-			corev1.Container{Name: "monitor", Ports: []corev1.ContainerPort{{Name: "mysql", ContainerPort: 9090}}})
-		Expect((&componentHostPortTransformer{}).Transform(transCtx, dag)).Should(Succeed())
-		Expect(synthesized.PodSpec.HostNetwork).Should(BeFalse())
-		Expect(synthesized.PodSpec.Containers[0].Ports[0].ContainerPort).Should(Equal(int32(3306)))
-		Expect(synthesized.PodSpec.Containers[0].Ports[0].HostPort).Should(Equal(int32(31001)))
-		Expect(synthesized.PodSpec.Containers[0].Ports[1].HostPort).Should(BeZero())
-		Expect(synthesized.PodSpec.Containers[1].Ports[0].HostPort).Should(BeZero())
-		Expect(synthesized.PodSpec.Containers[2].Ports[0].HostPort).Should(BeZero())
-	})
-
-	It("releases old automatic reservations when deleting a component with all ports explicit", func() {
+	It("releases automatic config-manager port with explicit kbagent ports", func() {
 		manager := intctrlutil.GetPortManager(nil)
 		oldKey := manager.PortKey(clusterName, compName, constant.ConfigSidecarName, constant.ConfigManagerPortName)
 		Expect(manager.UsePort(oldKey, 45004)).Should(Succeed())

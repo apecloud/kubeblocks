@@ -47,6 +47,7 @@ func (t *componentHostNetworkTransformer) Transform(ctx graph.TransformContext, 
 	if err != nil {
 		return err
 	}
+
 	comp := transCtx.Component
 	updateObjectsWithAllocatedPorts(synthesizedComp, comp, ports)
 

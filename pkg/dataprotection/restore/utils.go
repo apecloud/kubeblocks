@@ -205,12 +205,6 @@ func getMountPathWithSourceVolume(backup *dpv1alpha1.Backup, volumeSource string
 func ValidateAndInitRestoreMGR(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	restoreMgr *RestoreManager) error {
-	if config := restoreMgr.Restore.Spec.PrepareDataConfig; config != nil {
-		if err := dptypes.ValidateVolumeRestorePolicy(string(config.VolumeClaimRestorePolicy), "spec.prepareDataConfig.volumeClaimRestorePolicy"); err != nil {
-			return intctrlutil.NewFatalError(err.Error())
-		}
-	}
-
 	// get backupActionSet based on the specified backup name.
 	backupName := restoreMgr.Restore.Spec.Backup.Name
 	backupSet, err := restoreMgr.GetBackupActionSetByNamespaced(reqCtx, cli, backupName, restoreMgr.Restore.Spec.Backup.Namespace)

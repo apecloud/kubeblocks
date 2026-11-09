@@ -234,9 +234,6 @@ func (r RestoreOpsHandler) restoreClusterFromBackup(reqCtx intctrlutil.RequestCt
 	if restoreSpec == nil {
 		return nil, intctrlutil.NewFatalError("spec.restore can not be empty")
 	}
-	if err := validateRestorePolicy(restoreSpec); err != nil {
-		return nil, intctrlutil.NewFatalError(err.Error())
-	}
 	backupName := restoreSpec.BackupName
 	backupNamespace := restoreSpec.BackupNamespace
 	if backupNamespace == "" {

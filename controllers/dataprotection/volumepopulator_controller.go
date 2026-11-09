@@ -889,9 +889,6 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 	if err != nil {
 		return nil, intctrlutil.NewFatalError(err.Error())
 	}
-	if err := dptypes.ValidateVolumeRestorePolicy(parameters[dptypes.VolumeRestorePolicyParameterKey], dptypes.VolumeRestorePolicyParameterKey); err != nil {
-		return nil, intctrlutil.NewFatalError(err.Error())
-	}
 	decision, err := r.decidePVCRestore(reqCtx, pvc, backup, parameters)
 	if err != nil {
 		return nil, err

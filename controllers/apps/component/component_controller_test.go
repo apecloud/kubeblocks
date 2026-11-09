@@ -1863,27 +1863,76 @@ var _ = Describe("Component Controller", func() {
 			})()).Should(Succeed())
 			network := &kbappsv1.ComponentNetwork{DNSPolicy: ptr.To(corev1.DNSNone),
 				HostAliases: []corev1.HostAlias{{IP: "10.0.0.1", Hostnames: []string{"custom"}}},
-				DNSConfig:   &corev1.PodDNSConfig{Nameservers: []string{"10.0.0.2"}}}
+				DNSConfig:   &corev1.PodDNSConfig{Nameservers: []string{"10.0.0.2"}},
+				HostPorts:   []kbappsv1.HostPort{{Name: "mysql", Port: 30001}, {Name: "http", Port: 30002}}}
 			createCompObj(defaultCompName, compDefObj.Name, func(f *testapps.MockComponentFactory) {
 				f.GetObject().Spec.Network = network
 			})
-			checkNetwork := func(policy corev1.DNSPolicy, aliases []corev1.HostAlias, config *corev1.PodDNSConfig) {
+			checkNetwork := func(policy corev1.DNSPolicy, aliases []corev1.HostAlias, config *corev1.PodDNSConfig, hostPort int32) {
 				Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, its *workloads.InstanceSet) {
 					g.Expect(its.Spec.Template.Spec.HostNetwork).Should(BeFalse())
+					foundMySQL, foundAgent := false, false
+					for _, c := range its.Spec.Template.Spec.Containers {
+						if c.Name == testapps.DefaultMySQLContainerName {
+							foundMySQL = true
+							g.Expect(c.Ports[0].HostPort).Should(Equal(hostPort))
+						}
+						if c.Name == "kbagent" {
+							foundAgent = true
+							g.Expect(c.Ports[0].HostPort).Should(BeZero())
+						}
+					}
+					g.Expect(foundMySQL).Should(BeTrue())
+					g.Expect(foundAgent).Should(BeTrue())
 					g.Expect(its.Spec.Template.Spec.HostAliases).Should(Equal(aliases))
 					g.Expect(its.Spec.Template.Spec.DNSPolicy).Should(Equal(policy))
 					g.Expect(its.Spec.Template.Spec.DNSConfig).Should(Equal(config))
 				})).Should(Succeed())
 			}
-			checkNetwork(corev1.DNSNone, network.HostAliases, network.DNSConfig)
+			checkNetwork(corev1.DNSNone, network.HostAliases, network.DNSConfig, 30001)
 			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
 				comp.Spec.Network = &kbappsv1.ComponentNetwork{}
 			})()).Should(Succeed())
-			checkNetwork(corev1.DNSClusterFirst, nil, nil)
+			checkNetwork(corev1.DNSClusterFirst, nil, nil, 0)
 			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
 				comp.Spec.Network = nil
 			})()).Should(Succeed())
-			checkNetwork(corev1.DNSDefault, nil, nil)
+			checkNetwork(corev1.DNSDefault, nil, nil, 0)
+		})
+
+		It("reconciles host-network ports from existing automatic allocations to explicit mappings", func() {
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compDefObj), func(definition *kbappsv1.ComponentDefinition) {
+				definition.Spec.HostNetwork = &kbappsv1.HostNetwork{ContainerPorts: []kbappsv1.HostNetworkContainerPort{
+					{Container: testapps.DefaultMySQLContainerName, Ports: []string{"mysql"}},
+				}}
+			})()).Should(Succeed())
+			createCompObj(defaultCompName, compDefObj.Name, func(f *testapps.MockComponentFactory) {
+				f.GetObject().Spec.Network = &kbappsv1.ComponentNetwork{HostNetwork: true, DNSPolicy: ptr.To(corev1.DNSDefault)}
+				manager := intctrlutil.GetPortManager(nil)
+				for _, port := range []struct {
+					container, name string
+					number          int32
+				}{
+					{testapps.DefaultMySQLContainerName, "mysql", 45001}, {"kbagent", "http", 45002}, {"kbagent", "streaming", 45003},
+				} {
+					key := manager.PortKey(clusterKey.Name, defaultCompName, port.container, port.name)
+					Expect(manager.UsePort(key, port.number)).Should(Succeed())
+				}
+			})
+			checkPort := func(expected int32) {
+				Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, its *workloads.InstanceSet) {
+					g.Expect(its.Spec.Template.Spec.HostNetwork).Should(BeTrue())
+					g.Expect(its.Spec.Template.Spec.DNSPolicy).Should(Equal(corev1.DNSDefault))
+					g.Expect(its.Spec.Template.Spec.Containers[0].Ports[0].ContainerPort).Should(Equal(expected))
+				})).Should(Succeed())
+			}
+			checkPort(45001)
+			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+				comp.Spec.Network.HostPorts = []kbappsv1.HostPort{
+					{Name: "mysql", Port: 46001}, {Name: "http", Port: 46002}, {Name: "streaming", Port: 46003},
+				}
+			})()).Should(Succeed())
+			checkPort(46001)
 		})
 
 		It("component finalizers and labels", func() {

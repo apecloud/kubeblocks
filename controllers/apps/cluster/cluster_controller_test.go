@@ -829,7 +829,8 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		DescribeTable("persists network through Cluster reconciliation", func(sharded bool) {
-			network := &appsv1.ComponentNetwork{HostAliases: []corev1.HostAlias{{IP: "10.0.0.1", Hostnames: []string{"custom"}}}}
+			network := &appsv1.ComponentNetwork{HostAliases: []corev1.HostAlias{{IP: "10.0.0.1", Hostnames: []string{"custom"}}},
+				HostPorts: []appsv1.HostPort{{Name: "mysql", Port: 30001}}}
 			createClusterObjNoWait("", func(f *testapps.MockClusterFactory) {
 				spec := appsv1.ClusterComponentSpec{Name: defaultCompName, ComponentDef: compDefObj.Name, Replicas: 1, Network: network}
 				if sharded {

@@ -146,6 +146,9 @@ func hasHostNetworkEnabled(synthesizedComp *SynthesizedComponent,
 	if synthesizedComp != nil && synthesizedComp.PodSpec.HostNetwork {
 		return true
 	}
+	if synthesizedComp != nil && synthesizedComp.Network != nil && synthesizedComp.Network.HostNetwork {
+		return true
+	}
 	if comp != nil && comp.Spec.Network != nil && comp.Spec.Network.HostNetwork {
 		return true
 	}
@@ -159,32 +162,27 @@ func hasHostNetworkEnabled(synthesizedComp *SynthesizedComponent,
 	return slices.Index(strings.Split(comps, ","), compName) >= 0
 }
 
-func getHostNetworkPort(ctx context.Context, _ client.Reader, clusterName, compName, cName, pName string) (int32, error) {
-	key := intctrlutil.BuildHostPortName(clusterName, compName, cName, pName)
-	if v, ok := ctx.Value(mockHostNetworkPortManagerKey{}).(map[string]int32); ok {
-		if p, okk := v[key]; okk {
-			return p, nil
+func getHostNetworkPort(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	compName, cName, pName string) (int32, error) {
+	network := synthesizedComp.Network
+	if compName != synthesizedComp.Name {
+		comp := &appsv1.Component{}
+		compKey := types.NamespacedName{
+			Namespace: synthesizedComp.Namespace,
+			Name:      constant.GenerateClusterComponentName(synthesizedComp.ClusterName, compName),
 		}
-		return 0, nil
+		if err := cli.Get(ctx, compKey, comp, inDataContext()); err != nil {
+			return 0, err
+		}
+		network = comp.Spec.Network
 	}
-	pm := intctrlutil.GetPortManager()
+	pm := intctrlutil.GetPortManager(network)
 	if pm == nil {
 		return 0, nil
 	}
+	key := pm.PortKey(synthesizedComp.ClusterName, compName, cName, pName)
 	return pm.GetPort(key)
 }
-
-func mockHostNetworkPort(ctx context.Context, _ client.Reader, clusterName, compName, cName, pName string, port int32) context.Context {
-	key := intctrlutil.BuildHostPortName(clusterName, compName, cName, pName)
-	mockHostNetworkPortManager[key] = port
-	return context.WithValue(ctx, mockHostNetworkPortManagerKey{}, mockHostNetworkPortManager)
-}
-
-var (
-	mockHostNetworkPortManager = map[string]int32{}
-)
-
-type mockHostNetworkPortManagerKey struct{}
 
 func UDFReconfigureActionName(tpl SynthesizedFileTemplate) string {
 	return fmt.Sprintf("reconfigure-%s", tpl.Name)

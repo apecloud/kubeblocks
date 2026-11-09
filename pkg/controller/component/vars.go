@@ -458,7 +458,10 @@ func resolveHostNetworkPortRef(ctx context.Context, cli client.Reader, synthesiz
 	defineKey string, selector appsv1.HostNetworkVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
 	resolvePort := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
 		compName := obj.(string)
-		port, _ := getHostNetworkPort(ctx, cli, synthesizedComp.ClusterName, compName, selector.Container.Name, selector.Container.Port.Name)
+		port, err := getHostNetworkPort(ctx, cli, synthesizedComp, compName, selector.Container.Name, selector.Container.Port.Name)
+		if err != nil {
+			return nil, nil, err
+		}
 		if port > 0 {
 			return &corev1.EnvVar{
 				Name:  defineKey,

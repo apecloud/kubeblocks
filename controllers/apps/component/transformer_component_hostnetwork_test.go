@@ -135,16 +135,12 @@ var _ = Describe("component hostnetwork transformer test", func() {
 
 	DescribeTable("managed host network preserves explicit DNS policy", func(enabled bool, policy *corev1.DNSPolicy, expected corev1.DNSPolicy) {
 		transCtx.SynthesizeComponent.HostNetwork.ContainerPorts = nil
-		transCtx.SynthesizeComponent.Network = &appsv1.ComponentNetwork{HostNetwork: enabled, DNSPolicy: policy}
-		transCtx.Component.Spec.Network = transCtx.SynthesizeComponent.Network
+		transCtx.Component.Spec.Network = &appsv1.ComponentNetwork{HostNetwork: enabled, DNSPolicy: policy}
 		transCtx.SynthesizeComponent.PodSpec.HostNetwork = enabled
-		transCtx.SynthesizeComponent.Annotations = transCtx.Component.Annotations
 		if enabled {
-			transCtx.SynthesizeComponent.Annotations = nil
+			transCtx.Component.Annotations = nil
 		}
-		if policy != nil {
-			transCtx.SynthesizeComponent.PodSpec.DNSPolicy = *policy
-		}
+		transCtx.SynthesizeComponent.Annotations = transCtx.Component.Annotations
 		Expect((&componentHostNetworkTransformer{}).Transform(transCtx, dag)).Should(Succeed())
 		Expect(transCtx.SynthesizeComponent.PodSpec.HostNetwork).Should(BeTrue())
 		Expect(transCtx.SynthesizeComponent.PodSpec.DNSPolicy).Should(Equal(expected))

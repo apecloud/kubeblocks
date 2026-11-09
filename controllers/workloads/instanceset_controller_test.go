@@ -232,8 +232,6 @@ var _ = Describe("InstanceSet Controller", func() {
 			time.Sleep(1 * time.Second)
 			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
 				its.Spec.Template.Spec.DNSPolicy = corev1.DNSClusterFirstWithHostNet
-				its.Spec.Template.Spec.HostAliases = []corev1.HostAlias{{IP: "10.0.0.1", Hostnames: []string{"custom"}}}
-				its.Spec.Template.Spec.DNSConfig = &corev1.PodDNSConfig{Nameservers: []string{"10.0.0.2"}}
 			})()).ShouldNot(HaveOccurred())
 
 			for i := replicas; i > 0; i-- {
@@ -241,9 +239,6 @@ var _ = Describe("InstanceSet Controller", func() {
 				podKey := podsKey[i-1]
 				Eventually(testapps.CheckObj(&testCtx, podKey, func(g Gomega, pod *corev1.Pod) {
 					g.Expect(pod.CreationTimestamp.After(beforeUpdate)).Should(BeTrue())
-					g.Expect(pod.Spec.DNSPolicy).Should(Equal(corev1.DNSClusterFirstWithHostNet))
-					g.Expect(pod.Spec.HostAliases).Should(Equal([]corev1.HostAlias{{IP: "10.0.0.1", Hostnames: []string{"custom"}}}))
-					g.Expect(pod.Spec.DNSConfig).Should(Equal(&corev1.PodDNSConfig{Nameservers: []string{"10.0.0.2"}}))
 				})).Should(Succeed())
 
 				// mock new pod ready

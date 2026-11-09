@@ -22,6 +22,7 @@ package component
 import (
 	corev1 "k8s.io/api/core/v1"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -46,7 +47,10 @@ func (t *componentHostNetworkTransformer) Transform(ctx graph.TransformContext, 
 	if err != nil {
 		return err
 	}
-	return updateObjectsWithAllocatedPorts(synthesizedComp, ports)
+	comp := transCtx.Component
+	updateObjectsWithAllocatedPorts(synthesizedComp, comp, ports)
+
+	return nil
 }
 
 func allocateHostPorts(synthesizedComp *component.SynthesizedComponent) (map[string]map[string]int32, error) {
@@ -99,9 +103,12 @@ func allocateHostPortsWithFunc(pm *intctrlutil.PortManager, synthesizedComp *com
 	return ports, nil
 }
 
-func updateObjectsWithAllocatedPorts(synthesizedComp *component.SynthesizedComponent, ports map[string]map[string]int32) error {
+func updateObjectsWithAllocatedPorts(synthesizedComp *component.SynthesizedComponent,
+	comp *appsv1.Component, ports map[string]map[string]int32) {
 	synthesizedComp.PodSpec.HostNetwork = true
-	if synthesizedComp.Network == nil || synthesizedComp.Network.DNSPolicy == nil {
+	if comp.Spec.Network != nil && comp.Spec.Network.DNSPolicy != nil {
+		synthesizedComp.PodSpec.DNSPolicy = *comp.Spec.Network.DNSPolicy
+	} else {
 		synthesizedComp.PodSpec.DNSPolicy = corev1.DNSClusterFirstWithHostNet
 	}
 	for i, c := range synthesizedComp.PodSpec.Containers {
@@ -115,5 +122,4 @@ func updateObjectsWithAllocatedPorts(synthesizedComp *component.SynthesizedCompo
 		}
 	}
 	component.UpdateKBAgentContainer4HostNetwork(synthesizedComp)
-	return nil
 }

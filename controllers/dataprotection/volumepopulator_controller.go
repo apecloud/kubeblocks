@@ -154,6 +154,9 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 	if restore.Spec.PrepareDataConfig == nil || restore.Spec.PrepareDataConfig.DataSourceRef == nil {
 		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`spec.prepareDataConfig.datasourceRef of restore "%s" can not be empty`, restore.Name))
 	}
+	if err := dpv1alpha1.ValidateVolumeRestorePolicy(string(restore.Spec.PrepareDataConfig.VolumeClaimRestorePolicy), "spec.prepareDataConfig.volumeClaimRestorePolicy"); err != nil {
+		return nil, intctrlutil.NewFatalError(err.Error())
+	}
 	restoreMgr := dprestore.NewRestoreManager(restore, r.Recorder, r.Scheme, r.Client)
 	if err := dprestore.ValidateAndInitRestoreMGR(reqCtx, r.Client, restoreMgr); err != nil {
 		return nil, err

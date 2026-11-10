@@ -28,13 +28,10 @@ import (
 	"strings"
 	"time"
 
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -205,32 +202,6 @@ func getMountPathWithSourceVolume(backup *dpv1alpha1.Backup, volumeSource string
 	return ""
 }
 
-func restoreJobHasCompleted(statusActions []dpv1alpha1.RestoreStatusAction, jobName string) bool {
-	jobKey := BuildJobKeyForActionStatus(jobName)
-	for i := range statusActions {
-		if statusActions[i].ObjectKey == jobKey && statusActions[i].Status == dpv1alpha1.RestoreActionCompleted {
-			return true
-		}
-	}
-	return false
-}
-
-func deleteRestoreJob(reqCtx intctrlutil.RequestCtx, cli client.Client, jobKey string, namespace string) error {
-	jobName := strings.ReplaceAll(jobKey, fmt.Sprintf("%s/", constant.JobKind), "")
-	job := &batchv1.Job{}
-	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: jobName, Namespace: namespace}, job); err != nil {
-		return client.IgnoreNotFound(err)
-	}
-	if controllerutil.ContainsFinalizer(job, dptypes.DataProtectionFinalizerName) {
-		patch := client.MergeFrom(job.DeepCopy())
-		controllerutil.RemoveFinalizer(job, dptypes.DataProtectionFinalizerName)
-		if err := cli.Patch(reqCtx.Ctx, job, patch); err != nil {
-			return err
-		}
-	}
-	return intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, job)
-}
-
 // ValidateAndInitRestoreMGR validate if the restore CR is valid and init the restore manager.
 func ValidateAndInitRestoreMGR(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
@@ -327,7 +298,6 @@ func isTimeInRange(t time.Time, start time.Time, end time.Time) bool {
 
 func GetRestoreFromBackupAnnotation(
 	backup *dpv1alpha1.Backup,
-	volumeRestorePolicy string,
 	restoreTime string,
 	env []corev1.EnvVar,
 	doReadyRestoreAfterClusterRunning bool,
@@ -340,7 +310,6 @@ func GetRestoreFromBackupAnnotation(
 	restoreInfoMap := map[string]string{}
 	restoreInfoMap[constant.BackupNameKeyForRestore] = backup.Name
 	restoreInfoMap[constant.BackupNamespaceKeyForRestore] = backup.Namespace
-	restoreInfoMap[constant.VolumeRestorePolicyKeyForRestore] = volumeRestorePolicy
 	restoreInfoMap[constant.DoReadyRestoreAfterClusterRunning] = strconv.FormatBool(doReadyRestoreAfterClusterRunning)
 	if restoreTime != "" {
 		restoreInfoMap[constant.RestoreTimeKeyForRestore] = restoreTime

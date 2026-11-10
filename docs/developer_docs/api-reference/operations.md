@@ -3978,13 +3978,8 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the policy for restoring volume claims of a Component&rsquo;s Pods.
-It determines whether the volume claims should be restored sequentially (one by one) or in parallel (all at once).
-Support values:</p>
-<ul>
-<li>&ldquo;Serial&rdquo;</li>
-<li>&ldquo;Parallel&rdquo;</li>
-</ul>
+<p>Deprecated: Restore execution only supports Parallel. Omit this setting or use Parallel.
+Serial is retained for decoding existing resources and is rejected by the restore controller.</p>
 </td>
 </tr>
 <tr>

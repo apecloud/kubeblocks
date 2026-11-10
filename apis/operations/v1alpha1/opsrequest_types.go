@@ -984,12 +984,8 @@ type Restore struct {
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 
-	// Specifies the policy for restoring volume claims of a Component's Pods.
-	// It determines whether the volume claims should be restored sequentially (one by one) or in parallel (all at once).
-	// Support values:
-	//
-	// - "Serial"
-	// - "Parallel"
+	// Deprecated: Restore execution only supports Parallel. Omit this setting or use Parallel.
+	// Serial is retained for decoding existing resources and is rejected by the restore controller.
 	//
 	// +kubebuilder:validation:Enum=Serial;Parallel
 	// +kubebuilder:default=Parallel

@@ -335,10 +335,6 @@ func (m *portManager) allocatePort(key string, unavailable map[int32]bool) (int3
 		previousPort = port
 	}
 
-	if len(m.used) >= int(m.to-m.from)+1 {
-		return 0, fmt.Errorf("no available port: %s", key)
-	}
-
 	start := m.cursor
 	for {
 		if _, ok := m.used[m.cursor]; !ok && !unavailable[m.cursor] {

@@ -167,7 +167,7 @@ var _ = Describe("component hostnetwork transformer test", func() {
 			Expect(intctrlutil.InitDefaultHostPortManager(cli)).To(Succeed())
 
 			synth := transCtx.SynthesizeComponent
-			synth.Network.HostPorts = []appsv1.HostPort{{Name: "mysql", Port: 3306}, {Name: "http", Port: 15000}}
+			synth.Network = &appsv1.ComponentNetwork{HostNetwork: true, HostPorts: []appsv1.HostPort{{Name: "mysql", Port: 3306}, {Name: "http", Port: 15000}}}
 			synth.PodSpec.Containers[1].Args = []string{"--port", "3501", "--streaming-port", "3502"}
 			transformer := &componentHostNetworkTransformer{}
 			check := func(http, streaming int32) {

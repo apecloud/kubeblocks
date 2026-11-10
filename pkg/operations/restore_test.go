@@ -540,6 +540,7 @@ func TestRestoreOpsValidatesPolicyBeforeCreating(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
+			tc.spec.BackupName = "backup"
 			scheme := runtime.NewScheme()
 			require.NoError(t, appsv1.AddToScheme(scheme))
 			require.NoError(t, opsv1alpha1.AddToScheme(scheme))

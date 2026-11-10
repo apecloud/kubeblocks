@@ -117,31 +117,6 @@ var _ = Describe("Volume Populator Controller test", func() {
 		cleanEnv()
 	})
 
-	It("reuses an execution Restore after the API defaults its policy", func() {
-		pvc := testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, "policy-target", "cluster", "mysql", "data").
-			SetStorage("1Gi").Create(&testCtx).GetObject()
-		helper := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: getPopulatePVCName(pvc.UID), Namespace: pvc.Namespace}}
-		source := &dpv1alpha1.Restore{Spec: dpv1alpha1.RestoreSpec{
-			Backup: dpv1alpha1.BackupRef{Name: "backup", Namespace: pvc.Namespace},
-			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
-				DataSourceRef: &dpv1alpha1.VolumeConfig{VolumeSource: "data"},
-			},
-		}}
-		desired := buildExecutionRestore(pvc, helper, source)
-		data, err := json.Marshal(desired.Spec.PrepareDataConfig)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(string(data)).NotTo(ContainSubstring("volumeClaimRestorePolicy"))
-		vp := &VolumePopulatorReconciler{Client: k8sClient, Scheme: k8sClient.Scheme()}
-		reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
-		created, err := vp.ensureExecutionRestore(reqCtx, pvc, desired)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(created.Spec.PrepareDataConfig.VolumeClaimRestorePolicy).To(Equal(dpv1alpha1.VolumeClaimRestorePolicyParallel))
-
-		existing, err := vp.ensureExecutionRestore(reqCtx, pvc, buildExecutionRestore(pvc, helper, source))
-		Expect(err).NotTo(HaveOccurred())
-		Expect(existing.UID).To(Equal(created.UID))
-	})
-
 	Context("backup target selector helpers", func() {
 		It("detects effective PVC selectors beyond the app instance label", func() {
 			Expect(backupTargetHasEffectivePVCSelector(nil)).To(BeFalse())
@@ -1848,6 +1823,7 @@ func TestPopulateCreatesExecutionRestoreAndPolls(t *testing.T) {
 				RequiredPolicyForAllPodSelection: &dpv1alpha1.RequiredPolicyForAllPodSelection{
 					DataRestorePolicy: dpv1alpha1.OneToOneRestorePolicy,
 				},
+				VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicyParallel,
 			},
 		},
 	}
@@ -1910,6 +1886,8 @@ func TestPopulateCreatesExecutionRestoreAndPolls(t *testing.T) {
 	require.Equal(t, restore.Spec.Parameters, executionRestore.Spec.Parameters)
 	require.Equal(t, restore.Spec.PrepareDataConfig.RequiredPolicyForAllPodSelection,
 		executionRestore.Spec.PrepareDataConfig.RequiredPolicyForAllPodSelection)
+	require.Equal(t, dpv1alpha1.VolumeClaimRestorePolicyParallel,
+		executionRestore.Spec.PrepareDataConfig.VolumeClaimRestorePolicy)
 	require.Equal(t, []corev1.Toleration{{Operator: corev1.TolerationOpExists}},
 		executionRestore.Spec.PrepareDataConfig.SchedulingSpec.Tolerations)
 	require.Len(t, executionRestore.OwnerReferences, 1)

@@ -250,8 +250,9 @@ func (inPlaceHelper *inplaceRebuildHelper) createPrepareDataRestore(reqCtx intct
 			},
 			Env: inPlaceHelper.envForRestore,
 			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
-				SchedulingSpec:      schedulePolicy,
-				RestoreVolumeClaims: volumeClaims,
+				SchedulingSpec:           schedulePolicy,
+				VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicyParallel,
+				RestoreVolumeClaims:      volumeClaims,
 			},
 		},
 	}

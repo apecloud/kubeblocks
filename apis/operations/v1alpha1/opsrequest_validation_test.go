@@ -21,7 +21,6 @@ import (
 	"strings"
 	"testing"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -31,6 +30,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
+
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 )
 
 func TestValidateVolumeExpansion(t *testing.T) {
@@ -226,6 +228,37 @@ func TestValidateVolumeExpansionStorageClass(t *testing.T) {
 			}
 			if reads != tc.wantReads {
 				t.Fatalf("reads=%d, want %d", reads, tc.wantReads)
+			}
+		})
+	}
+}
+
+func TestValidateRestorePolicy(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		spec      Restore
+		wantError string
+	}{
+		{name: "omitted"},
+		{name: "parallel", spec: Restore{VolumeRestorePolicy: "Parallel", Parameters: []dpv1alpha1.ParameterPair{{Name: dpv1alpha1.VolumeRestorePolicyParameterKey, Value: "Parallel"}}}},
+		{name: "serial field", spec: Restore{VolumeRestorePolicy: "Serial"}, wantError: "spec.restore.volumeRestorePolicy: Serial is no longer supported"},
+		{name: "serial parameter with default field", spec: Restore{VolumeRestorePolicy: "Parallel", Parameters: []dpv1alpha1.ParameterPair{{Name: dpv1alpha1.VolumeRestorePolicyParameterKey, Value: "Serial"}}}, wantError: "spec.restore.parameters[" + dpv1alpha1.VolumeRestorePolicyParameterKey + "]: Serial is no longer supported"},
+		{name: "duplicate parameter", spec: Restore{Parameters: []dpv1alpha1.ParameterPair{
+			{Name: dpv1alpha1.VolumeRestorePolicyParameterKey, Value: "Serial"},
+			{Name: dpv1alpha1.VolumeRestorePolicyParameterKey, Value: "Parallel"},
+		}}, wantError: "Serial is no longer supported"},
+		{name: "invalid field", spec: Restore{VolumeRestorePolicy: "invalid"}, wantError: "invalid volume restore policy"},
+		{name: "invalid parameter", spec: Restore{Parameters: []dpv1alpha1.ParameterPair{{Name: dpv1alpha1.VolumeRestorePolicyParameterKey, Value: "invalid"}}}, wantError: "invalid volume restore policy"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ops := &OpsRequest{Spec: OpsRequestSpec{Type: RestoreType, SpecificOpsRequest: SpecificOpsRequest{Restore: &tc.spec}}}
+			err := ops.ValidateOps(context.Background(), nil, nil)
+			if tc.wantError == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else if err == nil || !strings.Contains(err.Error(), tc.wantError) {
+				t.Fatalf("error = %v, want %q", err, tc.wantError)
 			}
 		})
 	}

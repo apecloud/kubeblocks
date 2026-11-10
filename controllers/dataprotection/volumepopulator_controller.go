@@ -934,7 +934,6 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 				DataSourceRef: &dpv1alpha1.VolumeConfig{
 					VolumeSource: pvc.Annotations[constant.RestoreVolumeTemplateAnnotationKey],
 				},
-				VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicyParallel,
 			},
 			Env:        env,
 			Parameters: restoreParametersToPairs(restoreActionParameters(parameters)),
@@ -1385,7 +1384,12 @@ func (r *VolumePopulatorReconciler) ensureExecutionRestore(reqCtx intctrlutil.Re
 		}
 		return desired, nil
 	}
-	if !reflect.DeepEqual(existing.Spec, desired.Spec) {
+	existingSpec := existing.Spec.DeepCopy()
+	// The API defaults this field, while generated execution requests omit it.
+	if config := existingSpec.PrepareDataConfig; config != nil && config.VolumeClaimRestorePolicy == dpv1alpha1.VolumeClaimRestorePolicyParallel {
+		config.VolumeClaimRestorePolicy = ""
+	}
+	if !reflect.DeepEqual(*existingSpec, desired.Spec) {
 		return nil, intctrlutil.NewFatalError(fmt.Sprintf("execution restore %s/%s spec does not match current PVC restore intent",
 			existing.Namespace, existing.Name))
 	}
@@ -1453,8 +1457,7 @@ func buildExecutionRestore(pvc, populatePVC *corev1.PersistentVolumeClaim, sourc
 					VolumeClaimSpec: claimSpec,
 					VolumeConfig:    *prepareDataConfig.DataSourceRef,
 				}},
-				VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicyParallel,
-				SchedulingSpec:           prepareDataConfig.SchedulingSpec,
+				SchedulingSpec: prepareDataConfig.SchedulingSpec,
 			},
 		},
 	}

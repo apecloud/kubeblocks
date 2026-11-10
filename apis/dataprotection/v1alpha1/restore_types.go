@@ -171,7 +171,7 @@ type PrepareDataConfig struct {
 	//
 	// +kubebuilder:default=Parallel
 	// +kubebuilder:validation:Required
-	VolumeClaimRestorePolicy VolumeClaimRestorePolicy `json:"volumeClaimRestorePolicy"`
+	VolumeClaimRestorePolicy VolumeClaimRestorePolicy `json:"volumeClaimRestorePolicy,omitempty"`
 
 	// Specifies the scheduling spec for the restoring pod.
 	//

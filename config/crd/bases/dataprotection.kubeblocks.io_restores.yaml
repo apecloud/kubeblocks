@@ -1492,11 +1492,8 @@ spec:
                   volumeClaimRestorePolicy:
                     default: Parallel
                     description: |-
-                      Defines restore policy for persistent volume claim.
-                      Supported policies are as follows:
-
-                      - `Parallel`: parallel recovery of persistent volume claim.
-                      - `Serial`: restore the persistent volume claim in sequence, and wait until the previous persistent volume claim is restored before restoring a new one.
+                      Deprecated: Restore execution only supports Parallel. Omit this setting or use Parallel.
+                      Serial is retained for decoding existing resources and is rejected by the restore controller.
                     enum:
                     - Parallel
                     - Serial

@@ -343,65 +343,6 @@ var _ = Describe("RestoreManager Test", func() {
 			checkPVC(startingIndex, false, constant.AppName)
 		})
 
-		It("test with BuildPrepareDataJobs function and Serial volumeRestorePolicy", func() {
-			reqCtx := getReqCtx()
-			startingIndex := 1
-			restoreMGR, backupSet := initResources(reqCtx, startingIndex, false, func(f *testdp.MockRestoreFactory) {
-				f.SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
-					testdp.DataVolumeMountPath, "", int32(replicas), int32(startingIndex), nil).
-					SetVolumeClaimRestorePolicy(dpv1alpha1.VolumeClaimRestorePolicySerial)
-			})
-
-			actionSetName := "preparedata-0"
-			testSerialCreateJob := func(expectRestoreFinished bool) {
-				By("test BuildPrepareDataJobs function, expect for 1 job")
-				viper.Set(constant.KBToolsImage, "kubeblocks-tools")
-				target := utils.GetBackupStatusTarget(backupSet.Backup, restoreMGR.Restore.Spec.Backup.SourceTargetName)
-				jobs, err := restoreMGR.BuildPrepareDataJobs(reqCtx, k8sClient, *backupSet, target, actionSetName)
-				Expect(err).ShouldNot(HaveOccurred())
-				Expect(len(jobs)).Should(Equal(1))
-
-				By("test CreateJobsIfNotExist function")
-				jobs, err = restoreMGR.CreateJobsIfNotExist(reqCtx, k8sClient, restoreMGR.Restore, jobs)
-				Expect(err).ShouldNot(HaveOccurred())
-
-				By("test CheckJobsDone function and jobs is running")
-				allJobsFinished, existFailedJob, err := restoreMGR.CheckJobsDone(dpv1alpha1.PrepareData, actionSetName, *backupSet, jobs)
-				Expect(err).ShouldNot(HaveOccurred())
-				Expect(allJobsFinished).Should(BeFalse())
-
-				By("mock jobs are completed")
-				jobCondition := batchv1.JobCondition{Type: batchv1.JobComplete, Status: corev1.ConditionTrue}
-				for i := range jobs {
-					jobs[i].Status.Conditions = append(jobs[i].Status.Conditions, jobCondition)
-				}
-
-				By("test CheckJobsDone function and jobs are finished")
-				allJobsFinished, existFailedJob, err = restoreMGR.CheckJobsDone(dpv1alpha1.PrepareData, actionSetName, *backupSet, jobs)
-				Expect(err).ShouldNot(HaveOccurred())
-				Expect(allJobsFinished).Should(BeTrue())
-
-				By("test Recalculation function, allJobFinished should be false because it only restored one pvc.")
-				restoreMGR.Recalculation(backupSet.Backup.Name, actionSetName, &allJobsFinished, &existFailedJob)
-				if expectRestoreFinished {
-					Expect(allJobsFinished).Should(BeTrue())
-				} else {
-					Expect(allJobsFinished).Should(BeFalse())
-				}
-			}
-
-			// expect for creating and finishing the first restore job but restore is continuing.
-			testSerialCreateJob(false)
-
-			// expect for creating and finishing the last one restore job and restore should be competed.
-			testSerialCreateJob(true)
-
-			By("test AnalysisRestoreActionsWithBackup function")
-			allActionsFinished, _ := restoreMGR.AnalysisRestoreActionsWithBackup(dpv1alpha1.PrepareData, testdp.BackupName, actionSetName)
-			Expect(allActionsFinished).Should(BeTrue())
-
-		})
-
 		It("test with BuildVolumePopulateJob function", func() {
 			reqCtx := getReqCtx()
 			restoreMGR, backupSet := initResources(reqCtx, 0, true, func(f *testdp.MockRestoreFactory) {

@@ -20,15 +20,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package dataprotection
 
 import (
+	"context"
+	"testing"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/require"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
@@ -259,3 +266,37 @@ var _ = Describe("Volume Populator Controller test", func() {
 		})
 	})
 })
+
+func TestPVCRejectsSerialRestoreSource(t *testing.T) {
+	ctx := context.Background()
+	scheme := policyTestScheme(t)
+	source := serialRestore()
+	source.Spec.PrepareDataConfig.DataSourceRef = &dpv1alpha1.VolumeConfig{VolumeSource: "data"}
+	apiGroup := dptypes.DataprotectionAPIGroup
+	pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "target", Namespace: "default", UID: "target-uid"},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes:   []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+			Resources:     corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}},
+			DataSourceRef: &corev1.TypedObjectReference{APIGroup: &apiGroup, Kind: dptypes.RestoreKind, Name: source.Name},
+		}}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(pvc).WithObjects(source, pvc).Build()
+	r := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+	_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(pvc)})
+	require.NoError(t, err)
+	require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(pvc), pvc))
+	var condition *corev1.PersistentVolumeClaimCondition
+	for i := range pvc.Status.Conditions {
+		if pvc.Status.Conditions[i].Type == PersistentVolumeClaimPopulating {
+			condition = &pvc.Status.Conditions[i]
+		}
+	}
+	require.NotNil(t, condition)
+	require.Equal(t, ReasonPopulatingFailed, condition.Reason)
+	require.Contains(t, condition.Message, "Serial is no longer supported")
+	jobs := &batchv1.JobList{}
+	require.NoError(t, cli.List(ctx, jobs))
+	require.Empty(t, jobs.Items)
+	pvcs := &corev1.PersistentVolumeClaimList{}
+	require.NoError(t, cli.List(ctx, pvcs))
+	require.Len(t, pvcs.Items, 1, "do not create a helper PVC")
+}

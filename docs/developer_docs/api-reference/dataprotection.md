@@ -4901,12 +4901,8 @@ VolumeClaimRestorePolicy
 </em>
 </td>
 <td>
-<p>Defines restore policy for persistent volume claim.
-Supported policies are as follows:</p>
-<ul>
-<li><code>Parallel</code>: parallel recovery of persistent volume claim.</li>
-<li><code>Serial</code>: restore the persistent volume claim in sequence, and wait until the previous persistent volume claim is restored before restoring a new one.</li>
-</ul>
+<p>Deprecated: Restore execution only supports Parallel. Omit this setting or use Parallel.
+Serial is retained for decoding existing resources and is rejected by the restore controller.</p>
 </td>
 </tr>
 <tr>
@@ -6681,12 +6677,8 @@ Typically used to set up the tools image required for backup operations.</p>
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.PrepareDataConfig">PrepareDataConfig</a>)
 </p>
 <div>
-<p>VolumeClaimRestorePolicy defines restore policy for persistent volume claim.
-Supported policies are as follows:</p>
-<ol>
-<li>Parallel: parallel recovery of persistent volume claim.</li>
-<li>Serial: restore the persistent volume claim in sequence, and wait until the previous persistent volume claim is restored before restoring a new one.</li>
-</ol>
+<p>VolumeClaimRestorePolicy identifies the legacy volume restore policy setting.</p>
+<p>Deprecated: Restore execution only supports Parallel; Serial is rejected by the controller.</p>
 </div>
 <table>
 <thead>
@@ -6698,7 +6690,8 @@ Supported policies are as follows:</p>
 <tbody><tr><td><p>&#34;Parallel&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;Serial&#34;</p></td>
-<td></td>
+<td><p>Deprecated: Retained to identify unsupported Serial configurations.</p>
+</td>
 </tr></tbody>
 </table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.VolumeConfig">VolumeConfig

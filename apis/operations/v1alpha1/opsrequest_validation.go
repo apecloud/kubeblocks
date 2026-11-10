@@ -157,21 +157,12 @@ func (r *OpsRequest) validateRestore() error {
 	if spec == nil {
 		return nil
 	}
-	validatePolicy := func(policy, path string) error {
-		if policy == "" || policy == "Parallel" {
-			return nil
-		}
-		if policy == "Serial" {
-			return fmt.Errorf("%s: Serial is no longer supported; omit this setting or use Parallel", path)
-		}
-		return fmt.Errorf("%s: invalid volume restore policy %q; omit this setting or use Parallel", path, policy)
-	}
-	if err := validatePolicy(spec.VolumeRestorePolicy, "spec.restore.volumeRestorePolicy"); err != nil {
+	if err := dptypes.ValidateVolumeRestorePolicy(spec.VolumeRestorePolicy, "spec.restore.volumeRestorePolicy"); err != nil {
 		return err
 	}
 	for _, parameter := range spec.Parameters {
 		if parameter.Name == dptypes.VolumeRestorePolicyParameterKey {
-			if err := validatePolicy(parameter.Value, "spec.restore.parameters["+parameter.Name+"]"); err != nil {
+			if err := dptypes.ValidateVolumeRestorePolicy(parameter.Value, "spec.restore.parameters["+parameter.Name+"]"); err != nil {
 				return err
 			}
 		}

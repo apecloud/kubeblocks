@@ -526,10 +526,10 @@ func TestRestoreManagerStopsManagerContainer(t *testing.T) {
 
 func TestValidateVolumeRestorePolicy(t *testing.T) {
 	for _, policy := range []string{"", "Parallel"} {
-		require.NoError(t, ValidateVolumeRestorePolicy(policy, dptypes.VolumeRestorePolicyParameterKey))
+		require.NoError(t, dptypes.ValidateVolumeRestorePolicy(policy, dptypes.VolumeRestorePolicyParameterKey))
 	}
-	err := ValidateVolumeRestorePolicy("Serial", dptypes.VolumeRestorePolicyParameterKey)
+	err := dptypes.ValidateVolumeRestorePolicy("Serial", dptypes.VolumeRestorePolicyParameterKey)
 	require.ErrorContains(t, err, "Serial is no longer supported")
-	err = ValidateVolumeRestorePolicy("invalid", dptypes.VolumeRestorePolicyParameterKey)
+	err = dptypes.ValidateVolumeRestorePolicy("invalid", dptypes.VolumeRestorePolicyParameterKey)
 	require.ErrorContains(t, err, "invalid volume restore policy")
 }

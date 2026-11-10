@@ -25,7 +25,9 @@ import (
 	"testing"
 
 	. "github.com/onsi/gomega"
+
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -106,4 +108,76 @@ func TestHostPortsPreservePersistedAllocations(t *testing.T) {
 	g.Expect(manager.ReleaseByPrefix("cluster-comp")).To(Succeed())
 	g.Expect(cli.Get(context.Background(), client.ObjectKeyFromObject(cm), cm)).To(Succeed())
 	g.Expect(cm.Data).To(Equal(map[string]string{"cluster-other-database-db": "14009"}))
+}
+
+func TestInternalHostPortReallocation(t *testing.T) {
+	for _, failure := range []string{"conflict", "exhaustion"} {
+		t.Run(failure, func(t *testing.T) {
+			previousManager := defaultPortManager
+			t.Cleanup(func() { defaultPortManager = previousManager })
+			for key, value := range map[string]string{
+				constant.CfgKeyCtrlrMgrNS:         "default",
+				constant.CfgHostPortConfigMapName: "test-host-ports",
+				constant.CfgHostPortIncludeRanges: "15000-15003",
+				constant.CfgHostPortExcludeRanges: "",
+			} {
+				previous := viper.Get(key)
+				viper.Set(key, value)
+				t.Cleanup(func() { viper.Set(key, previous) })
+			}
+			scheme := runtime.NewScheme()
+			if err := corev1.AddToScheme(scheme); err != nil {
+				t.Fatal(err)
+			}
+			cli := fake.NewClientBuilder().WithScheme(scheme).Build()
+			if err := InitDefaultHostPortManager(cli); err != nil {
+				t.Fatal(err)
+			}
+			key := defaultPortManager.PortKey("cluster", "comp", "kbagent", "streaming")
+			if port, err := defaultPortManager.AllocatePort(key); err != nil || port != 15000 {
+				t.Fatalf("initial allocation = %d, %v", port, err)
+			}
+			network := &appsv1.ComponentNetwork{HostNetwork: true, HostPorts: []appsv1.HostPort{{Name: "http", Port: 15000}}}
+			cmKey := client.ObjectKey{Namespace: "default", Name: "test-host-ports"}
+			if failure == "conflict" {
+				cm := &corev1.ConfigMap{}
+				if err := cli.Get(context.Background(), cmKey, cm); err != nil {
+					t.Fatal(err)
+				}
+				cm.Data["other"] = "15002"
+				if err := cli.Update(context.Background(), cm); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				network.HostPorts = append(network.HostPorts, appsv1.HostPort{Name: "mysql", Port: 15001},
+					appsv1.HostPort{Name: "metrics", Port: 15002}, appsv1.HostPort{Name: "admin", Port: 15003})
+			}
+			_, err := GetPortManager(network).AllocatePort(key)
+			if err == nil || (failure == "conflict" && !apierrors.IsConflict(err)) {
+				t.Fatalf("expected %s failure, got %v", failure, err)
+			}
+			cm := &corev1.ConfigMap{}
+			if err := cli.Get(context.Background(), cmKey, cm); err != nil {
+				t.Fatal(err)
+			}
+			if cm.Data[key] != "15000" {
+				t.Fatalf("failed replacement changed historical record to %q", cm.Data[key])
+			}
+			if failure == "exhaustion" {
+				network.HostPorts = network.HostPorts[:1]
+			}
+			if port, err := GetPortManager(network).AllocatePort(key); err != nil || port != 15001 {
+				t.Fatalf("retry allocation = %d, %v", port, err)
+			}
+			if err := defaultPortManager.UsePort("reuse-old", 15000); err != nil {
+				t.Fatalf("old reservation was not released: %v", err)
+			}
+			if err := InitDefaultHostPortManager(cli); err != nil {
+				t.Fatal(err)
+			}
+			if port, err := GetPortManager(network).AllocatePort(key); err != nil || port != 15001 {
+				t.Fatalf("allocation after restart = %d, %v", port, err)
+			}
+		})
+	}
 }

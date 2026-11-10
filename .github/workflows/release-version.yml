@@ -25,6 +25,7 @@ jobs:
 
   release-test:
     runs-on: ubuntu-latest
+    timeout-minutes: ${{ (matrix.ops == 'test' && 15) || (matrix.ops == 'lint' && 6) || (matrix.ops == 'manifests' && 5) || 2 }}
     strategy:
       fail-fast: true
       matrix:
@@ -187,7 +188,7 @@ jobs:
         id: update_apis_doc
         run: |
           make doc
-          FILE_CHANGES=`git diff --name-only ${{ github.sha }}`
+          FILE_CHANGES=`git diff --name-only HEAD`
           if [[ -n "$FILE_CHANGES" ]]; then
             echo $FILE_CHANGES
             git config --local user.name "$GITHUB_ACTOR"

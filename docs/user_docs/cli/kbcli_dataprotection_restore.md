@@ -23,7 +23,7 @@ kbcli dataprotection restore [flags]
       --restore-key string             specify the key to restore in kv database, support multiple keys split by comma with wildcard pattern matching
       --restore-key-ignore-errors      whether or not to ignore errors when restore kv database by keys
       --restore-to-time string         point in time recovery(PITR)
-      --volume-restore-policy string   the volume claim restore policy, supported values: [Serial, Parallel] (default "Parallel")
+      --volume-restore-policy string   the volume claim restore policy, supported values: [Parallel] (default "Parallel")
 ```
 
 ### Options inherited from parent commands

@@ -57,10 +57,10 @@ func TestConfigManagerHostPorts(t *testing.T) {
 			g.Expect(intctrlutil.InitDefaultHostPortManager(cli)).To(Succeed())
 			comp := &component.SynthesizedComponent{ClusterName: "cluster", Name: "comp",
 				Network: &appsv1.ComponentNetwork{HostNetwork: true, HostPorts: []appsv1.HostPort{
-					{Name: "mysql", Port: 25001}, {Name: "http", Port: 25002}, {Name: "streaming", Port: 25003},
+					{Name: "mysql", Port: 3306}, {Name: "http", Port: 15000}, {Name: "streaming", Port: 15002},
 				}},
 			}
-			expected := int32(15000)
+			expected := int32(15001)
 			if explicit {
 				expected = 25004
 				comp.Network.HostPorts = append(comp.Network.HostPorts, appsv1.HostPort{Name: constant.ConfigManagerPortName, Port: expected})
@@ -73,11 +73,22 @@ func TestConfigManagerHostPorts(t *testing.T) {
 			if explicit {
 				g.Expect(cm.Data).To(BeEmpty())
 			} else {
-				g.Expect(cm.Data).To(HaveKeyWithValue("cluster-comp-config-manager-config-manager", "15000"))
+				g.Expect(cm.Data).To(HaveKeyWithValue("cluster-comp-config-manager-config-manager", "15001"))
 				g.Expect(intctrlutil.InitDefaultHostPortManager(cli)).To(Succeed())
 				recovered, getErr := allocConfigManagerHostPort(comp)
 				g.Expect(getErr).NotTo(HaveOccurred())
 				g.Expect(recovered).To(Equal(port))
+
+				comp.Network.HostPorts[1].Port = recovered
+				replacement, allocErr := allocConfigManagerHostPort(comp)
+				g.Expect(allocErr).NotTo(HaveOccurred())
+				g.Expect(replacement).To(Equal(int32(15000)))
+				g.Expect(cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "config-manager-host-ports"}, cm)).To(Succeed())
+				g.Expect(cm.Data).To(HaveKeyWithValue("cluster-comp-config-manager-config-manager", "15000"))
+				g.Expect(intctrlutil.InitDefaultHostPortManager(cli)).To(Succeed())
+				recovered, getErr = allocConfigManagerHostPort(comp)
+				g.Expect(getErr).NotTo(HaveOccurred())
+				g.Expect(recovered).To(Equal(replacement))
 			}
 		})
 	}

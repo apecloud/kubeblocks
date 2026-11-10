@@ -79,7 +79,7 @@ var _ = Describe("Restore OpsRequest", func() {
 		Expect(cluster.Spec.Restore.Source.Namespace).Should(Equal(opsRequest.Namespace))
 		Expect(cluster.Spec.Restore.PITR).Should(Equal("2026-05-04T08:00:00Z"))
 		Expect(cluster.Spec.Restore.Parameters).Should(HaveKeyWithValue("restore-param", "restore-value"))
-		Expect(cluster.Spec.Restore.Parameters).Should(HaveKeyWithValue(dptypes.VolumeRestorePolicyParameterKey, string(dpv1alpha1.VolumeClaimRestorePolicyParallel)))
+		Expect(cluster.Spec.Restore.Parameters).Should(HaveKeyWithValue(dpv1alpha1.VolumeRestorePolicyParameterKey, string(dpv1alpha1.VolumeClaimRestorePolicyParallel)))
 		Expect(cluster.Spec.Restore.Parameters).Should(HaveKeyWithValue(dptypes.DeferPostReadyUntilClusterRunningParameterKey, "true"))
 		var restoreEnv []corev1.EnvVar
 		Expect(json.Unmarshal([]byte(cluster.Spec.Restore.Parameters[dptypes.RestoreEnvParameterKey]), &restoreEnv)).Should(Succeed())
@@ -501,8 +501,8 @@ func newRestoreTargetClusterWithoutRestoreCondition(namespace, name string, phas
 				},
 				PITR: "2026-05-04T08:00:00Z",
 				Parameters: map[string]string{
-					"restore-param":                                       "restore-value",
-					dptypes.VolumeRestorePolicyParameterKey:               string(dpv1alpha1.VolumeClaimRestorePolicyParallel),
+					"restore-param": "restore-value",
+					dpv1alpha1.VolumeRestorePolicyParameterKey:            string(dpv1alpha1.VolumeClaimRestorePolicyParallel),
 					dptypes.RestoreEnvParameterKey:                        `[{"name":"RESTORE_ENV","value":"true"}]`,
 					dptypes.DeferPostReadyUntilClusterRunningParameterKey: "true",
 				},
@@ -532,10 +532,10 @@ func TestRestoreOpsValidatesPolicyBeforeCreating(t *testing.T) {
 		{name: "omitted", valid: true},
 		{name: "parallel", spec: opsv1alpha1.Restore{VolumeRestorePolicy: "Parallel"}, valid: true},
 		{name: "serial field", spec: opsv1alpha1.Restore{VolumeRestorePolicy: "Serial"}},
-		{name: "parameter hidden by default field", spec: opsv1alpha1.Restore{VolumeRestorePolicy: "Parallel", Parameters: []dpv1alpha1.ParameterPair{{Name: dptypes.VolumeRestorePolicyParameterKey, Value: "Serial"}}}},
+		{name: "parameter hidden by default field", spec: opsv1alpha1.Restore{VolumeRestorePolicy: "Parallel", Parameters: []dpv1alpha1.ParameterPair{{Name: dpv1alpha1.VolumeRestorePolicyParameterKey, Value: "Serial"}}}},
 		{name: "duplicate parameter", spec: opsv1alpha1.Restore{Parameters: []dpv1alpha1.ParameterPair{
-			{Name: dptypes.VolumeRestorePolicyParameterKey, Value: "Serial"},
-			{Name: dptypes.VolumeRestorePolicyParameterKey, Value: "Parallel"},
+			{Name: dpv1alpha1.VolumeRestorePolicyParameterKey, Value: "Serial"},
+			{Name: dpv1alpha1.VolumeRestorePolicyParameterKey, Value: "Parallel"},
 		}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

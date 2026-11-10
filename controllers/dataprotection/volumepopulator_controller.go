@@ -444,8 +444,8 @@ func pvcRestorePolicyError(ctx context.Context, cli client.Reader, pvc *corev1.P
 	if err != nil {
 		return intctrlutil.NewFatalError(err.Error())
 	}
-	if err := dptypes.ValidateVolumeRestorePolicy(parameters[dptypes.VolumeRestorePolicyParameterKey],
-		"PVC restore parameters["+dptypes.VolumeRestorePolicyParameterKey+"]"); err != nil {
+	if err := dpv1alpha1.ValidateVolumeRestorePolicy(parameters[dpv1alpha1.VolumeRestorePolicyParameterKey],
+		"PVC restore parameters["+dpv1alpha1.VolumeRestorePolicyParameterKey+"]"); err != nil {
 		return intctrlutil.NewFatalError(err.Error())
 	}
 	if pvc.Spec.DataSourceRef.Kind == dptypes.RestoreKind {
@@ -454,7 +454,7 @@ func pvcRestorePolicyError(ctx context.Context, cli client.Reader, pvc *corev1.P
 			return err
 		}
 		if config := source.Spec.PrepareDataConfig; config != nil {
-			if err := dptypes.ValidateVolumeRestorePolicy(string(config.VolumeClaimRestorePolicy), "spec.prepareDataConfig.volumeClaimRestorePolicy"); err != nil {
+			if err := dpv1alpha1.ValidateVolumeRestorePolicy(string(config.VolumeClaimRestorePolicy), "spec.prepareDataConfig.volumeClaimRestorePolicy"); err != nil {
 				return intctrlutil.NewFatalError(err.Error())
 			}
 		}
@@ -1507,7 +1507,7 @@ func restoreActionParameters(parameters map[string]string) map[string]string {
 	internalKeys := map[string]struct{}{
 		dptypes.SourceTargetNameAnnotationKey:                 {},
 		dptypes.SourceTargetPodNameAnnotationKey:              {},
-		dptypes.VolumeRestorePolicyParameterKey:               {},
+		dpv1alpha1.VolumeRestorePolicyParameterKey:            {},
 		dptypes.RestoreEnvParameterKey:                        {},
 		dptypes.DeferPostReadyUntilClusterRunningParameterKey: {},
 	}

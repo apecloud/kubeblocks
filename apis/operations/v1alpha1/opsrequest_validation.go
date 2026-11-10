@@ -33,8 +33,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 const (
@@ -157,12 +157,12 @@ func (r *OpsRequest) validateRestore() error {
 	if spec == nil {
 		return nil
 	}
-	if err := dptypes.ValidateVolumeRestorePolicy(spec.VolumeRestorePolicy, "spec.restore.volumeRestorePolicy"); err != nil {
+	if err := dpv1alpha1.ValidateVolumeRestorePolicy(spec.VolumeRestorePolicy, "spec.restore.volumeRestorePolicy"); err != nil {
 		return err
 	}
 	for _, parameter := range spec.Parameters {
-		if parameter.Name == dptypes.VolumeRestorePolicyParameterKey {
-			if err := dptypes.ValidateVolumeRestorePolicy(parameter.Value, "spec.restore.parameters["+parameter.Name+"]"); err != nil {
+		if parameter.Name == dpv1alpha1.VolumeRestorePolicyParameterKey {
+			if err := dpv1alpha1.ValidateVolumeRestorePolicy(parameter.Value, "spec.restore.parameters["+parameter.Name+"]"); err != nil {
 				return err
 			}
 		}

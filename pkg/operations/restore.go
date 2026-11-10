@@ -310,7 +310,7 @@ func restoreSpecToParametersMap(restoreSpec *opsv1alpha1.Restore) map[string]str
 		result[parameter.Name] = parameter.Value
 	}
 	if restoreSpec.VolumeRestorePolicy != "" {
-		result[dptypes.VolumeRestorePolicyParameterKey] = restoreSpec.VolumeRestorePolicy
+		result[dpv1alpha1.VolumeRestorePolicyParameterKey] = restoreSpec.VolumeRestorePolicy
 	}
 	if len(restoreSpec.Env) > 0 {
 		if data, err := json.Marshal(restoreSpec.Env); err == nil {

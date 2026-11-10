@@ -33,7 +33,6 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 func TestValidateVolumeExpansion(t *testing.T) {
@@ -241,15 +240,15 @@ func TestValidateRestorePolicy(t *testing.T) {
 		wantError string
 	}{
 		{name: "omitted"},
-		{name: "parallel", spec: Restore{VolumeRestorePolicy: "Parallel", Parameters: []dpv1alpha1.ParameterPair{{Name: dptypes.VolumeRestorePolicyParameterKey, Value: "Parallel"}}}},
+		{name: "parallel", spec: Restore{VolumeRestorePolicy: "Parallel", Parameters: []dpv1alpha1.ParameterPair{{Name: dpv1alpha1.VolumeRestorePolicyParameterKey, Value: "Parallel"}}}},
 		{name: "serial field", spec: Restore{VolumeRestorePolicy: "Serial"}, wantError: "spec.restore.volumeRestorePolicy: Serial is no longer supported"},
-		{name: "serial parameter with default field", spec: Restore{VolumeRestorePolicy: "Parallel", Parameters: []dpv1alpha1.ParameterPair{{Name: dptypes.VolumeRestorePolicyParameterKey, Value: "Serial"}}}, wantError: "spec.restore.parameters[" + dptypes.VolumeRestorePolicyParameterKey + "]: Serial is no longer supported"},
+		{name: "serial parameter with default field", spec: Restore{VolumeRestorePolicy: "Parallel", Parameters: []dpv1alpha1.ParameterPair{{Name: dpv1alpha1.VolumeRestorePolicyParameterKey, Value: "Serial"}}}, wantError: "spec.restore.parameters[" + dpv1alpha1.VolumeRestorePolicyParameterKey + "]: Serial is no longer supported"},
 		{name: "duplicate parameter", spec: Restore{Parameters: []dpv1alpha1.ParameterPair{
-			{Name: dptypes.VolumeRestorePolicyParameterKey, Value: "Serial"},
-			{Name: dptypes.VolumeRestorePolicyParameterKey, Value: "Parallel"},
+			{Name: dpv1alpha1.VolumeRestorePolicyParameterKey, Value: "Serial"},
+			{Name: dpv1alpha1.VolumeRestorePolicyParameterKey, Value: "Parallel"},
 		}}, wantError: "Serial is no longer supported"},
 		{name: "invalid field", spec: Restore{VolumeRestorePolicy: "invalid"}, wantError: "invalid volume restore policy"},
-		{name: "invalid parameter", spec: Restore{Parameters: []dpv1alpha1.ParameterPair{{Name: dptypes.VolumeRestorePolicyParameterKey, Value: "invalid"}}}, wantError: "invalid volume restore policy"},
+		{name: "invalid parameter", spec: Restore{Parameters: []dpv1alpha1.ParameterPair{{Name: dpv1alpha1.VolumeRestorePolicyParameterKey, Value: "invalid"}}}, wantError: "invalid volume restore policy"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ops := &OpsRequest{Spec: OpsRequestSpec{Type: RestoreType, SpecificOpsRequest: SpecificOpsRequest{Restore: &tc.spec}}}

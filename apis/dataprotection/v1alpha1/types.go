@@ -17,6 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
@@ -101,6 +103,23 @@ const (
 	// Deprecated: Retained to identify unsupported Serial configurations.
 	VolumeClaimRestorePolicySerial VolumeClaimRestorePolicy = "Serial"
 )
+
+// VolumeRestorePolicyParameterKey identifies the legacy volume restore policy parameter.
+//
+// Deprecated: Omit this parameter or use Parallel; Serial is rejected.
+const VolumeRestorePolicyParameterKey = "dataprotection.kubeblocks.io/volume-restore-policy"
+
+// ValidateVolumeRestorePolicy accepts omitted and legacy Parallel settings.
+func ValidateVolumeRestorePolicy(policy, path string) error {
+	switch VolumeClaimRestorePolicy(policy) {
+	case "", VolumeClaimRestorePolicyParallel:
+		return nil
+	case VolumeClaimRestorePolicySerial:
+		return fmt.Errorf("%s: Serial is no longer supported; omit this setting or use Parallel", path)
+	default:
+		return fmt.Errorf("%s: invalid volume restore policy %q; omit this setting or use Parallel", path, policy)
+	}
+}
 
 type DataRestorePolicy string
 

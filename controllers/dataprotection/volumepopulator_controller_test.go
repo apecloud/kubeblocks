@@ -840,7 +840,7 @@ func TestRestoreParametersKeepRuntimeSettingsOutOfActionParameters(t *testing.T)
 	parameters := map[string]string{
 		"restore-param":                                       "restore-value",
 		dptypes.SourceTargetPodNameAnnotationKey:              "source-mysql-0",
-		dptypes.VolumeRestorePolicyParameterKey:               string(dpv1alpha1.VolumeClaimRestorePolicyParallel),
+		dpv1alpha1.VolumeRestorePolicyParameterKey:            string(dpv1alpha1.VolumeClaimRestorePolicyParallel),
 		dptypes.DeferPostReadyUntilClusterRunningParameterKey: "true",
 	}
 
@@ -5233,7 +5233,7 @@ func TestPVCRejectsSerialForBackupAndRestoreSources(t *testing.T) {
 				Spec: corev1.PersistentVolumeClaimSpec{DataSourceRef: &corev1.TypedObjectReference{APIGroup: &apiGroup, Kind: kind, Name: "source"}}}
 			objects := []client.Object{pvc}
 			if kind == dptypes.BackupKind {
-				parameters, err := json.Marshal(map[string]string{dptypes.VolumeRestorePolicyParameterKey: "Serial"})
+				parameters, err := json.Marshal(map[string]string{dpv1alpha1.VolumeRestorePolicyParameterKey: "Serial"})
 				require.NoError(t, err)
 				pvc.Annotations = map[string]string{constant.RestoreParametersAnnotationKey: string(parameters)}
 			} else {
@@ -5261,7 +5261,7 @@ func TestPVCRejectsSerialForBackupAndRestoreSources(t *testing.T) {
 func TestVolumePopulatorRejectsClusterSerialParameters(t *testing.T) {
 	ctx := context.Background()
 	scheme, cluster, component, its, pvc := parentRestoreObjects(t)
-	cluster.Spec.Restore.Parameters = map[string]string{dptypes.VolumeRestorePolicyParameterKey: "Serial"}
+	cluster.Spec.Restore.Parameters = map[string]string{dpv1alpha1.VolumeRestorePolicyParameterKey: "Serial"}
 	// Apps forwards restore parameters without interpreting DP-specific keys.
 	parameters, err := json.Marshal(cluster.Spec.Restore.Parameters)
 	require.NoError(t, err)

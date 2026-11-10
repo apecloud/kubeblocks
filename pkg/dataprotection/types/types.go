@@ -19,20 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package types
 
-import "fmt"
-
 var (
 	// DefaultBackOffLimit is the default backoff limit for jobs.
 	DefaultBackOffLimit = int32(2)
 )
-
-// ValidateVolumeRestorePolicy accepts omitted and legacy Parallel settings.
-func ValidateVolumeRestorePolicy(policy, path string) error {
-	if policy == "" || policy == "Parallel" {
-		return nil
-	}
-	if policy == "Serial" {
-		return fmt.Errorf("%s: Serial is no longer supported; omit this setting or use Parallel", path)
-	}
-	return fmt.Errorf("%s: invalid volume restore policy %q; omit this setting or use Parallel", path, policy)
-}

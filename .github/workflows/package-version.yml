@@ -86,7 +86,7 @@ jobs:
         id: update_apis_doc
         run: |
           make doc
-          FILE_CHANGES=`git diff --name-only ${{ github.sha }}`
+          FILE_CHANGES=`git diff --name-only HEAD`
           if [[ -n "$FILE_CHANGES" ]]; then
             echo $FILE_CHANGES
             git config --local user.name "$GITHUB_ACTOR"

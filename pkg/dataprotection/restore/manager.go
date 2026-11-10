@@ -525,26 +525,6 @@ func (r *RestoreManager) BuildPrepareDataJobs(reqCtx intctrlutil.RequestCtx, cli
 		claimsTemplate     = prepareDataConfig.RestoreVolumeClaimsTemplate
 	)
 
-	if prepareDataConfig.IsSerialPolicy() {
-		// obtain the PVC serial number that needs to be restored
-		currentOrder := 1
-		prepareActions := r.Restore.Status.Actions.PrepareData
-		for i := range prepareActions {
-			if prepareActions[i].BackupName != backupSet.Backup.Name || prepareActions[i].Name != actionName {
-				continue
-			}
-			if prepareActions[i].Status == dpv1alpha1.RestoreActionCompleted && currentOrder < restoreJobReplicas {
-				currentOrder += 1
-				if prepareDataConfig.IsSerialPolicy() {
-					// if the restore policy is Serial, should delete the completed job to release the pvc.
-					if err := deleteRestoreJob(reqCtx, cli, prepareActions[i].ObjectKey, r.Restore.Namespace); err != nil {
-						return nil, err
-					}
-				}
-			}
-		}
-		restoreJobReplicas = currentOrder
-	}
 	// build restore job to prepare pvc's data
 	for i := 0; i < restoreJobReplicas; i++ {
 		// reset specific volumes and volumeMounts
@@ -591,11 +571,6 @@ func (r *RestoreManager) BuildPrepareDataJobs(reqCtx intctrlutil.RequestCtx, cli
 		}
 		// build job and append
 		job := jobBuilder.setJobName(jobBuilder.builderRestoreJobName(i)).addCommonEnv(sourceTargetPodName).build()
-		if prepareDataConfig.IsSerialPolicy() &&
-			restoreJobHasCompleted(r.Restore.Status.Actions.PrepareData, job.Name) {
-			// if the job has completed and the restore policy is Serial, continue
-			continue
-		}
 		restoreJobs = append(restoreJobs, job)
 	}
 	return restoreJobs, nil
@@ -948,28 +923,4 @@ func (r *RestoreManager) StopManagerContainer(pod *corev1.Pod) error {
 		return client.IgnoreNotFound(err)
 	}
 	return nil
-}
-
-// Recalculation whether all actions have been completed.
-func (r *RestoreManager) Recalculation(backupName, actionName string, allActionsFinished, existFailedAction *bool) {
-	prepareDataConfig := r.Restore.Spec.PrepareDataConfig
-	if !prepareDataConfig.IsSerialPolicy() {
-		return
-	}
-
-	if *existFailedAction {
-		// under the Serial policy, restore will be failed if any action is failed.
-		*allActionsFinished = true
-		return
-	}
-	var actionCount int
-	for _, v := range r.Restore.Status.Actions.PrepareData {
-		if v.Name == actionName && v.BackupName == backupName {
-			actionCount += 1
-		}
-	}
-	if actionCount != GetRestoreActionsCountForPrepareData(prepareDataConfig) {
-		// if the number of actions is not equal to the number of target actions, the recovery has not yet ended
-		*allActionsFinished = false
-	}
 }

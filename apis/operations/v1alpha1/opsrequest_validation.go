@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
@@ -146,8 +147,18 @@ func (r *OpsRequest) ValidateOps(ctx context.Context,
 		return r.validateExpose(ctx, cluster)
 	case RebuildInstanceType:
 		return r.validateRebuildInstance(cluster)
+	case RestoreType:
+		return r.validateRestore()
 	}
 	return nil
+}
+
+func (r *OpsRequest) validateRestore() error {
+	spec := r.Spec.GetRestore()
+	if spec == nil {
+		return nil
+	}
+	return dpv1alpha1.ValidateVolumeRestorePolicy(spec.VolumeRestorePolicy, "spec.restore.volumeRestorePolicy")
 }
 
 // validateExpose validates expose api when spec.type is Expose

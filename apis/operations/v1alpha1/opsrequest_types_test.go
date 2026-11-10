@@ -290,3 +290,24 @@ func TestValidateUpgradeInstanceTargets(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateRestorePolicy(t *testing.T) {
+	for _, tc := range []struct{ name, policy, wantError string }{
+		{name: "omitted"},
+		{name: "parallel", policy: "Parallel"},
+		{name: "serial", policy: "Serial", wantError: "Serial is no longer supported"},
+		{name: "invalid", policy: "invalid", wantError: "invalid volume restore policy"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ops := &OpsRequest{Spec: OpsRequestSpec{Type: RestoreType, SpecificOpsRequest: SpecificOpsRequest{Restore: &Restore{VolumeRestorePolicy: tc.policy}}}}
+			err := ops.ValidateOps(context.Background(), nil, nil)
+			if tc.wantError == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else if err == nil || !strings.Contains(err.Error(), tc.wantError) {
+				t.Fatalf("error = %v, want %q", err, tc.wantError)
+			}
+		})
+	}
+}

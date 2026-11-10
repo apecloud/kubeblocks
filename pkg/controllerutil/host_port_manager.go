@@ -327,10 +327,7 @@ func (m *portManager) AllocatePort(key string) (int32, error) {
 		return port, nil
 	}
 
-	if len(m.used) >= int(m.to-m.from)+1 {
-		return 0, fmt.Errorf("no available port: %s", key)
-	}
-
+	start := m.cursor
 	for {
 		if _, ok := m.used[m.cursor]; !ok {
 			break
@@ -338,6 +335,9 @@ func (m *portManager) AllocatePort(key string) (int32, error) {
 		m.cursor++
 		if m.cursor > m.to {
 			m.cursor = m.from
+		}
+		if m.cursor == start {
+			return 0, fmt.Errorf("no available port: %s", key)
 		}
 	}
 	if err := m.update(key, m.cursor); err != nil {

@@ -37,13 +37,20 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-func NewStatusReconciler() kubebuilderx.Reconciler {
+func NewStatusReconciler() *statusReconciler {
 	return &statusReconciler{}
 }
 
-type statusReconciler struct{}
+type statusReconciler struct {
+	requeueAfter time.Duration
+}
 
 var _ kubebuilderx.Reconciler = &statusReconciler{}
+
+// RequeueAfter reports a pending availability wait without stopping later reconciliation steps.
+func (r *statusReconciler) RequeueAfter() time.Duration {
+	return r.requeueAfter
+}
 
 func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || !model.IsObjectStatusUpdating(tree.GetRoot()) {
@@ -53,6 +60,7 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 }
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
+	r.requeueAfter = 0
 	inst := tree.GetRoot().(*workloads.Instance)
 	stopped := ptr.Deref(inst.Spec.Stop, false)
 	r.reconcileRestoreCondition(tree, inst)
@@ -126,11 +134,10 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 	inst.Status.Configs = configs
 
-	result := kubebuilderx.Continue
 	if inst.Spec.MinReadySeconds > 0 && ready && !available {
-		result.RetryAfter = time.Second
+		r.requeueAfter = time.Second
 	}
-	return result, nil
+	return kubebuilderx.Continue, nil
 }
 
 func (r *statusReconciler) reconcileRestoreCondition(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) {

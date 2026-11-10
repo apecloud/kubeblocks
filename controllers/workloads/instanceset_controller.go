@@ -77,13 +77,14 @@ type InstanceSetReconciler struct {
 func (r *InstanceSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithValues("InstanceSet", req.NamespacedName)
 
+	status := instanceset.NewStatusReconciler()
 	res, err := kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
 		Prepare(instanceset.NewTreeLoader()).
 		Do(instanceset.NewAPIVersionReconciler()).
 		Do(instanceset.NewFixMetaReconciler()).
 		Do(instanceset.NewDeletionReconciler()).
 		Do(instanceset.NewValidationReconciler()).
-		Do(instanceset.NewStatusReconciler()).
+		Do(status).
 		Do(instanceset.NewRevisionUpdateReconciler()).
 		Do(instanceset.NewAssistantObjectReconciler()).
 		Do(instanceset.NewReplicasAlignmentReconciler()).
@@ -92,7 +93,7 @@ func (r *InstanceSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// TODO(free6om): handle error based on ErrorCode (after defined)
 
-	return res, err
+	return withStatusRetry(res, err, status.RequeueAfter())
 }
 
 // SetupWithManager sets up the controller with the Manager.

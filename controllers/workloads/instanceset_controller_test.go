@@ -99,7 +99,7 @@ var _ = Describe("InstanceSet configured readiness", func() {
 				return its, tree
 			}
 			reconcile := func(tree *kubebuilderx.ObjectTree) {
-				r := instanceset.NewStatusReconciler()
+				var r kubebuilderx.Reconciler = instanceset.NewStatusReconciler()
 				if instanceAPI {
 					r = instanceset2.NewStatusReconciler()
 				}

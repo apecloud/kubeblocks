@@ -248,8 +248,7 @@ var _ = Describe("status reconciler test", func() {
 			}
 			res, err = reconcileStatus(tree)
 			Expect(err).Should(BeNil())
-			Expect(res.Next).Should(Equal(kubebuilderx.Continue.Next))
-			Expect(res.RetryAfter).Should(BeNumerically(">", 0))
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 			Expect(its.Status.Replicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.ReadyReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(0))

@@ -22,7 +22,6 @@ package kubebuilderx
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -65,9 +64,8 @@ type controller struct {
 	recorder record.EventRecorder
 	logger   logr.Logger
 
-	res        Result
-	err        error
-	retryAfter time.Duration
+	res Result
+	err error
 
 	oldTree *ObjectTree
 	tree    *ObjectTree
@@ -109,9 +107,6 @@ func (c *controller) Do(reconciler Reconciler) Controller {
 		return c
 	}
 	c.res, c.err = reconciler.Reconcile(c.tree)
-	if after := c.res.RetryAfter; after > 0 && (c.retryAfter == 0 || after < c.retryAfter) {
-		c.retryAfter = after
-	}
 	return c
 }
 
@@ -139,11 +134,8 @@ func (c *controller) Commit() (ctrl.Result, error) {
 		}
 		return ctrl.Result{}, c.err
 	}
-	if c.res.Next == rtry && c.res.RetryAfter <= 0 {
-		return ctrl.Result{Requeue: true}, nil
-	}
-	if c.res.Next == rtry || c.retryAfter > 0 {
-		return ctrl.Result{Requeue: true, RequeueAfter: c.retryAfter}, nil
+	if c.res.Next == rtry {
+		return ctrl.Result{Requeue: true, RequeueAfter: c.res.RetryAfter}, nil
 	}
 	return ctrl.Result{}, nil
 }

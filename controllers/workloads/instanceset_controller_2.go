@@ -76,18 +76,20 @@ func (r *InstanceSetReconciler2) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 	logger := log.FromContext(ctx).WithValues("InstanceSet2", req.NamespacedName)
-	return kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
+	status := instanceset2.NewStatusReconciler()
+	res, err := kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
 		Prepare(instanceset2.NewTreeLoader()).
 		Do(instanceset2.NewAPIVersionReconciler()).
 		Do(instanceset2.NewFixMetaReconciler()).
 		Do(instanceset2.NewDeletionReconciler()).
 		Do(instanceset2.NewValidationReconciler()).
-		Do(instanceset2.NewStatusReconciler()).
+		Do(status).
 		Do(instanceset2.NewRevisionUpdateReconciler()).
 		Do(instanceset2.NewAssistantObjectReconciler()).
 		Do(instanceset2.NewAlignmentReconciler()).
 		Do(instanceset2.NewUpdateReconciler()).
 		Commit()
+	return withStatusRetry(res, err, status.RequeueAfter())
 }
 
 func (r *InstanceSetReconciler2) SetupWithManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {

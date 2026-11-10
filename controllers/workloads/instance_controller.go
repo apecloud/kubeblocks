@@ -89,17 +89,19 @@ type InstanceReconciler struct {
 func (r *InstanceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithValues("Instance", req.NamespacedName)
 
-	return kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
+	status := instance.NewStatusReconciler()
+	res, err := kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
 		Prepare(instance.NewTreeLoader()).
 		Do(instance.NewFixMetaReconciler()).
 		Do(instance.NewDeletionReconciler(r.Client)).
 		Do(instance.NewRevisionUpdateReconciler()).
-		Do(instance.NewStatusReconciler()).
+		Do(status).
 		// Do(instance.NewRevisionUpdateReconciler()).
 		Do(instance.NewAssistantObjectReconciler()).
 		Do(instance.NewAlignmentReconciler()).
 		Do(instance.NewUpdateReconciler()).
 		Commit()
+	return withStatusRetry(res, err, status.RequeueAfter())
 }
 
 // SetupWithManager sets up the controller with the Manager.

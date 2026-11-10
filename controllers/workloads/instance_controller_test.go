@@ -1299,12 +1299,13 @@ func TestInstanceStopResumeRetriesAfterPodCreatedBeforeStatusCommit(t *testing.T
 }
 
 var _ = Describe("Instance availability scheduling", func() {
-	It("allows storage alignment and Stop while ready runtime waits for availability", func() {
+	It("allows storage alignment and Stop while OnDelete runtime waits for availability", func() {
 		scheme := runtime.NewScheme()
 		Expect(clientgoscheme.AddToScheme(scheme)).Should(Succeed())
 		Expect(workloads.AddToScheme(scheme)).Should(Succeed())
 		inst := stopTestInstance()
 		inst.Spec.MinReadySeconds = 3600
+		inst.Spec.InstanceUpdateStrategyType = ptr.To(kbappsv1.OnDeleteStrategyType)
 		claims := inst.Spec.VolumeClaimTemplates
 		inst.Spec.VolumeClaimTemplates = nil
 		cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&workloads.Instance{}, &corev1.Pod{}, &corev1.PersistentVolumeClaim{}).WithObjects(inst).Build()

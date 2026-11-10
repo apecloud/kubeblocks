@@ -25,6 +25,7 @@ jobs:
 
   release-test:
     runs-on: ubuntu-latest
+    timeout-minutes: ${{ (matrix.ops == 'test' && 15) || (matrix.ops == 'lint' && 6) || (matrix.ops == 'manifests' && 5) || 2 }}
     strategy:
       fail-fast: true
       matrix:

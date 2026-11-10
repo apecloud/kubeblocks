@@ -51,15 +51,14 @@ type RestoreManager struct {
 	Scheme  *k8sruntime.Scheme
 
 	// private
-	namespace           string
-	RestoreTime         string
-	env                 []corev1.EnvVar
-	parameters          []dpv1alpha1.ParameterPair
-	volumeRestorePolicy dpv1alpha1.VolumeClaimRestorePolicy
-	startingIndex       int32
-	replicas            int32
-	restoreLabels       map[string]string
-	RestoreNamePrefix   string
+	namespace         string
+	RestoreTime       string
+	env               []corev1.EnvVar
+	parameters        []dpv1alpha1.ParameterPair
+	startingIndex     int32
+	replicas          int32
+	restoreLabels     map[string]string
+	RestoreNamePrefix string
 	// SourceTargetName overrides the source target for prepareData Restores.
 	// It is primarily used by scale-out restoration.
 	SourceTargetName string
@@ -73,15 +72,14 @@ func NewRestoreManager(ctx context.Context,
 	replicas, startingIndex int32,
 ) *RestoreManager {
 	return &RestoreManager{
-		Cluster:             cluster,
-		Client:              cli,
-		Ctx:                 ctx,
-		Scheme:              scheme,
-		replicas:            replicas,
-		startingIndex:       startingIndex,
-		namespace:           cluster.Namespace,
-		volumeRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicyParallel,
-		restoreLabels:       restoreLabels,
+		Cluster:       cluster,
+		Client:        cli,
+		Ctx:           ctx,
+		Scheme:        scheme,
+		replicas:      replicas,
+		startingIndex: startingIndex,
+		namespace:     cluster.Namespace,
+		restoreLabels: restoreLabels,
 	}
 }
 
@@ -222,7 +220,7 @@ func (r *RestoreManager) buildPrepareDataRestore(comp *component.SynthesizedComp
 			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
 				RequiredPolicyForAllPodSelection: requiredPolicy,
 				SchedulingSpec:                   r.buildSchedulingSpec(comp, template),
-				VolumeClaimRestorePolicy:         r.volumeRestorePolicy,
+				VolumeClaimRestorePolicy:         dpv1alpha1.VolumeClaimRestorePolicyParallel,
 				RestoreVolumeClaimsTemplate: &dpv1alpha1.RestoreVolumeClaimsTemplate{
 					Replicas:      r.replicas,
 					StartingIndex: startingIndex,
@@ -410,21 +408,13 @@ func (r *RestoreManager) createRestoreAndWait(compObj *appsv1.Component, restore
 		case dpv1alpha1.RestorePhaseCompleted:
 			continue
 		case dpv1alpha1.RestorePhaseFailed:
-			if r.volumeRestorePolicy == dpv1alpha1.VolumeClaimRestorePolicyParallel {
-				errType = intctrlutil.ErrorTypeRestoreFailed
-				msgs = append(msgs, fmt.Sprintf(`restore "%s" status is Failed, you can describe it and re-restore the cluster.`, restore.GetName()))
-				continue
-			}
-			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRestoreFailed, `restore "%s" status is Failed, you can describe it and re-restore the cluster.`, restore.GetName())
+			errType = intctrlutil.ErrorTypeRestoreFailed
+			msgs = append(msgs, fmt.Sprintf(`restore "%s" status is Failed, you can describe it and re-restore the cluster.`, restore.GetName()))
 		default:
-			if r.volumeRestorePolicy == dpv1alpha1.VolumeClaimRestorePolicyParallel {
-				if errType != intctrlutil.ErrorTypeRestoreFailed {
-					errType = intctrlutil.ErrorTypeNeedWaiting
-				}
-				msgs = append(msgs, fmt.Sprintf(`waiting for restore "%s" successfully`, restore.GetName()))
-				continue
+			if errType != intctrlutil.ErrorTypeRestoreFailed {
+				errType = intctrlutil.ErrorTypeNeedWaiting
 			}
-			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting, `waiting for restore "%s" successfully`, restore.GetName())
+			msgs = append(msgs, fmt.Sprintf(`waiting for restore "%s" successfully`, restore.GetName()))
 		}
 	}
 	if errType != "" {

@@ -158,7 +158,7 @@ type PrepareDataConfig struct {
 	RestoreVolumeClaims []RestoreVolumeClaim `json:"volumeClaims,omitempty"`
 
 	// Defines a template to build persistent Volume claims that need to be restored.
-	// These claims will be created in an orderly manner based on the number of replicas or reused if they already exist.
+	// These claims will be created for the required replicas or reused if they already exist.
 	//
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.prepareDataConfig.volumeClaimsTemplate"
 	// +patchMergeKey=name
@@ -166,11 +166,8 @@ type PrepareDataConfig struct {
 	// +optional
 	RestoreVolumeClaimsTemplate *RestoreVolumeClaimsTemplate `json:"volumeClaimsTemplate,omitempty"`
 
-	// Defines restore policy for persistent volume claim.
-	// Supported policies are as follows:
-	//
-	// - `Parallel`: parallel recovery of persistent volume claim.
-	// - `Serial`: restore the persistent volume claim in sequence, and wait until the previous persistent volume claim is restored before restoring a new one.
+	// Deprecated: Restore execution only supports Parallel. Omit this setting or use Parallel.
+	// Serial is retained for decoding existing resources and is rejected by the restore controller.
 	//
 	// +kubebuilder:default=Parallel
 	// +kubebuilder:validation:Required
@@ -524,11 +521,4 @@ type RestoreList struct {
 
 func init() {
 	SchemeBuilder.Register(&Restore{}, &RestoreList{})
-}
-
-func (p *PrepareDataConfig) IsSerialPolicy() bool {
-	if p == nil {
-		return false
-	}
-	return p.VolumeClaimRestorePolicy == VolumeClaimRestorePolicySerial
 }

@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
@@ -145,6 +146,26 @@ func (r *OpsRequest) ValidateOps(ctx context.Context,
 		return r.validateExpose(ctx, cluster)
 	case RebuildInstanceType:
 		return r.validateRebuildInstance(cluster)
+	case RestoreType:
+		return r.validateRestore()
+	}
+	return nil
+}
+
+func (r *OpsRequest) validateRestore() error {
+	spec := r.Spec.GetRestore()
+	if spec == nil {
+		return nil
+	}
+	if err := dpv1alpha1.ValidateVolumeRestorePolicy(spec.VolumeRestorePolicy, "spec.restore.volumeRestorePolicy"); err != nil {
+		return err
+	}
+	for _, parameter := range spec.Parameters {
+		if parameter.Name == dpv1alpha1.VolumeRestorePolicyParameterKey {
+			if err := dpv1alpha1.ValidateVolumeRestorePolicy(parameter.Value, "spec.restore.parameters["+parameter.Name+"]"); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

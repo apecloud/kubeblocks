@@ -159,6 +159,9 @@ func Build(input Input) ([]workloads.InstanceStatus, error) {
 		status := workloads.InstanceStatus{PodName: name, CurrentState: workloads.InstanceCurrentStateAbsent}
 		if old := previousByName[name]; old != nil {
 			status.Provisioned = old.Provisioned
+			if old.DataLoaded != nil {
+				status.DataLoaded = ptr.To(*old.DataLoaded)
+			}
 			if old.MemberJoined != nil {
 				status.MemberJoined = ptr.To(*old.MemberJoined)
 			}

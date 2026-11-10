@@ -30,7 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
@@ -225,8 +227,58 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if err = setInstanceStatus(tree, its, podList); err != nil {
 		return kubebuilderx.Continue, err
 	}
+	if workloadlifecycle.HasData(its) && !stopping {
+		present, storage, ownedStorage := sets.New[string](), sets.New[string](), sets.New[string]()
+		for _, pod := range podList {
+			present.Insert(pod.Name)
+		}
+		for _, pvc := range tree.List(&corev1.PersistentVolumeClaim{}) {
+			name := pvc.GetLabels()[constant.KBAppPodNameLabelKey]
+			storage.Insert(name)
+			if metav1.IsControlledBy(pvc, its) {
+				ownedStorage.Insert(name)
+			}
+		}
+		retention := its.Spec.PersistentVolumeClaimRetentionPolicy
+		deleteData := retention == nil || retention.WhenScaled != kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType
+		for i := range its.Status.InstanceStatus {
+			status := &its.Status.InstanceStatus[i]
+			if present.Has(status.PodName) {
+				continue
+			}
+			if status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive {
+				if !storage.Has(status.PodName) && (status.DataLoaded != nil || status.Provisioned) {
+					status.DataLoaded = ptr.To(false)
+				}
+				continue
+			}
+			if !deleteData || !ownedStorage.Has(status.PodName) {
+				continue
+			}
+			if workloadlifecycle.RetirementBlocked(its, status) || workloadlifecycle.NeedsMemberRetirement(its, status) {
+				continue
+			}
+			if status.DataLoaded == nil || *status.DataLoaded {
+				status.DataLoaded = ptr.To(false)
+			}
+		}
+	}
 	if lifecycleStatusEnabled(its) && workloadlifecycle.CriticalStatusChanged(previous, its.Status.InstanceStatus) {
 		return kubebuilderx.RetryAfter(time.Second), nil
+	}
+
+	if workloadlifecycle.HasData(its) && !stopping {
+		for _, pod := range podList {
+			if status := its.FindInstanceStatus(pod.Name); status != nil && status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive && !pod.DeletionTimestamp.IsZero() {
+				return lifecycleWait(tree, its, fmt.Errorf("waiting for runtime of instance %s to be deleted", pod.Name))
+			}
+		}
+		for _, pvc := range tree.List(&corev1.PersistentVolumeClaim{}) {
+			name := pvc.GetLabels()[constant.KBAppPodNameLabelKey]
+			if status := its.FindInstanceStatus(name); status != nil && status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive && !pvc.GetDeletionTimestamp().IsZero() {
+				return lifecycleWait(tree, its, fmt.Errorf("waiting for storage of instance %s to be deleted", name))
+			}
+		}
 	}
 
 	if !stopping && its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
@@ -556,9 +608,11 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		}
 	}
 	syncObservationPVCStatus(tree, observations)
+	resources := statusResourceObservations(tree, its)
 
 	statuses, err := instancestatus.Build(instancestatus.Input{
 		RequireMemberLeave: its.Spec.LifecycleActions != nil && its.Spec.LifecycleActions.MemberLeave != nil,
+		Resources:          resources,
 		Previous:           its.Status.InstanceStatus,
 		DesiredAssignments: desiredTemplateAssignments,
 		Offline:            offlineNames,
@@ -571,6 +625,27 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	}
 	its.Status.InstanceStatus = statuses
 	return nil
+}
+
+func statusResourceObservations(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) []instancestatus.ResourceObservation {
+	if tree == nil {
+		return nil
+	}
+	var resources []instancestatus.ResourceObservation
+	retain := its.Spec.PersistentVolumeClaimRetentionPolicy != nil &&
+		its.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled == kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType
+	for _, object := range tree.List(&corev1.PersistentVolumeClaim{}) {
+		pvc := object.(*corev1.PersistentVolumeClaim)
+		owner := metav1.GetControllerOf(pvc)
+		name := pvc.Labels[constant.KBAppPodNameLabelKey]
+		tracked := its.FindInstanceStatus(name)
+		keepResult := tracked != nil && tracked.DataLoaded != nil
+		if owner == nil || owner.UID != its.UID || name == "" || (retain && pvc.DeletionTimestamp.IsZero() && !keepResult) {
+			continue
+		}
+		resources = append(resources, instancestatus.ResourceObservation{InstanceName: name})
+	}
+	return resources
 }
 
 func observePodRuntime(its *workloads.InstanceSet, pod *corev1.Pod, roles map[string]workloads.ReplicaRole) (instancestatus.Observation, error) {

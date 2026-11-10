@@ -465,3 +465,16 @@ func TestBuildRetainsUnknownProvisionedMembershipUntilLeave(t *testing.T) {
 		t.Fatalf("completed leave retained empty released identity: %+v %v", statuses, err)
 	}
 }
+
+func TestBuildPreservesDataResultAcrossRuntimeAbsence(t *testing.T) {
+	for _, data := range []*bool{nil, ptr.To(false), ptr.To(true)} {
+		input := Input{Previous: []workloads.InstanceStatus{{PodName: "demo-1", DataLoaded: data}}, DesiredAssignments: []TemplateAssignment{{InstanceName: "demo-1"}}}
+		statuses, err := Build(input)
+		if err != nil || len(statuses) != 1 || !reflect.DeepEqual(statuses[0].DataLoaded, data) {
+			t.Fatalf("runtime absence lost data result: %#v %v", statuses, err)
+		}
+		if data != nil && statuses[0].DataLoaded == data {
+			t.Fatal("summary aliases the prior data result")
+		}
+	}
+}

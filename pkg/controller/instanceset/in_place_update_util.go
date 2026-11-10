@@ -34,6 +34,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
+	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -55,8 +56,9 @@ func supportPodVerticalScaling() bool {
 	return viper.GetBool(constant.FeatureGateInPlacePodVerticalScaling)
 }
 
-func filterInPlaceFields(src *corev1.PodTemplateSpec) *corev1.PodTemplateSpec {
+func filterInPlaceFields(src *corev1.PodTemplateSpec, preserveDataWorkerImage bool) *corev1.PodTemplateSpec {
 	template := src.DeepCopy()
+	workloadlifecycle.FilterTransient(&template.Spec)
 	// filter annotations
 	var annotations map[string]string
 	if len(template.Annotations) > 0 {
@@ -75,7 +77,9 @@ func filterInPlaceFields(src *corev1.PodTemplateSpec) *corev1.PodTemplateSpec {
 		template.Spec.Containers[i].Image = ""
 	}
 	for i := range template.Spec.InitContainers {
-		template.Spec.InitContainers[i].Image = ""
+		if !preserveDataWorkerImage || !workloadlifecycle.IsDataWorker(&template.Spec.InitContainers[i]) {
+			template.Spec.InitContainers[i].Image = ""
+		}
 	}
 	// filter spec.activeDeadlineSeconds
 	template.Spec.ActiveDeadlineSeconds = nil

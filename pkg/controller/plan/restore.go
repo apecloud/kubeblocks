@@ -289,9 +289,9 @@ func (r *RestoreManager) buildPrepareDataRestore(comp *component.SynthesizedComp
 			Env:         r.env,
 			Parameters:  r.parameters,
 			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
-				VolumeClaimRestorePolicy:         dpv1alpha1.VolumeClaimRestorePolicyParallel,
 				RequiredPolicyForAllPodSelection: r.buildRequiredPolicy(sourceTarget),
 				SchedulingSpec:                   r.buildSchedulingSpec(comp, template),
+				VolumeClaimRestorePolicy:         dpv1alpha1.VolumeClaimRestorePolicyParallel,
 				RestoreVolumeClaimsTemplate: &dpv1alpha1.RestoreVolumeClaimsTemplate{
 					Replicas:      r.replicas,
 					StartingIndex: startingIndex,

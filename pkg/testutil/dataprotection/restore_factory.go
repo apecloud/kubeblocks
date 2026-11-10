@@ -73,7 +73,9 @@ func (f *MockRestoreFactory) AddEnv(env corev1.EnvVar) *MockRestoreFactory {
 func (f *MockRestoreFactory) initPrepareDataConfig() {
 	prepareDataConfig := f.Get().Spec.PrepareDataConfig
 	if prepareDataConfig == nil {
-		f.Get().Spec.PrepareDataConfig = &dpv1alpha1.PrepareDataConfig{VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicyParallel}
+		f.Get().Spec.PrepareDataConfig = &dpv1alpha1.PrepareDataConfig{
+			VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicyParallel,
+		}
 	}
 }
 

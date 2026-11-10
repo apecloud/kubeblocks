@@ -218,7 +218,30 @@ func CheckBackupRepoForRestore(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	return repoName, nil
 }
 
+func (r *RestoreReconciler) checkRestorePolicy(reqCtx intctrlutil.RequestCtx, restore *dpv1alpha1.Restore) (*ctrl.Result, error) {
+	config := restore.Spec.PrepareDataConfig
+	if config == nil {
+		return nil, nil
+	}
+	err := dpv1alpha1.ValidateVolumeRestorePolicy(string(config.VolumeClaimRestorePolicy), "spec.prepareDataConfig.volumeClaimRestorePolicy")
+	if err == nil {
+		return nil, nil
+	}
+	patch := client.MergeFrom(restore.DeepCopy())
+	dprestore.SetRestoreValidationCondition(restore, dprestore.ReasonValidateFailed, err.Error())
+	restore.Status.Phase = dpv1alpha1.RestorePhaseFailed
+	restore.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
+	if patchErr := r.Client.Status().Patch(reqCtx.Ctx, restore, patch); patchErr != nil {
+		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(patchErr, reqCtx.Log, ""))
+	}
+	r.Recorder.Event(restore, corev1.EventTypeWarning, dprestore.ReasonValidateFailed, err.Error())
+	return intctrlutil.ResultToP(intctrlutil.Reconciled())
+}
+
 func (r *RestoreReconciler) newAction(reqCtx intctrlutil.RequestCtx, restore *dpv1alpha1.Restore) (ctrl.Result, error) {
+	if res, err := r.checkRestorePolicy(reqCtx, restore); res != nil {
+		return *res, err
+	}
 	oldRestore := restore.DeepCopy()
 	patch := client.MergeFrom(oldRestore)
 	// patch metaObject
@@ -505,10 +528,6 @@ func (r *RestoreReconciler) handleBackupActionSet(reqCtx intctrlutil.RequestCtx,
 	allActionsFinished, existFailedAction, err = restoreMgr.CheckJobsDone(stage, actionName, backupSet, jobs)
 	if err != nil {
 		return false, err
-	}
-	if stage == dpv1alpha1.PrepareData {
-		// recalculation whether all actions have been completed.
-		restoreMgr.Recalculation(backupSet.Backup.Name, actionName, &allActionsFinished, &existFailedAction)
 	}
 	return checkIsCompleted(allActionsFinished, existFailedAction)
 }

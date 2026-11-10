@@ -199,7 +199,7 @@ func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, op
 	}
 	restoreSpec := opsRequest.Spec.GetRestore()
 	// set the restore annotation to cluster
-	restoreAnnotation, err := restore.GetRestoreFromBackupAnnotation(backup, restoreSpec.VolumeRestorePolicy, restoreSpec.RestorePointInTime,
+	restoreAnnotation, err := restore.GetRestoreFromBackupAnnotation(backup, restoreSpec.RestorePointInTime,
 		restoreSpec.Env, restoreSpec.DeferPostReadyUntilClusterRunning, restoreSpec.Parameters)
 	if err != nil {
 		return nil, err

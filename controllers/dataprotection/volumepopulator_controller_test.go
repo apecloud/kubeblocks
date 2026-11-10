@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/utils/ptr"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
@@ -839,16 +840,13 @@ func TestRestoreParametersKeepRuntimeSettingsOutOfActionParameters(t *testing.T)
 	parameters := map[string]string{
 		"restore-param":                                       "restore-value",
 		dptypes.SourceTargetPodNameAnnotationKey:              "source-mysql-0",
-		dptypes.VolumeRestorePolicyParameterKey:               string(dpv1alpha1.VolumeClaimRestorePolicySerial),
+		dpv1alpha1.VolumeRestorePolicyParameterKey:            string(dpv1alpha1.VolumeClaimRestorePolicyParallel),
 		dptypes.DeferPostReadyUntilClusterRunningParameterKey: "true",
 	}
 
 	actionParameters := restoreActionParameters(parameters)
 
 	require.Equal(t, map[string]string{"restore-param": "restore-value"}, actionParameters)
-	policy, err := volumeRestorePolicyFromParameters(parameters)
-	require.NoError(t, err)
-	require.Equal(t, dpv1alpha1.VolumeClaimRestorePolicySerial, policy)
 }
 
 func TestRestoreEnvFromParameters(t *testing.T) {
@@ -1825,7 +1823,7 @@ func TestPopulateCreatesExecutionRestoreAndPolls(t *testing.T) {
 				RequiredPolicyForAllPodSelection: &dpv1alpha1.RequiredPolicyForAllPodSelection{
 					DataRestorePolicy: dpv1alpha1.OneToOneRestorePolicy,
 				},
-				VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicySerial,
+				VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicyParallel,
 			},
 		},
 	}
@@ -1888,7 +1886,7 @@ func TestPopulateCreatesExecutionRestoreAndPolls(t *testing.T) {
 	require.Equal(t, restore.Spec.Parameters, executionRestore.Spec.Parameters)
 	require.Equal(t, restore.Spec.PrepareDataConfig.RequiredPolicyForAllPodSelection,
 		executionRestore.Spec.PrepareDataConfig.RequiredPolicyForAllPodSelection)
-	require.Equal(t, restore.Spec.PrepareDataConfig.VolumeClaimRestorePolicy,
+	require.Equal(t, dpv1alpha1.VolumeClaimRestorePolicyParallel,
 		executionRestore.Spec.PrepareDataConfig.VolumeClaimRestorePolicy)
 	require.Equal(t, []corev1.Toleration{{Operator: corev1.TolerationOpExists}},
 		executionRestore.Spec.PrepareDataConfig.SchedulingSpec.Tolerations)
@@ -2808,82 +2806,6 @@ func TestEnsureExecutionRestoreRejectsSpecMutation(t *testing.T) {
 	require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err.Error())
 }
 
-func TestWaitForSerialPredecessorsWaitsForEarlierUnboundPVC(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(scheme))
-	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
-	apiGroup := dptypes.DataprotectionAPIGroup
-	previous := newRestorePVCForSerialTest("data-target-0", "")
-	current := newRestorePVCForSerialTest("data-target-1", "")
-	backup := newBackupForRestoreDecision([]string{"data"}, nil)
-	reconciler := &VolumePopulatorReconciler{
-		Client:   fake.NewClientBuilder().WithScheme(scheme).WithObjects(previous, current, backup).Build(),
-		Recorder: record.NewFakeRecorder(10),
-	}
-	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{
-		Spec: dpv1alpha1.RestoreSpec{
-			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
-				VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicySerial,
-			},
-		},
-	}, nil, scheme, reconciler.Client)
-	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(current), current))
-	current.Spec.DataSourceRef.APIGroup = &apiGroup
-
-	err := reconciler.waitForSerialPredecessors(intctrlutil.RequestCtx{Ctx: context.Background()}, current, restoreMgr)
-
-	require.Error(t, err)
-	require.True(t, intctrlutil.IsRequeueError(err), err.Error())
-}
-
-func TestWaitForSerialPredecessorsAllowsAfterEarlierBoundPVC(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(scheme))
-	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
-	previous := newRestorePVCForSerialTest("data-target-0", "pv-0")
-	previous.Annotations[volume.AnnBindCompleted] = "yes"
-	current := newRestorePVCForSerialTest("data-target-1", "")
-	backup := newBackupForRestoreDecision([]string{"data"}, nil)
-	reconciler := &VolumePopulatorReconciler{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(previous, current, backup).Build()}
-	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{
-		Spec: dpv1alpha1.RestoreSpec{
-			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
-				VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicySerial,
-			},
-		},
-	}, nil, scheme, reconciler.Client)
-
-	err := reconciler.waitForSerialPredecessors(intctrlutil.RequestCtx{Ctx: context.Background()}, current, restoreMgr)
-
-	require.NoError(t, err)
-}
-
-func TestWaitForSerialPredecessorsAllowsAfterEarlierReleasedPVC(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(scheme))
-	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
-	previous := newRestorePVCForSerialTest("data-target-0", "pv-0")
-	previous.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
-		Type:   PersistentVolumeClaimPopulating,
-		Status: corev1.ConditionTrue,
-		Reason: ReasonPopulatingSucceed,
-	}}
-	current := newRestorePVCForSerialTest("data-target-1", "")
-	backup := newBackupForRestoreDecision([]string{"data"}, nil)
-	reconciler := &VolumePopulatorReconciler{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(previous, current, backup).Build()}
-	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{
-		Spec: dpv1alpha1.RestoreSpec{
-			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
-				VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicySerial,
-			},
-		},
-	}, nil, scheme, reconciler.Client)
-
-	err := reconciler.waitForSerialPredecessors(intctrlutil.RequestCtx{Ctx: context.Background()}, current, restoreMgr)
-
-	require.NoError(t, err)
-}
-
 func TestRestorePVCAggregationAllowsReleasedPVCWithoutBindingAnnotation(t *testing.T) {
 	for _, reason := range []string{ReasonPopulatingSucceed, ReasonPopulatingProvisioned} {
 		t.Run(reason, func(t *testing.T) {
@@ -2909,59 +2831,6 @@ func TestRestorePVCAggregationAllowsReleasedPVCWithoutBindingAnnotation(t *testi
 			require.NoError(t, err)
 			require.True(t, clusterReady)
 		})
-	}
-}
-
-func TestWaitForSerialPredecessorsSkipsProvisionOnlyPVC(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(scheme))
-	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
-	previous := newRestorePVCForSerialTest("logs-target-0", "")
-	previous.Labels[constant.VolumeClaimTemplateNameLabelKey] = "logs"
-	previous.Annotations[constant.RestoreVolumeTemplateAnnotationKey] = "logs"
-	current := newRestorePVCForSerialTest("data-target-1", "")
-	backup := newBackupForRestoreDecision([]string{"data"}, nil)
-	reconciler := &VolumePopulatorReconciler{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(previous, current, backup).Build()}
-	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{
-		Spec: dpv1alpha1.RestoreSpec{
-			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
-				VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicySerial,
-			},
-		},
-	}, nil, scheme, reconciler.Client)
-
-	err := reconciler.waitForSerialPredecessors(intctrlutil.RequestCtx{Ctx: context.Background()}, current, restoreMgr)
-
-	require.NoError(t, err)
-}
-
-func newRestorePVCForSerialTest(name, volumeName string) *corev1.PersistentVolumeClaim {
-	apiGroup := dptypes.DataprotectionAPIGroup
-	return &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default",
-			Name:      name,
-			UID:       types.UID(name + "-uid"),
-			Labels: map[string]string{
-				constant.AppManagedByLabelKey:            constant.AppName,
-				constant.AppInstanceLabelKey:             "cluster",
-				constant.KBAppComponentLabelKey:          "mysql",
-				constant.KBAppPodNameLabelKey:            name,
-				constant.VolumeClaimTemplateNameLabelKey: "data",
-			},
-			Annotations: map[string]string{
-				constant.RestoreSourceKindAnnotationKey:      dptypes.BackupKind,
-				constant.RestoreSourceNamespaceAnnotationKey: "default",
-			},
-		},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			VolumeName: volumeName,
-			DataSourceRef: &corev1.TypedObjectReference{
-				APIGroup: &apiGroup,
-				Kind:     dptypes.BackupKind,
-				Name:     "backup",
-			},
-		},
 	}
 }
 
@@ -5352,4 +5221,66 @@ func TestEnsurePostReadyRestore_MultiComponent_PostReadyOnly_TargetsSlice(t *tes
 		"Restore CR owner should be the backup target component (tidb) even when target is in Status.Targets[0]")
 	require.Equal(t, "tidb", restore.Spec.Backup.SourceTargetName)
 	require.Equal(t, postReadyRestoreName(tidbComp.UID), restore.Name)
+}
+
+func TestPVCRejectsSerialForBackupAndRestoreSources(t *testing.T) {
+	for _, kind := range []string{dptypes.BackupKind, dptypes.RestoreKind} {
+		t.Run(kind, func(t *testing.T) {
+			ctx := context.Background()
+			scheme := policyTestScheme(t)
+			apiGroup := dptypes.DataprotectionAPIGroup
+			pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "target", Namespace: "default", UID: "target-uid"},
+				Spec: corev1.PersistentVolumeClaimSpec{DataSourceRef: &corev1.TypedObjectReference{APIGroup: &apiGroup, Kind: kind, Name: "source"}}}
+			objects := []client.Object{pvc}
+			if kind == dptypes.BackupKind {
+				parameters, err := json.Marshal(map[string]string{dpv1alpha1.VolumeRestorePolicyParameterKey: "Serial"})
+				require.NoError(t, err)
+				pvc.Annotations = map[string]string{constant.RestoreParametersAnnotationKey: string(parameters)}
+			} else {
+				source := serialRestore()
+				source.Name = "source"
+				source.Spec.PrepareDataConfig.DataSourceRef = &dpv1alpha1.VolumeConfig{VolumeSource: "data"}
+				objects = append(objects, source)
+			}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(pvc).WithObjects(objects...).Build()
+			r := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(20)}
+			_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(pvc)})
+			require.NoError(t, err)
+			require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(pvc), pvc))
+			condition := findPVCConditionByType(pvc, kbappsv1.ConditionTypeRestore)
+			require.NotNil(t, condition)
+			require.Equal(t, corev1.ConditionFalse, condition.Status)
+			require.Contains(t, condition.Message, "Serial is no longer supported")
+			restores := &dpv1alpha1.RestoreList{}
+			require.NoError(t, cli.List(ctx, restores))
+			require.Len(t, restores.Items, len(objects)-1, "do not create an execution Restore")
+		})
+	}
+}
+
+func TestVolumePopulatorRejectsClusterSerialParameters(t *testing.T) {
+	ctx := context.Background()
+	scheme, cluster, component, its, pvc := parentRestoreObjects(t)
+	cluster.Spec.Restore.Parameters = map[string]string{dpv1alpha1.VolumeRestorePolicyParameterKey: "Serial"}
+	// Apps forwards restore parameters without interpreting DP-specific keys.
+	parameters, err := json.Marshal(cluster.Spec.Restore.Parameters)
+	require.NoError(t, err)
+	pvc.Annotations[constant.RestoreParametersAnnotationKey] = string(parameters)
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(pvc).
+		WithObjects(cluster, component, its, pvc).Build()
+	r := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(20)}
+	for range 2 {
+		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(pvc)})
+		require.NoError(t, err)
+		require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(pvc), pvc))
+	}
+	condition := findPVCConditionByType(pvc, kbappsv1.ConditionTypeRestore)
+	require.NotNil(t, condition)
+	require.Equal(t, corev1.ConditionFalse, condition.Status)
+	require.Contains(t, condition.Message, "Serial is no longer supported")
+	restores := &dpv1alpha1.RestoreList{}
+	require.NoError(t, cli.List(ctx, restores))
+	require.Empty(t, restores.Items, "reject before starting restore execution")
+	helper := &corev1.PersistentVolumeClaim{}
+	require.True(t, apierrors.IsNotFound(cli.Get(ctx, client.ObjectKey{Namespace: pvc.Namespace, Name: getPopulatePVCName(pvc.UID)}, helper)))
 }

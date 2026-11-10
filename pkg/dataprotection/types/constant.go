@@ -77,8 +77,6 @@ const (
 	SourceTargetNameAnnotationKey = "dataprotection.kubeblocks.io/source-target-name"
 	// SourceTargetPodNameAnnotationKey records the source target pod name for Backup dataSource PVC restores.
 	SourceTargetPodNameAnnotationKey = "dataprotection.kubeblocks.io/source-target-pod-name"
-	// VolumeRestorePolicyParameterKey records the volume restore policy for Backup dataSource PVC restores.
-	VolumeRestorePolicyParameterKey = "dataprotection.kubeblocks.io/volume-restore-policy"
 	// RestoreEnvParameterKey records restore env for Backup dataSource PVC restores.
 	RestoreEnvParameterKey = "dataprotection.kubeblocks.io/restore-env"
 	// DeferPostReadyUntilClusterRunningParameterKey records whether post-ready restore should wait for Cluster running.

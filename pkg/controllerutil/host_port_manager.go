@@ -316,32 +316,43 @@ func (m *portManager) UsePort(key string, port int32) error {
 }
 
 func (m *portManager) AllocatePort(key string) (int32, error) {
+	return m.allocatePort(key, nil)
+}
+
+func (m *portManager) allocatePort(key string, unavailable map[int32]bool) (int32, error) {
 	m.Lock()
 	defer m.Unlock()
 
+	var previousPort int32
 	if value, ok := m.cm.Data[key]; ok {
 		port, err := m.parsePort(value)
 		if err != nil {
 			return 0, err
 		}
-		return port, nil
+		if !unavailable[port] {
+			return port, nil
+		}
+		previousPort = port
 	}
 
-	if len(m.used) >= int(m.to-m.from)+1 {
-		return 0, fmt.Errorf("no available port: %s", key)
-	}
-
+	start := m.cursor
 	for {
-		if _, ok := m.used[m.cursor]; !ok {
+		if _, ok := m.used[m.cursor]; !ok && !unavailable[m.cursor] {
 			break
 		}
 		m.cursor++
 		if m.cursor > m.to {
 			m.cursor = m.from
 		}
+		if m.cursor == start {
+			return 0, fmt.Errorf("no available port: %s", key)
+		}
 	}
 	if err := m.update(key, m.cursor); err != nil {
 		return 0, err
+	}
+	if owner, ok := m.used[previousPort]; ok && owner == key && previousPort != m.cursor {
+		delete(m.used, previousPort)
 	}
 	return m.cursor, nil
 }
@@ -397,7 +408,11 @@ func (m *definedPortManager) AllocatePort(key string) (int32, error) {
 		return port, nil
 	}
 	if m.isKBAgentPortNNotDefinedInKey(key) {
-		return m.defaultPortManager.AllocatePort(key)
+		unavailable := make(map[int32]bool, len(m.hostPorts))
+		for _, port := range m.hostPorts {
+			unavailable[port] = true
+		}
+		return m.defaultPortManager.allocatePort(key, unavailable)
 	}
 	return 0, fmt.Errorf("no available port: %s", key)
 

@@ -34,6 +34,7 @@ import (
 	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -156,6 +157,7 @@ var _ = Describe("Instance Controller", func() {
 		It("status - available & role", func() {
 			createInstObj(instName, func(f *testapps.MockInstanceFactory) {
 				f.SetMinReadySeconds(minReadySeconds).
+					SetInstanceUpdateStrategyType(ptr.To(kbappsv1.OnDeleteStrategyType)).
 					SetRoles([]workloads.ReplicaRole{
 						{
 							Name:                 "leader",
@@ -177,6 +179,9 @@ var _ = Describe("Instance Controller", func() {
 				g.Expect(inst.Status.Ready).Should(BeTrue())
 				g.Expect(inst.Status.Available).Should(BeFalse())
 				g.Expect(inst.Status.Role).Should(BeEmpty())
+				result, err := (&InstanceReconciler{Client: k8sClient, Scheme: k8sClient.Scheme(), Recorder: record.NewFakeRecorder(100)}).Reconcile(ctx, ctrl.Request{NamespacedName: instKey})
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(result.RequeueAfter).Should(Equal(time.Second))
 			})).Should(Succeed())
 
 			mockPodReadyNAvailable(instObj.Namespace, instObj.Name, minReadySeconds)
@@ -196,6 +201,38 @@ var _ = Describe("Instance Controller", func() {
 				g.Expect(inst.Status.Available).Should(BeTrue())
 				g.Expect(inst.Status.Role).Should(Equal("leader"))
 			})).Should(Succeed())
+		})
+
+		It("status - container failure timeout without Pod updates", func() {
+			createInstObj(instName, func(f *testapps.MockInstanceFactory) {
+				f.SetMinReadySeconds(30)
+				f.GetObject().Spec.Template.Spec.Containers[0].Env = []corev1.EnvVar{{Name: "PASSWORD", ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{LocalObjectReference: corev1.LocalObjectReference{Name: "missing"}, Key: "password"},
+				}}}
+			})
+			pod := &corev1.Pod{}
+			Expect(k8sClient.Get(ctx, instKey, pod)).To(Succeed())
+			pod.Status.Phase = corev1.PodPending
+			pod.Status.Conditions = []corev1.PodCondition{
+				{Type: corev1.PodReady, Status: corev1.ConditionFalse, LastTransitionTime: metav1.Now()},
+				{Type: corev1.ContainersReady, Status: corev1.ConditionFalse, LastTransitionTime: metav1.Now()},
+			}
+			pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: pod.Spec.Containers[0].Name, Image: pod.Spec.Containers[0].Image, State: corev1.ContainerState{
+				Waiting: &corev1.ContainerStateWaiting{Reason: "CreateContainerConfigError", Message: "secret missing not found"},
+			}}}
+			Expect(k8sClient.Status().Update(ctx, pod)).To(Succeed())
+			version := pod.ResourceVersion
+			Consistently(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
+				g.Expect(meta.IsStatusConditionTrue(inst.Status.Conditions, string(workloads.InstanceFailure))).To(BeFalse())
+			}), time.Second).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
+				condition := meta.FindStatusCondition(inst.Status.Conditions, string(workloads.InstanceFailure))
+				g.Expect(condition).NotTo(BeNil())
+				g.Expect(condition.Status).To(Equal(metav1.ConditionTrue))
+				g.Expect(condition.ObservedGeneration).To(Equal(inst.Generation))
+			}), intctrlutil.PodContainerFailedTimeout+5*time.Second).Should(Succeed())
+			Expect(k8sClient.Get(ctx, instKey, pod)).To(Succeed())
+			Expect(pod.ResourceVersion).To(Equal(version))
 		})
 
 		It("delete - delete pvc", func() {
@@ -1215,4 +1252,88 @@ func TestInstanceStopResumeRetriesAfterPodCreatedBeforeStatusCommit(t *testing.T
 			}
 		})
 	}
+}
+
+func TestInstanceAdmittedVolumeExpansionAfterReadinessLoss(t *testing.T) {
+	g := NewWithT(t)
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	g.Expect(clientgoscheme.AddToScheme(scheme)).To(Succeed())
+	g.Expect(workloads.AddToScheme(scheme)).To(Succeed())
+	model.AddScheme(workloads.AddToScheme)
+	its := setStopFixture()
+	its.Spec.Replicas = ptr.To[int32](1)
+	its.Spec.MinReadySeconds = 30
+	its.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: "data", MountPath: "/data"}}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&workloads.InstanceSet{}, &workloads.Instance{}, &corev1.Pod{}, &corev1.PersistentVolumeClaim{}).WithObjects(its).Build()
+	parentKey := client.ObjectKeyFromObject(its)
+	childKey := client.ObjectKey{Namespace: "default", Name: "demo-0"}
+	runParent := func() {
+		r := &InstanceSetReconciler2{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(100)}
+		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: parentKey})
+		g.Expect(err).NotTo(HaveOccurred())
+	}
+	runChild := func() {
+		r := &InstanceReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(100)}
+		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: childKey})
+		g.Expect(err).NotTo(HaveOccurred())
+	}
+	for i := 0; i < 4; i++ {
+		runParent()
+	}
+	inst := &workloads.Instance{}
+	g.Expect(cli.Get(ctx, childKey, inst)).To(Succeed())
+	// Emulate API-server generation assignment, which fake storage omits.
+	inst.Generation = 1
+	g.Expect(cli.Update(ctx, inst)).To(Succeed())
+	for i := 0; i < 3; i++ {
+		runChild()
+	}
+	pod := &corev1.Pod{}
+	g.Expect(cli.Get(ctx, childKey, pod)).To(Succeed())
+	pod.Status.Phase = corev1.PodRunning
+	pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: metav1.NewTime(time.Now().Add(-time.Minute))}}
+	pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "db", Image: "db:v1", Ready: true}}
+	g.Expect(cli.Status().Update(ctx, pod)).To(Succeed())
+	runChild()
+	g.Expect(cli.Get(ctx, childKey, inst)).To(Succeed())
+	g.Expect(inst.Status.Ready).To(BeTrue())
+	g.Expect(inst.Status.Available).To(BeTrue())
+	claimKey := client.ObjectKey{Namespace: "default", Name: "data-demo-0"}
+	claim := &corev1.PersistentVolumeClaim{}
+	g.Expect(cli.Get(ctx, claimKey, claim)).To(Succeed())
+	claim.Spec.VolumeName = "pv-data"
+	g.Expect(cli.Update(ctx, claim)).To(Succeed())
+	claim.Status.Phase = corev1.ClaimBound
+	claim.Status.Capacity = corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}
+	g.Expect(cli.Status().Update(ctx, claim)).To(Succeed())
+	runParent()
+	g.Expect(cli.Get(ctx, parentKey, its)).To(Succeed())
+	its.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
+	its.Generation++
+	g.Expect(cli.Update(ctx, its)).To(Succeed())
+	runParent()
+	g.Expect(cli.Get(ctx, childKey, inst)).To(Succeed())
+	requested := inst.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage]
+	g.Expect(requested.Cmp(resource.MustParse("2Gi"))).To(BeZero(), "ITS must hand off the expansion before readiness is lost")
+	inst.Generation++
+	g.Expect(cli.Update(ctx, inst)).To(Succeed())
+	// Runtime readiness can change after ITS admission, before Instance applies it.
+	pod.Status.Conditions[0].Status = corev1.ConditionFalse
+	pod.Status.Conditions[0].LastTransitionTime = metav1.Now()
+	pod.Status.ContainerStatuses[0].Ready = false
+	g.Expect(cli.Status().Update(ctx, pod)).To(Succeed())
+	podSpec := pod.Spec.DeepCopy()
+	runChild()
+	g.Expect(cli.Get(ctx, claimKey, claim)).To(Succeed())
+	requested = claim.Spec.Resources.Requests[corev1.ResourceStorage]
+	g.Expect(requested.Cmp(resource.MustParse("2Gi"))).To(BeZero(), "unready status must not prevent already-admitted PVC expansion")
+	g.Expect(cli.Get(ctx, childKey, inst)).To(Succeed())
+	g.Expect(inst.Status.Ready).To(BeFalse())
+	g.Expect(inst.Status.Available).To(BeFalse())
+	g.Expect(claim.Spec.VolumeName).To(Equal("pv-data"))
+	g.Expect(claim.Status.Capacity).To(Equal(corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}))
+	g.Expect(cli.Get(ctx, childKey, pod)).To(Succeed())
+	g.Expect(pod.Spec).To(Equal(*podSpec))
+	g.Expect(pod.Status.Conditions[0].Status).To(Equal(corev1.ConditionFalse))
 }

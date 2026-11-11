@@ -112,7 +112,9 @@ const (
 )
 
 type Result struct {
-	Next       controlMethod
+	Next controlMethod
+	// RetryAfter requests a delayed reconciliation independently of Next.
+	// The earliest positive delay wins; an immediate Retry takes precedence.
 	RetryAfter time.Duration
 }
 
@@ -127,6 +129,12 @@ var (
 	// and retry from the beginning with a delay specified by `after`.
 	RetryAfter = func(after time.Duration) Result {
 		return Result{Next: rtry, RetryAfter: after}
+	}
+
+	// ContinueWithRetryAfter continues the control flow and requests a delayed reconciliation.
+	// A non-positive delay is equivalent to Continue.
+	ContinueWithRetryAfter = func(after time.Duration) Result {
+		return Result{Next: cntn, RetryAfter: after}
 	}
 )
 

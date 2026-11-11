@@ -122,12 +122,6 @@ var (
 	// Continue tells the control flow to continue
 	Continue = Result{Next: cntn}
 
-	// ContinueWithRetryAfter continues the control flow and requests a delayed reconciliation.
-	// A non-positive delay is equivalent to Continue.
-	ContinueWithRetryAfter = func(after time.Duration) Result {
-		return Result{Next: cntn, RetryAfter: after}
-	}
-
 	// Commit tells the control flow to stop and jump to the commit phase
 	Commit = Result{Next: cmmt}
 
@@ -135,6 +129,12 @@ var (
 	// and retry from the beginning with a delay specified by `after`.
 	RetryAfter = func(after time.Duration) Result {
 		return Result{Next: rtry, RetryAfter: after}
+	}
+
+	// ContinueWithRetryAfter continues the control flow and requests a delayed reconciliation.
+	// A non-positive delay is equivalent to Continue.
+	ContinueWithRetryAfter = func(after time.Duration) Result {
+		return Result{Next: cntn, RetryAfter: after}
 	}
 )
 

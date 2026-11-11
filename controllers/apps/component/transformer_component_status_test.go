@@ -184,14 +184,71 @@ var _ = Describe("component status transformer conditions", func() {
 	}
 
 	Context("role probe timeout", func() {
-		DescribeTable("uses only InstanceSet observations", func(instanceAPI bool) {
-			runningITS.Spec.EnableInstanceAPI = ptr.To(instanceAPI)
+		BeforeEach(func() {
 			runningITS.Spec.Roles = []workloads.ReplicaRole{{Name: "primary"}, {Name: "secondary"}}
 			runningITS.Status.InstanceStatus = nil
 			runningITS.Status.Conditions = []metav1.Condition{{
 				Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue,
-				ObservedGeneration: runningITS.Generation, LastTransitionTime: metav1.Now(), Reason: workloads.ReasonReady,
+				ObservedGeneration: runningITS.Generation, LastTransitionTime: metav1.NewTime(time.Now().Add(-2 * time.Minute)), Reason: workloads.ReasonReady,
 			}}
+		})
+
+		DescribeTable("requires an updated and ready InstanceSet", func(mutate func(*workloads.InstanceSet), wantFailure bool) {
+			if mutate != nil {
+				mutate(runningITS)
+			}
+			failed, messages := transformer.hasFailedPod()
+			Expect(failed).Should(Equal(wantFailure))
+			if wantFailure {
+				Expect(messages).ShouldNot(BeEmpty())
+			}
+		},
+			Entry("stopped workload retains old ready condition", func(its *workloads.InstanceSet) {
+				its.Status.Replicas = 0
+				its.Status.ReadyReplicas = 0
+				its.Status.UpdatedReplicas = 0
+			}, false),
+			Entry("workload has not observed start", func(its *workloads.InstanceSet) {
+				its.Status.ObservedGeneration--
+			}, false),
+			Entry("workload belongs to previous component generation", func(its *workloads.InstanceSet) {
+				its.Annotations[constant.KubeBlocksGenerationKey] = strconv.FormatInt(comp.Generation-1, 10)
+			}, false),
+			Entry("replicas have not finished updating", func(its *workloads.InstanceSet) {
+				its.Status.UpdatedReplicas = 1
+			}, false),
+			Entry("ready condition is stale while pods are not ready", func(its *workloads.InstanceSet) {
+				its.Status.ReadyReplicas = 1
+			}, false),
+			Entry("ready condition belongs to a previous generation", func(its *workloads.InstanceSet) {
+				its.Status.Conditions[0].ObservedGeneration--
+			}, false),
+			Entry("ready condition is false", func(its *workloads.InstanceSet) {
+				its.Status.Conditions[0].Status = metav1.ConditionFalse
+			}, false),
+			Entry("ready pods still have time to report roles", func(its *workloads.InstanceSet) {
+				its.Status.Conditions[0].LastTransitionTime = metav1.Now()
+			}, false),
+			Entry("ready pods without roles time out", nil, true),
+			Entry("role probe completed", func(its *workloads.InstanceSet) {
+				its.Status.InstanceStatus = []workloads.InstanceStatus{
+					{PodName: "pod-0", Role: "primary"},
+					{PodName: "pod-1", Role: "secondary"},
+					{PodName: "pod-2", Role: "secondary"},
+				}
+			}, false),
+			Entry("real instance failure is not hidden by pending update", func(its *workloads.InstanceSet) {
+				its.Status.Replicas = 0
+				its.Status.Conditions = append(its.Status.Conditions, metav1.Condition{
+					Type: string(workloads.InstanceFailure), Status: metav1.ConditionTrue,
+					Reason: "Failed", Message: "instance creation failed",
+				})
+			}, true),
+		)
+
+		DescribeTable("uses only InstanceSet observations", func(instanceAPI bool) {
+			runningITS.Spec.EnableInstanceAPI = ptr.To(instanceAPI)
+			runningITS.Status.Conditions[0].LastTransitionTime = metav1.Now()
 			lowerResourceReads := 0
 			transCtx.Client = fake.NewClientBuilder().WithScheme(model.GetScheme()).WithInterceptorFuncs(interceptor.Funcs{
 				Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, object client.Object, opts ...client.GetOption) error {

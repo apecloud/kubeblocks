@@ -130,9 +130,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		if ready {
 			return kubebuilderx.RetryAfter(time.Second), nil
 		}
-		result := kubebuilderx.Continue
-		result.RetryAfter = time.Second
-		return result, nil
+		return kubebuilderx.ContinueWithRetryAfter(time.Second), nil
 	}
 	return kubebuilderx.Continue, nil
 }

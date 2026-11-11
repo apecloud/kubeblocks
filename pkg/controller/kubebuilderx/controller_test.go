@@ -50,11 +50,9 @@ var _ = Describe("controller test", func() {
 			tree := NewObjectTree()
 			tree.SetRoot(root)
 			tree.EventRecorder = record.NewFakeRecorder(100)
-			delayed := Continue
-			delayed.RetryAfter = time.Second
 			ctrlr := NewController(ctx, cli, ctrl.Request{}, tree.EventRecorder, logger).
 				Prepare(&dummyLoader{tree: tree}).
-				Do(&dummyReconciler{res: delayed}).
+				Do(&dummyReconciler{res: ContinueWithRetryAfter(time.Second)}).
 				Do(&dummyReconciler{res: next, err: stepErr})
 			if next.Next != cntn {
 				ctrlr = ctrlr.Do(&dummyReconciler{err: fmt.Errorf("step after Retry or Commit must not run")})
@@ -72,7 +70,7 @@ var _ = Describe("controller test", func() {
 			Expect(cli.Get(ctx, client.ObjectKeyFromObject(committed), committed)).To(Succeed())
 		},
 			Entry("plain Continue preserves the wakeup", Continue, nil, time.Second),
-			Entry("an earlier Continue wakeup wins", Result{Next: cntn, RetryAfter: 500 * time.Millisecond}, nil, 500*time.Millisecond),
+			Entry("an earlier Continue wakeup wins", ContinueWithRetryAfter(500*time.Millisecond), nil, 500*time.Millisecond),
 			Entry("Retry stops the chain and preserves the earlier wakeup", RetryAfter(2*time.Second), nil, time.Second),
 			Entry("immediate Retry takes precedence and stops the chain", RetryAfter(0), nil, time.Duration(0)),
 			Entry("Commit stops the chain and preserves the wakeup", Commit, nil, time.Second),

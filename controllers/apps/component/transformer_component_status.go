@@ -40,8 +40,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 const (
@@ -137,10 +135,7 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 	isITSUpdatedNRunning := t.isInstanceSetRunning()
 
 	// check if the component has failed pod
-	hasFailedPod, messages, err := t.hasFailedPod(transCtx)
-	if err != nil {
-		return err
-	}
+	hasFailedPod, messages := t.hasFailedPod()
 
 	// check if the component scale out failed
 	hasRunningScaleOut, hasFailedScaleOut, err := t.hasScaleOutRunning(transCtx)
@@ -279,9 +274,9 @@ func (t *componentStatusTransformer) hasVolumeExpansionRunning() bool {
 }
 
 // hasFailedPod checks if the instance set has failed pod.
-func (t *componentStatusTransformer) hasFailedPod(transCtx *componentTransformContext) (bool, componentMessageMap, error) {
+func (t *componentStatusTransformer) hasFailedPod() (bool, componentMessageMap) {
 	if t.runningITS == nil {
-		return false, nil, nil
+		return false, nil
 	}
 
 	messages := componentMessageMap{}
@@ -290,100 +285,33 @@ func (t *componentStatusTransformer) hasFailedPod(transCtx *componentTransformCo
 	if hasFailedPod {
 		failureCondition := meta.FindStatusCondition(t.runningITS.Status.Conditions, string(workloads.InstanceFailure))
 		messages.setObjectMessage(workloads.InstanceSetKind, t.runningITS.Name, failureCondition.Message)
-		return true, messages, nil
+		return true, messages
 	}
 
 	// A stopped or updating workload can retain InstanceReady=True from an earlier
 	// generation, including when there are no pods. Only use its ready timestamp
 	// for the role-probe deadline once the desired workload is updated and ready.
 	if !t.isWorkloadUpdated() || t.runningITS.Status.ReadyReplicas != *t.runningITS.Spec.Replicas {
-		return false, nil, nil
+		return false, nil
 	}
 
 	// check InstanceReady condition
 	condition := meta.FindStatusCondition(t.runningITS.Status.Conditions, string(workloads.InstanceReady))
 	if condition == nil || condition.Status != metav1.ConditionTrue || condition.ObservedGeneration != t.runningITS.Generation {
-		return false, nil, nil
+		return false, nil
 	}
 
 	// all instances are in Ready condition, check role probe
 	if t.runningITS.IsRoleProbeDone() {
-		return false, nil, nil
-	}
-	readyTime, err := t.roleProbeReadyTime(transCtx, condition.LastTransitionTime.Time)
-	if err != nil {
-		return false, nil, err
+		return false, nil
 	}
 	probeTimeoutDuration := time.Duration(defaultRoleProbeTimeoutAfterPodsReady) * time.Second
-	if !readyTime.IsZero() && time.Now().After(readyTime.Add(probeTimeoutDuration)) {
+	if time.Now().After(condition.LastTransitionTime.Add(probeTimeoutDuration)) {
 		messages.setObjectMessage(workloads.InstanceSetKind, t.runningITS.Name, "Role probe timeout, check whether the application is available")
-		return true, messages, nil
+		return true, messages
 	}
 
-	return false, nil, nil
-}
-
-func (t *componentStatusTransformer) roleProbeReadyTime(transCtx *componentTransformContext, readyTime time.Time) (time.Time, error) {
-	if t.runningITS.Spec.EnableInstanceAPI != nil && *t.runningITS.Spec.EnableInstanceAPI {
-		clusterName, err := component.GetClusterName(t.comp)
-		if err != nil {
-			return time.Time{}, err
-		}
-		compName, err := component.GetComponentName(t.comp)
-		if err != nil {
-			return time.Time{}, err
-		}
-		instances := &workloads.InstanceList{}
-		ctx := multicluster.IntoContext(transCtx.Context, t.runningITS.Annotations[constant.KBAppMultiClusterPlacementKey])
-		if err := transCtx.Client.List(ctx, instances, client.InNamespace(t.comp.Namespace),
-			client.MatchingLabels(constant.GetCompLabels(clusterName, compName)), multicluster.InDataContext()); err != nil {
-			return time.Time{}, err
-		}
-		if len(instances.Items) != int(*t.runningITS.Spec.Replicas) {
-			return time.Time{}, nil
-		}
-		for _, inst := range instances.Items {
-			if !intctrlutil.IsInstanceReady(&inst) {
-				return time.Time{}, nil
-			}
-			condition := meta.FindStatusCondition(inst.Status.Conditions, string(workloads.InstanceReady))
-			if condition.LastTransitionTime.IsZero() {
-				return time.Time{}, nil
-			}
-			if condition.LastTransitionTime.After(readyTime) {
-				readyTime = condition.LastTransitionTime.Time
-			}
-		}
-		return readyTime, nil
-	}
-	pods, err := component.ListOwnedInstances(transCtx.Context, transCtx.Client, t.comp, t.runningITS)
-	if err != nil {
-		return time.Time{}, err
-	}
-	if len(pods) != int(*t.runningITS.Spec.Replicas) {
-		return time.Time{}, nil
-	}
-	for _, pod := range pods {
-		if !intctrlutil.IsPodReady(pod) {
-			return time.Time{}, nil
-		}
-		condition := intctrlutil.GetPodCondition(&pod.Status, corev1.PodReady)
-		if condition == nil || condition.LastTransitionTime.IsZero() {
-			return time.Time{}, nil
-		}
-		if condition.LastTransitionTime.After(readyTime) {
-			readyTime = condition.LastTransitionTime.Time
-		}
-		// A runtime can restart between observations while Ready remains true.
-		for _, statuses := range [][]corev1.ContainerStatus{pod.Status.ContainerStatuses, pod.Status.InitContainerStatuses} {
-			for _, status := range statuses {
-				if status.State.Running != nil && status.State.Running.StartedAt.After(readyTime) {
-					readyTime = status.State.Running.StartedAt.Time
-				}
-			}
-		}
-	}
-	return readyTime, nil
+	return false, nil
 }
 
 // setComponentStatusPhase sets the component phase and messages conditionally.

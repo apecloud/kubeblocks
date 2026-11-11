@@ -60,7 +60,6 @@ var _ = Describe("component status transformer conditions", func() {
 		compDef       *appsv1.ComponentDefinition
 		runningITS    *workloads.InstanceSet
 		protoITS      *workloads.InstanceSet
-		reader        *appsutil.MockReader
 		eventRecorder record.EventRecorder
 	)
 
@@ -134,7 +133,7 @@ var _ = Describe("component status transformer conditions", func() {
 		runningITS = newReadyITS(1, 3, nil)
 		protoITS = runningITS.DeepCopy()
 
-		reader = &appsutil.MockReader{
+		reader := &appsutil.MockReader{
 			Objects: []client.Object{compDef, comp},
 		}
 		graphCli := model.NewGraphClient(reader)
@@ -185,201 +184,43 @@ var _ = Describe("component status transformer conditions", func() {
 	}
 
 	Context("role probe timeout", func() {
-		var pods []*corev1.Pod
-
-		BeforeEach(func() {
-			oldReadyTime := metav1.NewTime(time.Now().Add(-2 * time.Minute))
+		DescribeTable("uses only InstanceSet observations", func(instanceAPI bool) {
+			runningITS.Spec.EnableInstanceAPI = ptr.To(instanceAPI)
 			runningITS.Spec.Roles = []workloads.ReplicaRole{{Name: "primary"}, {Name: "secondary"}}
+			runningITS.Status.InstanceStatus = nil
 			runningITS.Status.Conditions = []metav1.Condition{{
 				Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue,
-				ObservedGeneration: runningITS.Generation, LastTransitionTime: oldReadyTime, Reason: "Ready",
+				ObservedGeneration: runningITS.Generation, LastTransitionTime: metav1.Now(), Reason: workloads.ReasonReady,
 			}}
-			pods = nil
-			for i := 0; i < int(*runningITS.Spec.Replicas); i++ {
-				pod := &corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: comp.Namespace, Name: "pod-" + strconv.Itoa(i),
-						Labels: constant.GetCompLabels(clusterName, compName),
-					},
-					Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "server", Image: "server:latest"}}},
-					Status: corev1.PodStatus{
-						Phase: corev1.PodRunning,
-						Conditions: []corev1.PodCondition{{
-							Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: oldReadyTime,
-						}},
-						ContainerStatuses: []corev1.ContainerStatus{{
-							Name: "server", Ready: true,
-							State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{StartedAt: oldReadyTime}},
-						}},
-					},
-				}
-				pods = append(pods, pod)
-				reader.Objects = append(reader.Objects, pod)
-				reader.Objects = append(reader.Objects, &workloads.Instance{
-					ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name, Generation: runningITS.Generation},
-					Status: workloads.InstanceStatus2{
-						ObservedGeneration: runningITS.Generation, Conditions: runningITS.Status.Conditions,
-					},
-				})
-			}
-		})
-
-		It("uses reported Instance readiness without reading Pods in Instance mode", func() {
-			runningITS.Spec.EnableInstanceAPI = ptr.To(true)
-			instances := make([]client.Object, 0, *runningITS.Spec.Replicas)
-			for i := int32(0); i < *runningITS.Spec.Replicas; i++ {
-				instances = append(instances, &workloads.Instance{
-					ObjectMeta: metav1.ObjectMeta{Namespace: comp.Namespace, Name: "instance-" + strconv.Itoa(int(i)), Generation: 1,
-						Labels: constant.GetCompLabels(clusterName, compName)},
-					Status: workloads.InstanceStatus2{ObservedGeneration: 1, Conditions: []metav1.Condition{{
-						Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue,
-						ObservedGeneration: 1, LastTransitionTime: metav1.Now(), Reason: workloads.ReasonReady,
-					}}},
-				})
-			}
-			podReads := 0
-			cli := fake.NewClientBuilder().WithScheme(model.GetScheme()).WithStatusSubresource(&workloads.Instance{}).
-				WithObjects(instances...).WithInterceptorFuncs(interceptor.Funcs{
+			lowerResourceReads := 0
+			transCtx.Client = fake.NewClientBuilder().WithScheme(model.GetScheme()).WithInterceptorFuncs(interceptor.Funcs{
+				Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, object client.Object, opts ...client.GetOption) error {
+					switch object.(type) {
+					case *workloads.Instance, *corev1.Pod, *corev1.PersistentVolumeClaim:
+						lowerResourceReads++
+						return errors.New("Component must not read resources below InstanceSet")
+					}
+					return c.Get(ctx, key, object, opts...)
+				},
 				List: func(ctx context.Context, c client.WithWatch, objects client.ObjectList, opts ...client.ListOption) error {
-					if _, ok := objects.(*corev1.PodList); ok {
-						podReads++
-						return errors.New("Instance mode must not list Pods")
+					switch objects.(type) {
+					case *workloads.InstanceList, *corev1.PodList, *corev1.PersistentVolumeClaimList:
+						lowerResourceReads++
+						return errors.New("Component must not list resources below InstanceSet")
 					}
 					return c.List(ctx, objects, opts...)
 				},
 			}).Build()
-			transCtx.Client = cli
-			failed, _, err := transformer.hasFailedPod(transCtx)
-			Expect(err).Should(Succeed())
-			Expect(failed).Should(BeFalse())
-			for _, object := range instances {
-				inst := &workloads.Instance{}
-				Expect(cli.Get(context.Background(), client.ObjectKeyFromObject(object), inst)).Should(Succeed())
-				inst.Status.Conditions[0].LastTransitionTime = metav1.NewTime(time.Now().Add(-2 * time.Minute))
-				Expect(cli.Status().Update(context.Background(), inst)).Should(Succeed())
-			}
-			failed, _, err = transformer.hasFailedPod(transCtx)
-			Expect(err).Should(Succeed())
-			Expect(failed).Should(BeTrue())
-			Expect(podReads).Should(BeZero())
-		})
-
-		DescribeTable("waits for the current ready runtime",
-			func(mutate func(*workloads.InstanceSet, []*corev1.Pod), wantFailure bool) {
-				if mutate != nil {
-					mutate(runningITS, pods)
-				}
-				failed, messages, err := transformer.hasFailedPod(transCtx)
-				Expect(err).Should(Succeed())
-				Expect(failed).Should(Equal(wantFailure))
-				if wantFailure {
-					Expect(messages).Should(HaveKeyWithValue("InstanceSet/"+runningITS.Name,
-						"Role probe timeout, check whether the application is available"))
-				} else {
-					Expect(messages).Should(BeEmpty())
-				}
-			},
-			Entry("fresh ready Pod with an old aggregate and instance condition", func(_ *workloads.InstanceSet, pods []*corev1.Pod) {
-				pods[0].Status.Conditions[0].LastTransitionTime = metav1.Now()
-			}, false),
-			Entry("new container runtime with unchanged Pod Ready condition", func(_ *workloads.InstanceSet, pods []*corev1.Pod) {
-				pods[0].Status.ContainerStatuses[0].State.Running.StartedAt = metav1.Now()
-			}, false),
-			Entry("new sidecar runtime with unchanged Pod Ready condition", func(_ *workloads.InstanceSet, pods []*corev1.Pod) {
-				pods[0].Spec.InitContainers = []corev1.Container{{
-					Name: "sidecar", Image: "sidecar:latest", RestartPolicy: ptr.To(corev1.ContainerRestartPolicyAlways),
-				}}
-				pods[0].Status.InitContainerStatuses = []corev1.ContainerStatus{{
-					Name: "sidecar", Ready: true,
-					State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{StartedAt: metav1.Now()}},
-				}}
-			}, false),
-			Entry("aggregate condition has not observed the current generation", func(its *workloads.InstanceSet, _ []*corev1.Pod) {
-				its.Status.Conditions[0].ObservedGeneration--
-			}, false),
-			Entry("stopped workload retains an old ready condition", func(its *workloads.InstanceSet, _ []*corev1.Pod) {
-				its.Status.Replicas, its.Status.ReadyReplicas, its.Status.UpdatedReplicas = 0, 0, 0
-			}, false),
-			Entry("workload has not observed start", func(its *workloads.InstanceSet, _ []*corev1.Pod) {
-				its.Status.ObservedGeneration--
-			}, false),
-			Entry("workload belongs to a previous component generation", func(its *workloads.InstanceSet, _ []*corev1.Pod) {
-				its.Annotations[constant.KubeBlocksGenerationKey] = "0"
-			}, false),
-			Entry("replicas have not finished updating", func(its *workloads.InstanceSet, _ []*corev1.Pod) {
-				its.Status.UpdatedReplicas--
-			}, false),
-			Entry("ready replica count is stale", func(its *workloads.InstanceSet, _ []*corev1.Pod) {
-				its.Status.ReadyReplicas--
-			}, false),
-			Entry("aggregate condition is false", func(its *workloads.InstanceSet, _ []*corev1.Pod) {
-				its.Status.Conditions[0].Status = metav1.ConditionFalse
-			}, false),
-			Entry("aggregate ready time is recent", func(its *workloads.InstanceSet, _ []*corev1.Pod) {
-				its.Status.Conditions[0].LastTransitionTime = metav1.Now()
-			}, false),
-			Entry("actual Pod is not ready", func(_ *workloads.InstanceSet, pods []*corev1.Pod) {
-				pods[0].Status.Conditions[0].Status = corev1.ConditionFalse
-			}, false),
-			Entry("actual Pod is terminating", func(_ *workloads.InstanceSet, pods []*corev1.Pod) {
-				now := metav1.Now()
-				pods[0].DeletionTimestamp = &now
-			}, false),
-			Entry("Pod ready time is unknown", func(_ *workloads.InstanceSet, pods []*corev1.Pod) {
-				pods[0].Status.Conditions[0].LastTransitionTime = metav1.Time{}
-			}, false),
-			Entry("ready Pods without roles have timed out", nil, true),
-			Entry("role probe is complete", func(its *workloads.InstanceSet, pods []*corev1.Pod) {
-				for _, pod := range pods {
-					its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{PodName: pod.Name, Role: "secondary"})
-				}
-			}, false),
-		)
-
-		It("waits when the observed Pods do not match the ready replica count", func() {
-			reader.Objects = reader.Objects[:len(reader.Objects)-2]
-			failed, messages, err := transformer.hasFailedPod(transCtx)
-			Expect(err).Should(Succeed())
-			Expect(failed).Should(BeFalse())
-			Expect(messages).Should(BeEmpty())
-		})
-
-		It("reports an instance failure while an update is pending", func() {
-			runningITS.Status.Replicas = 0
-			runningITS.Status.Conditions = append(runningITS.Status.Conditions, metav1.Condition{
-				Type: string(workloads.InstanceFailure), Status: metav1.ConditionTrue,
-				Reason: "Failed", Message: "instance creation failed",
-			})
-			failed, messages, err := transformer.hasFailedPod(transCtx)
-			Expect(err).Should(Succeed())
-			Expect(failed).Should(BeTrue())
-			Expect(messages).Should(HaveKeyWithValue("InstanceSet/"+runningITS.Name, "instance creation failed"))
-		})
-
-		It("propagates a Pod read error without reporting a role failure", func() {
-			readErr := errors.New("Pod list failed")
-			transCtx.Client = fake.NewClientBuilder().WithInterceptorFuncs(interceptor.Funcs{
-				List: func(context.Context, client.WithWatch, client.ObjectList, ...client.ListOption) error {
-					return readErr
-				},
-			}).Build()
-			Expect(transformer.reconcileStatus(transCtx)).Should(MatchError(readErr))
-			Expect(comp.Status.Phase).Should(Equal(appsv1.RunningComponentPhase))
-			Expect(comp.Status.Message).Should(BeEmpty())
-		})
-
-		It("keeps a fresh runtime updating and reports failure after its ready deadline", func() {
-			pods[0].Status.Conditions[0].LastTransitionTime = metav1.Now()
 			Expect(transformer.reconcileStatus(transCtx)).Should(Succeed())
 			Expect(comp.Status.Phase).Should(Equal(appsv1.UpdatingComponentPhase))
 			Expect(comp.Status.Message).Should(BeEmpty())
-
-			pods[0].Status.Conditions[0].LastTransitionTime = metav1.NewTime(time.Now().Add(-2 * time.Minute))
+			runningITS.Status.Conditions[0].LastTransitionTime = metav1.NewTime(time.Now().Add(-2 * time.Minute))
 			Expect(transformer.reconcileStatus(transCtx)).Should(Succeed())
 			Expect(comp.Status.Phase).Should(Equal(appsv1.FailedComponentPhase))
 			Expect(comp.Status.Message).Should(HaveKeyWithValue("InstanceSet/"+runningITS.Name,
 				"Role probe timeout, check whether the application is available"))
-		})
+			Expect(lowerResourceReads).Should(BeZero())
+		}, Entry("legacy InstanceSet", false), Entry("Instance API", true))
 	})
 
 	Context("reconcileRestoreCondition", func() {

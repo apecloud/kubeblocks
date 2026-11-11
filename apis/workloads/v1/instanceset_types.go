@@ -772,20 +772,24 @@ type InstanceTemplateStatus struct {
 type ConditionType string
 
 const (
-	// InstanceReady reports observed runtime health. For an InstanceSet, it is True when every identity
-	// assigned to spec.replicas exists and is healthy. The replica target defaults to 1.
-	// An explicit zero target is ready even while extra instances await cleanup. Extra instances cannot
-	// replace missing assigned identities and do not independently block readiness. Incomplete allocation
-	// is Unknown. Readiness does not require roles, revision convergence, or operation completion.
-	// Its observedGeneration identifies the spec evaluated. Its lastTransitionTime changes only when
-	// this condition's status changes, including across generations.
+	// InstanceReady indicates whether an Instance is ready.
+	// For an InstanceSet, it is True when every expected instance exists and is ready,
+	// and False when any expected instance is missing or not ready.
+	// The expected replica count is spec.replicas, which defaults to 1.
+	// An explicit replica count of 0 makes this condition True.
+	// Instances outside the expected set do not affect this condition.
+	// The status is Unknown when the expected instances cannot yet be determined.
+	// observedGeneration identifies the evaluated spec generation.
+	// lastTransitionTime records when this condition's status last changed.
 	InstanceReady ConditionType = "InstanceReady"
 
-	// InstanceAvailable requires InstanceReady and each required runtime to have remained ready for
-	// the current MinReadySeconds, measured from that runtime's Ready transition rather than the aggregate
-	// condition. With MinReadySeconds zero, its status matches InstanceReady, but transition times can differ.
-	// Its observedGeneration identifies the spec evaluated. Its lastTransitionTime changes only when
-	// this condition's status changes, including across generations.
+	// InstanceAvailable indicates whether an Instance is available.
+	// It is True when InstanceReady is True and the instance has been continuously ready
+	// for at least spec.minReadySeconds seconds.
+	// For an InstanceSet, this requirement applies to every expected instance.
+	// When spec.minReadySeconds is 0, its status matches InstanceReady.
+	// observedGeneration identifies the evaluated spec generation.
+	// lastTransitionTime records when this condition's status last changed.
 	InstanceAvailable ConditionType = "InstanceAvailable"
 
 	// InstanceFailure is added in an instance set when at least one of its instances(pods) is in a `Failed` phase.

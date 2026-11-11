@@ -19340,9 +19340,7 @@ InstanceSetStatus
 It is True when InstanceReady is True and the instance has been continuously ready
 for at least spec.minReadySeconds seconds.
 For an InstanceSet, this requirement applies to every expected instance.
-When spec.minReadySeconds is 0, its status matches InstanceReady.
-observedGeneration identifies the evaluated spec generation.
-lastTransitionTime records when this condition&rsquo;s status last changed.</p>
+When spec.minReadySeconds is 0, its status matches InstanceReady.</p>
 </td>
 </tr><tr><td><p>&#34;InstanceFailure&#34;</p></td>
 <td><p>InstanceFailure is added in an instance set when at least one of its instances(pods) is in a <code>Failed</code> phase.</p>
@@ -19353,10 +19351,7 @@ For an InstanceSet, it is True when every expected instance exists and is ready,
 and False when any expected instance is missing or not ready.
 The expected replica count is spec.replicas, which defaults to 1.
 An explicit replica count of 0 makes this condition True.
-Instances outside the expected set do not affect this condition.
-The status is Unknown when the expected instances cannot yet be determined.
-observedGeneration identifies the evaluated spec generation.
-lastTransitionTime records when this condition&rsquo;s status last changed.</p>
+Instances outside the expected set do not affect this condition.</p>
 </td>
 </tr><tr><td><p>&#34;Restore&#34;</p></td>
 <td><p>InstanceRestore indicates whether the initial data restore for this Instance or InstanceSet has completed.</p>

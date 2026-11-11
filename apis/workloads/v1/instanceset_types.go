@@ -778,9 +778,6 @@ const (
 	// The expected replica count is spec.replicas, which defaults to 1.
 	// An explicit replica count of 0 makes this condition True.
 	// Instances outside the expected set do not affect this condition.
-	// The status is Unknown when the expected instances cannot yet be determined.
-	// observedGeneration identifies the evaluated spec generation.
-	// lastTransitionTime records when this condition's status last changed.
 	InstanceReady ConditionType = "InstanceReady"
 
 	// InstanceAvailable indicates whether an Instance is available.
@@ -788,8 +785,6 @@ const (
 	// for at least spec.minReadySeconds seconds.
 	// For an InstanceSet, this requirement applies to every expected instance.
 	// When spec.minReadySeconds is 0, its status matches InstanceReady.
-	// observedGeneration identifies the evaluated spec generation.
-	// lastTransitionTime records when this condition's status last changed.
 	InstanceAvailable ConditionType = "InstanceAvailable"
 
 	// InstanceFailure is added in an instance set when at least one of its instances(pods) is in a `Failed` phase.

@@ -296,7 +296,8 @@ func (t *componentStatusTransformer) hasFailedPod() (bool, componentMessageMap) 
 	}
 
 	// check InstanceReady condition
-	if !meta.IsStatusConditionTrue(t.runningITS.Status.Conditions, string(workloads.InstanceReady)) {
+	condition := meta.FindStatusCondition(t.runningITS.Status.Conditions, string(workloads.InstanceReady))
+	if condition == nil || condition.Status != metav1.ConditionTrue || condition.ObservedGeneration != t.runningITS.Generation {
 		return false, nil
 	}
 
@@ -305,7 +306,6 @@ func (t *componentStatusTransformer) hasFailedPod() (bool, componentMessageMap) 
 		return false, nil
 	}
 	probeTimeoutDuration := time.Duration(defaultRoleProbeTimeoutAfterPodsReady) * time.Second
-	condition := meta.FindStatusCondition(t.runningITS.Status.Conditions, string(workloads.InstanceReady))
 	if time.Now().After(condition.LastTransitionTime.Add(probeTimeoutDuration)) {
 		messages.setObjectMessage(workloads.InstanceSetKind, t.runningITS.Name, "Role probe timeout, check whether the application is available")
 		return true, messages

@@ -41,19 +41,12 @@ import (
 )
 
 // statusReconciler computes the current status
-type statusReconciler struct {
-	requeueAfter time.Duration
-}
+type statusReconciler struct{}
 
 var _ kubebuilderx.Reconciler = &statusReconciler{}
 
-func NewStatusReconciler() *statusReconciler {
+func NewStatusReconciler() kubebuilderx.Reconciler {
 	return &statusReconciler{}
-}
-
-// RequeueAfter reports a pending availability wait without stopping later reconciliation steps.
-func (r *statusReconciler) RequeueAfter() time.Duration {
-	return r.requeueAfter
 }
 
 func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
@@ -64,18 +57,14 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 }
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
-	r.requeueAfter = 0
 	its := tree.GetRoot().(*workloads.InstanceSet)
 	previous := append([]metav1.Condition(nil), its.Status.Conditions...)
-	pending, err := reconcileReadiness(tree)
+	err := reconcileReadiness(tree)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
 	if instancestatus.ReadinessConditionsChanged(previous, its.Status.Conditions) {
 		return kubebuilderx.RetryAfter(time.Millisecond), nil
-	}
-	if pending {
-		r.requeueAfter = time.Second
 	}
 	if !model.IsObjectStatusUpdating(its) {
 		return kubebuilderx.Continue, nil
@@ -84,7 +73,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	return kubebuilderx.Continue, err
 }
 
-func reconcileReadiness(tree *kubebuilderx.ObjectTree) (bool, error) {
+func reconcileReadiness(tree *kubebuilderx.ObjectTree) error {
 	its := tree.GetRoot().(*workloads.InstanceSet)
 	assignments, _, err := instancetemplate.BuildAssignments(tree, its)
 	health := make(map[string]instancestatus.Health)

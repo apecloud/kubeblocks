@@ -40,6 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -323,6 +324,38 @@ func (t *componentStatusTransformer) hasFailedPod(transCtx *componentTransformCo
 }
 
 func (t *componentStatusTransformer) roleProbeReadyTime(transCtx *componentTransformContext, readyTime time.Time) (time.Time, error) {
+	if t.runningITS.Spec.EnableInstanceAPI != nil && *t.runningITS.Spec.EnableInstanceAPI {
+		clusterName, err := component.GetClusterName(t.comp)
+		if err != nil {
+			return time.Time{}, err
+		}
+		compName, err := component.GetComponentName(t.comp)
+		if err != nil {
+			return time.Time{}, err
+		}
+		instances := &workloads.InstanceList{}
+		ctx := multicluster.IntoContext(transCtx.Context, t.runningITS.Annotations[constant.KBAppMultiClusterPlacementKey])
+		if err := transCtx.Client.List(ctx, instances, client.InNamespace(t.comp.Namespace),
+			client.MatchingLabels(constant.GetCompLabels(clusterName, compName)), multicluster.InDataContext()); err != nil {
+			return time.Time{}, err
+		}
+		if len(instances.Items) != int(*t.runningITS.Spec.Replicas) {
+			return time.Time{}, nil
+		}
+		for _, inst := range instances.Items {
+			if !intctrlutil.IsInstanceReady(&inst) {
+				return time.Time{}, nil
+			}
+			condition := meta.FindStatusCondition(inst.Status.Conditions, string(workloads.InstanceReady))
+			if condition.LastTransitionTime.IsZero() {
+				return time.Time{}, nil
+			}
+			if condition.LastTransitionTime.After(readyTime) {
+				readyTime = condition.LastTransitionTime.Time
+			}
+		}
+		return readyTime, nil
+	}
 	pods, err := component.ListOwnedInstances(transCtx.Context, transCtx.Client, t.comp, t.runningITS)
 	if err != nil {
 		return time.Time{}, err

@@ -224,6 +224,46 @@ var _ = Describe("component status transformer conditions", func() {
 			}
 		})
 
+		It("uses reported Instance readiness without reading Pods in Instance mode", func() {
+			runningITS.Spec.EnableInstanceAPI = ptr.To(true)
+			instances := make([]client.Object, 0, *runningITS.Spec.Replicas)
+			for i := int32(0); i < *runningITS.Spec.Replicas; i++ {
+				instances = append(instances, &workloads.Instance{
+					ObjectMeta: metav1.ObjectMeta{Namespace: comp.Namespace, Name: "instance-" + strconv.Itoa(int(i)), Generation: 1,
+						Labels: constant.GetCompLabels(clusterName, compName)},
+					Status: workloads.InstanceStatus2{ObservedGeneration: 1, Conditions: []metav1.Condition{{
+						Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue,
+						ObservedGeneration: 1, LastTransitionTime: metav1.Now(), Reason: workloads.ReasonReady,
+					}}},
+				})
+			}
+			podReads := 0
+			cli := fake.NewClientBuilder().WithScheme(model.GetScheme()).WithStatusSubresource(&workloads.Instance{}).
+				WithObjects(instances...).WithInterceptorFuncs(interceptor.Funcs{
+				List: func(ctx context.Context, c client.WithWatch, objects client.ObjectList, opts ...client.ListOption) error {
+					if _, ok := objects.(*corev1.PodList); ok {
+						podReads++
+						return errors.New("Instance mode must not list Pods")
+					}
+					return c.List(ctx, objects, opts...)
+				},
+			}).Build()
+			transCtx.Client = cli
+			failed, _, err := transformer.hasFailedPod(transCtx)
+			Expect(err).Should(Succeed())
+			Expect(failed).Should(BeFalse())
+			for _, object := range instances {
+				inst := &workloads.Instance{}
+				Expect(cli.Get(context.Background(), client.ObjectKeyFromObject(object), inst)).Should(Succeed())
+				inst.Status.Conditions[0].LastTransitionTime = metav1.NewTime(time.Now().Add(-2 * time.Minute))
+				Expect(cli.Status().Update(context.Background(), inst)).Should(Succeed())
+			}
+			failed, _, err = transformer.hasFailedPod(transCtx)
+			Expect(err).Should(Succeed())
+			Expect(failed).Should(BeTrue())
+			Expect(podReads).Should(BeZero())
+		})
+
 		DescribeTable("waits for the current ready runtime",
 			func(mutate func(*workloads.InstanceSet, []*corev1.Pod), wantFailure bool) {
 				if mutate != nil {

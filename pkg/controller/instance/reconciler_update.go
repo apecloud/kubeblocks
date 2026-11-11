@@ -50,14 +50,18 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
-	if model.IsReconciliationPaused(tree.GetRoot()) {
-		return kubebuilderx.ConditionUnsatisfied
-	}
 	return kubebuilderx.ConditionSatisfied
 }
 
 func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	inst := tree.GetRoot().(*workloads.Instance)
+	result := kubebuilderx.Continue
+	if inst.Spec.MinReadySeconds > 0 && inst.Status.Ready && !inst.Status.Available {
+		result = kubebuilderx.RetryAfter(time.Second)
+	}
+	if model.IsReconciliationPaused(inst) {
+		return result, nil
+	}
 
 	newNameSet := sets.New[string](podName(inst))
 	oldNameSet := sets.New[string]()
@@ -69,12 +73,12 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	updateNameSet := oldNameSet.Intersection(newNameSet)
 	if len(updateNameSet) != len(oldNameSet) || len(updateNameSet) != len(newNameSet) {
 		tree.Logger.Info(fmt.Sprintf("Instance %s/%s is not aligned", inst.Namespace, inst.Name))
-		return kubebuilderx.Continue, nil
+		return result, nil
 	}
 
 	// do nothing if update strategy type is 'OnDelete'
 	if inst.Spec.InstanceUpdateStrategyType != nil && *inst.Spec.InstanceUpdateStrategyType == kbappsv1.OnDeleteStrategyType {
-		return kubebuilderx.Continue, nil
+		return result, nil
 	}
 
 	// treat old and Pending pod as a special case, as they can be updated without a consequence
@@ -187,10 +191,10 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if !isBlocked {
 		meta.RemoveStatusCondition(&inst.Status.Conditions, string(workloads.InstanceUpdateRestricted))
 	}
-	if needRetry {
+	if needRetry && result == kubebuilderx.Continue {
 		return kubebuilderx.RetryAfter(time.Second * time.Duration(inst.Spec.MinReadySeconds)), nil
 	}
-	return kubebuilderx.Continue, nil
+	return result, nil
 }
 
 func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod) error {

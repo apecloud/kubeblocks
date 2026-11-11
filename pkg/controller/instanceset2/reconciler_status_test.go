@@ -21,14 +21,11 @@ package instanceset2
 
 import (
 	"testing"
-	"time"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -176,7 +173,6 @@ func TestSetInstanceStatusReadsCurrentStateFromInstance(t *testing.T) {
 		{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue, ObservedGeneration: inst.Generation},
 		{Type: string(workloads.InstanceFailure), Status: metav1.ConditionTrue, ObservedGeneration: inst.Generation},
 	}
-	addITS2RuntimePodFixture(t, tree, inst)
 	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
 		t.Fatal(err)
 	}
@@ -298,7 +294,6 @@ func TestSetInstanceStatusKeepsRuntimeStateIndependentFromConvergence(t *testing
 		t.Fatal(err)
 	}
 
-	addITS2RuntimePodFixture(t, tree, inst)
 	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
 		t.Fatal(err)
 	}
@@ -756,7 +751,6 @@ func TestStatusReconcilerReadsCurrentRevisionFromInstanceStatus(t *testing.T) {
 		},
 	}
 
-	addITS2RuntimePodFixture(t, tree, inst)
 	if err := tree.Add(inst); err != nil {
 		t.Fatalf("add instance: %v", err)
 	}
@@ -1085,31 +1079,5 @@ func assertITS2UpToDate(t *testing.T, its *workloads.InstanceSet, name string, w
 	status := its.FindInstanceStatus(name)
 	if status == nil || status.UpToDate != want {
 		t.Fatalf("instance %s UpToDate = %#v, want %v", name, status, want)
-	}
-}
-
-func addITS2RuntimePodFixture(t *testing.T, tree *kubebuilderx.ObjectTree, inst *workloads.Instance) {
-	t.Helper()
-	inst.UID = types.UID(inst.Name)
-	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: inst.Name, Namespace: inst.Namespace,
-			Labels: map[string]string{appsv1.ControllerRevisionHashLabelKey: inst.Status.CurrentRevision},
-			OwnerReferences: []metav1.OwnerReference{{
-				APIVersion: workloads.GroupVersion.String(), Kind: "Instance", Name: inst.Name,
-				UID: inst.UID, Controller: ptr.To(true),
-			}},
-		},
-		Spec: *inst.Spec.Template.Spec.DeepCopy(),
-		Status: corev1.PodStatus{
-			Phase:      corev1.PodRunning,
-			Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: metav1.NewTime(time.Now().Add(-time.Hour))}},
-		},
-	}
-	for _, container := range pod.Spec.Containers {
-		pod.Status.ContainerStatuses = append(pod.Status.ContainerStatuses, corev1.ContainerStatus{Name: container.Name, Image: container.Image, Ready: true})
-	}
-	if err := tree.Add(pod); err != nil {
-		t.Fatal(err)
 	}
 }

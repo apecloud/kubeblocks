@@ -25,8 +25,6 @@ import (
 	"sort"
 	"time"
 
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -43,20 +41,13 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-func NewStatusReconciler() *statusReconciler {
+func NewStatusReconciler() kubebuilderx.Reconciler {
 	return &statusReconciler{}
 }
 
-type statusReconciler struct {
-	requeueAfter time.Duration
-}
+type statusReconciler struct{}
 
 var _ kubebuilderx.Reconciler = &statusReconciler{}
-
-// RequeueAfter reports a pending availability wait without stopping later reconciliation steps.
-func (r *statusReconciler) RequeueAfter() time.Duration {
-	return r.requeueAfter
-}
 
 func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
@@ -66,18 +57,14 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 }
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
-	r.requeueAfter = 0
 	its := tree.GetRoot().(*workloads.InstanceSet)
 	previous := append([]metav1.Condition(nil), its.Status.Conditions...)
-	pending, err := reconcileReadiness(tree)
+	err := reconcileReadiness(tree)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
 	if instancestatus.ReadinessConditionsChanged(previous, its.Status.Conditions) {
 		return kubebuilderx.RetryAfter(time.Millisecond), nil
-	}
-	if pending {
-		r.requeueAfter = time.Second
 	}
 	if !model.IsObjectStatusUpdating(its) {
 		return kubebuilderx.Continue, nil
@@ -86,40 +73,24 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	return kubebuilderx.Continue, err
 }
 
-func reconcileReadiness(tree *kubebuilderx.ObjectTree) (bool, error) {
+func reconcileReadiness(tree *kubebuilderx.ObjectTree) error {
 	its := tree.GetRoot().(*workloads.InstanceSet)
 	assignments, _, err := instancetemplate.BuildAssignments(tree, its)
 	health := make(map[string]instancestatus.Health)
 	for _, object := range tree.List(&workloads.Instance{}) {
 		inst := object.(*workloads.Instance)
-		health[inst.Name] = instanceReadiness(tree, its, inst)
+		health[inst.Name] = instanceReadiness(its, inst)
 	}
 	return instancestatus.SetReadinessConditions(its, assignments, health, err)
 }
 
-func instanceReadiness(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, inst *workloads.Instance) instancestatus.Health {
+func instanceReadiness(its *workloads.InstanceSet, inst *workloads.Instance) instancestatus.Health {
 	if inst.Status.CurrentState != workloads.InstanceCurrentStatePresent || !intctrlutil.IsInstanceReady(inst) {
 		return instancestatus.Health{}
 	}
-	var runtimePod *corev1.Pod
-	for _, object := range tree.List(&corev1.Pod{}) {
-		pod := object.(*corev1.Pod)
-		owner := metav1.GetControllerOf(pod)
-		if inst.UID == "" || owner == nil || owner.UID != inst.UID || owner.Kind != "Instance" ||
-			pod.Labels[appsv1.ControllerRevisionHashLabelKey] != inst.Status.CurrentRevision {
-			continue
-		}
-		if runtimePod != nil {
-			return instancestatus.Health{Pending: true}
-		}
-		runtimePod = pod
-	}
-	if runtimePod == nil {
-		return instancestatus.Health{Pending: true}
-	}
-	health := instancestatus.PodHealth(runtimePod, its.Spec.MinReadySeconds)
-	health.Pending = !health.Ready
-	return health
+	available := its.Spec.MinReadySeconds == 0 ||
+		(inst.Spec.MinReadySeconds >= its.Spec.MinReadySeconds && intctrlutil.IsInstanceAvailable(inst))
+	return instancestatus.Health{Ready: true, Available: available}
 }
 
 func (r *statusReconciler) reconcileStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
@@ -174,7 +145,7 @@ func (r *statusReconciler) reconcileStatus(tree *kubebuilderx.ObjectTree) (kubeb
 			replicas++
 			template2TemplatesStatus[templateName].Replicas++
 		}
-		health := instanceReadiness(tree, its, inst)
+		health := instanceReadiness(its, inst)
 		if health.Ready {
 			readyReplicas++
 			template2TemplatesStatus[templateName].ReadyReplicas++
@@ -448,7 +419,7 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		case workloads.InstanceCurrentStatePresent, workloads.InstanceCurrentStateTerminating:
 			// InstanceSet revisions identify desired Instance specs, while Instance CurrentRevision identifies the
 			// actual Pod revision. Keep the two revision domains separate.
-			health := instanceReadiness(tree, its, inst)
+			health := instanceReadiness(its, inst)
 			instanceSpecRevision := getInstanceRevision(inst)
 			observation := instancestatus.Observation{
 				InstanceName:    inst.Name,

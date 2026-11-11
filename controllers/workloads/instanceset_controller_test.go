@@ -90,16 +90,16 @@ var _ = Describe("InstanceSet configured readiness", func() {
 							Spec: workloads.InstanceSpec{Template: *its.Spec.Template.DeepCopy()},
 							Status: workloads.InstanceStatus2{ObservedGeneration: 1, CurrentState: workloads.InstanceCurrentStatePresent,
 								Ready: true, Available: true, Conditions: []metav1.Condition{{Type: string(workloads.InstanceReady),
-									Status: metav1.ConditionTrue, ObservedGeneration: 1}}}}
-						pod.OwnerReferences = []metav1.OwnerReference{{APIVersion: workloads.GroupVersion.String(), Kind: "Instance", Name: name, UID: inst.UID, Controller: ptr.To(true)}}
+									Status: metav1.ConditionTrue, ObservedGeneration: 1}, {Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue, ObservedGeneration: 1}}}}
 						Expect(tree.Add(inst)).Should(Succeed())
+						continue
 					}
 					Expect(tree.Add(pod)).Should(Succeed())
 				}
 				return its, tree
 			}
 			reconcile := func(tree *kubebuilderx.ObjectTree) {
-				var r kubebuilderx.Reconciler = instanceset.NewStatusReconciler()
+				r := instanceset.NewStatusReconciler()
 				if instanceAPI {
 					r = instanceset2.NewStatusReconciler()
 				}
@@ -174,6 +174,7 @@ var _ = Describe("InstanceSet configured readiness", func() {
 					inst := object.(*workloads.Instance)
 					inst.Spec.MinReadySeconds = 7200
 					inst.Status.Available = false
+					meta.SetStatusCondition(&inst.Status.Conditions, metav1.Condition{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionFalse, Reason: "NotAvailable"})
 				}
 				reconcile(tree)
 				Expect(ready().LastTransitionTime.Equal(&readyTime)).Should(BeTrue())
@@ -188,6 +189,12 @@ var _ = Describe("InstanceSet configured readiness", func() {
 				Expect(available().Status).Should(Equal(metav1.ConditionFalse))
 				for _, object := range tree.List(&corev1.Pod{}) {
 					object.(*corev1.Pod).Status.Conditions[0].LastTransitionTime = metav1.NewTime(time.Now().Add(-3 * time.Hour))
+				}
+				reconcile(tree)
+				for _, object := range tree.List(&workloads.Instance{}) {
+					inst := object.(*workloads.Instance)
+					inst.Status.Available = true
+					meta.SetStatusCondition(&inst.Status.Conditions, metav1.Condition{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue, Reason: "Available"})
 				}
 				reconcile(tree)
 				Expect(available().Status).Should(Equal(metav1.ConditionTrue))
@@ -207,6 +214,8 @@ var _ = Describe("InstanceSet configured readiness", func() {
 					inst := object.(*workloads.Instance)
 					if inst.Name == "demo-9" {
 						inst.Status.Conditions = append(inst.Status.Conditions, metav1.Condition{Type: string(workloads.InstanceFailure), Status: metav1.ConditionTrue})
+						inst.Status.Ready = false
+						meta.SetStatusCondition(&inst.Status.Conditions, metav1.Condition{Type: string(workloads.InstanceReady), Status: metav1.ConditionFalse, Reason: "NotReady"})
 					}
 				}
 				reconcile(tree)
@@ -236,6 +245,13 @@ var _ = Describe("InstanceSet configured readiness", func() {
 					if object.GetName() == "demo-0" {
 						now := metav1.Now()
 						object.SetDeletionTimestamp(&now)
+					}
+				}
+				for _, object := range tree.List(&workloads.Instance{}) {
+					if object.GetName() == "demo-0" {
+						now := metav1.Now()
+						object.SetDeletionTimestamp(&now)
+						object.(*workloads.Instance).Status.CurrentState = workloads.InstanceCurrentStateTerminating
 					}
 				}
 				reconcile(tree)
@@ -277,67 +293,43 @@ var _ = Describe("InstanceSet configured readiness", func() {
 				Expect(read().Status.ReadyReplicas).Should(Equal(int32(2)))
 			})
 
-			It("becomes Available on its scheduled retry without another object event", func() {
-				var cli client.Client
-				var parent func() (ctrl.Result, error)
-				if instanceAPI {
-					its := setStopFixture()
-					its.Spec.MinReadySeconds = 1
-					cli = newSetStopClient(GinkgoT(), its)
-					reconcileSetStop(GinkgoT(), cli, 5)
-					bindSetStopClaims(GinkgoT(), cli)
-					markSetStopPodsReady(GinkgoT(), cli)
-					for _, pod := range listSetStopPods(GinkgoT(), cli) {
-						pod.Status.Conditions[0].LastTransitionTime = metav1.Now()
-						Expect(cli.Status().Update(context.Background(), &pod)).Should(Succeed())
-					}
-					reconcileSetStop(GinkgoT(), cli, 5)
-					parent = func() (ctrl.Result, error) { return reconcileSetStopParent(cli) }
-				} else {
+			if !instanceAPI {
+				It("becomes Available on its scheduled retry without another object event", func() {
+					var cli client.Client
+					var parent func() (ctrl.Result, error)
+
 					cli = legacyStopRecoveryFixture(GinkgoT(), 2, 1)
 					legacyStopRecoveryReady(GinkgoT(), cli)
 					parent = func() (ctrl.Result, error) {
 						r := &InstanceSetReconciler{Client: cli, Scheme: cli.Scheme(), Recorder: record.NewFakeRecorder(100)}
 						return r.Reconcile(context.Background(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: "default", Name: "legacy-stop"}})
 					}
-				}
-				var its *workloads.InstanceSet
-				deadline := time.Now().Add(5 * time.Second)
-				for {
-					result, err := parent()
-					Expect(err).ShouldNot(HaveOccurred())
-					if instanceAPI {
-						its = readSetStop(GinkgoT(), cli)
-					} else {
-						its = legacyStopRecoverySet(GinkgoT(), cli)
-					}
-					if meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable)) {
-						break
-					}
-					Expect(result.RequeueAfter).Should(BeNumerically(">", 0))
-					Expect(result.RequeueAfter).Should(BeNumerically("<", time.Until(deadline)))
-					time.Sleep(result.RequeueAfter)
-				}
-				Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable))).Should(BeTrue())
-			})
 
-			DescribeTable("keeps availability wakeups for extra runtime while paused", func(target int32) {
-				var cli client.Client
-				var read func() *workloads.InstanceSet
-				var mutate func(func(*workloads.InstanceSet))
-				var parent func() (ctrl.Result, error)
-				var pods []corev1.Pod
-				if instanceAPI {
-					cli = newSetStopClient(GinkgoT(), setStopFixture())
-					reconcileSetStop(GinkgoT(), cli, 5)
-					bindSetStopClaims(GinkgoT(), cli)
-					markSetStopPodsReady(GinkgoT(), cli)
-					reconcileSetStop(GinkgoT(), cli, 5)
-					read = func() *workloads.InstanceSet { return readSetStop(GinkgoT(), cli) }
-					mutate = func(change func(*workloads.InstanceSet)) { mutateSetStop(GinkgoT(), cli, change) }
-					parent = func() (ctrl.Result, error) { return reconcileSetStopParent(cli) }
-					pods = listSetStopPods(GinkgoT(), cli)
-				} else {
+					var its *workloads.InstanceSet
+					deadline := time.Now().Add(5 * time.Second)
+					for {
+						result, err := parent()
+						Expect(err).ShouldNot(HaveOccurred())
+
+						its = legacyStopRecoverySet(GinkgoT(), cli)
+
+						if meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable)) {
+							break
+						}
+						Expect(result.RequeueAfter).Should(BeNumerically(">", 0))
+						Expect(result.RequeueAfter).Should(BeNumerically("<", time.Until(deadline)))
+						time.Sleep(result.RequeueAfter)
+					}
+					Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable))).Should(BeTrue())
+				})
+
+				DescribeTable("keeps availability wakeups for extra runtime while paused", func(target int32) {
+					var cli client.Client
+					var read func() *workloads.InstanceSet
+					var mutate func(func(*workloads.InstanceSet))
+					var parent func() (ctrl.Result, error)
+					var pods []corev1.Pod
+
 					cli = legacyStopRecoveryFixture(GinkgoT(), 2, 0)
 					legacyStopRecoveryReady(GinkgoT(), cli)
 					read = func() *workloads.InstanceSet { return legacyStopRecoverySet(GinkgoT(), cli) }
@@ -347,39 +339,41 @@ var _ = Describe("InstanceSet configured readiness", func() {
 						return r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(read())})
 					}
 					pods = legacyStopRecoveryPods(GinkgoT(), cli)
-				}
-				Expect(read().Status.AvailableReplicas).Should(Equal(int32(2)))
-				mutate(func(its *workloads.InstanceSet) {
-					its.Spec.Paused = true
-					its.Spec.Replicas = ptr.To(target)
-					its.Spec.MinReadySeconds = 3600
-				})
-				var extraName string
-				for i := range pods {
-					pod := &pods[i]
-					pod.Status.Conditions[0].LastTransitionTime = metav1.NewTime(time.Now().Add(-2 * time.Hour))
-					if strings.HasSuffix(pod.Name, "-1") {
-						pod.Status.Conditions[0].LastTransitionTime = metav1.Now()
-						extraName = pod.Name
+
+					Expect(read().Status.AvailableReplicas).Should(Equal(int32(2)))
+					mutate(func(its *workloads.InstanceSet) {
+						its.Spec.Paused = true
+						its.Spec.Replicas = ptr.To(target)
+						its.Spec.MinReadySeconds = 3600
+					})
+					var extraName string
+					for i := range pods {
+						pod := &pods[i]
+						pod.Status.Conditions[0].LastTransitionTime = metav1.NewTime(time.Now().Add(-2 * time.Hour))
+						if strings.HasSuffix(pod.Name, "-1") {
+							pod.Status.Conditions[0].LastTransitionTime = metav1.Now()
+							extraName = pod.Name
+						}
+						Expect(cli.Status().Update(context.Background(), pod)).Should(Succeed())
 					}
-					Expect(cli.Status().Update(context.Background(), pod)).Should(Succeed())
-				}
-				Expect(extraName).ShouldNot(BeEmpty())
-				var result ctrl.Result
-				for i := 0; i < 5; i++ {
-					var err error
-					result, err = parent()
-					Expect(err).ShouldNot(HaveOccurred())
-				}
-				its := read()
-				Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceReady))).Should(BeTrue())
-				Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable))).Should(BeTrue())
-				Expect(its.Status.Replicas).Should(Equal(int32(2)))
-				Expect(its.Status.ReadyReplicas).Should(Equal(int32(2)))
-				Expect(its.Status.AvailableReplicas).Should(Equal(int32(1)))
-				Expect(its.FindInstanceStatus(extraName).Available).Should(BeFalse())
-				Expect(result.RequeueAfter).Should(BeNumerically(">", 0))
-			}, Entry("positive target with an extra", int32(1)), Entry("zero target with extras", int32(0)))
+					Expect(extraName).ShouldNot(BeEmpty())
+					var result ctrl.Result
+					for i := 0; i < 5; i++ {
+						var err error
+						result, err = parent()
+						Expect(err).ShouldNot(HaveOccurred())
+					}
+					its := read()
+					Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceReady))).Should(BeTrue())
+					Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable))).Should(BeTrue())
+					Expect(its.Status.Replicas).Should(Equal(int32(2)))
+					Expect(its.Status.ReadyReplicas).Should(Equal(int32(2)))
+					Expect(its.Status.AvailableReplicas).Should(Equal(int32(1)))
+					Expect(its.FindInstanceStatus(extraName).Available).Should(BeFalse())
+					Expect(result.RequeueAfter).Should(BeNumerically(">", 0))
+				}, Entry("positive target with an extra", int32(1)), Entry("zero target with extras", int32(0)))
+			}
+
 		})
 	}
 })

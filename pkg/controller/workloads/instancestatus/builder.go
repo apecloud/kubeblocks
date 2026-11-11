@@ -71,7 +71,6 @@ type Input struct {
 type Health struct {
 	Ready     bool
 	Available bool
-	Pending   bool
 }
 
 // PodHealth observes runtime health using the current parent's availability policy.
@@ -95,10 +94,10 @@ func PodHealth(pod *corev1.Pod, minReadySeconds int32) Health {
 }
 
 // SetReadinessConditions evaluates configured identities independently of extra runtime objects.
-func SetReadinessConditions(its *workloads.InstanceSet, assignments []instancetemplate.Assignment, health map[string]Health, assignmentErr error) (bool, error) {
+func SetReadinessConditions(its *workloads.InstanceSet, assignments []instancetemplate.Assignment, health map[string]Health, assignmentErr error) error {
 	if assignmentErr != nil {
 		if !instancetemplate.IsAssignmentIncomplete(assignmentErr) {
-			return false, assignmentErr
+			return assignmentErr
 		}
 		for _, kind := range []workloads.ConditionType{workloads.InstanceReady, workloads.InstanceAvailable} {
 			meta.SetStatusCondition(&its.Status.Conditions, metav1.Condition{
@@ -106,13 +105,9 @@ func SetReadinessConditions(its *workloads.InstanceSet, assignments []instancete
 				Reason: "AssignmentIncomplete", Message: assignmentErr.Error(),
 			})
 		}
-		return false, nil
+		return nil
 	}
 	var notReady, notAvailable []string
-	pending := false
-	for _, member := range health {
-		pending = pending || member.Pending || member.Ready && !member.Available
-	}
 	for _, assignment := range assignments {
 		member := health[assignment.InstanceName]
 		if !member.Ready {
@@ -137,13 +132,13 @@ func SetReadinessConditions(its *workloads.InstanceSet, assignments []instancete
 			condition.Reason = result.failureReason
 			message, err := json.Marshal(result.unhealthy)
 			if err != nil {
-				return false, err
+				return err
 			}
 			condition.Message = string(message)
 		}
 		meta.SetStatusCondition(&its.Status.Conditions, condition)
 	}
-	return pending, nil
+	return nil
 }
 
 // ReadinessConditionsChanged identifies observations that must persist before child changes.

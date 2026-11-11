@@ -127,7 +127,10 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	inst.Status.Configs = configs
 
 	if !stopped && inst.Spec.MinReadySeconds > 0 && !available {
-		return kubebuilderx.RetryAfter(time.Second), nil
+		if ready {
+			return kubebuilderx.RetryAfter(time.Second), nil
+		}
+		return kubebuilderx.ContinueWithRetryAfter(time.Second), nil
 	}
 	return kubebuilderx.Continue, nil
 }

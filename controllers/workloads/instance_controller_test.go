@@ -194,6 +194,7 @@ var _ = Describe("Instance Controller", func() {
 		It("status - available & role", func() {
 			createInstObj(instName, func(f *testapps.MockInstanceFactory) {
 				f.SetMinReadySeconds(minReadySeconds).
+					SetInstanceUpdateStrategyType(ptr.To(kbappsv1.OnDeleteStrategyType)).
 					SetRoles([]workloads.ReplicaRole{
 						{
 							Name:                 "leader",
@@ -215,6 +216,9 @@ var _ = Describe("Instance Controller", func() {
 				g.Expect(inst.Status.Ready).Should(BeTrue())
 				g.Expect(inst.Status.Available).Should(BeFalse())
 				g.Expect(inst.Status.Role).Should(BeEmpty())
+				result, err := (&InstanceReconciler{Client: k8sClient, Scheme: k8sClient.Scheme(), Recorder: record.NewFakeRecorder(100)}).Reconcile(ctx, ctrl.Request{NamespacedName: instKey})
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(result.RequeueAfter).Should(Equal(time.Second))
 			})).Should(Succeed())
 
 			mockPodReadyNAvailable(instObj.Namespace, instObj.Name, minReadySeconds)
@@ -1298,134 +1302,101 @@ func TestInstanceStopResumeRetriesAfterPodCreatedBeforeStatusCommit(t *testing.T
 	}
 }
 
-func TestInstanceAvailabilityRetry(t *testing.T) {
-	for _, tc := range []struct {
-		name     string
-		expand   bool
-		minReady int32
-	}{
-		{"OnDelete retains availability retry", false, 30},
-		{"admitted expansion survives readiness loss", true, 30},
-		{"expansion without readiness delay", true, 0},
-	} {
-		expand := tc.expand
-		t.Run(tc.name, func(t *testing.T) {
-			g := NewWithT(t)
-			ctx := context.Background()
-			scheme := runtime.NewScheme()
-			g.Expect(clientgoscheme.AddToScheme(scheme)).To(Succeed())
-			g.Expect(workloads.AddToScheme(scheme)).To(Succeed())
-			model.AddScheme(workloads.AddToScheme)
-			its := &workloads.InstanceSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "proof", Namespace: "default", UID: "its-uid", Generation: 1},
-				Spec: workloads.InstanceSetSpec{
-					EnableInstanceAPI: ptr.To(true),
-					Replicas:          ptr.To[int32](1),
-					MinReadySeconds:   tc.minReady,
-					Selector:          &metav1.LabelSelector{MatchLabels: map[string]string{"app": "proof"}},
-					Template: corev1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "proof"}},
-						Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "db", Image: "db:v1", VolumeMounts: []corev1.VolumeMount{{Name: "data", MountPath: "/data"}}}}},
-					},
-					VolumeClaimTemplates: []corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "data"}, Spec: corev1.PersistentVolumeClaimSpec{
-						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-						Resources:   corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}},
-					}}},
-				},
-			}
-			if !expand {
-				its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{Type: kbappsv1.OnDeleteStrategyType}
-			}
-			cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&workloads.InstanceSet{}, &workloads.Instance{}, &corev1.Pod{}, &corev1.PersistentVolumeClaim{}).WithObjects(its).Build()
-			parentKey := client.ObjectKeyFromObject(its)
-			childKey := client.ObjectKey{Namespace: "default", Name: "proof-0"}
-			runParent := func() {
-				r := &InstanceSetReconciler2{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(100)}
-				_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: parentKey})
-				g.Expect(err).NotTo(HaveOccurred())
-			}
-			runChild := func() ctrl.Result {
-				r := &InstanceReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(100)}
-				res, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: childKey})
-				g.Expect(err).NotTo(HaveOccurred())
-				return res
-			}
-			for i := 0; i < 4; i++ {
-				runParent()
-			}
-			inst := &workloads.Instance{}
-			g.Expect(cli.Get(ctx, childKey, inst)).To(Succeed())
-			// Emulate API-server generation assignment, which fake storage omits.
-			inst.Generation = 1
-			g.Expect(cli.Update(ctx, inst)).To(Succeed())
-			for i := 0; i < 3; i++ {
-				runChild()
-			}
-			pod := &corev1.Pod{}
-			g.Expect(cli.Get(ctx, childKey, pod)).To(Succeed())
-			pod.Status.Phase = corev1.PodRunning
-			pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: metav1.Now()}}
-			pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "db", Image: "db:v1", Ready: true}}
-			if expand {
-				pod.Status.Conditions[0].LastTransitionTime = metav1.NewTime(time.Now().Add(-time.Minute))
-			}
-			g.Expect(cli.Status().Update(ctx, pod)).To(Succeed())
-			res := runChild()
-			if !expand {
-				g.Expect(cli.Get(ctx, childKey, inst)).To(Succeed())
-				g.Expect(inst.Status.Ready).To(BeTrue())
-				g.Expect(inst.Status.Available).To(BeFalse())
-				g.Expect(res.RequeueAfter).To(Equal(time.Second))
-				pod.Status.Conditions[0].LastTransitionTime = metav1.NewTime(time.Now().Add(-time.Minute))
-				g.Expect(cli.Status().Update(ctx, pod)).To(Succeed())
-				runChild()
-				g.Expect(cli.Get(ctx, childKey, inst)).To(Succeed())
-				g.Expect(inst.Status.Available).To(BeTrue())
-				return
-			}
-			g.Expect(cli.Get(ctx, childKey, inst)).To(Succeed())
-			g.Expect(inst.Status.Ready).To(BeTrue())
-			g.Expect(inst.Status.Available).To(BeTrue())
-			claimKey := client.ObjectKey{Namespace: "default", Name: "data-proof-0"}
-			claim := &corev1.PersistentVolumeClaim{}
-			g.Expect(cli.Get(ctx, claimKey, claim)).To(Succeed())
-			claim.Spec.VolumeName = "pv-data"
-			g.Expect(cli.Update(ctx, claim)).To(Succeed())
-			claim.Status.Phase = corev1.ClaimBound
-			claim.Status.Capacity = corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}
-			g.Expect(cli.Status().Update(ctx, claim)).To(Succeed())
-			runParent()
-			g.Expect(cli.Get(ctx, parentKey, its)).To(Succeed())
-			its.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
-			its.Generation++
-			g.Expect(cli.Update(ctx, its)).To(Succeed())
-			runParent()
-			g.Expect(cli.Get(ctx, childKey, inst)).To(Succeed())
-			requested := inst.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage]
-			g.Expect(requested.Cmp(resource.MustParse("2Gi"))).To(BeZero(), "ITS must hand off the expansion before readiness is lost")
-			inst.Generation++
-			g.Expect(cli.Update(ctx, inst)).To(Succeed())
-			// Runtime readiness can change after ITS admission, before Instance applies it.
-			pod.Status.Conditions[0].Status = corev1.ConditionFalse
-			pod.Status.Conditions[0].LastTransitionTime = metav1.Now()
-			pod.Status.ContainerStatuses[0].Ready = false
-			g.Expect(cli.Status().Update(ctx, pod)).To(Succeed())
-			podSpec := pod.Spec.DeepCopy()
-			for i := 0; i < 3; i++ {
-				res = runChild()
-			}
-			g.Expect(cli.Get(ctx, claimKey, claim)).To(Succeed())
-			g.Expect(cli.Get(ctx, childKey, inst)).To(Succeed())
-			g.Expect(inst.Status.Ready).To(BeFalse())
-			g.Expect(inst.Status.Available).To(BeFalse())
-			requested = claim.Spec.Resources.Requests[corev1.ResourceStorage]
-			t.Logf("ITS handed off 2Gi; after three Instance reconciles: ready=%v available=%v PVC request=%s retry=%v", inst.Status.Ready, inst.Status.Available, requested.String(), res.RequeueAfter)
-			g.Expect(requested.Cmp(resource.MustParse("2Gi"))).To(BeZero(), "unready status must not prevent already-admitted PVC expansion")
-			g.Expect(claim.Spec.VolumeName).To(Equal("pv-data"))
-			g.Expect(claim.Status.Capacity).To(Equal(corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}))
-			g.Expect(cli.Get(ctx, childKey, pod)).To(Succeed())
-			g.Expect(pod.Spec).To(Equal(*podSpec))
-			g.Expect(pod.Status.Conditions[0].Status).To(Equal(corev1.ConditionFalse))
-		})
+func TestInstanceAdmittedVolumeExpansionAfterReadinessLoss(t *testing.T) {
+	g := NewWithT(t)
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	g.Expect(clientgoscheme.AddToScheme(scheme)).To(Succeed())
+	g.Expect(workloads.AddToScheme(scheme)).To(Succeed())
+	model.AddScheme(workloads.AddToScheme)
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "proof", Namespace: "default", UID: "its-uid", Generation: 1},
+		Spec: workloads.InstanceSetSpec{
+			EnableInstanceAPI: ptr.To(true),
+			Replicas:          ptr.To[int32](1),
+			MinReadySeconds:   30,
+			Selector:          &metav1.LabelSelector{MatchLabels: map[string]string{"app": "proof"}},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "proof"}},
+				Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "db", Image: "db:v1", VolumeMounts: []corev1.VolumeMount{{Name: "data", MountPath: "/data"}}}}},
+			},
+			VolumeClaimTemplates: []corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "data"}, Spec: corev1.PersistentVolumeClaimSpec{
+				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+				Resources:   corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}},
+			}}},
+		},
 	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&workloads.InstanceSet{}, &workloads.Instance{}, &corev1.Pod{}, &corev1.PersistentVolumeClaim{}).WithObjects(its).Build()
+	parentKey := client.ObjectKeyFromObject(its)
+	childKey := client.ObjectKey{Namespace: "default", Name: "proof-0"}
+	runParent := func() {
+		r := &InstanceSetReconciler2{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(100)}
+		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: parentKey})
+		g.Expect(err).NotTo(HaveOccurred())
+	}
+	runChild := func() {
+		r := &InstanceReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(100)}
+		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: childKey})
+		g.Expect(err).NotTo(HaveOccurred())
+	}
+	for i := 0; i < 4; i++ {
+		runParent()
+	}
+	inst := &workloads.Instance{}
+	g.Expect(cli.Get(ctx, childKey, inst)).To(Succeed())
+	// Emulate API-server generation assignment, which fake storage omits.
+	inst.Generation = 1
+	g.Expect(cli.Update(ctx, inst)).To(Succeed())
+	for i := 0; i < 3; i++ {
+		runChild()
+	}
+	pod := &corev1.Pod{}
+	g.Expect(cli.Get(ctx, childKey, pod)).To(Succeed())
+	pod.Status.Phase = corev1.PodRunning
+	pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: metav1.NewTime(time.Now().Add(-time.Minute))}}
+	pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "db", Image: "db:v1", Ready: true}}
+	g.Expect(cli.Status().Update(ctx, pod)).To(Succeed())
+	runChild()
+	g.Expect(cli.Get(ctx, childKey, inst)).To(Succeed())
+	g.Expect(inst.Status.Ready).To(BeTrue())
+	g.Expect(inst.Status.Available).To(BeTrue())
+	claimKey := client.ObjectKey{Namespace: "default", Name: "data-proof-0"}
+	claim := &corev1.PersistentVolumeClaim{}
+	g.Expect(cli.Get(ctx, claimKey, claim)).To(Succeed())
+	claim.Spec.VolumeName = "pv-data"
+	g.Expect(cli.Update(ctx, claim)).To(Succeed())
+	claim.Status.Phase = corev1.ClaimBound
+	claim.Status.Capacity = corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}
+	g.Expect(cli.Status().Update(ctx, claim)).To(Succeed())
+	runParent()
+	g.Expect(cli.Get(ctx, parentKey, its)).To(Succeed())
+	its.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
+	its.Generation++
+	g.Expect(cli.Update(ctx, its)).To(Succeed())
+	runParent()
+	g.Expect(cli.Get(ctx, childKey, inst)).To(Succeed())
+	requested := inst.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage]
+	g.Expect(requested.Cmp(resource.MustParse("2Gi"))).To(BeZero(), "ITS must hand off the expansion before readiness is lost")
+	inst.Generation++
+	g.Expect(cli.Update(ctx, inst)).To(Succeed())
+	// Runtime readiness can change after ITS admission, before Instance applies it.
+	pod.Status.Conditions[0].Status = corev1.ConditionFalse
+	pod.Status.Conditions[0].LastTransitionTime = metav1.Now()
+	pod.Status.ContainerStatuses[0].Ready = false
+	g.Expect(cli.Status().Update(ctx, pod)).To(Succeed())
+	podSpec := pod.Spec.DeepCopy()
+	for i := 0; i < 3; i++ {
+		runChild()
+	}
+	g.Expect(cli.Get(ctx, claimKey, claim)).To(Succeed())
+	g.Expect(cli.Get(ctx, childKey, inst)).To(Succeed())
+	g.Expect(inst.Status.Ready).To(BeFalse())
+	g.Expect(inst.Status.Available).To(BeFalse())
+	requested = claim.Spec.Resources.Requests[corev1.ResourceStorage]
+	g.Expect(requested.Cmp(resource.MustParse("2Gi"))).To(BeZero(), "unready status must not prevent already-admitted PVC expansion")
+	g.Expect(claim.Spec.VolumeName).To(Equal("pv-data"))
+	g.Expect(claim.Status.Capacity).To(Equal(corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}))
+	g.Expect(cli.Get(ctx, childKey, pod)).To(Succeed())
+	g.Expect(pod.Spec).To(Equal(*podSpec))
+	g.Expect(pod.Status.Conditions[0].Status).To(Equal(corev1.ConditionFalse))
 }

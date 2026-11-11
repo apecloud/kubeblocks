@@ -93,7 +93,15 @@ func (r *InstanceSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// TODO(free6om): handle error based on ErrorCode (after defined)
 
-	return withStatusRetry(res, err, status.RequeueAfter())
+	after := status.RequeueAfter()
+	if err != nil || after <= 0 || (res.Requeue && res.RequeueAfter <= 0) {
+		return res, err
+	}
+	if res.RequeueAfter <= 0 || after < res.RequeueAfter {
+		res.Requeue = true
+		res.RequeueAfter = after
+	}
+	return res, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

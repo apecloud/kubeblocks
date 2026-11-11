@@ -89,7 +89,15 @@ func (r *InstanceSetReconciler2) Reconcile(ctx context.Context, req ctrl.Request
 		Do(instanceset2.NewAlignmentReconciler()).
 		Do(instanceset2.NewUpdateReconciler()).
 		Commit()
-	return withStatusRetry(res, err, status.RequeueAfter())
+	after := status.RequeueAfter()
+	if err != nil || after <= 0 || (res.Requeue && res.RequeueAfter <= 0) {
+		return res, err
+	}
+	if res.RequeueAfter <= 0 || after < res.RequeueAfter {
+		res.Requeue = true
+		res.RequeueAfter = after
+	}
+	return res, nil
 }
 
 func (r *InstanceSetReconciler2) SetupWithManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {

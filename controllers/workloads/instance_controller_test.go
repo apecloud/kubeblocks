@@ -1342,26 +1342,13 @@ func TestInstanceAdmittedVolumeExpansionAfterReadinessLoss(t *testing.T) {
 	g.Expect(clientgoscheme.AddToScheme(scheme)).To(Succeed())
 	g.Expect(workloads.AddToScheme(scheme)).To(Succeed())
 	model.AddScheme(workloads.AddToScheme)
-	its := &workloads.InstanceSet{
-		ObjectMeta: metav1.ObjectMeta{Name: "proof", Namespace: "default", UID: "its-uid", Generation: 1},
-		Spec: workloads.InstanceSetSpec{
-			EnableInstanceAPI: ptr.To(true),
-			Replicas:          ptr.To[int32](1),
-			MinReadySeconds:   30,
-			Selector:          &metav1.LabelSelector{MatchLabels: map[string]string{"app": "proof"}},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "proof"}},
-				Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "db", Image: "db:v1", VolumeMounts: []corev1.VolumeMount{{Name: "data", MountPath: "/data"}}}}},
-			},
-			VolumeClaimTemplates: []corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "data"}, Spec: corev1.PersistentVolumeClaimSpec{
-				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-				Resources:   corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}},
-			}}},
-		},
-	}
+	its := setStopFixture()
+	its.Spec.Replicas = ptr.To[int32](1)
+	its.Spec.MinReadySeconds = 30
+	its.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: "data", MountPath: "/data"}}
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&workloads.InstanceSet{}, &workloads.Instance{}, &corev1.Pod{}, &corev1.PersistentVolumeClaim{}).WithObjects(its).Build()
 	parentKey := client.ObjectKeyFromObject(its)
-	childKey := client.ObjectKey{Namespace: "default", Name: "proof-0"}
+	childKey := client.ObjectKey{Namespace: "default", Name: "demo-0"}
 	runParent := func() {
 		r := &InstanceSetReconciler2{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(100)}
 		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: parentKey})
@@ -1393,7 +1380,7 @@ func TestInstanceAdmittedVolumeExpansionAfterReadinessLoss(t *testing.T) {
 	g.Expect(cli.Get(ctx, childKey, inst)).To(Succeed())
 	g.Expect(inst.Status.Ready).To(BeTrue())
 	g.Expect(inst.Status.Available).To(BeTrue())
-	claimKey := client.ObjectKey{Namespace: "default", Name: "data-proof-0"}
+	claimKey := client.ObjectKey{Namespace: "default", Name: "data-demo-0"}
 	claim := &corev1.PersistentVolumeClaim{}
 	g.Expect(cli.Get(ctx, claimKey, claim)).To(Succeed())
 	claim.Spec.VolumeName = "pv-data"

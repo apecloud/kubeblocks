@@ -20,10 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"time"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -31,18 +36,14 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-// instanceAlignmentReconciler is responsible for aligning the actual instances(pods) with the desired replicas specified in the spec,
-// including horizontal scaling and recovering from unintended pod deletions etc.
-// only handle instance count, don't care instance revision.
-//
-// TODO(free6om): support membership reconfiguration
-type instanceAlignmentReconciler struct{}
+type instanceAlignmentReconciler struct{ reader client.Reader }
 
-func NewReplicasAlignmentReconciler() kubebuilderx.Reconciler {
-	return &instanceAlignmentReconciler{}
+func NewReplicasAlignmentReconciler(reader client.Reader) kubebuilderx.Reconciler {
+	return &instanceAlignmentReconciler{reader: reader}
 }
 
 func (r *instanceAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
@@ -105,7 +106,6 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	// TODO(free6om): handle BestEffortParallel: always keep the majority available.
 
 	// 3. handle alignment (create new instances and delete useless instances)
-	// create new instances
 	newNameList := sets.List(newNameSet)
 	baseSort(newNameList, func(i int) (string, int) {
 		return parseParentNameAndOrdinal(newNameList[i])
@@ -125,9 +125,126 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 			}
 		}
 	}
+	retirementNames := deleteNameSet.Clone()
+	for _, status := range its.Status.InstanceStatus {
+		if !newNameSet.Has(status.PodName) && workloadlifecycle.NeedsMemberRetirement(its, &status) {
+			retirementNames.Insert(status.PodName)
+		}
+	}
+	for _, pvc := range tree.List(&corev1.PersistentVolumeClaim{}) {
+		name := pvc.GetLabels()[constant.KBAppPodNameLabelKey]
+		if name != "" && !newNameSet.Has(name) {
+			retirementNames.Insert(name)
+		}
+	}
+	retire := func(names sets.Set[string]) (kubebuilderx.Result, error) {
+		waiting := false
+		candidates := sets.List(names)
+		baseSort(candidates, func(i int) (string, int) {
+			return parseParentNameAndOrdinal(candidates[i])
+		}, nil, false)
+		retiredNames := sets.New[string]()
+		for _, name := range candidates {
+			pod := oldInstanceMap[name]
+			absent := pod == nil
+			if absent && !workloadlifecycle.NeedsMemberRetirement(its, its.FindInstanceStatus(name)) {
+				continue
+			}
+			if !isOrderedReady && concurrency <= 0 {
+				break
+			}
+			if isOrderedReady && !absent && !intctrlutil.IsPodReady(pod) {
+				tree.EventRecorder.Eventf(its, corev1.EventTypeWarning, "InstanceSet %s/%s is waiting for Pod %s to be Ready",
+					its.Namespace,
+					its.Name,
+					pod.Name)
+			}
+			if workloadlifecycle.Enabled(its) && !isStopRequested(its) {
+				if workloadlifecycle.RetirementBlocked(its, its.FindInstanceStatus(name)) {
+					waiting = true
+					continue
+				}
+				if workloadlifecycle.NeedsMemberRetirement(its, its.FindInstanceStatus(name)) {
+					if absent {
+						pod = &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: its.Namespace}}
+					}
+					return reconcileMember(tree, its, pod, false, r.reader)
+				}
+			}
+			if absent {
+				continue
+			}
+			if err := tree.Delete(pod); err != nil {
+				return kubebuilderx.Continue, err
+			}
+			if workloadlifecycle.Enabled(its) {
+				return kubebuilderx.RetryAfter(time.Second), nil
+			}
+
+			retiredNames.Insert(pod.Name)
+
+			if isOrderedReady {
+				break
+			}
+			concurrency--
+		}
+
+		retentionPolicy := its.Spec.PersistentVolumeClaimRetentionPolicy
+		retireClaims := !isStopRequested(its) && (retentionPolicy == nil || retentionPolicy.WhenScaled != kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType)
+		if retireClaims {
+			for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
+				name := obj.GetLabels()[constant.KBAppPodNameLabelKey]
+				if name == "" || !names.Has(name) {
+					continue
+				}
+				if workloadlifecycle.Enabled(its) && workloadlifecycle.RetirementBlocked(its, its.FindInstanceStatus(name)) {
+					waiting = true
+					continue
+				}
+				if workloadlifecycle.Enabled(its) && workloadlifecycle.NeedsMemberRetirement(its, its.FindInstanceStatus(name)) {
+					continue
+				}
+				if retiredNames.Has(name) || (!oldNameSet.Has(name) && metav1.IsControlledBy(obj, its)) {
+					if err := tree.Delete(obj); err != nil {
+						return kubebuilderx.Continue, err
+					}
+				}
+			}
+		}
+
+		if waiting {
+			return kubebuilderx.RetryAfter(time.Second), nil
+		}
+		return kubebuilderx.Continue, nil
+	}
+	if workloadlifecycle.Enabled(its) && !isStopRequested(its) {
+		independentNames := sets.New[string]()
+		for name := range retirementNames {
+			status := its.FindInstanceStatus(name)
+			if status != nil && !workloadlifecycle.NeedsLeave(its, status) && (status.MemberJoined != nil && !*status.MemberJoined) {
+				independentNames.Insert(name)
+			}
+		}
+		if result, err := retire(independentNames); err != nil || result != kubebuilderx.Continue {
+			return result, err
+		}
+	}
+
+	runtimeChanged := false
+	memberWaiting := false
 	var currentAlignedNameList []string
 	for i, name := range newNameList {
 		if _, ok := createNameSet[name]; !ok {
+			pod := oldInstanceMap[name]
+			if !runtimeChanged && !memberWaiting {
+				if result, err := reconcileMember(tree, its, pod, true, r.reader); err != nil || result != kubebuilderx.Continue {
+					if status := its.FindInstanceStatus(name); err == nil && status != nil && status.MemberJoined != nil && !*status.MemberJoined {
+						memberWaiting = true
+					} else {
+						return result, err
+					}
+				}
+			}
 			currentAlignedNameList = append(currentAlignedNameList, name)
 			continue
 		}
@@ -146,6 +263,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if err := tree.Add(newPod); err != nil {
 			return kubebuilderx.Continue, err
 		}
+		runtimeChanged = true
 		currentAlignedNameList = append(currentAlignedNameList, name)
 
 		if isOrderedReady {
@@ -168,6 +286,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 			case err != nil:
 				return kubebuilderx.Continue, err
 			case oldPvc == nil:
+				runtimeChanged = true
 				if err = tree.Add(pvc); err != nil {
 					return kubebuilderx.Continue, err
 				}
@@ -177,6 +296,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 					if err := tryTakeOverExternalPVC(its, pvcObj.(*corev1.PersistentVolumeClaim)); err != nil {
 						return kubebuilderx.Continue, err
 					}
+					runtimeChanged = runtimeChanged || !equality.Semantic.DeepEqual(oldPvc, pvcObj)
 					if err = tree.Update(pvcObj); err != nil {
 						return kubebuilderx.Continue, err
 					}
@@ -185,52 +305,19 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		}
 	}
 
-	// delete useless instances
-	retiredNames := sets.New[string]()
-	priorities := make(map[string]int)
-	sortObjects(oldInstanceList, priorities, false)
-	for _, object := range oldInstanceList {
-		pod, _ := object.(*corev1.Pod)
-		if _, ok := deleteNameSet[pod.Name]; !ok {
-			continue
-		}
-		if !isOrderedReady && concurrency <= 0 {
-			break
-		}
-		if isOrderedReady && !intctrlutil.IsPodReady(pod) {
-			tree.EventRecorder.Eventf(its, corev1.EventTypeWarning, "InstanceSet %s/%s is waiting for Pod %s to be Ready",
-				its.Namespace,
-				its.Name,
-				pod.Name)
-		}
-		if err := tree.Delete(pod); err != nil {
-			return kubebuilderx.Continue, err
-		}
-
-		retiredNames.Insert(pod.Name)
-
-		if isOrderedReady {
-			break
-		}
-		concurrency--
+	if workloadlifecycle.Enabled(its) && runtimeChanged {
+		return kubebuilderx.RetryAfter(time.Second), nil
+	}
+	if memberWaiting {
+		return kubebuilderx.Continue, nil
+	}
+	if result, err := retire(retirementNames); err != nil || result != kubebuilderx.Continue {
+		return result, err
 	}
 
-	retentionPolicy := its.Spec.PersistentVolumeClaimRetentionPolicy
-	retireClaims := !isStopRequested(its) && (retentionPolicy == nil || retentionPolicy.WhenScaled != kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType)
-	if retireClaims {
-		for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
-			name := obj.GetLabels()[constant.KBAppPodNameLabelKey]
-			if name == "" || newNameSet.Has(name) {
-				continue
-			}
-			if retiredNames.Has(name) || (!oldNameSet.Has(name) && metav1.IsControlledBy(obj, its)) {
-				if err := tree.Delete(obj); err != nil {
-					return kubebuilderx.Continue, err
-				}
-			}
-		}
+	if workloadlifecycle.Enabled(its) {
+		meta.RemoveStatusCondition(&its.Status.Conditions, "InstanceLifecycle")
 	}
-
 	return kubebuilderx.Continue, nil
 }
 

@@ -58,10 +58,6 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	inst := tree.GetRoot().(*workloads.Instance)
-	result := kubebuilderx.Continue
-	if inst.Spec.MinReadySeconds > 0 && inst.Status.Ready && !inst.Status.Available {
-		result = kubebuilderx.RetryAfter(time.Second)
-	}
 
 	newNameSet := sets.New[string](podName(inst))
 	oldNameSet := sets.New[string]()
@@ -73,12 +69,12 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	updateNameSet := oldNameSet.Intersection(newNameSet)
 	if len(updateNameSet) != len(oldNameSet) || len(updateNameSet) != len(newNameSet) {
 		tree.Logger.Info(fmt.Sprintf("Instance %s/%s is not aligned", inst.Namespace, inst.Name))
-		return result, nil
+		return kubebuilderx.Continue, nil
 	}
 
 	// do nothing if update strategy type is 'OnDelete'
 	if inst.Spec.InstanceUpdateStrategyType != nil && *inst.Spec.InstanceUpdateStrategyType == kbappsv1.OnDeleteStrategyType {
-		return result, nil
+		return kubebuilderx.Continue, nil
 	}
 
 	// treat old and Pending pod as a special case, as they can be updated without a consequence
@@ -191,10 +187,10 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if !isBlocked {
 		meta.RemoveStatusCondition(&inst.Status.Conditions, string(workloads.InstanceUpdateRestricted))
 	}
-	if needRetry && result == kubebuilderx.Continue {
+	if needRetry {
 		return kubebuilderx.RetryAfter(time.Second * time.Duration(inst.Spec.MinReadySeconds)), nil
 	}
-	return result, nil
+	return kubebuilderx.Continue, nil
 }
 
 func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod) error {

@@ -34,6 +34,7 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -238,6 +239,38 @@ var _ = Describe("Instance Controller", func() {
 				g.Expect(inst.Status.Available).Should(BeTrue())
 				g.Expect(inst.Status.Role).Should(Equal("leader"))
 			})).Should(Succeed())
+		})
+
+		It("status - container failure timeout without Pod updates", func() {
+			createInstObj(instName, func(f *testapps.MockInstanceFactory) {
+				f.SetMinReadySeconds(30)
+				f.GetObject().Spec.Template.Spec.Containers[0].Env = []corev1.EnvVar{{Name: "PASSWORD", ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{LocalObjectReference: corev1.LocalObjectReference{Name: "missing"}, Key: "password"},
+				}}}
+			})
+			pod := &corev1.Pod{}
+			Expect(k8sClient.Get(ctx, instKey, pod)).To(Succeed())
+			pod.Status.Phase = corev1.PodPending
+			pod.Status.Conditions = []corev1.PodCondition{
+				{Type: corev1.PodReady, Status: corev1.ConditionFalse, LastTransitionTime: metav1.Now()},
+				{Type: corev1.ContainersReady, Status: corev1.ConditionFalse, LastTransitionTime: metav1.Now()},
+			}
+			pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: pod.Spec.Containers[0].Name, Image: pod.Spec.Containers[0].Image, State: corev1.ContainerState{
+				Waiting: &corev1.ContainerStateWaiting{Reason: "CreateContainerConfigError", Message: "secret missing not found"},
+			}}}
+			Expect(k8sClient.Status().Update(ctx, pod)).To(Succeed())
+			version := pod.ResourceVersion
+			Consistently(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
+				g.Expect(meta.IsStatusConditionTrue(inst.Status.Conditions, string(workloads.InstanceFailure))).To(BeFalse())
+			}), time.Second).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
+				condition := meta.FindStatusCondition(inst.Status.Conditions, string(workloads.InstanceFailure))
+				g.Expect(condition).NotTo(BeNil())
+				g.Expect(condition.Status).To(Equal(metav1.ConditionTrue))
+				g.Expect(condition.ObservedGeneration).To(Equal(inst.Generation))
+			}), intctrlutil.PodContainerFailedTimeout+5*time.Second).Should(Succeed())
+			Expect(k8sClient.Get(ctx, instKey, pod)).To(Succeed())
+			Expect(pod.ResourceVersion).To(Equal(version))
 		})
 
 		It("delete - delete pvc", func() {
@@ -1295,8 +1328,8 @@ func TestInstanceStopResumeRetriesAfterPodCreatedBeforeStatusCommit(t *testing.T
 			if !reflect.DeepEqual(claim, committedClaim) {
 				t.Fatal("retry changed the already committed PVC")
 			}
-			if result.RequeueAfter != 0 {
-				t.Fatalf("unready runtime should wait for a Pod event: %#v", result)
+			if minReadySeconds > 0 && result.RequeueAfter != time.Second {
+				t.Fatalf("retry lost the earlier readiness wait: %#v", result)
 			}
 		})
 	}
@@ -1385,15 +1418,13 @@ func TestInstanceAdmittedVolumeExpansionAfterReadinessLoss(t *testing.T) {
 	pod.Status.ContainerStatuses[0].Ready = false
 	g.Expect(cli.Status().Update(ctx, pod)).To(Succeed())
 	podSpec := pod.Spec.DeepCopy()
-	for i := 0; i < 3; i++ {
-		runChild()
-	}
+	runChild()
 	g.Expect(cli.Get(ctx, claimKey, claim)).To(Succeed())
+	requested = claim.Spec.Resources.Requests[corev1.ResourceStorage]
+	g.Expect(requested.Cmp(resource.MustParse("2Gi"))).To(BeZero(), "unready status must not prevent already-admitted PVC expansion")
 	g.Expect(cli.Get(ctx, childKey, inst)).To(Succeed())
 	g.Expect(inst.Status.Ready).To(BeFalse())
 	g.Expect(inst.Status.Available).To(BeFalse())
-	requested = claim.Spec.Resources.Requests[corev1.ResourceStorage]
-	g.Expect(requested.Cmp(resource.MustParse("2Gi"))).To(BeZero(), "unready status must not prevent already-admitted PVC expansion")
 	g.Expect(claim.Spec.VolumeName).To(Equal("pv-data"))
 	g.Expect(claim.Status.Capacity).To(Equal(corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}))
 	g.Expect(cli.Get(ctx, childKey, pod)).To(Succeed())

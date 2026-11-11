@@ -112,7 +112,9 @@ const (
 )
 
 type Result struct {
-	Next       controlMethod
+	Next controlMethod
+	// RetryAfter requests a delayed reconciliation independently of Next.
+	// The earliest positive delay wins; an immediate Retry takes precedence.
 	RetryAfter time.Duration
 }
 

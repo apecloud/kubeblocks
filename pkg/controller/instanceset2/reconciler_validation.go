@@ -26,6 +26,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 )
 
 func NewValidationReconciler() kubebuilderx.Reconciler {
@@ -45,6 +46,9 @@ func (r *validationReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kube
 
 func (r *validationReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its := tree.GetRoot().(*workloads.InstanceSet)
+	if err := workloadlifecycle.Validate(its); err != nil {
+		return kubebuilderx.Commit, err
+	}
 	if err := validateUnsupportedFeatures(its); err != nil {
 		return kubebuilderx.Commit, err
 	}

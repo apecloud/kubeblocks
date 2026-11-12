@@ -56,8 +56,13 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 	return kubebuilderx.ConditionSatisfied
 }
 
-func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
+func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (result kubebuilderx.Result, err error) {
 	inst := tree.GetRoot().(*workloads.Instance)
+	defer func() {
+		if err == nil && result == kubebuilderx.Continue && needsMemberJoin(inst) && !ptr.Deref(inst.Spec.Stop, false) {
+			result = kubebuilderx.RetryAfter(time.Second)
+		}
+	}()
 
 	newNameSet := sets.New[string](podName(inst))
 	oldNameSet := sets.New[string]()

@@ -21,6 +21,7 @@ package instanceset
 
 import (
 	"slices"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -127,6 +128,9 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 		return kubebuilderx.Continue, err
 	}
 	its.Status.ObservedGeneration = its.Generation
+	if lifecycleStatusEnabled(its) {
+		return kubebuilderx.RetryAfter(time.Second), nil
+	}
 
 	return kubebuilderx.Continue, nil
 }

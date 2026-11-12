@@ -18824,6 +18824,20 @@ If set, all the computing resources will be released.</p>
 </tr>
 <tr>
 <td>
+<code>scaledUp</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ScaledUp indicates that this Instance was created for a new scale-out allocation.
+It only determines initial membership handling while MemberJoined is unset.
+An unset value is treated as false. It remains stable for this Instance object.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>scaledDown</code><br/>
 <em>
 bool
@@ -20518,6 +20532,20 @@ If set, all the computing resources will be released.</p>
 </tr>
 <tr>
 <td>
+<code>scaledUp</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ScaledUp indicates that this Instance was created for a new scale-out allocation.
+It only determines initial membership handling while MemberJoined is unset.
+An unset value is treated as false. It remains stable for this Instance object.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>scaledDown</code><br/>
 <em>
 bool
@@ -20582,7 +20610,8 @@ InstanceDesiredState
 <td>
 <em>(Optional)</em>
 <p>DesiredState describes whether the instance should be running (Active), is retained without running (Offline),
-or is no longer allocated and is kept only while its runtime is still observed (Released).
+or is no longer allocated (Released).
+Released entries may remain while the runtime or associated resources are observed or membership cleanup is unfinished.
 An empty value from an older object is treated as Active.</p>
 </td>
 </tr>
@@ -20638,9 +20667,9 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>MemberJoined records the tracked membership result. nil means no result is tracked and does not prove absence,
-false records not joined, and true records joined. A successful leave can record false.
-Runtime health and role do not determine this value.</p>
+<p>MemberJoined records whether the configured membership step is satisfied. nil means no result is tracked
+and does not prove absence, false means not joined, and true means joined, including initial instances
+that need no join action. A successful leave records false. Runtime health and role do not complete a pending join.</p>
 </td>
 </tr>
 <tr>
@@ -20816,9 +20845,9 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>MemberJoined records the tracked membership result. nil means no result is tracked and does not prove absence,
-false records not joined, and true records joined. A successful leave can record false.
-Runtime health and role do not determine this value.</p>
+<p>MemberJoined records whether the configured membership step is satisfied. nil means no result is tracked
+and does not prove absence, false means not joined, and true means joined, including initial instances
+that need no join action. A successful leave records false. Runtime health and role do not complete a pending join.</p>
 </td>
 </tr>
 <tr>

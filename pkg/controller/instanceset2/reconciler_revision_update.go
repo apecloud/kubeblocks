@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset2
 
 import (
+	"time"
+
 	"k8s.io/apimachinery/pkg/api/equality"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -72,6 +74,9 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 	r.invalidateAffectedInstanceStatus(its, desiredInstances, instances)
 
 	its.Status.ObservedGeneration = its.Generation
+	if lifecycleStatusEnabled(its) {
+		return kubebuilderx.RetryAfter(time.Second), nil
+	}
 
 	return kubebuilderx.Continue, nil
 }

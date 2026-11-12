@@ -157,6 +157,29 @@ var _ = Describe("component status transformer conditions", func() {
 		transformer.synthesizeComp = transCtx.SynthesizeComponent
 	})
 
+	DescribeTable("role probe timeout requires a current Ready condition", func(readyGeneration int64, readyFor time.Duration, wantPhase appsv1.ComponentPhase) {
+		runningITS.Generation = 2
+		runningITS.Status.ObservedGeneration = 2
+		runningITS.Spec.Roles = []workloads.ReplicaRole{{Name: "leader"}}
+		runningITS.Status.InstanceStatus = nil
+		runningITS.Status.Conditions = []metav1.Condition{{
+			Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue,
+			ObservedGeneration: readyGeneration, LastTransitionTime: metav1.NewTime(time.Now().Add(-readyFor)), Reason: workloads.ReasonReady,
+		}}
+		Expect(transformer.reconcileStatus(transCtx)).Should(Succeed())
+		Expect(comp.Status.Phase).Should(Equal(wantPhase))
+		if wantPhase == appsv1.FailedComponentPhase {
+			Expect(comp.Status.Message).Should(HaveKeyWithValue("InstanceSet/"+runningITS.Name,
+				"Role probe timeout, check whether the application is available"))
+		} else {
+			Expect(comp.Status.Message).Should(BeEmpty())
+		}
+	},
+		Entry("ignores a timeout from an older generation", int64(1), 2*time.Minute, appsv1.UpdatingComponentPhase),
+		Entry("reports the current generation's timeout", int64(2), 2*time.Minute, appsv1.FailedComponentPhase),
+		Entry("waits for the current generation's deadline", int64(2), time.Duration(0), appsv1.UpdatingComponentPhase),
+	)
+
 	Context("reconcileHealthyCondition", func() {
 		It("should be unhealthy when runningITS is nil", func() {
 			transformer.runningITS = nil

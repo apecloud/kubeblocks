@@ -108,6 +108,22 @@ func TestInstanceSetPropagatesAvailabilityPolicy(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	its = readSetStop(t, cli)
+	if !meta.IsStatusConditionFalse(its.Status.Conditions, string(workloads.InstanceAvailable)) || its.Status.AvailableReplicas != 0 {
+		t.Fatal("parent accepted availability before the child observed its policy")
+	}
+	pending := 0
+	for _, child := range listSetStopChildren(t, cli) {
+		if child.Spec.MinReadySeconds == 30 && child.Generation != child.Status.ObservedGeneration && child.Status.Available {
+			pending++
+		}
+		if status := its.FindInstanceStatus(child.Name); status == nil || status.Available {
+			t.Fatalf("%s reused an old Available report during policy propagation: %#v", child.Name, status)
+		}
+	}
+	if pending != 1 {
+		t.Fatalf("expected one handed-off child retaining an old Available report, got %d", pending)
+	}
 	markSetStopPodsReady(t, cli)
 	reconcileSetStop(t, cli, 5)
 	for _, child := range listSetStopChildren(t, cli) {

@@ -445,7 +445,7 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 			// actual Pod revision. Keep the two revision domains separate.
 			instanceSpecRevision := getInstanceRevision(inst)
 			available := its.Spec.MinReadySeconds == 0 ||
-				(inst.Spec.MinReadySeconds >= its.Spec.MinReadySeconds && inst.Status.Available)
+				(inst.Spec.MinReadySeconds >= its.Spec.MinReadySeconds && intctrlutil.IsInstanceAvailable(inst))
 			observation := instancestatus.Observation{
 				InstanceName:    inst.Name,
 				State:           inst.Status.CurrentState,

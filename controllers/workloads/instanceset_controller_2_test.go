@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/version"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
@@ -54,7 +55,68 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
+
+func TestInstanceSetHealthWaitsForChildObservation(t *testing.T) {
+	previousServerInfo := viper.Get(constant.CfgKeyServerInfo)
+	viper.Set(constant.CfgKeyServerInfo, version.Info{GitVersion: "v1.26.1"})
+	t.Cleanup(func() { viper.Set(constant.CfgKeyServerInfo, previousServerInfo) })
+	for _, minReadySeconds := range []int32{0, 30} {
+		t.Run(fmt.Sprintf("minReadySeconds=%d", minReadySeconds), func(t *testing.T) {
+			its := setStopFixture()
+			its.Spec.MinReadySeconds = minReadySeconds
+			cli := newSetStopClient(t, its)
+			reconcileSetStop(t, cli, 5)
+			markSetStopPodsReady(t, cli)
+			reconcileSetStop(t, cli, 3)
+			mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
+				its.Spec.Template.Spec.Containers[0].Image = "db:v2"
+			})
+			for range 2 {
+				if _, err := reconcileSetStopParent(cli); err != nil {
+					t.Fatal(err)
+				}
+			}
+			pending := ""
+			for _, child := range listSetStopChildren(t, cli) {
+				if child.Generation != child.Status.ObservedGeneration {
+					if !child.Status.Ready || !child.Status.Available || child.Spec.Template.Spec.Containers[0].Image != "db:v2" {
+						t.Fatal("fixture did not retain a healthy report across the template handoff")
+					}
+					pending = child.Name
+				}
+			}
+			if pending == "" {
+				t.Fatal("fixture did not hand off the updated child spec")
+			}
+			for range 2 {
+				if _, err := reconcileSetStopParent(cli); err != nil {
+					t.Fatal(err)
+				}
+			}
+			its = readSetStop(t, cli)
+			status := its.FindInstanceStatus(pending)
+			if meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceReady)) || status == nil || status.Ready || status.Available {
+				t.Fatalf("parent reused health before the child observed its spec: %#v", its.Status)
+			}
+			for i := 0; i < 6; i++ {
+				reconcileSetStop(t, cli, 1)
+				markSetStopPodsReady(t, cli)
+			}
+			reconcileSetStop(t, cli, 2)
+			its = readSetStop(t, cli)
+			if !meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable)) {
+				t.Fatal("parent health did not recover after child reconciliation")
+			}
+			for _, status := range its.Status.InstanceStatus {
+				if !status.Ready || !status.Available {
+					t.Fatalf("per-instance health did not recover: %#v", status)
+				}
+			}
+		})
+	}
+}
 
 func TestInstanceSetPropagatesAvailabilityPolicy(t *testing.T) {
 	its := setStopFixture()

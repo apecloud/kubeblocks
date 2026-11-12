@@ -384,7 +384,7 @@ func TestSetInstanceStatusKeepsRuntimeStateIndependentFromConvergence(t *testing
 	inst := &workloads.Instance{
 		ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Generation: 2},
 		Status: workloads.InstanceStatus2{
-			ObservedGeneration: 1,
+			ObservedGeneration: 2,
 			CurrentState:       workloads.InstanceCurrentStatePresent,
 			CurrentRevision:    "current",
 			UpdateRevision:     "stale-target",
@@ -394,6 +394,10 @@ func TestSetInstanceStatusKeepsRuntimeStateIndependentFromConvergence(t *testing
 			Role:               "leader",
 			Conditions: []metav1.Condition{{
 				Type: string(workloads.InstanceFailure), Status: metav1.ConditionTrue,
+			}, {
+				Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue, ObservedGeneration: 2,
+			}, {
+				Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue, ObservedGeneration: 2,
 			}},
 		},
 	}

@@ -375,6 +375,81 @@ func TestSafeMetadataOnlyInPlaceUpdate(t *testing.T) {
 	}
 }
 
+func TestEqualResourcesInPlaceFieldsSkipsOmittedRequests(t *testing.T) {
+	oldPod := builder.NewPodBuilder("default", "mysql-0").
+		SetContainers([]corev1.Container{{
+			Name: "mysql",
+			Resources: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("2Gi"),
+				},
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("500m"),
+					corev1.ResourceMemory: resource.MustParse("1Gi"),
+				},
+			},
+		}}).
+		GetObject()
+
+	omittedRequests := oldPod.DeepCopy()
+	omittedRequests.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("1"),
+			corev1.ResourceMemory: resource.MustParse("2Gi"),
+		},
+	}
+	if !equalResourcesInPlaceFields(oldPod, omittedRequests) {
+		t.Fatal("omitted desired CPU/memory requests should not force resource inequality")
+	}
+
+	explicitRequestChanged := omittedRequests.DeepCopy()
+	explicitRequestChanged.Spec.Containers[0].Resources.Requests = corev1.ResourceList{
+		corev1.ResourceCPU: resource.MustParse("1"),
+	}
+	if equalResourcesInPlaceFields(oldPod, explicitRequestChanged) {
+		t.Fatal("explicit desired CPU request must still be compared")
+	}
+
+	limitChanged := omittedRequests.DeepCopy()
+	limitChanged.Spec.Containers[0].Resources.Limits[corev1.ResourceMemory] = resource.MustParse("3Gi")
+	if equalResourcesInPlaceFields(oldPod, limitChanged) {
+		t.Fatal("limits must still be compared")
+	}
+}
+
+func TestLimitOnlyScaleDownMergesValidAndConverges(t *testing.T) {
+	livePod := builder.NewPodBuilder("default", "mysql-0").
+		SetContainers([]corev1.Container{{
+			Name: "mysql",
+			Resources: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+				// the live request was defaulted from the old limit at admission
+				Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+			},
+		}}).
+		GetObject()
+
+	desired := livePod.DeepCopy()
+	desired.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("500m")},
+	}
+
+	merged := livePod.DeepCopy()
+	mergeInPlaceFields(desired, merged)
+
+	limit := merged.Spec.Containers[0].Resources.Limits[corev1.ResourceCPU]
+	request := merged.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU]
+	if request.Cmp(limit) > 0 {
+		t.Fatalf("merged pod is invalid: request %s > limit %s", request.String(), limit.String())
+	}
+	// second reconcile: the merged (now live) pod must compare equal to the
+	// desired template so the resize path terminates instead of looping
+	if !equalResourcesInPlaceFields(merged, desired) {
+		t.Fatal("resize must converge: merged pod still differs from the desired template")
+	}
+}
+
 func TestConfigsToUpdateStillReportsRealConfigHashMismatch(t *testing.T) {
 	inst := builder.NewInstanceBuilder("default", "valkey-0").
 		SetConfigs([]workloads.ConfigTemplate{{

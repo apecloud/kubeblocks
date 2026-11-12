@@ -102,6 +102,52 @@ func TestStatusConditionsRequireExpectedInstances(t *testing.T) {
 	}
 }
 
+func TestStatusReconcilerUsesParentAvailabilityPolicy(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		parent, child int32
+		ready, report bool
+		available     bool
+	}{
+		{name: "shorter child policy", parent: 30, ready: true, report: true},
+		{name: "zero parent policy", child: 3600, ready: true, available: true},
+		{name: "matching policy still waiting", parent: 30, child: 30, ready: true},
+		{name: "matching policy satisfied", parent: 30, child: 30, ready: true, report: true, available: true},
+		{name: "longer child policy satisfied", parent: 30, child: 60, ready: true, report: true, available: true},
+		{name: "zero policy still requires Ready"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", Generation: 1},
+				Spec: workloads.InstanceSetSpec{Replicas: ptr.To[int32](1), MinReadySeconds: tc.parent}}
+			inst := &workloads.Instance{ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Namespace: its.Namespace, Generation: 1},
+				Spec: workloads.InstanceSpec{MinReadySeconds: tc.child},
+				Status: workloads.InstanceStatus2{ObservedGeneration: 1, CurrentState: workloads.InstanceCurrentStatePresent,
+					Ready: tc.ready, Available: tc.report}}
+			for kind, healthy := range map[workloads.ConditionType]bool{workloads.InstanceReady: tc.ready, workloads.InstanceAvailable: tc.report} {
+				status := metav1.ConditionFalse
+				if healthy {
+					status = metav1.ConditionTrue
+				}
+				meta.SetStatusCondition(&inst.Status.Conditions, metav1.Condition{Type: string(kind), Status: status, Reason: "Observed", ObservedGeneration: 1})
+			}
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			if err := tree.Add(inst); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			if meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceReady)) != tc.ready ||
+				meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable)) != tc.available ||
+				(its.Status.AvailableReplicas == 1) != tc.available ||
+				its.FindInstanceStatus(inst.Name).Available != tc.available {
+				t.Fatalf("parent availability policy was not applied consistently: %#v", its.Status)
+			}
+		})
+	}
+}
+
 func TestStatusReconcilerAggregatesInstanceRestoreConditions(t *testing.T) {
 	newFixture := func() (*workloads.InstanceSet, *kubebuilderx.ObjectTree) {
 		its := &workloads.InstanceSet{

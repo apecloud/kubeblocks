@@ -118,10 +118,21 @@ var _ = Describe("InstanceSet configured readiness", func() {
 				its, tree := newTree(replicas, names...)
 				its.Spec.Stop = ptr.To(stop)
 				if unhealthyExtra {
-					for _, object := range tree.List(&corev1.Pod{}) {
-						pod := object.(*corev1.Pod)
-						if pod.Name == "demo-9" {
-							pod.Status.Conditions[0].Status = corev1.ConditionFalse
+					if instanceAPI {
+						object, err := tree.Get(&workloads.Instance{ObjectMeta: metav1.ObjectMeta{Name: "demo-9", Namespace: its.Namespace}})
+						Expect(err).ShouldNot(HaveOccurred())
+						Expect(object).ShouldNot(BeNil())
+						inst := object.(*workloads.Instance)
+						inst.Status.Ready, inst.Status.Available = false, false
+						for i := range inst.Status.Conditions {
+							inst.Status.Conditions[i].Status = metav1.ConditionFalse
+						}
+					} else {
+						for _, object := range tree.List(&corev1.Pod{}) {
+							pod := object.(*corev1.Pod)
+							if pod.Name == "demo-9" {
+								pod.Status.Conditions[0].Status = corev1.ConditionFalse
+							}
 						}
 					}
 				}

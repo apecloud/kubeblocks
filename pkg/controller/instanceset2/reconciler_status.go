@@ -451,7 +451,7 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 				State:           inst.Status.CurrentState,
 				Revision:        inst.Status.CurrentRevision,
 				UpToDate:        isInstanceUpdatedWithRevisions(inst, instanceSpecRevision, instanceSpecUpdateRevisions),
-				Ready:           intctrlutil.IsInstanceReady(inst),
+				Ready:           inst.Status.Ready,
 				Available:       available,
 				Failed:          meta.IsStatusConditionTrue(inst.Status.Conditions, string(workloads.InstanceFailure)),
 				Configs:         inst.Status.Configs,

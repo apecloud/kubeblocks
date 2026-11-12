@@ -65,21 +65,21 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		inst, _ := object.(*workloads.Instance)
 		instanceList = append(instanceList, inst)
 	}
-	// Flat-ordinal reassignment can temporarily expose fewer authoritative names than spec.replicas.
-	// Validate before mutating any status fields so a partial view cannot replace the last complete status.
-	if its.Spec.FlatInstanceOrdinal {
-		if _, _, err := instancetemplate.BuildAssignments(tree, its); err != nil {
-			if instancetemplate.IsAssignmentIncomplete(err) {
-				return kubebuilderx.Continue, nil
-			}
-			return kubebuilderx.Continue, err
+	assignments, _, err := instancetemplate.BuildAssignments(tree, its)
+	if err != nil {
+		if instancetemplate.IsAssignmentIncomplete(err) {
+			return kubebuilderx.Continue, nil
 		}
+		return kubebuilderx.Continue, err
 	}
 	replicas := int32(0)
 	currentReplicas, updatedReplicas := int32(0), int32(0)
 	readyReplicas, availableReplicas := int32(0), int32(0)
 	notReadyNames := sets.New[string]()
-	notAvailableNames := sets.New[string]()
+	for _, assignment := range assignments {
+		notReadyNames.Insert(assignment.InstanceName)
+	}
+	notAvailableNames := notReadyNames.Clone()
 	currentRevisions := map[string]string{}
 	updateRevisions, err := revisionmap.Decode(its.Status.UpdateRevisions)
 	if err != nil {
@@ -107,7 +107,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			continue
 		}
 		{
-			notReadyNames.Insert(inst.Name)
 			replicas++
 			template2TemplatesStatus[templateName].Replicas++
 		}
@@ -118,8 +117,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			if intctrlutil.IsInstanceAvailable(inst) {
 				availableReplicas++
 				template2TemplatesStatus[templateName].AvailableReplicas++
-			} else {
-				notAvailableNames.Insert(inst.Name)
+				notAvailableNames.Delete(inst.Name)
 			}
 		}
 		currentRevisions[inst.Name] = getInstanceRevision(inst)
@@ -156,13 +154,13 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 	}
 
-	readyCondition, err := buildReadyCondition(its, readyReplicas >= replicas, notReadyNames)
+	readyCondition, err := buildReadyCondition(its, notReadyNames.Len() == 0, notReadyNames)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
 	meta.SetStatusCondition(&its.Status.Conditions, *readyCondition)
 
-	availableCondition, err := buildAvailableCondition(its, availableReplicas >= replicas, notAvailableNames)
+	availableCondition, err := buildAvailableCondition(its, notAvailableNames.Len() == 0, notAvailableNames)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}

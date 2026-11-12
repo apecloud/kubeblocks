@@ -32966,16 +32966,24 @@ InstanceSetStatus
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;InstanceAvailable&#34;</p></td>
-<td><p>InstanceAvailable ConditionStatus will be True if all instances(pods) are in the ready condition
-and continue for &ldquo;MinReadySeconds&rdquo; seconds. Otherwise, it will be set to False.</p>
+<td><p>InstanceAvailable indicates whether an Instance is ready and has remained ready
+for at least spec.minReadySeconds seconds.
+For an InstanceSet, it is True when every expected instance is available,
+and False when any expected instance is missing or unavailable.
+An explicit replica count of 0 makes this condition True.
+Instances outside the expected set do not affect this condition.</p>
 </td>
 </tr><tr><td><p>&#34;InstanceFailure&#34;</p></td>
 <td><p>InstanceFailure is added in an instance set when at least one of its instances(pods) is in a <code>Failed</code> phase.</p>
 </td>
 </tr><tr><td><p>&#34;InstanceReady&#34;</p></td>
-<td><p>InstanceReady is added in an instance set when at least one of its instances(pods) is in a Ready condition.
-ConditionStatus will be True if all its instances(pods) are in a Ready condition.
-Or, a NotReady reason with not ready instances encoded in the Message filed will be set.</p>
+<td><p>InstanceReady indicates whether an Instance is ready.
+For an InstanceSet, it is True when every expected instance exists and is ready,
+and False when any expected instance is missing or not ready.
+Expected instances follow the replica and instance-template configuration.
+The expected replica count is spec.replicas, which defaults to 1.
+An explicit replica count of 0 makes this condition True.
+Instances outside the expected set do not affect this condition.</p>
 </td>
 </tr><tr><td><p>&#34;InstanceUpdateRestricted&#34;</p></td>
 <td><p>InstanceUpdateRestricted represents a ConditionType that indicates updates to an InstanceSet are blocked(when the
@@ -33760,7 +33768,7 @@ string
 <td>
 <em>(Optional)</em>
 <p>Represents the latest available observations of an instanceset&rsquo;s current state.
-Known .status.conditions.type are: &ldquo;InstanceFailure&rdquo;, &ldquo;InstanceReady&rdquo;</p>
+Known .status.conditions.type are: &ldquo;InstanceFailure&rdquo;, &ldquo;InstanceReady&rdquo;, &ldquo;InstanceAvailable&rdquo;.</p>
 </td>
 </tr>
 <tr>

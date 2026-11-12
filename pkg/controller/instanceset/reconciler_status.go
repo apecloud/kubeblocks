@@ -64,15 +64,12 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		pod, _ := object.(*corev1.Pod)
 		podList = append(podList, pod)
 	}
-	// Flat-ordinal reassignment can temporarily expose fewer authoritative names than spec.replicas.
-	// Validate before mutating any status fields so a partial view cannot replace the last complete status.
-	if its.Spec.FlatInstanceOrdinal {
-		if _, _, err := instancetemplate.BuildAssignments(tree, its); err != nil {
-			if instancetemplate.IsAssignmentIncomplete(err) {
-				return kubebuilderx.Continue, nil
-			}
-			return kubebuilderx.Continue, err
+	assignments, _, err := instancetemplate.BuildAssignments(tree, its)
+	if err != nil {
+		if instancetemplate.IsAssignmentIncomplete(err) {
+			return kubebuilderx.Continue, nil
 		}
+		return kubebuilderx.Continue, err
 	}
 	// 2. calculate status summary
 	updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
@@ -83,7 +80,10 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	currentReplicas, updatedReplicas := int32(0), int32(0)
 	readyReplicas, availableReplicas := int32(0), int32(0)
 	notReadyNames := sets.New[string]()
-	notAvailableNames := sets.New[string]()
+	for _, assignment := range assignments {
+		notReadyNames.Insert(assignment.InstanceName)
+	}
+	notAvailableNames := notReadyNames.Clone()
 	currentRevisions := map[string]string{}
 
 	template2TemplatesStatus := map[string]*workloads.InstanceTemplateStatus{}
@@ -110,7 +110,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 		currentRevisions[pod.Name] = getPodRevision(pod)
 		if isCreated(pod) {
-			notReadyNames.Insert(pod.Name)
 			replicas++
 			template2TemplatesStatus[templateName].Replicas++
 		}
@@ -121,8 +120,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			if intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
 				availableReplicas++
 				template2TemplatesStatus[templateName].AvailableReplicas++
-			} else {
-				notAvailableNames.Insert(pod.Name)
+				notAvailableNames.Delete(pod.Name)
 			}
 		}
 		if isCreated(pod) && !isTerminating(pod) {
@@ -176,13 +174,13 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 	}
 
-	readyCondition, err := buildReadyCondition(its, readyReplicas >= replicas, notReadyNames)
+	readyCondition, err := buildReadyCondition(its, notReadyNames.Len() == 0, notReadyNames)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
 	meta.SetStatusCondition(&its.Status.Conditions, *readyCondition)
 
-	availableCondition, err := buildAvailableCondition(its, availableReplicas >= replicas, notAvailableNames)
+	availableCondition, err := buildAvailableCondition(its, notAvailableNames.Len() == 0, notAvailableNames)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}

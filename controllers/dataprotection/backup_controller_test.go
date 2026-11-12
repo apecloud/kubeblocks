@@ -2098,7 +2098,7 @@ var _ = Describe("Backup Controller test", func() {
 				cluster.Status.Conditions = []metav1.Condition{{
 					Type:               kbappsv1.ConditionTypeRestore,
 					Status:             metav1.ConditionTrue,
-					Reason:             "RestoreCompleted",
+					Reason:             "Completed",
 					LastTransitionTime: metav1.Now(),
 				}}
 			})).Should(Succeed())

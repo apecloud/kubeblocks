@@ -239,7 +239,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 }
 
 func (r *statusReconciler) reconcileRestoreCondition(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) error {
-	restoreCond := meta.FindStatusCondition(its.Status.Conditions, string(workloads.InstanceRestore))
+	restoreCond := meta.FindStatusCondition(its.Status.Conditions, string(workloads.Restore))
 	if restoreCond != nil && (restoreCond.Status == metav1.ConditionTrue || restoreCond.Status == metav1.ConditionFalse) {
 		return nil
 	}
@@ -248,7 +248,7 @@ func (r *statusReconciler) reconcileRestoreCondition(tree *kubebuilderx.ObjectTr
 		return err
 	}
 	if condition == nil {
-		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceRestore))
+		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.Restore))
 		return nil
 	}
 	meta.SetStatusCondition(&its.Status.Conditions, *condition)
@@ -281,7 +281,7 @@ func buildRestoreCondition(tree *kubebuilderx.ObjectTree, its *workloads.Instanc
 			completedPVCNames.Insert(pvc.Name)
 		case corev1.ConditionFalse:
 			return &metav1.Condition{
-				Type:               string(workloads.InstanceRestore),
+				Type:               string(workloads.Restore),
 				Status:             metav1.ConditionFalse,
 				ObservedGeneration: its.Generation,
 				Reason:             workloads.ReasonRestoreFailed,
@@ -291,7 +291,7 @@ func buildRestoreCondition(tree *kubebuilderx.ObjectTree, its *workloads.Instanc
 	}
 	if missingPVCNames.Len() > 0 {
 		return &metav1.Condition{
-			Type:               string(workloads.InstanceRestore),
+			Type:               string(workloads.Restore),
 			Status:             metav1.ConditionUnknown,
 			ObservedGeneration: its.Generation,
 			Reason:             workloads.ReasonRestoreRunning,
@@ -300,7 +300,7 @@ func buildRestoreCondition(tree *kubebuilderx.ObjectTree, its *workloads.Instanc
 	}
 	if completedPVCNames.Len() == expectedPVCNames.Len() {
 		return &metav1.Condition{
-			Type:               string(workloads.InstanceRestore),
+			Type:               string(workloads.Restore),
 			Status:             metav1.ConditionTrue,
 			ObservedGeneration: its.Generation,
 			Reason:             workloads.ReasonRestoreCompleted,
@@ -308,7 +308,7 @@ func buildRestoreCondition(tree *kubebuilderx.ObjectTree, its *workloads.Instanc
 		}, nil
 	}
 	return &metav1.Condition{
-		Type:               string(workloads.InstanceRestore),
+		Type:               string(workloads.Restore),
 		Status:             metav1.ConditionUnknown,
 		ObservedGeneration: its.Generation,
 		Reason:             workloads.ReasonRestoreRunning,
@@ -344,7 +344,7 @@ func expectedRestorePVCNames(tree *kubebuilderx.ObjectTree, its *workloads.Insta
 
 func findPVCRestoreCondition(pvc *corev1.PersistentVolumeClaim) *corev1.PersistentVolumeClaimCondition {
 	for i := range pvc.Status.Conditions {
-		if string(pvc.Status.Conditions[i].Type) == string(workloads.InstanceRestore) {
+		if string(pvc.Status.Conditions[i].Type) == string(workloads.Restore) {
 			return &pvc.Status.Conditions[i]
 		}
 	}

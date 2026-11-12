@@ -19336,11 +19336,12 @@ InstanceSetStatus
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;InstanceAvailable&#34;</p></td>
-<td><p>InstanceAvailable indicates whether an Instance is available.
-It is True when InstanceReady is True and the instance has been continuously ready
+<td><p>InstanceAvailable indicates whether an Instance is ready and has remained ready
 for at least spec.minReadySeconds seconds.
-For an InstanceSet, this requirement applies to every expected instance.
-When spec.minReadySeconds is 0, its status matches InstanceReady.</p>
+For an InstanceSet, it is True when every expected instance is available,
+and False when any expected instance is missing or unavailable.
+An explicit replica count of 0 makes this condition True.
+Instances outside the expected set do not affect this condition.</p>
 </td>
 </tr><tr><td><p>&#34;InstanceFailure&#34;</p></td>
 <td><p>InstanceFailure is added in an instance set when at least one of its instances(pods) is in a <code>Failed</code> phase.</p>
@@ -19349,6 +19350,7 @@ When spec.minReadySeconds is 0, its status matches InstanceReady.</p>
 <td><p>InstanceReady indicates whether an Instance is ready.
 For an InstanceSet, it is True when every expected instance exists and is ready,
 and False when any expected instance is missing or not ready.
+Expected instances follow the replica and instance-template configuration.
 The expected replica count is spec.replicas, which defaults to 1.
 An explicit replica count of 0 makes this condition True.
 Instances outside the expected set do not affect this condition.</p>

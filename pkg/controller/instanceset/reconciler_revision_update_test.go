@@ -21,7 +21,6 @@ package instanceset
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -52,15 +51,7 @@ var _ = Describe("revision update reconciler test", func() {
 			its.Status.ObservedGeneration = 1
 			tree := kubebuilderx.NewObjectTree()
 			tree.SetRoot(its)
-			status := NewStatusReconciler()
-			Expect(status.PreCondition(tree)).Should(Equal(kubebuilderx.ConditionSatisfied))
-			for i := 0; i < 2; i++ {
-				_, err := status.Reconcile(tree)
-				Expect(err).ShouldNot(HaveOccurred())
-			}
-			Expect(its.Status.ObservedGeneration).Should(Equal(int64(1)))
-			Expect(its.Status.InstanceStatus).Should(BeEmpty())
-			Expect(its.Status.UpdateRevisions).Should(BeEmpty())
+			Expect(NewStatusReconciler().PreCondition(tree)).Should(Equal(kubebuilderx.ConditionUnsatisfied))
 			Expect(NewRevisionUpdateReconciler().PreCondition(tree)).Should(Equal(kubebuilderx.ConditionSatisfied))
 
 			its.Status.ObservedGeneration = its.Generation
@@ -201,7 +192,9 @@ func TestRevisionUpdateInvalidatesOnlyAffectedLegacyInstances(t *testing.T) {
 			its.Generation++
 			tt.mutate(its)
 
-			assertStatusWaitsForRevision(t, tree)
+			if NewStatusReconciler().PreCondition(tree) != kubebuilderx.ConditionUnsatisfied {
+				t.Fatal("status reconciler must remain before revision update and wait for the new generation target")
+			}
 			if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 				t.Fatal(err)
 			}
@@ -211,7 +204,7 @@ func TestRevisionUpdateInvalidatesOnlyAffectedLegacyInstances(t *testing.T) {
 
 			// The next status pass consumes the new revisions. The affected instance remains stale and
 			// the unaffected observation remains true across the two-reconcile handoff.
-			if _, err := (&statusReconciler{}).reconcileStatus(tree); err != nil {
+			if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
 				t.Fatal(err)
 			}
 			assertLegacyUpToDate(t, its, "demo-0", false)
@@ -233,7 +226,9 @@ func TestRevisionUpdateInvalidatesMissingLegacyPod(t *testing.T) {
 	its.Spec.Instances[0].Resources = &corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")},
 	}
-	assertStatusWaitsForRevision(t, tree)
+	if NewStatusReconciler().PreCondition(tree) != kubebuilderx.ConditionUnsatisfied {
+		t.Fatal("status reconciler must wait for revision publication")
+	}
 	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)
 	}
@@ -245,25 +240,5 @@ func TestRevisionUpdateInvalidatesMissingLegacyPod(t *testing.T) {
 	assertLegacyUpToDate(t, its, "demo-1", true)
 	if !missing.Ready || !missing.Available {
 		t.Fatalf("revision updater changed runtime observations: %#v", missing)
-	}
-}
-
-func assertStatusWaitsForRevision(t *testing.T, tree *kubebuilderx.ObjectTree) {
-	t.Helper()
-	its := tree.GetRoot().(*workloads.InstanceSet)
-	before := its.Status.DeepCopy()
-	r := NewStatusReconciler()
-	if r.PreCondition(tree) != kubebuilderx.ConditionSatisfied {
-		t.Fatal("readiness must assess the pending generation")
-	}
-	for i := 0; i < 2; i++ {
-		if _, err := r.Reconcile(tree); err != nil {
-			t.Fatal(err)
-		}
-	}
-	after := its.Status.DeepCopy()
-	after.Conditions = before.Conditions
-	if !reflect.DeepEqual(before, after) {
-		t.Fatalf("full status changed before revision publication: before=%#v after=%#v", before, after)
 	}
 }

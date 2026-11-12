@@ -64,7 +64,7 @@ jobs:
 
   pre-push:
     needs: trigger-mode
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     name: Push Pre-Check
     steps:
       - uses: actions/checkout@v4

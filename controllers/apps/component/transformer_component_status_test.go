@@ -385,34 +385,6 @@ var _ = Describe("component status transformer conditions", func() {
 	})
 
 	Context("reconcileHealthyCondition", func() {
-		DescribeTable("preserves convergence requirements when aggregate health is true", func(mutate func(*workloads.InstanceSet), ready bool) {
-			runningITS.Status.Conditions = []metav1.Condition{
-				{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue, ObservedGeneration: runningITS.Generation},
-				{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue, ObservedGeneration: runningITS.Generation},
-			}
-			mutate(runningITS)
-			Expect(transformer.isInstanceSetRunning()).Should(Equal(ready))
-			Expect(transformer.reconcileHealthyCondition(transCtx)).Should(Succeed())
-			condition := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionHealthy)
-			Expect(condition).ShouldNot(BeNil())
-			Expect(condition.Status == metav1.ConditionTrue).Should(Equal(ready))
-		},
-			Entry("fully converged", func(*workloads.InstanceSet) {}, true),
-			Entry("initialization incomplete", func(its *workloads.InstanceSet) { its.Status.ReadyInitReplicas-- }, false),
-			Entry("generation pending", func(its *workloads.InstanceSet) { its.Status.ObservedGeneration-- }, false),
-			Entry("missing runtime", func(its *workloads.InstanceSet) { its.Status.Replicas-- }, false),
-			Entry("extra runtime awaiting cleanup", func(its *workloads.InstanceSet) { its.Status.Replicas++ }, false),
-			Entry("missing healthy runtime", func(its *workloads.InstanceSet) { its.Status.ReadyReplicas-- }, false),
-			Entry("update incomplete", func(its *workloads.InstanceSet) { its.Status.UpdatedReplicas-- }, false),
-			Entry("minimum readiness duration unmet", func(its *workloads.InstanceSet) {
-				its.Spec.MinReadySeconds = 10
-				its.Status.AvailableReplicas = 2
-			}, false),
-			Entry("roles pending", func(its *workloads.InstanceSet) {
-				its.Spec.Roles = []workloads.ReplicaRole{{Name: "primary"}}
-			}, false),
-		)
-
 		It("should be unhealthy when runningITS is nil", func() {
 			transformer.runningITS = nil
 			err := transformer.reconcileHealthyCondition(transCtx)

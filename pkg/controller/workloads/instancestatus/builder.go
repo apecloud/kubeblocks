@@ -20,21 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instancestatus
 
 import (
-	"encoding/json"
 	"fmt"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
 
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // TemplateAssignment associates an instance identity with a template.
@@ -65,92 +58,6 @@ type Input struct {
 	Observations       []Observation
 	TemplateHints      []TemplateAssignment
 	UpdateRevisions    map[string]string
-}
-
-// Health is one trusted observation of an identity's runtime health.
-type Health struct {
-	Ready     bool
-	Available bool
-}
-
-// PodHealth observes runtime health using the current parent's availability policy.
-func PodHealth(pod *corev1.Pod, minReadySeconds int32) Health {
-	if pod == nil || !intctrlutil.IsPodReady(pod) {
-		return Health{}
-	}
-	for _, container := range pod.Spec.Containers {
-		index := slices.IndexFunc(pod.Status.ContainerStatuses, func(status corev1.ContainerStatus) bool {
-			return status.Name == container.Name
-		})
-		if index < 0 {
-			continue
-		}
-		status := pod.Status.ContainerStatuses[index]
-		if !intctrlutil.MatchContainerImageInStatus(container.Image, status.Image, status.ImageID) {
-			return Health{}
-		}
-	}
-	return Health{Ready: true, Available: intctrlutil.IsPodAvailable(pod, minReadySeconds)}
-}
-
-// SetReadinessConditions evaluates configured identities independently of extra runtime objects.
-func SetReadinessConditions(its *workloads.InstanceSet, assignments []instancetemplate.Assignment, health map[string]Health, assignmentErr error) error {
-	if assignmentErr != nil {
-		if !instancetemplate.IsAssignmentIncomplete(assignmentErr) {
-			return assignmentErr
-		}
-		for _, kind := range []workloads.ConditionType{workloads.InstanceReady, workloads.InstanceAvailable} {
-			meta.SetStatusCondition(&its.Status.Conditions, metav1.Condition{
-				Type: string(kind), Status: metav1.ConditionUnknown, ObservedGeneration: its.Generation,
-				Reason: "AssignmentIncomplete", Message: assignmentErr.Error(),
-			})
-		}
-		return nil
-	}
-	var notReady, notAvailable []string
-	for _, assignment := range assignments {
-		member := health[assignment.InstanceName]
-		if !member.Ready {
-			notReady = append(notReady, assignment.InstanceName)
-		}
-		if !member.Ready || !member.Available {
-			notAvailable = append(notAvailable, assignment.InstanceName)
-		}
-	}
-	for _, result := range []struct {
-		kind          workloads.ConditionType
-		unhealthy     []string
-		successReason string
-		failureReason string
-	}{
-		{workloads.InstanceReady, notReady, workloads.ReasonReady, workloads.ReasonNotReady},
-		{workloads.InstanceAvailable, notAvailable, workloads.ReasonAvailable, workloads.ReasonNotAvailable},
-	} {
-		condition := metav1.Condition{Type: string(result.kind), Status: metav1.ConditionTrue, ObservedGeneration: its.Generation, Reason: result.successReason}
-		if len(result.unhealthy) > 0 {
-			condition.Status = metav1.ConditionFalse
-			condition.Reason = result.failureReason
-			message, err := json.Marshal(result.unhealthy)
-			if err != nil {
-				return err
-			}
-			condition.Message = string(message)
-		}
-		meta.SetStatusCondition(&its.Status.Conditions, condition)
-	}
-	return nil
-}
-
-// ReadinessConditionsChanged identifies observations that must persist before child changes.
-func ReadinessConditionsChanged(previous, current []metav1.Condition) bool {
-	for _, kind := range []string{string(workloads.InstanceReady), string(workloads.InstanceAvailable)} {
-		condition := meta.FindStatusCondition(current, kind)
-		old := meta.FindStatusCondition(previous, kind)
-		if condition != nil && (old == nil || old.Status != condition.Status || old.ObservedGeneration != condition.ObservedGeneration) {
-			return true
-		}
-	}
-	return false
 }
 
 // ConfigsApplied reports whether every desired config hash has been observed for an instance.

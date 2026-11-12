@@ -775,16 +775,18 @@ const (
 	// InstanceReady indicates whether an Instance is ready.
 	// For an InstanceSet, it is True when every expected instance exists and is ready,
 	// and False when any expected instance is missing or not ready.
+	// Expected instances follow the replica and instance-template configuration.
 	// The expected replica count is spec.replicas, which defaults to 1.
 	// An explicit replica count of 0 makes this condition True.
 	// Instances outside the expected set do not affect this condition.
 	InstanceReady ConditionType = "InstanceReady"
 
-	// InstanceAvailable indicates whether an Instance is available.
-	// It is True when InstanceReady is True and the instance has been continuously ready
+	// InstanceAvailable indicates whether an Instance is ready and has remained ready
 	// for at least spec.minReadySeconds seconds.
-	// For an InstanceSet, this requirement applies to every expected instance.
-	// When spec.minReadySeconds is 0, its status matches InstanceReady.
+	// For an InstanceSet, it is True when every expected instance is available,
+	// and False when any expected instance is missing or unavailable.
+	// An explicit replica count of 0 makes this condition True.
+	// Instances outside the expected set do not affect this condition.
 	InstanceAvailable ConditionType = "InstanceAvailable"
 
 	// InstanceFailure is added in an instance set when at least one of its instances(pods) is in a `Failed` phase.

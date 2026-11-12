@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/version"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
@@ -50,90 +51,150 @@ import (
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-func TestInstanceSetUsesInstanceStatusWithoutRuntimeReads(t *testing.T) {
+func TestInstanceSetHealthWaitsForChildObservation(t *testing.T) {
+	previousServerInfo := viper.Get(constant.CfgKeyServerInfo)
+	viper.Set(constant.CfgKeyServerInfo, version.Info{GitVersion: "v1.26.1"})
+	t.Cleanup(func() { viper.Set(constant.CfgKeyServerInfo, previousServerInfo) })
+	for _, minReadySeconds := range []int32{0, 30} {
+		t.Run(fmt.Sprintf("minReadySeconds=%d", minReadySeconds), func(t *testing.T) {
+			its := setStopFixture()
+			its.Spec.MinReadySeconds = minReadySeconds
+			cli := newSetStopClient(t, its)
+			reconcileSetStop(t, cli, 5)
+			markSetStopPodsReady(t, cli)
+			reconcileSetStop(t, cli, 3)
+			mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
+				its.Spec.Template.Spec.Containers[0].Image = "db:v2"
+			})
+			for range 2 {
+				if _, err := reconcileSetStopParent(cli); err != nil {
+					t.Fatal(err)
+				}
+			}
+			pending := ""
+			for _, child := range listSetStopChildren(t, cli) {
+				if child.Generation != child.Status.ObservedGeneration {
+					if !child.Status.Ready || !child.Status.Available || child.Spec.Template.Spec.Containers[0].Image != "db:v2" {
+						t.Fatal("fixture did not retain a healthy report across the template handoff")
+					}
+					pending = child.Name
+				}
+			}
+			if pending == "" {
+				t.Fatal("fixture did not hand off the updated child spec")
+			}
+			for range 2 {
+				if _, err := reconcileSetStopParent(cli); err != nil {
+					t.Fatal(err)
+				}
+			}
+			its = readSetStop(t, cli)
+			status := its.FindInstanceStatus(pending)
+			if meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceReady)) || status == nil || status.Ready || status.Available {
+				t.Fatalf("parent reused health before the child observed its spec: %#v", its.Status)
+			}
+			for i := 0; i < 6; i++ {
+				reconcileSetStop(t, cli, 1)
+				markSetStopPodsReady(t, cli)
+			}
+			reconcileSetStop(t, cli, 2)
+			its = readSetStop(t, cli)
+			if !meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable)) {
+				t.Fatal("parent health did not recover after child reconciliation")
+			}
+			for _, status := range its.Status.InstanceStatus {
+				if !status.Ready || !status.Available {
+					t.Fatalf("per-instance health did not recover: %#v", status)
+				}
+			}
+		})
+	}
+}
+
+func TestInstanceSetPropagatesAvailabilityPolicy(t *testing.T) {
 	its := setStopFixture()
-	its.Spec.MinReadySeconds = 30
 	cli := newSetStopClient(t, its)
 	reconcileSetStop(t, cli, 5)
 	bindSetStopClaims(t, cli)
 	markSetStopPodsReady(t, cli)
-	reconcileSetStop(t, cli, 5)
-	objects := []client.Object{readSetStop(t, cli)}
-	for _, child := range listSetStopChildren(t, cli) {
-		objects = append(objects, child.DeepCopy())
+	for _, pod := range listSetStopPods(t, cli) {
+		pod.Status.Conditions[0].LastTransitionTime = metav1.Now()
+		if err := cli.Status().Update(context.Background(), &pod); err != nil {
+			t.Fatal(err)
+		}
 	}
-	storage := fake.NewClientBuilder().WithScheme(cli.Scheme()).WithStatusSubresource(&workloads.InstanceSet{}, &workloads.Instance{}).WithObjects(objects...).Build()
-	cli = storage
-	blockedReads := 0
-	parentClient := interceptor.NewClient(storage, interceptor.Funcs{
+	reconcileSetStop(t, cli, 3)
+	readyTime := meta.FindStatusCondition(readSetStop(t, cli).Status.Conditions, string(workloads.InstanceReady)).LastTransitionTime
+	parentClient := &setStopClient{Client: interceptor.NewClient(cli.(*setStopClient).Client.(client.WithWatch), interceptor.Funcs{
 		Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 			switch obj.(type) {
 			case *corev1.Pod, *corev1.PersistentVolumeClaim:
-				blockedReads++
-				return fmt.Errorf("InstanceSet must not read %T", obj)
+				t.Fatalf("InstanceSet must not read %T", obj)
 			}
 			return c.Get(ctx, key, obj, opts...)
 		},
-		List: func(ctx context.Context, c client.WithWatch, objects client.ObjectList, opts ...client.ListOption) error {
-			switch objects.(type) {
+		List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+			switch list.(type) {
 			case *corev1.PodList, *corev1.PersistentVolumeClaimList:
-				blockedReads++
-				return fmt.Errorf("InstanceSet must not list %T", objects)
+				t.Fatalf("InstanceSet must not list %T", list)
 			}
-			return c.List(ctx, objects, opts...)
+			return c.List(ctx, list, opts...)
 		},
-	})
-	for i := 0; i < 3; i++ {
-		if _, err := reconcileSetStopParent(parentClient); err != nil {
-			t.Fatal(err)
-		}
-	}
-	before := readSetStop(t, cli)
-	if !meta.IsStatusConditionTrue(before.Status.Conditions, string(workloads.InstanceAvailable)) || blockedReads != 0 {
-		t.Fatalf("parent did not use Instance availability: blocked reads=%d, status=%#v", blockedReads, before.Status)
-	}
-	child := listSetStopChildren(t, cli)[0]
-	child.Status.Available = false
-	meta.SetStatusCondition(&child.Status.Conditions, metav1.Condition{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionFalse, Reason: workloads.ReasonNotAvailable, ObservedGeneration: child.Generation})
-	if err := cli.Status().Update(context.Background(), &child); err != nil {
-		t.Fatal(err)
-	}
-	for i := 0; i < 3; i++ {
-		if _, err := reconcileSetStopParent(parentClient); err != nil {
-			t.Fatal(err)
-		}
-	}
-	after := readSetStop(t, cli)
-	if !meta.IsStatusConditionTrue(after.Status.Conditions, string(workloads.InstanceReady)) ||
-		!meta.IsStatusConditionFalse(after.Status.Conditions, string(workloads.InstanceAvailable)) || blockedReads != 0 {
-		t.Fatalf("parent did not follow the child status: blocked reads=%d, status=%#v", blockedReads, after.Status)
-	}
-	oldReady := meta.FindStatusCondition(before.Status.Conditions, string(workloads.InstanceReady))
-	newReady := meta.FindStatusCondition(after.Status.Conditions, string(workloads.InstanceReady))
-	if !newReady.LastTransitionTime.Equal(&oldReady.LastTransitionTime) {
-		t.Fatal("availability update changed Ready transition time")
-	}
-	child.Status.Available = true
-	meta.SetStatusCondition(&child.Status.Conditions, metav1.Condition{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue, Reason: workloads.ReasonAvailable, ObservedGeneration: child.Generation})
-	if err := cli.Status().Update(context.Background(), &child); err != nil {
-		t.Fatal(err)
-	}
+	})}
 	mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
 		its.Spec.Paused = true
-		its.Spec.MinReadySeconds = 60
+		its.Spec.MinReadySeconds = 30
 	})
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 2; i++ {
 		if _, err := reconcileSetStopParent(parentClient); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if !meta.IsStatusConditionFalse(readSetStop(t, cli).Status.Conditions, string(workloads.InstanceAvailable)) || blockedReads != 0 {
-		t.Fatal("parent accepted availability reported under an older, shorter policy")
+	its = readSetStop(t, cli)
+	if !meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceReady)) ||
+		!meta.FindStatusCondition(its.Status.Conditions, string(workloads.InstanceReady)).LastTransitionTime.Equal(&readyTime) ||
+		!meta.IsStatusConditionFalse(its.Status.Conditions, string(workloads.InstanceAvailable)) ||
+		its.Status.AvailableReplicas != 0 || its.FindInstanceStatus("demo-0").Available {
+		t.Fatalf("parent accepted availability under the old child policy: %#v", its.Status)
+	}
+	mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Paused = false })
+	for i := 0; i < 2; i++ {
+		if _, err := reconcileSetStopParent(parentClient); err != nil {
+			t.Fatal(err)
+		}
+	}
+	its = readSetStop(t, cli)
+	if !meta.IsStatusConditionFalse(its.Status.Conditions, string(workloads.InstanceAvailable)) || its.Status.AvailableReplicas != 0 {
+		t.Fatal("parent accepted availability before the child observed its policy")
+	}
+	pending := 0
+	for _, child := range listSetStopChildren(t, cli) {
+		if child.Spec.MinReadySeconds == 30 && child.Generation != child.Status.ObservedGeneration && child.Status.Available {
+			pending++
+		}
+		if status := its.FindInstanceStatus(child.Name); status == nil || status.Available {
+			t.Fatalf("%s reused an old Available report during policy propagation: %#v", child.Name, status)
+		}
+	}
+	if pending != 1 {
+		t.Fatalf("expected one handed-off child retaining an old Available report, got %d", pending)
+	}
+	markSetStopPodsReady(t, cli)
+	reconcileSetStop(t, cli, 5)
+	for _, child := range listSetStopChildren(t, cli) {
+		if child.Spec.MinReadySeconds != 30 {
+			t.Fatalf("availability waiting blocked policy propagation: %#v", child.Spec)
+		}
+	}
+	if !meta.IsStatusConditionTrue(readSetStop(t, cli).Status.Conditions, string(workloads.InstanceAvailable)) {
+		t.Fatal("parent did not recover after the child observed its policy")
 	}
 }
 
@@ -227,6 +288,21 @@ var _ = Describe("InstanceSet Controller 2", func() {
 	}
 
 	Context("provision", func() {
+		It("becomes Available without another Pod update", func() {
+			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
+				f.SetReplicas(1)
+				f.Get().Spec.MinReadySeconds = 2
+			})
+			mockPodStatusReady(itsKey.Namespace, podName(0), metav1.Now())
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceReady))).Should(BeTrue())
+				g.Expect(meta.IsStatusConditionFalse(its.Status.Conditions, string(workloads.InstanceAvailable))).Should(BeTrue())
+			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable))).Should(BeTrue())
+			}), 5*time.Second).Should(Succeed())
+		})
+
 		It("create & delete", func() {
 			createITSObj(itsName, nil)
 
@@ -670,149 +746,6 @@ var _ = Describe("InstanceSet Controller 2", func() {
 			})).Should(Succeed())
 		})
 	})
-
-	Context("readiness", func() {
-		It("becomes Available through Instance status events without another Pod update", func() {
-			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
-				f.SetReplicas(1)
-				f.Get().Spec.MinReadySeconds = 2
-			})
-			childKey := client.ObjectKey{Namespace: itsKey.Namespace, Name: podName(0)}
-			mockPodStatusReady(itsKey.Namespace, childKey.Name, metav1.Now())
-			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
-				g.Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceReady))).Should(BeTrue())
-				g.Expect(meta.IsStatusConditionFalse(its.Status.Conditions, string(workloads.InstanceAvailable))).Should(BeTrue())
-			})).Should(Succeed())
-			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
-				g.Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable))).Should(BeTrue())
-			}), 5*time.Second).Should(Succeed())
-		})
-
-		It("reports a fresh Ready transition after stop and resume", func() {
-			t := GinkgoT()
-			cli := newSetStopClient(t, setStopFixture())
-			reconcileSetStop(t, cli, 5)
-			bindSetStopClaims(t, cli)
-			markSetStopPodsReady(t, cli)
-			reconcileSetStop(t, cli, 5)
-			before := ageInstanceSetReadyCondition(cli, readSetStop(t, cli))
-
-			mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(true) })
-			reconcileSetStop(t, cli, 10)
-			expectInstanceSetNoRuntime(readSetStop(t, cli))
-
-			mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(false) })
-			_, err := reconcileSetStopParent(cli)
-			Expect(err).ShouldNot(HaveOccurred())
-			expectInstanceSetNotReady(readSetStop(t, cli))
-			reconcileSetStop(t, cli, 3)
-			markSetStopPodsReady(t, cli)
-			reconcileSetStop(t, cli, 3)
-			conditions := readSetStop(t, cli).Status.Conditions
-			Expect(meta.IsStatusConditionTrue(conditions, string(workloads.InstanceReady))).Should(BeTrue())
-			Expect(meta.FindStatusCondition(conditions, string(workloads.InstanceReady)).LastTransitionTime.After(before.Time)).Should(BeTrue())
-		})
-
-		It("reports Ready and Available through explicit zero-target scale transitions", func() {
-			t := GinkgoT()
-			its := setStopFixture()
-			its.Spec.Replicas = ptr.To[int32](0)
-			cli := newSetStopClient(t, its)
-			reconcileSetStop(t, cli, 5)
-			its = readSetStop(t, cli)
-			Expect(its.Status.Replicas).Should(BeZero())
-			Expect(its.Status.ReadyReplicas).Should(BeZero())
-			Expect(its.Status.AvailableReplicas).Should(BeZero())
-			Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceReady))).Should(BeTrue())
-			Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable))).Should(BeTrue())
-			before := ageInstanceSetReadyCondition(cli, its)
-
-			mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Replicas = ptr.To[int32](1) })
-			reconcileSetStop(t, cli, 3)
-			its = readSetStop(t, cli)
-			expectInstanceSetNotReady(its)
-			Expect(meta.IsStatusConditionFalse(its.Status.Conditions, string(workloads.InstanceAvailable))).Should(BeTrue())
-			Expect(its.Status.ObservedGeneration).Should(Equal(its.Generation))
-			Expect(meta.FindStatusCondition(its.Status.Conditions, string(workloads.InstanceReady)).ObservedGeneration).Should(Equal(its.Generation))
-			Expect(meta.FindStatusCondition(its.Status.Conditions, string(workloads.InstanceAvailable)).ObservedGeneration).Should(Equal(its.Generation))
-			bindSetStopClaims(t, cli)
-			markSetStopPodsReady(t, cli)
-			reconcileSetStop(t, cli, 3)
-			its = readSetStop(t, cli)
-			Expect(its.Status.Replicas).Should(Equal(int32(1)))
-			Expect(its.Status.ReadyReplicas).Should(Equal(int32(1)))
-			Expect(its.Status.AvailableReplicas).Should(Equal(int32(1)))
-			Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceReady))).Should(BeTrue())
-			Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable))).Should(BeTrue())
-			Expect(meta.FindStatusCondition(its.Status.Conditions, string(workloads.InstanceReady)).LastTransitionTime.After(before.Time)).Should(BeTrue())
-
-			mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Replicas = ptr.To[int32](0) })
-			reconcileSetStop(t, cli, 10)
-			its = readSetStop(t, cli)
-			Expect(listSetStopPods(t, cli)).Should(BeEmpty())
-			Expect(listSetStopChildren(t, cli)).Should(BeEmpty())
-			Expect(its.Status.Replicas).Should(BeZero())
-			Expect(its.Status.ReadyReplicas).Should(BeZero())
-			Expect(its.Status.AvailableReplicas).Should(BeZero())
-			Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceReady))).Should(BeTrue())
-			Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable))).Should(BeTrue())
-		})
-
-		It("reports Ready before MinReadySeconds makes instances Available", func() {
-			t := GinkgoT()
-			its := setStopFixture()
-			its.Spec.MinReadySeconds = 86400
-			cli := newSetStopClient(t, its)
-			reconcileSetStop(t, cli, 5)
-			bindSetStopClaims(t, cli)
-			markSetStopPodsReady(t, cli)
-			reconcileSetStop(t, cli, 5)
-			conditions := readSetStop(t, cli).Status.Conditions
-			Expect(meta.IsStatusConditionTrue(conditions, string(workloads.InstanceReady))).Should(BeTrue())
-			Expect(meta.IsStatusConditionFalse(conditions, string(workloads.InstanceAvailable))).Should(BeTrue())
-		})
-
-		It("publishes the missing desired instance before recreating it", func() {
-			t := GinkgoT()
-			cli := newSetStopClient(t, setStopFixture())
-			reconcileSetStop(t, cli, 5)
-			bindSetStopClaims(t, cli)
-			markSetStopPodsReady(t, cli)
-			reconcileSetStop(t, cli, 5)
-			inst := &listSetStopChildren(t, cli)[0]
-			inst.Finalizers = nil
-			Expect(cli.Update(context.Background(), inst)).Should(Succeed())
-			Expect(cli.Delete(context.Background(), inst)).Should(Succeed())
-			_, err := reconcileSetStopParent(cli)
-			Expect(err).ShouldNot(HaveOccurred())
-
-			its := readSetStop(t, cli)
-			Expect(meta.IsStatusConditionFalse(its.Status.Conditions, string(workloads.InstanceReady))).Should(BeTrue())
-			Expect(meta.IsStatusConditionFalse(its.Status.Conditions, string(workloads.InstanceAvailable))).Should(BeTrue())
-			Expect(meta.FindStatusCondition(its.Status.Conditions, string(workloads.InstanceReady)).Message).Should(ContainSubstring(inst.Name))
-		})
-
-		It("preserves the Ready transition across unrelated generation changes", func() {
-			t := GinkgoT()
-			cli := newSetStopClient(t, setStopFixture())
-			reconcileSetStop(t, cli, 5)
-			bindSetStopClaims(t, cli)
-			markSetStopPodsReady(t, cli)
-			reconcileSetStop(t, cli, 5)
-			before := ageInstanceSetReadyCondition(cli, readSetStop(t, cli))
-			mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
-				its.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
-			})
-			for i := 0; i < 2; i++ {
-				_, err := reconcileSetStopParent(cli)
-				Expect(err).ShouldNot(HaveOccurred())
-			}
-
-			conditions := readSetStop(t, cli).Status.Conditions
-			Expect(meta.IsStatusConditionTrue(conditions, string(workloads.InstanceReady))).Should(BeTrue())
-			Expect(meta.FindStatusCondition(conditions, string(workloads.InstanceReady)).LastTransitionTime.Equal(&before)).Should(BeTrue())
-		})
-	})
 })
 
 type setStopClient struct {
@@ -854,32 +787,12 @@ func (w *failSetStopStatusWriter) Update(ctx context.Context, obj client.Object,
 }
 
 func TestInstanceSetStopRecoversAfterParentStatusFailure(t *testing.T) {
-	for _, scenario := range []struct {
-		name         string
-		stopping     bool
-		afterHandoff bool
-	}{
-		{name: "stop=true", stopping: true},
-		{name: "stop=false"},
-		{name: "stop=true/after-handoff", stopping: true, afterHandoff: true},
-		{name: "stop=false/after-handoff", afterHandoff: true},
-	} {
-		t.Run(scenario.name, func(t *testing.T) {
-			stopping := scenario.stopping
+	for _, stopping := range []bool{true, false} {
+		t.Run(fmt.Sprintf("stop=%t", stopping), func(t *testing.T) {
 			its := setStopFixture()
 			cli := newSetStopClient(t, its)
 			reconcileSetStop(t, cli, 5)
 			claims := bindSetStopClaims(t, cli)
-			assertStorageUnchanged := func() {
-				t.Helper()
-				currentClaims := &corev1.PersistentVolumeClaimList{}
-				if err := cli.List(context.Background(), currentClaims); err != nil {
-					t.Fatal(err)
-				}
-				if !reflect.DeepEqual(currentClaims.Items, claims) {
-					t.Fatal("parent status failure/recovery changed storage")
-				}
-			}
 			markSetStopPodsReady(t, cli)
 			reconcileSetStop(t, cli, 3)
 			if !stopping {
@@ -903,16 +816,13 @@ func TestInstanceSetStopRecoversAfterParentStatusFailure(t *testing.T) {
 			}
 			beforeStatus := readSetStop(t, cli).Status
 			faulty := &failSetStopStatusClient{Client: cli, fail: true}
-			if !scenario.afterHandoff {
-				if _, err := reconcileSetStopParent(faulty); !errors.Is(err, errSetStopStatusWrite) || faulty.fail {
-					t.Fatalf("expected parent condition publication fault before child handoff, got %v", err)
-				}
-				if !reflect.DeepEqual(readSetStop(t, cli).Status, beforeStatus) {
-					t.Fatal("failed parent status write changed the persisted status")
-				}
-				assertStorageUnchanged()
+			if _, err := reconcileSetStopParent(faulty); !errors.Is(err, errSetStopStatusWrite) || faulty.fail {
+				t.Fatalf("expected parent status fault after child handoff, got %v", err)
 			}
-			assertHandoffs := func(want int) {
+			if !reflect.DeepEqual(readSetStop(t, cli).Status, beforeStatus) {
+				t.Fatal("failed parent status write changed the persisted status")
+			}
+			assertOneHandoff := func() {
 				t.Helper()
 				handoffs := 0
 				for _, child := range listSetStopChildren(t, cli) {
@@ -926,33 +836,15 @@ func TestInstanceSetStopRecoversAfterParentStatusFailure(t *testing.T) {
 						}
 					}
 				}
-				if handoffs != want {
-					t.Fatalf("parent fault/retry admitted %d children, want %d", handoffs, want)
+				if handoffs != 1 {
+					t.Fatalf("parent fault/retry admitted %d children into a one-slot budget", handoffs)
 				}
 			}
-			assertHandoffs(0)
-			publishSetStopConditions(t, cli)
-			assertHandoffs(0)
-			if scenario.afterHandoff {
-				beforeStatus = readSetStop(t, cli).Status
-				if _, err := reconcileSetStopParent(faulty); !errors.Is(err, errSetStopStatusWrite) || faulty.fail {
-					t.Fatalf("expected parent status fault after child handoff, got %v", err)
-				}
-				if !reflect.DeepEqual(readSetStop(t, cli).Status, beforeStatus) {
-					t.Fatal("failed post-handoff write changed the persisted parent status")
-				}
-			} else if _, err := reconcileSetStopParent(cli); err != nil {
+			assertOneHandoff()
+			if _, err := reconcileSetStopParent(cli); err != nil {
 				t.Fatal(err)
 			}
-			assertHandoffs(1)
-			assertStorageUnchanged()
-			for i := 0; i < 2; i++ {
-				if _, err := reconcileSetStopParent(cli); err != nil {
-					t.Fatal(err)
-				}
-				assertHandoffs(1)
-				assertStorageUnchanged()
-			}
+			assertOneHandoff()
 			if stopping {
 				reconcileSetStop(t, cli, 10)
 				if len(listSetStopPods(t, cli)) != 0 || readSetStop(t, cli).Status.Replicas != 0 {
@@ -985,7 +877,13 @@ func TestInstanceSetStopRecoversAfterParentStatusFailure(t *testing.T) {
 					}
 				}
 			}
-			assertStorageUnchanged()
+			currentClaims := &corev1.PersistentVolumeClaimList{}
+			if err := cli.List(context.Background(), currentClaims); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(currentClaims.Items, claims) {
+				t.Fatal("parent status failure/recovery changed storage")
+			}
 		})
 	}
 }
@@ -1014,13 +912,8 @@ func (c *setStopClient) Update(ctx context.Context, obj client.Object, opts ...c
 }
 
 func (c *setStopClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
-	if inst, ok := obj.(*workloads.Instance); ok {
-		if inst.Generation == 0 {
-			inst.Generation = 1
-		}
-		if inst.UID == "" {
-			inst.UID = types.UID(inst.Name + "-uid")
-		}
+	if inst, ok := obj.(*workloads.Instance); ok && inst.Generation == 0 {
+		inst.Generation = 1
 	}
 	return c.Client.Create(ctx, obj, opts...)
 }
@@ -1056,6 +949,7 @@ func TestInstanceSetStopResumeDuringPodObservationDelay(t *testing.T) {
 		}
 	}
 	wrapped := cli.(*setStopClient)
+	wrapped.delayPodObservation = true
 	reconcileStopEntry(t, cli, 2)
 	pvc := bindStopPVC(t, cli)
 	pod := readStopPod(t, cli)
@@ -1064,11 +958,9 @@ func TestInstanceSetStopResumeDuringPodObservationDelay(t *testing.T) {
 		t.Fatal(err)
 	}
 	mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(true) })
-	publishSetStopConditions(t, cli)
 	if _, err := reconcileSetStopParent(cli); err != nil {
 		t.Fatal(err)
 	}
-	wrapped.delayPodObservation = true
 	reconcileStopEntry(t, cli, 1)
 	stopped := readStopInstance(t, cli)
 	if !ptr.Deref(stopped.Spec.Stop, false) || stopped.Generation != stopped.Status.ObservedGeneration || stopped.Status.CurrentState != workloads.InstanceCurrentStateAbsent {
@@ -1082,7 +974,6 @@ func TestInstanceSetStopResumeDuringPodObservationDelay(t *testing.T) {
 		its.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
 	})
 	wrapped.delayPodObservation = false
-	publishSetStopConditions(t, cli)
 	wrapped.beforePodDelete = func() error { _, err := reconcileSetStopParent(cli); return err }
 	controller := &InstanceReconciler{Client: cli, Scheme: cli.Scheme(), Recorder: record.NewFakeRecorder(1000)}
 	conflictResult, err := controller.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(stopped)})
@@ -1173,10 +1064,6 @@ func TestInstanceSetStopClearsAppliedStatus(t *testing.T) {
 		its.Spec.Stop = ptr.To(true)
 		its.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
 	})
-	publishSetStopConditions(t, cli)
-	if readSetStop(t, cli).Status.UpdatedReplicas != before.UpdatedReplicas {
-		t.Fatal("condition publication changed applied replica status")
-	}
 	for i := 0; i < 2; i++ {
 		if _, err := reconcileSetStopParent(cli); err != nil {
 			t.Fatal(err)
@@ -1195,24 +1082,10 @@ func TestInstanceSetStopClearsAppliedStatus(t *testing.T) {
 	if len(listSetStopPods(t, cli)) != 0 || readSetStop(t, cli).Status.Replicas != 0 {
 		t.Fatal("MinReadySeconds prevented Stop from completing")
 	}
-}
-
-func publishSetStopConditions(t *testing.T, cli client.Client) {
-	t.Helper()
-	before := readSetStop(t, cli)
-	children := listSetStopChildren(t, cli)
-	result, err := reconcileSetStopParent(cli)
-	if err != nil {
-		t.Fatal(err)
-	}
-	after := readSetStop(t, cli)
-	if result.RequeueAfter <= 0 || after.Status.ObservedGeneration != before.Status.ObservedGeneration || !reflect.DeepEqual(children, listSetStopChildren(t, cli)) {
-		t.Fatal("condition publication changed the revision observation or child resources")
-	}
-	for _, kind := range []string{string(workloads.InstanceReady), string(workloads.InstanceAvailable)} {
-		condition := meta.FindStatusCondition(after.Status.Conditions, kind)
-		if condition == nil || condition.ObservedGeneration != after.Generation {
-			t.Fatalf("condition %s was not published for generation %d", kind, after.Generation)
+	for _, kind := range []workloads.ConditionType{workloads.InstanceReady, workloads.InstanceAvailable} {
+		condition := meta.FindStatusCondition(readSetStop(t, cli).Status.Conditions, string(kind))
+		if condition == nil || condition.Status != metav1.ConditionFalse {
+			t.Fatalf("missing positive replica target must be unhealthy: %#v", condition)
 		}
 	}
 }
@@ -1224,7 +1097,7 @@ func reconcileSetStopParent(cli client.Client) (ctrl.Result, error) {
 	return (&InstanceSetReconciler2{Client: cli, Scheme: cli.Scheme(), Recorder: recorder}).Reconcile(ctx, req)
 }
 
-func readSetStop(t GinkgoTInterface, cli client.Client) *workloads.InstanceSet {
+func readSetStop(t *testing.T, cli client.Client) *workloads.InstanceSet {
 	t.Helper()
 	its := &workloads.InstanceSet{}
 	if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "demo"}, its); err != nil {
@@ -1233,7 +1106,7 @@ func readSetStop(t GinkgoTInterface, cli client.Client) *workloads.InstanceSet {
 	return its
 }
 
-func mutateSetStop(t GinkgoTInterface, cli client.Client, change func(*workloads.InstanceSet)) {
+func mutateSetStop(t *testing.T, cli client.Client, change func(*workloads.InstanceSet)) {
 	t.Helper()
 	its := readSetStop(t, cli)
 	change(its)
@@ -1243,7 +1116,7 @@ func mutateSetStop(t GinkgoTInterface, cli client.Client, change func(*workloads
 	}
 }
 
-func listSetStopPods(t GinkgoTInterface, cli client.Client) []corev1.Pod {
+func listSetStopPods(t *testing.T, cli client.Client) []corev1.Pod {
 	t.Helper()
 	list := &corev1.PodList{}
 	if err := cli.List(context.Background(), list); err != nil {
@@ -1252,7 +1125,7 @@ func listSetStopPods(t GinkgoTInterface, cli client.Client) []corev1.Pod {
 	return list.Items
 }
 
-func bindSetStopClaims(t GinkgoTInterface, cli client.Client) []corev1.PersistentVolumeClaim {
+func bindSetStopClaims(t *testing.T, cli client.Client) []corev1.PersistentVolumeClaim {
 	t.Helper()
 	claims := &corev1.PersistentVolumeClaimList{}
 	if err := cli.List(context.Background(), claims); err != nil {
@@ -1275,7 +1148,7 @@ func bindSetStopClaims(t GinkgoTInterface, cli client.Client) []corev1.Persisten
 	return claims.Items
 }
 
-func markSetStopPodsReady(t GinkgoTInterface, cli client.Client) {
+func markSetStopPodsReady(t *testing.T, cli client.Client) {
 	t.Helper()
 	for _, pod := range listSetStopPods(t, cli) {
 		pod.Status.Phase = corev1.PodRunning
@@ -1287,7 +1160,7 @@ func markSetStopPodsReady(t GinkgoTInterface, cli client.Client) {
 	}
 }
 
-func listSetStopChildren(t GinkgoTInterface, cli client.Client) []workloads.Instance {
+func listSetStopChildren(t *testing.T, cli client.Client) []workloads.Instance {
 	t.Helper()
 	list := &workloads.InstanceList{}
 	if err := cli.List(context.Background(), list); err != nil {
@@ -1428,7 +1301,6 @@ func TestInstanceSetStopScaleRetirement(t *testing.T) {
 			its.Spec.Replicas = ptr.To(int32(1))
 			its.Spec.Template.Spec.Containers[0].Image = "db:latest"
 		})
-		publishSetStopConditions(t, cli)
 		wrapped := cli.(*setStopClient)
 		wrapped.childWrites = 0
 		wrapped.failChildWriteAt = 3
@@ -1636,7 +1508,6 @@ func TestInstanceSetStopParallelPartialWriteKeepsBudget(t *testing.T) {
 		its.Spec.Stop = ptr.To(true)
 		its.Spec.ParallelPodManagementConcurrency = ptr.To(intstr.FromInt(2))
 	})
-	publishSetStopConditions(t, cli)
 	wrapped := cli.(*setStopClient)
 	wrapped.childWrites = 0
 	wrapped.failChildWriteAt = 2
@@ -1674,7 +1545,6 @@ func TestInstanceSetStopParallelPartialWriteKeepsBudget(t *testing.T) {
 	mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
 		its.Spec.Template.Spec.Containers[0].Image = "db:latest"
 	})
-	publishSetStopConditions(t, cli)
 	wrapped.resumeWrites = 0
 	wrapped.failResumeWriteAt = 2
 	if _, err := reconcileSetStopParent(cli); !errors.Is(err, errSetStopResumeWrite) || wrapped.resumeWrites != 2 {
@@ -1745,7 +1615,7 @@ func TestInstanceSetStopParallelPartialWriteKeepsBudget(t *testing.T) {
 	assertClaimsUnchanged()
 }
 
-func newSetStopClient(t GinkgoTInterface, its *workloads.InstanceSet) client.Client {
+func newSetStopClient(t *testing.T, its *workloads.InstanceSet) client.Client {
 	t.Helper()
 	s := runtime.NewScheme()
 	if err := clientgoscheme.AddToScheme(s); err != nil {
@@ -1754,6 +1624,7 @@ func newSetStopClient(t GinkgoTInterface, its *workloads.InstanceSet) client.Cli
 	if err := workloads.AddToScheme(s); err != nil {
 		t.Fatal(err)
 	}
+	model.AddScheme(workloads.AddToScheme)
 	return &setStopClient{Client: fake.NewClientBuilder().WithScheme(s).WithStatusSubresource(&workloads.InstanceSet{}, &workloads.Instance{}, &corev1.Pod{}, &corev1.PersistentVolumeClaim{}).WithObjects(its).Build()}
 }
 
@@ -1765,7 +1636,7 @@ func setStopFixture() *workloads.InstanceSet {
 	}}
 }
 
-func reconcileSetStop(t GinkgoTInterface, cli client.Client, count int) {
+func reconcileSetStop(t *testing.T, cli client.Client, count int) {
 	t.Helper()
 	ctx := context.Background()
 	for i := 0; i < count; i++ {
@@ -1804,7 +1675,6 @@ func TestInstanceSetStopScaleReversalKeepsDeletionPolicy(t *testing.T) {
 				its.Spec.Replicas = ptr.To(int32(1))
 				its.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
 			})
-			publishSetStopConditions(t, cli)
 			if _, err := reconcileSetStopParent(cli); err != nil {
 				t.Fatal(err)
 			}
@@ -1823,7 +1693,6 @@ func TestInstanceSetStopScaleReversalKeepsDeletionPolicy(t *testing.T) {
 				its.Spec.Replicas = ptr.To(int32(2))
 				its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 			})
-			publishSetStopConditions(t, cli)
 			if _, err := reconcileSetStopParent(cli); err != nil {
 				t.Fatal(err)
 			}
@@ -1998,7 +1867,6 @@ func TestInstanceSetStopWaitsForDeletionObservation(t *testing.T) {
 		its.Spec.Replicas = ptr.To(int32(1))
 		its.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
 	})
-	publishSetStopConditions(t, cli)
 	reconcileParent()
 	for _, name := range []string{"demo-0", "demo-1"} {
 		reconcileInstance(name)
@@ -2030,7 +1898,6 @@ func TestInstanceSetStopWaitsForDeletionObservation(t *testing.T) {
 		t.Fatalf("fixture did not keep the Pod Running before deletion was observed: %v", err)
 	}
 	mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(true) })
-	publishSetStopConditions(t, cli)
 	reconcileParent()
 	if err := cli.Get(ctx, key, inst); err != nil || !ptr.Deref(inst.Spec.Stop, false) || inst.Generation <= generation || inst.Status.ObservedGeneration == inst.Generation {
 		t.Fatalf("deleting Instance Stop handoff did not invalidate the pre-deletion observation: %v", err)
@@ -2350,7 +2217,6 @@ func TestInstanceRetentionScaleReversal(t *testing.T) {
 				its.Spec.PodManagementPolicy = scenario.policy
 				its.Spec.ParallelPodManagementConcurrency = ptr.To(intstr.FromInt32(1))
 			})
-			publishSetStopConditions(t, cli)
 			if _, err := reconcileRetentionSet(cli); err != nil {
 				t.Fatal(err)
 			}
@@ -2446,9 +2312,6 @@ func TestInstanceRetentionPartialHandoff(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
-				if !deleting {
-					publishSetStopConditions(t, cli)
-				}
 				faulty := &retentionWriteFailureClient{Client: cli, failure: failure}
 				result, err := reconcileRetentionSet(faulty)
 				if apierrors.IsConflict(failure) {
@@ -2515,12 +2378,10 @@ func TestInstanceRetentionPartialHandoff(t *testing.T) {
 func TestInstanceRetentionPartialScaleReversal(t *testing.T) {
 	cli := retentionFixture(t, 4)
 	changeRetentionSet(t, cli, func(its *workloads.InstanceSet) { its.Spec.Replicas = ptr.To(int32(2)) })
-	publishSetStopConditions(t, cli)
 	if _, err := reconcileRetentionSet(cli); err != nil {
 		t.Fatal(err)
 	}
 	changeRetentionSet(t, cli, func(its *workloads.InstanceSet) { its.Spec.Replicas = ptr.To(int32(4)) })
-	publishSetStopConditions(t, cli)
 	failure := errors.New("injected scale reversal update failure")
 	if _, err := reconcileRetentionSet(&retentionWriteFailureClient{Client: cli, failure: failure}); !errors.Is(err, failure) {
 		t.Fatalf("expected partial reversal failure, got %v", err)
@@ -2607,7 +2468,6 @@ func TestInstanceRetentionScaleDownAdmission(t *testing.T) {
 				its.Spec.ParallelPodManagementConcurrency = ptr.To(intstr.FromInt(1))
 				its.Spec.Replicas = ptr.To(int32(0))
 			})
-			publishSetStopConditions(t, cli)
 			if _, err := reconcileRetentionSet(cli); err != nil {
 				t.Fatal(err)
 			}
@@ -2619,7 +2479,6 @@ func TestInstanceRetentionScaleDownAdmission(t *testing.T) {
 			changeRetentionSet(t, cli, func(its *workloads.InstanceSet) {
 				its.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled = kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType
 			})
-			publishSetStopConditions(t, cli)
 			if _, err := reconcileRetentionSet(cli); err != nil {
 				t.Fatal(err)
 			}

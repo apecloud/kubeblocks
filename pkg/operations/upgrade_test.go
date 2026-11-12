@@ -1032,10 +1032,8 @@ func TestUpgradeInstanceTemplateOwnerConvergence(t *testing.T) {
 				if err := tree.Update(pod); err != nil {
 					t.Fatal(err)
 				}
-				for i := 0; i < 2; i++ {
-					if _, err := instanceset.NewStatusReconciler().Reconcile(tree); err != nil {
-						t.Fatal(err)
-					}
+				if _, err := instanceset.NewStatusReconciler().Reconcile(tree); err != nil {
+					t.Fatal(err)
 				}
 			}
 			publish()

@@ -221,7 +221,8 @@ var _ = Describe("component status transformer conditions", func() {
 				its.Status.ReadyReplicas = 1
 			}, false),
 			Entry("ready condition belongs to a previous generation", func(its *workloads.InstanceSet) {
-				its.Status.Conditions[0].ObservedGeneration--
+				its.Generation++
+				its.Status.ObservedGeneration = its.Generation
 			}, false),
 			Entry("ready condition is false", func(its *workloads.InstanceSet) {
 				its.Status.Conditions[0].Status = metav1.ConditionFalse

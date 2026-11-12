@@ -70,7 +70,15 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.Continue, nil
 	}
 	_, err = r.reconcileStatus(tree)
-	return kubebuilderx.Continue, err
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	if its.Spec.MinReadySeconds > 0 && (its.Status.ReadyReplicas > its.Status.AvailableReplicas ||
+		(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceReady)) &&
+			!meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable)))) {
+		return kubebuilderx.ContinueWithRetryAfter(time.Second), nil
+	}
+	return kubebuilderx.Continue, nil
 }
 
 func reconcileReadiness(tree *kubebuilderx.ObjectTree) error {

@@ -51,7 +51,10 @@ func NewUpdateReconciler() kubebuilderx.Reconciler {
 }
 
 func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
-	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
+	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) || isStopRequested(tree.GetRoot().(*workloads.InstanceSet)) {
+		return kubebuilderx.ConditionUnsatisfied
+	}
+	if model.IsReconciliationPaused(tree.GetRoot()) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
 	return kubebuilderx.ConditionSatisfied
@@ -59,15 +62,6 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
-	result := kubebuilderx.Continue
-	if its.Spec.MinReadySeconds > 0 && (its.Status.ReadyReplicas > its.Status.AvailableReplicas ||
-		(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceReady)) &&
-			!meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable)))) {
-		result = kubebuilderx.RetryAfter(time.Second)
-	}
-	if model.IsReconciliationPaused(its) || isStopRequested(its) {
-		return result, nil
-	}
 	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
 	if err != nil {
 		return kubebuilderx.Continue, err
@@ -91,6 +85,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	oldNameSet := sets.New[string]()
 	oldInstanceMap := make(map[string]*corev1.Pod)
 	var oldPodList []*corev1.Pod
+	result := kubebuilderx.Continue
 	for _, object := range tree.List(&corev1.Pod{}) {
 		oldNameSet.Insert(object.GetName())
 		pod, _ := object.(*corev1.Pod)

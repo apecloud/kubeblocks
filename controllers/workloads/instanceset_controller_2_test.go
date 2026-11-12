@@ -32,6 +32,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -922,6 +923,12 @@ func TestInstanceSetStopClearsAppliedStatus(t *testing.T) {
 	reconcileSetStop(t, cli, 10)
 	if len(listSetStopPods(t, cli)) != 0 || readSetStop(t, cli).Status.Replicas != 0 {
 		t.Fatal("MinReadySeconds prevented Stop from completing")
+	}
+	for _, kind := range []workloads.ConditionType{workloads.InstanceReady, workloads.InstanceAvailable} {
+		condition := meta.FindStatusCondition(readSetStop(t, cli).Status.Conditions, string(kind))
+		if condition == nil || condition.Status != metav1.ConditionFalse {
+			t.Fatalf("missing positive replica target must be unhealthy: %#v", condition)
+		}
 	}
 }
 

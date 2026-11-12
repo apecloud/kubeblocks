@@ -22,6 +22,7 @@ package instanceset
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -30,6 +31,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -40,6 +42,70 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
+
+func TestStatusConditionsRequireExpectedInstances(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		replicas       *int32
+		ready, failed  []string
+		named, healthy bool
+	}{
+		{name: "no instances", replicas: ptr.To[int32](2)},
+		{name: "healthy subset", replicas: ptr.To[int32](2), ready: []string{"demo-0"}},
+		{name: "wrong identity replaces a missing target", replicas: ptr.To[int32](2), ready: []string{"demo-0", "demo-2"}},
+		{name: "old default identity cannot replace named target", replicas: ptr.To[int32](2), ready: []string{"demo-0", "demo-1"}, named: true},
+		{name: "all targets healthy", replicas: ptr.To[int32](2), ready: []string{"demo-0", "demo-1"}, healthy: true},
+		{name: "failed target", replicas: ptr.To[int32](1), failed: []string{"demo-0"}},
+		{name: "failed extra does not block healthy target", replicas: ptr.To[int32](1), ready: []string{"demo-0"}, failed: []string{"demo-1"}, healthy: true},
+		{name: "zero target with failed extra", replicas: ptr.To[int32](0), failed: []string{"demo-0"}, healthy: true},
+		{name: "default target is one", ready: []string{"demo-0"}, healthy: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			its := &workloads.InstanceSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", Generation: 1},
+				Spec: workloads.InstanceSetSpec{Replicas: tc.replicas,
+					Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "db", Image: "db:v1"}}}}},
+				Status: workloads.InstanceSetStatus{ObservedGeneration: 1},
+			}
+			if tc.named {
+				its.Spec.Instances = []workloads.InstanceTemplate{{Name: "named", Replicas: ptr.To[int32](1)}}
+			}
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			for _, name := range append(append([]string(nil), tc.ready...), tc.failed...) {
+				pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"}, Spec: *its.Spec.Template.Spec.DeepCopy()}
+				pod.Status.Phase = corev1.PodFailed
+				if slices.Contains(tc.ready, name) {
+					pod.Status.Phase = corev1.PodRunning
+					pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: metav1.Now()}}
+					pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "db", Image: "db:v1", Ready: true}}
+				}
+				if err := tree.Add(pod); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			for _, kind := range []workloads.ConditionType{workloads.InstanceReady, workloads.InstanceAvailable} {
+				condition := meta.FindStatusCondition(its.Status.Conditions, string(kind))
+				want := metav1.ConditionFalse
+				if tc.healthy {
+					want = metav1.ConditionTrue
+				}
+				if condition == nil || condition.Status != want {
+					t.Errorf("%s = %#v, want %s", kind, condition, want)
+				}
+			}
+			if its.Status.Replicas != int32(len(tc.ready)+len(tc.failed)) || its.Status.ReadyReplicas != int32(len(tc.ready)) || its.Status.AvailableReplicas != int32(len(tc.ready)) {
+				t.Errorf("runtime counts must retain extra instances: %#v", its.Status)
+			}
+			if meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceFailure)) != (len(tc.failed) > 0) {
+				t.Error("failure reporting must retain extra instances")
+			}
+		})
+	}
+}
 
 var _ = Describe("status reconciler test", func() {
 	BeforeEach(func() {
@@ -88,6 +154,11 @@ var _ = Describe("status reconciler test", func() {
 		Expect(result).Should(Equal(kubebuilderx.Continue))
 		Expect(its.Status.ReadyReplicas).Should(BeZero())
 		Expect(its.Status.InstanceStatus).Should(HaveLen(2))
+		for _, kind := range []workloads.ConditionType{workloads.InstanceReady, workloads.InstanceAvailable} {
+			condition := meta.FindStatusCondition(its.Status.Conditions, string(kind))
+			Expect(condition).ShouldNot(BeNil())
+			Expect(condition.Status).Should(Equal(metav1.ConditionFalse))
+		}
 		for name, template := range map[string]string{"demo-0": "b", "demo-1": "a"} {
 			status := its.FindInstanceStatus(name)
 			Expect(status).ShouldNot(BeNil())

@@ -309,7 +309,7 @@ type InstanceSetStatus struct {
 	UpdateRevision string `json:"updateRevision,omitempty"`
 
 	// Represents the latest available observations of an instanceset's current state.
-	// Known .status.conditions.type are: "InstanceFailure", "InstanceReady", "Restore"
+	// Known .status.conditions.type are: "InstanceFailure", "InstanceReady", "InstanceAvailable", "Restore".
 	//
 	// +optional
 	// +patchMergeKey=type
@@ -772,13 +772,21 @@ type InstanceTemplateStatus struct {
 type ConditionType string
 
 const (
-	// InstanceReady is added in an instance set when at least one of its instances(pods) is in a Ready condition.
-	// ConditionStatus will be True if all its instances(pods) are in a Ready condition.
-	// Or, a NotReady reason with not ready instances encoded in the Message filed will be set.
+	// InstanceReady indicates whether an Instance is ready.
+	// For an InstanceSet, it is True when every expected instance exists and is ready,
+	// and False when any expected instance is missing or not ready.
+	// Expected instances follow the replica and instance-template configuration.
+	// The expected replica count is spec.replicas, which defaults to 1.
+	// An explicit replica count of 0 makes this condition True.
+	// Instances outside the expected set do not affect this condition.
 	InstanceReady ConditionType = "InstanceReady"
 
-	// InstanceAvailable ConditionStatus will be True if all instances(pods) are in the ready condition
-	// and continue for "MinReadySeconds" seconds. Otherwise, it will be set to False.
+	// InstanceAvailable indicates whether an Instance is ready and has remained ready
+	// for at least spec.minReadySeconds seconds.
+	// For an InstanceSet, it is True when every expected instance is available,
+	// and False when any expected instance is missing or unavailable.
+	// An explicit replica count of 0 makes this condition True.
+	// Instances outside the expected set do not affect this condition.
 	InstanceAvailable ConditionType = "InstanceAvailable"
 
 	// InstanceFailure is added in an instance set when at least one of its instances(pods) is in a `Failed` phase.

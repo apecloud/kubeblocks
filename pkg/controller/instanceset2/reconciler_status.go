@@ -114,7 +114,8 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			readyReplicas++
 			template2TemplatesStatus[templateName].ReadyReplicas++
 			notReadyNames.Delete(inst.Name)
-			if intctrlutil.IsInstanceAvailable(inst) {
+			if its.Spec.MinReadySeconds == 0 ||
+				(inst.Spec.MinReadySeconds >= its.Spec.MinReadySeconds && intctrlutil.IsInstanceAvailable(inst)) {
 				availableReplicas++
 				template2TemplatesStatus[templateName].AvailableReplicas++
 				notAvailableNames.Delete(inst.Name)
@@ -191,7 +192,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		pendingLifecycle = pendingLifecycle || ptr.Deref(inst.Spec.Stop, false)
 	}
 	if !pendingLifecycle && its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
-		return kubebuilderx.RetryAfter(time.Second), nil
+		return kubebuilderx.ContinueWithRetryAfter(time.Second), nil
 	}
 	return kubebuilderx.Continue, nil
 }
@@ -443,13 +444,15 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 			// InstanceSet revisions identify desired Instance specs, while Instance CurrentRevision identifies the
 			// actual Pod revision. Keep the two revision domains separate.
 			instanceSpecRevision := getInstanceRevision(inst)
+			available := its.Spec.MinReadySeconds == 0 ||
+				(inst.Spec.MinReadySeconds >= its.Spec.MinReadySeconds && intctrlutil.IsInstanceAvailable(inst))
 			observation := instancestatus.Observation{
 				InstanceName:    inst.Name,
 				State:           inst.Status.CurrentState,
 				Revision:        inst.Status.CurrentRevision,
 				UpToDate:        isInstanceUpdatedWithRevisions(inst, instanceSpecRevision, instanceSpecUpdateRevisions),
 				Ready:           inst.Status.Ready,
-				Available:       inst.Status.Available,
+				Available:       available,
 				Failed:          meta.IsStatusConditionTrue(inst.Status.Conditions, string(workloads.InstanceFailure)),
 				Configs:         inst.Status.Configs,
 				VolumeExpansion: inst.Status.VolumeExpansion,

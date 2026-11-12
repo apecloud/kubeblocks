@@ -45,6 +45,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -54,6 +55,86 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
+
+func TestInstanceSetPropagatesAvailabilityPolicy(t *testing.T) {
+	its := setStopFixture()
+	cli := newSetStopClient(t, its)
+	reconcileSetStop(t, cli, 5)
+	bindSetStopClaims(t, cli)
+	markSetStopPodsReady(t, cli)
+	for _, pod := range listSetStopPods(t, cli) {
+		pod.Status.Conditions[0].LastTransitionTime = metav1.Now()
+		if err := cli.Status().Update(context.Background(), &pod); err != nil {
+			t.Fatal(err)
+		}
+	}
+	reconcileSetStop(t, cli, 3)
+	readyTime := meta.FindStatusCondition(readSetStop(t, cli).Status.Conditions, string(workloads.InstanceReady)).LastTransitionTime
+	parentClient := &setStopClient{Client: interceptor.NewClient(cli.(*setStopClient).Client.(client.WithWatch), interceptor.Funcs{
+		Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+			switch obj.(type) {
+			case *corev1.Pod, *corev1.PersistentVolumeClaim:
+				t.Fatalf("InstanceSet must not read %T", obj)
+			}
+			return c.Get(ctx, key, obj, opts...)
+		},
+		List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+			switch list.(type) {
+			case *corev1.PodList, *corev1.PersistentVolumeClaimList:
+				t.Fatalf("InstanceSet must not list %T", list)
+			}
+			return c.List(ctx, list, opts...)
+		},
+	})}
+	mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
+		its.Spec.Paused = true
+		its.Spec.MinReadySeconds = 30
+	})
+	for i := 0; i < 2; i++ {
+		if _, err := reconcileSetStopParent(parentClient); err != nil {
+			t.Fatal(err)
+		}
+	}
+	its = readSetStop(t, cli)
+	if !meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceReady)) ||
+		!meta.FindStatusCondition(its.Status.Conditions, string(workloads.InstanceReady)).LastTransitionTime.Equal(&readyTime) ||
+		!meta.IsStatusConditionFalse(its.Status.Conditions, string(workloads.InstanceAvailable)) ||
+		its.Status.AvailableReplicas != 0 || its.FindInstanceStatus("demo-0").Available {
+		t.Fatalf("parent accepted availability under the old child policy: %#v", its.Status)
+	}
+	mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Paused = false })
+	for i := 0; i < 2; i++ {
+		if _, err := reconcileSetStopParent(parentClient); err != nil {
+			t.Fatal(err)
+		}
+	}
+	its = readSetStop(t, cli)
+	if !meta.IsStatusConditionFalse(its.Status.Conditions, string(workloads.InstanceAvailable)) || its.Status.AvailableReplicas != 0 {
+		t.Fatal("parent accepted availability before the child observed its policy")
+	}
+	pending := 0
+	for _, child := range listSetStopChildren(t, cli) {
+		if child.Spec.MinReadySeconds == 30 && child.Generation != child.Status.ObservedGeneration && child.Status.Available {
+			pending++
+		}
+		if status := its.FindInstanceStatus(child.Name); status == nil || status.Available {
+			t.Fatalf("%s reused an old Available report during policy propagation: %#v", child.Name, status)
+		}
+	}
+	if pending != 1 {
+		t.Fatalf("expected one handed-off child retaining an old Available report, got %d", pending)
+	}
+	markSetStopPodsReady(t, cli)
+	reconcileSetStop(t, cli, 5)
+	for _, child := range listSetStopChildren(t, cli) {
+		if child.Spec.MinReadySeconds != 30 {
+			t.Fatalf("availability waiting blocked policy propagation: %#v", child.Spec)
+		}
+	}
+	if !meta.IsStatusConditionTrue(readSetStop(t, cli).Status.Conditions, string(workloads.InstanceAvailable)) {
+		t.Fatal("parent did not recover after the child observed its policy")
+	}
+}
 
 var _ = Describe("InstanceSet Controller 2", func() {
 	var (
@@ -145,6 +226,21 @@ var _ = Describe("InstanceSet Controller 2", func() {
 	}
 
 	Context("provision", func() {
+		It("becomes Available without another Pod update", func() {
+			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
+				f.SetReplicas(1)
+				f.Get().Spec.MinReadySeconds = 2
+			})
+			mockPodStatusReady(itsKey.Namespace, podName(0), metav1.Now())
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceReady))).Should(BeTrue())
+				g.Expect(meta.IsStatusConditionFalse(its.Status.Conditions, string(workloads.InstanceAvailable))).Should(BeTrue())
+			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable))).Should(BeTrue())
+			}), 5*time.Second).Should(Succeed())
+		})
+
 		It("create & delete", func() {
 			createITSObj(itsName, nil)
 

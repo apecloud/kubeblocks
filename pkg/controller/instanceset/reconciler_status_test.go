@@ -84,8 +84,10 @@ func TestStatusConditionsRequireExpectedInstances(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-				t.Fatal(err)
+			for range 2 {
+				if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+					t.Fatal(err)
+				}
 			}
 			for _, kind := range []workloads.ConditionType{workloads.InstanceReady, workloads.InstanceAvailable} {
 				condition := meta.FindStatusCondition(its.Status.Conditions, string(kind))
@@ -149,6 +151,9 @@ var _ = Describe("status reconciler test", func() {
 		tree := kubebuilderx.NewObjectTree()
 		tree.SetRoot(its)
 
+		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+			Fail(err.Error())
+		}
 		result, err := NewStatusReconciler().Reconcile(tree)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(result).Should(Equal(kubebuilderx.Continue))
@@ -279,6 +284,9 @@ var _ = Describe("status reconciler test", func() {
 			By("all pods are not ready")
 			reconciler = NewStatusReconciler()
 			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ConditionSatisfied))
+			if _, err := reconciler.Reconcile(tree); err != nil {
+				Fail(err.Error())
+			}
 			res, err := reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
@@ -305,9 +313,12 @@ var _ = Describe("status reconciler test", func() {
 				makePodAvailableWithRevision(pod, oldRevision, false)
 				currentRevisionMap[pod.Name] = oldRevision
 			}
+			if _, err := reconciler.Reconcile(tree); err != nil {
+				Fail(err.Error())
+			}
 			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
-			Expect(res).Should(Equal(kubebuilderx.RetryAfter(time.Second)))
+			Expect(res).Should(Equal(kubebuilderx.ContinueWithRetryAfter(time.Second)))
 			Expect(its.Status.Replicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.ReadyReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(0))
@@ -339,6 +350,9 @@ var _ = Describe("status reconciler test", func() {
 				pod, ok := object.(*corev1.Pod)
 				Expect(ok).Should(BeTrue())
 				makePodAvailableWithRevision(pod, updateRevisions[pod.Name], true)
+			}
+			if _, err := reconciler.Reconcile(tree); err != nil {
+				Fail(err.Error())
 			}
 			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
@@ -377,6 +391,9 @@ var _ = Describe("status reconciler test", func() {
 				Expect(condition).ShouldNot(BeNil())
 				condition.Status = corev1.ConditionFalse
 			}
+			if _, err := reconciler.Reconcile(tree); err != nil {
+				Fail(err.Error())
+			}
 			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
@@ -406,6 +423,9 @@ var _ = Describe("status reconciler test", func() {
 				pod, ok := object.(*corev1.Pod)
 				Expect(ok).Should(BeTrue())
 				pod.Status.Phase = corev1.PodFailed
+			}
+			if _, err := reconciler.Reconcile(tree); err != nil {
+				Fail(err.Error())
 			}
 			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
@@ -440,6 +460,9 @@ var _ = Describe("status reconciler test", func() {
 				Expect(ok).Should(BeTrue())
 				makePodAvailableWithRevision(pod, updateRevisions[pod.Name], true)
 			}
+			if _, err := reconciler.Reconcile(tree); err != nil {
+				Fail(err.Error())
+			}
 			res, err := reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
@@ -458,6 +481,9 @@ var _ = Describe("status reconciler test", func() {
 				Expect(ok).Should(BeTrue())
 				pod.Spec.Containers[0].Image = newImage
 			}
+			if _, err := reconciler.Reconcile(tree); err != nil {
+				Fail(err.Error())
+			}
 			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
@@ -475,6 +501,9 @@ var _ = Describe("status reconciler test", func() {
 				pod, ok := object.(*corev1.Pod)
 				Expect(ok).Should(BeTrue())
 				makePodAvailableWithRevision(pod, updateRevisions[pod.Name], true)
+			}
+			if _, err := reconciler.Reconcile(tree); err != nil {
+				Fail(err.Error())
 			}
 			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
@@ -508,6 +537,9 @@ var _ = Describe("status reconciler test", func() {
 				break
 			}
 			reconciler = NewStatusReconciler()
+			if _, err := reconciler.Reconcile(tree); err != nil {
+				Fail(err.Error())
+			}
 			res, err := reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
@@ -700,8 +732,10 @@ func TestLegacyInstanceStatusTracksConfigAndPVCConvergence(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-			t.Fatal(err)
+		for range 2 {
+			if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
 		}
 		assertLegacyUpToDate(t, its, "demo-0", true)
 		assertLegacyUpToDate(t, its, "demo-1", true)
@@ -717,8 +751,10 @@ func TestLegacyInstanceStatusTracksConfigAndPVCConvergence(t *testing.T) {
 		its, tree, _ := newLegacyInstanceStatusFixture(t, nil)
 		its.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{claim}
 		addLegacyPVCs(t, tree, its, resource.MustParse("1Gi"))
-		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-			t.Fatal(err)
+		for range 2 {
+			if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
 		}
 
 		its.Generation++
@@ -738,8 +774,10 @@ func TestLegacyInstanceStatusTracksConfigAndPVCConvergence(t *testing.T) {
 
 		pvc := legacyPVCForInstance(tree, "demo-0")
 		pvc.Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
-		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-			t.Fatal(err)
+		for range 2 {
+			if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
 		}
 		status := its.FindInstanceStatus("demo-0")
 		if status.UpToDate || !status.VolumeExpansion {
@@ -747,8 +785,10 @@ func TestLegacyInstanceStatusTracksConfigAndPVCConvergence(t *testing.T) {
 		}
 
 		pvc.Status.Capacity[corev1.ResourceStorage] = resource.MustParse("2Gi")
-		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-			t.Fatal(err)
+		for range 2 {
+			if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
 		}
 		status = its.FindInstanceStatus("demo-0")
 		if !status.UpToDate || status.VolumeExpansion {
@@ -763,8 +803,10 @@ func TestLegacyInstanceStatusTracksConfigAndPVCConvergence(t *testing.T) {
 						capacity.Sub(resource.MustParse("1Gi"))
 					}
 					pvc.Status.Capacity = corev1.ResourceList{corev1.ResourceStorage: capacity}
-					if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-						t.Fatal(err)
+					for range 2 {
+						if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+							t.Fatal(err)
+						}
 					}
 					if its.FindInstanceStatus("demo-0").UpToDate != previous {
 						t.Fatalf("initial UpToDate = %t, want %t", its.FindInstanceStatus("demo-0").UpToDate, previous)
@@ -777,8 +819,10 @@ func TestLegacyInstanceStatusTracksConfigAndPVCConvergence(t *testing.T) {
 					} else {
 						pvc.Status.Capacity = nil
 					}
-					if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-						t.Fatal(err)
+					for range 2 {
+						if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+							t.Fatal(err)
+						}
 					}
 					if its.FindInstanceStatus("demo-0").UpToDate != previous {
 						t.Errorf("missing %s changed UpToDate from %t to %t", missing, previous, its.FindInstanceStatus("demo-0").UpToDate)
@@ -790,8 +834,10 @@ func TestLegacyInstanceStatusTracksConfigAndPVCConvergence(t *testing.T) {
 					if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 						t.Fatal(err)
 					}
-					if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-						t.Fatal(err)
+					for range 2 {
+						if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+							t.Fatal(err)
+						}
 					}
 					if its.FindInstanceStatus("demo-0").UpToDate {
 						t.Error("the previous result must not confirm a new capacity target")
@@ -802,8 +848,10 @@ func TestLegacyInstanceStatusTracksConfigAndPVCConvergence(t *testing.T) {
 					if err := tree.Add(pvc); err != nil {
 						t.Fatal(err)
 					}
-					if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-						t.Fatal(err)
+					for range 2 {
+						if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+							t.Fatal(err)
+						}
 					}
 					if !its.FindInstanceStatus("demo-0").UpToDate {
 						t.Error("observing the new capacity must restore convergence")
@@ -823,8 +871,10 @@ func TestLegacyAllocationChangesStayInDesiredAndCurrentState(t *testing.T) {
 	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-		t.Fatal(err)
+	for range 2 {
+		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+			t.Fatal(err)
+		}
 	}
 	added := its.FindInstanceStatus("demo-2")
 	if added == nil || added.DesiredState != workloads.InstanceDesiredStateActive || added.CurrentState != workloads.InstanceCurrentStateAbsent || added.UpToDate {
@@ -836,8 +886,10 @@ func TestLegacyAllocationChangesStayInDesiredAndCurrentState(t *testing.T) {
 	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-		t.Fatal(err)
+	for range 2 {
+		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+			t.Fatal(err)
+		}
 	}
 	released := its.FindInstanceStatus("demo-1")
 	if released == nil || released.DesiredState != workloads.InstanceDesiredStateReleased || released.CurrentState != workloads.InstanceCurrentStatePresent || released.UpToDate {
@@ -849,8 +901,10 @@ func TestLegacyAllocationChangesStayInDesiredAndCurrentState(t *testing.T) {
 	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-		t.Fatal(err)
+	for range 2 {
+		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+			t.Fatal(err)
+		}
 	}
 	offline := its.FindInstanceStatus("demo-0")
 	if offline == nil || offline.DesiredState != workloads.InstanceDesiredStateOffline || offline.CurrentState != workloads.InstanceCurrentStatePresent || offline.UpToDate {
@@ -883,8 +937,10 @@ func newLegacyInstanceStatusFixture(t *testing.T, configs []workloads.ConfigTemp
 		}
 		pods[name] = pod
 	}
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-		t.Fatal(err)
+	for range 2 {
+		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+			t.Fatal(err)
+		}
 	}
 	assertLegacyUpToDate(t, its, "demo-0", true)
 	assertLegacyUpToDate(t, its, "demo-1", true)
@@ -922,8 +978,10 @@ func newLegacyInstanceStatusFixtureFromSet(t *testing.T, its *workloads.Instance
 		}
 		pods[name] = pod
 	}
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-		t.Fatal(err)
+	for range 2 {
+		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+			t.Fatal(err)
+		}
 	}
 	return its, tree, pods
 }

@@ -50,7 +50,7 @@ func NewStatusReconciler() kubebuilderx.Reconciler {
 }
 
 func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
-	if tree.GetRoot() == nil || !model.IsObjectStatusUpdating(tree.GetRoot()) {
+	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
 	return kubebuilderx.ConditionSatisfied
@@ -58,6 +58,7 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	previousConditions := append([]metav1.Condition(nil), its.Status.Conditions...)
 	stopping := isStopRequested(its)
 	// 1. get all pods
 	pods := tree.List(&corev1.Pod{})
@@ -143,7 +144,31 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 				template2TemplatesStatus[templateName].UpdatedReplicas++
 			}
 		}
+	}
+	readyCondition, err := buildReadyCondition(its, notReadyNames.Len() == 0, notReadyNames)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	meta.SetStatusCondition(&its.Status.Conditions, *readyCondition)
 
+	availableCondition, err := buildAvailableCondition(its, notAvailableNames.Len() == 0, notAvailableNames)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	meta.SetStatusCondition(&its.Status.Conditions, *availableCondition)
+
+	for _, kind := range []workloads.ConditionType{workloads.InstanceReady, workloads.InstanceAvailable} {
+		previous := meta.FindStatusCondition(previousConditions, string(kind))
+		current := meta.FindStatusCondition(its.Status.Conditions, string(kind))
+		if previous == nil || previous.Status != current.Status || previous.ObservedGeneration != current.ObservedGeneration {
+			return kubebuilderx.RetryAfter(time.Millisecond), nil
+		}
+	}
+	if !model.IsObjectStatusUpdating(its) {
+		return kubebuilderx.Continue, nil
+	}
+
+	for _, pod := range podList {
 		if nodeName, ok := podToNodeMapping[pod.Name]; ok {
 			// there's chance that a pod is currently running and wait to be deleted so that it can be rescheduled
 			if pod.Spec.NodeName == nodeName {
@@ -153,6 +178,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			}
 		}
 	}
+
 	its.Status.Replicas = replicas
 	its.Status.ReadyReplicas = readyReplicas
 	its.Status.AvailableReplicas = availableReplicas
@@ -176,18 +202,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 	}
 
-	readyCondition, err := buildReadyCondition(its, notReadyNames.Len() == 0, notReadyNames)
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
-	meta.SetStatusCondition(&its.Status.Conditions, *readyCondition)
-
-	availableCondition, err := buildAvailableCondition(its, notAvailableNames.Len() == 0, notAvailableNames)
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
-	meta.SetStatusCondition(&its.Status.Conditions, *availableCondition)
-
 	// 3. set InstanceFailure condition
 	failureCondition, err := buildFailureCondition(its, podList)
 	if err != nil {
@@ -209,7 +223,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	if !stopping && its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
-		return kubebuilderx.RetryAfter(time.Second), nil
+		return kubebuilderx.ContinueWithRetryAfter(time.Second), nil
 	}
 
 	// serviceaccount name migration process

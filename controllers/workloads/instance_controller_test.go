@@ -1393,6 +1393,8 @@ func TestInstanceAdmittedVolumeExpansionAfterReadinessLoss(t *testing.T) {
 	its.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
 	its.Generation++
 	g.Expect(cli.Update(ctx, its)).To(Succeed())
+	// Publish the new-generation conditions before handing off the expansion.
+	runParent()
 	runParent()
 	g.Expect(cli.Get(ctx, childKey, inst)).To(Succeed())
 	requested := inst.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage]

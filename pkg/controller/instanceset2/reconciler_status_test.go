@@ -52,7 +52,8 @@ func TestStatusReconcilerUsesParentAvailabilityPolicy(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", Generation: 1},
-				Spec: workloads.InstanceSetSpec{Replicas: ptr.To[int32](1), MinReadySeconds: tc.parent}}
+				Spec:   workloads.InstanceSetSpec{Replicas: ptr.To[int32](1), MinReadySeconds: tc.parent},
+				Status: workloads.InstanceSetStatus{ObservedGeneration: 1}}
 			inst := &workloads.Instance{ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Namespace: its.Namespace, Generation: 1},
 				Spec: workloads.InstanceSpec{MinReadySeconds: tc.child},
 				Status: workloads.InstanceStatus2{ObservedGeneration: 1, CurrentState: workloads.InstanceCurrentStatePresent,
@@ -69,8 +70,10 @@ func TestStatusReconcilerUsesParentAvailabilityPolicy(t *testing.T) {
 			if err := tree.Add(inst); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-				t.Fatal(err)
+			for range 2 {
+				if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+					t.Fatal(err)
+				}
 			}
 			if meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceReady)) != tc.ready ||
 				meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable)) != tc.available ||
@@ -125,8 +128,10 @@ func TestStatusConditionsRequireExpectedInstances(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-				t.Fatal(err)
+			for range 2 {
+				if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+					t.Fatal(err)
+				}
 			}
 			for _, kind := range []workloads.ConditionType{workloads.InstanceReady, workloads.InstanceAvailable} {
 				condition := meta.FindStatusCondition(its.Status.Conditions, string(kind))
@@ -855,8 +860,10 @@ func TestStatusReconcilerReadsCurrentRevisionFromInstanceStatus(t *testing.T) {
 	if err := tree.Add(inst); err != nil {
 		t.Fatalf("add instance: %v", err)
 	}
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-		t.Fatalf("reconcile status: %v", err)
+	for range 2 {
+		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+			t.Fatalf("reconcile status: %v", err)
+		}
 	}
 
 	got := tree.GetRoot().(*workloads.InstanceSet)
@@ -888,8 +895,10 @@ func TestStatusReconcilerReadsCurrentRevisionFromInstanceStatus(t *testing.T) {
 	// Dynamic config and PVC convergence are represented by UpToDate, but do not make a
 	// healthy runtime unready or unavailable.
 	inst.Status.UpToDate = false
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-		t.Fatalf("reconcile non-converged runtime status: %v", err)
+	for range 2 {
+		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+			t.Fatalf("reconcile non-converged runtime status: %v", err)
+		}
 	}
 	got = tree.GetRoot().(*workloads.InstanceSet)
 	status = got.FindInstanceStatus(inst.Name)
@@ -962,8 +971,10 @@ func TestStatusReconcilerDoesNotDependOnRevisionAnnotationForCurrentRevision(t *
 	if err := tree.Add(inst); err != nil {
 		t.Fatalf("add instance: %v", err)
 	}
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-		t.Fatalf("reconcile status: %v", err)
+	for range 2 {
+		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+			t.Fatalf("reconcile status: %v", err)
+		}
 	}
 
 	got := tree.GetRoot().(*workloads.InstanceSet)
@@ -1015,8 +1026,10 @@ func TestStatusReconcilerPublishesTransferredFlatAllocation(t *testing.T) {
 	tree := kubebuilderx.NewObjectTree()
 	tree.SetRoot(its)
 
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-		t.Fatal(err)
+	for range 2 {
+		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if its.Status.ReadyReplicas != 0 || len(its.Status.InstanceStatus) != 2 {
 		t.Fatalf("incorrect absent transfer status: %#v", its.Status)
@@ -1082,8 +1095,10 @@ func TestITS2AllocationChangesStayInDesiredAndCurrentState(t *testing.T) {
 	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-		t.Fatal(err)
+	for range 2 {
+		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+			t.Fatal(err)
+		}
 	}
 	added := its.FindInstanceStatus("demo-2")
 	if added == nil || added.DesiredState != workloads.InstanceDesiredStateActive || added.CurrentState != workloads.InstanceCurrentStateAbsent || added.UpToDate {
@@ -1095,8 +1110,10 @@ func TestITS2AllocationChangesStayInDesiredAndCurrentState(t *testing.T) {
 	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-		t.Fatal(err)
+	for range 2 {
+		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+			t.Fatal(err)
+		}
 	}
 	released := its.FindInstanceStatus("demo-1")
 	if released == nil || released.DesiredState != workloads.InstanceDesiredStateReleased || released.CurrentState != workloads.InstanceCurrentStatePresent || released.UpToDate {
@@ -1108,8 +1125,10 @@ func TestITS2AllocationChangesStayInDesiredAndCurrentState(t *testing.T) {
 	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-		t.Fatal(err)
+	for range 2 {
+		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+			t.Fatal(err)
+		}
 	}
 	offline := its.FindInstanceStatus("demo-0")
 	if offline == nil || offline.DesiredState != workloads.InstanceDesiredStateOffline || offline.CurrentState != workloads.InstanceCurrentStatePresent || offline.UpToDate {
@@ -1154,8 +1173,10 @@ func newITS2InstanceStatusFixtureFromSet(t *testing.T, its *workloads.InstanceSe
 		}
 		instances[name] = inst
 	}
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-		t.Fatal(err)
+	for range 2 {
+		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+			t.Fatal(err)
+		}
 	}
 	assertITS2UpToDate(t, its, "demo-0", true)
 	assertITS2UpToDate(t, its, "demo-1", true)

@@ -1549,7 +1549,7 @@ func TestInstanceSetStopDuringFlatOrdinalTransfer(t *testing.T) {
 		_, err := (&InstanceSetReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(100)}).Reconcile(context.Background(), ctrl.Request{NamespacedName: key})
 		return err
 	}
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 4; i++ {
 		if err := reconcile(); err != nil {
 			t.Fatal(err)
 		}
@@ -1561,6 +1561,14 @@ func TestInstanceSetStopDuringFlatOrdinalTransfer(t *testing.T) {
 	if err := cli.Get(context.Background(), key, its); err != nil {
 		t.Fatal(err)
 	}
+	if len(its.Status.InstanceStatus) != 2 {
+		t.Fatalf("fixture did not publish both historical identities: %#v", its.Status.InstanceStatus)
+	}
+	for _, status := range its.Status.InstanceStatus {
+		if status.TemplateName == nil || *status.TemplateName != "a" {
+			t.Fatalf("fixture did not publish the historical template: %#v", status)
+		}
+	}
 	its.Spec.Instances[0].Name = "b"
 	its.Spec.Stop = ptr.To(true)
 	its.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
@@ -1568,6 +1576,7 @@ func TestInstanceSetStopDuringFlatOrdinalTransfer(t *testing.T) {
 	if err := cli.Update(context.Background(), its); err != nil {
 		t.Fatal(err)
 	}
+	publishLegacyInstanceSetReadiness(t, cli, its.Name)
 	for i := 0; i < 3; i++ {
 		if err := reconcile(); err != nil {
 			pod := &corev1.Pod{}
@@ -2159,6 +2168,7 @@ func TestLegacyInstanceSetStopRecoveryFlatTemplateChange(t *testing.T) {
 					changeTemplate(its)
 					its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{Type: kbappsv1.OnDeleteStrategyType}
 				})
+				publishLegacyInstanceSetReadiness(t, cli, "legacy-stop")
 				legacyStopRecoveryReconcile(t, cli, 2)
 			}
 			claims := legacyStopRecoveryClaims(t, cli)
@@ -2236,7 +2246,8 @@ func TestLegacyInstanceSetStopRecoveryTerminatingSummary(t *testing.T) {
 	legacyStopRecoveryReady(t, cli)
 	legacyStopRecoveryHold(t, cli)
 	legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(true) })
-	legacyStopRecoveryReconcile(t, cli, 2)
+	publishLegacyInstanceSetReadiness(t, cli, "legacy-stop")
+	legacyStopRecoveryReconcile(t, cli, 3)
 	assertTerminating := func() {
 		t.Helper()
 		its := legacyStopRecoverySet(t, cli)
@@ -2250,6 +2261,7 @@ func TestLegacyInstanceSetStopRecoveryTerminatingSummary(t *testing.T) {
 	}
 	assertTerminating()
 	legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(false) })
+	publishLegacyInstanceSetReadiness(t, cli, "legacy-stop")
 	legacyStopRecoveryReconcile(t, cli, 1)
 	assertTerminating()
 }
@@ -2275,8 +2287,18 @@ func TestLegacyInstanceSetStopRecoveryWaitsForTermination(t *testing.T) {
 		},
 	})
 	controller := &InstanceSetReconciler{Client: faulty, Recorder: record.NewFakeRecorder(1000)}
+	podsBefore := legacyStopRecoveryPods(t, cli)
+	claimsBefore := legacyStopRecoveryClaims(t, cli)
 	if _, err := controller.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKey{Namespace: "default", Name: "legacy-stop"}}); !errors.Is(err, failure) || !fired {
 		t.Fatalf("expected injected Stop status failure, got %v", err)
+	}
+	if !reflect.DeepEqual(podsBefore, legacyStopRecoveryPods(t, cli)) || !reflect.DeepEqual(claimsBefore, legacyStopRecoveryClaims(t, cli)) {
+		t.Fatal("failed readiness publication changed Pods or PVCs")
+	}
+	publishLegacyInstanceSetReadiness(t, cli, "legacy-stop")
+	fired = false
+	if _, err := controller.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKey{Namespace: "default", Name: "legacy-stop"}}); !errors.Is(err, failure) || !fired {
+		t.Fatalf("expected injected Stop status failure after deletion, got %v", err)
 	}
 	its := legacyStopRecoverySet(t, cli)
 	status := its.FindInstanceStatus("legacy-stop-0")
@@ -2302,6 +2324,7 @@ func TestLegacyInstanceSetStopRecoveryWaitsForTermination(t *testing.T) {
 		its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{Type: kbappsv1.RollingUpdateStrategyType, RollingUpdate: &workloads.RollingUpdate{MaxUnavailable: ptr.To(intstr.FromInt(2))}}
 		its.Spec.Configs = []workloads.ConfigTemplate{{Name: "server", ConfigHash: ptr.To("new"), Reconfigure: &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"true"}}}}}
 	})
+	publishLegacyInstanceSetReadiness(t, cli, "legacy-stop")
 	before := legacyStopRecoveryPods(t, cli)[0]
 	if result := legacyStopRecoveryReconcile(t, cli, 1); result.RequeueAfter != time.Second {
 		t.Fatalf("early resume did not wait for termination: %#v", result)
@@ -2454,6 +2477,18 @@ func TestLegacyInstanceSetStopRecoveryPartialCommit(t *testing.T) {
 				},
 			})
 			controller := &InstanceSetReconciler{Client: faulty, Recorder: record.NewFakeRecorder(1000)}
+			if failStatus {
+				podsBefore := legacyStopRecoveryPods(t, cli)
+				_, err := controller.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKey{Namespace: "default", Name: "legacy-stop"}})
+				if !errors.Is(err, failure) || !fired {
+					t.Fatalf("expected injected readiness publication failure, got %v", err)
+				}
+				if attempts != 0 || deleted != 0 || !reflect.DeepEqual(podsBefore, legacyStopRecoveryPods(t, cli)) || !reflect.DeepEqual(claims, legacyStopRecoveryClaims(t, cli)) {
+					t.Fatal("failed readiness publication changed Pods or PVCs")
+				}
+			}
+			publishLegacyInstanceSetReadiness(t, cli, "legacy-stop")
+			fired = false
 			_, err := controller.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKey{Namespace: "default", Name: "legacy-stop"}})
 			if !errors.Is(err, failure) || !fired {
 				t.Fatalf("expected injected Stop failure, got %v", err)
@@ -2716,6 +2751,7 @@ func TestInstanceSetPVCRetirementAfterPartialCommit(t *testing.T) {
 	pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
 		its.Spec.Replicas = ptr.To(int32(2))
 	})
+	publishLegacyInstanceSetReadiness(t, cli, "pvc-lifecycle")
 	failure := errors.New("injected retired PVC delete failure")
 	fired, attempts, deleted := false, 0, 0
 	faulty := interceptor.NewClient(cli, interceptor.Funcs{
@@ -2796,6 +2832,7 @@ func TestInstanceSetPVCMixedRetirement(t *testing.T) {
 				its.Spec.ParallelPodManagementConcurrency = ptr.To(intstr.FromInt(1))
 				its.Spec.PersistentVolumeClaimRetentionPolicy = &kbappsv1.PersistentVolumeClaimRetentionPolicy{WhenScaled: policy}
 			})
+			publishLegacyInstanceSetReadiness(t, cli, "pvc-lifecycle")
 			pvcLifecycleReconcile(t, cli, 1)
 			pods := pvcLifecyclePods(t, cli)
 			if len(pods) != 2 {
@@ -2892,6 +2929,7 @@ func TestInstanceSetPVCOfflineRetirementPolicy(t *testing.T) {
 					its.Spec.OfflineInstances = []string{"pvc-lifecycle-0"}
 					its.Spec.PersistentVolumeClaimRetentionPolicy = &workloads.PersistentVolumeClaimRetentionPolicy{WhenScaled: policy}
 				})
+				publishLegacyInstanceSetReadiness(t, cli, "pvc-lifecycle")
 				pvcLifecycleReconcile(t, cli, 1)
 				pvcLifecycleReady(t, cli)
 				pvcLifecycleReconcile(t, cli, 4)
@@ -2917,5 +2955,248 @@ func TestInstanceSetPVCOfflineRetirementPolicy(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+var _ = Describe("InstanceSet readiness publication", func() {
+	newFixture := func(instanceAPI bool) (client.WithWatch, client.ObjectKey, func(client.Client) (ctrl.Result, error)) {
+		scheme := runtime.NewScheme()
+		Expect(clientgoscheme.AddToScheme(scheme)).Should(Succeed())
+		Expect(workloads.AddToScheme(scheme)).Should(Succeed())
+		its := &workloads.InstanceSet{
+			ObjectMeta: metav1.ObjectMeta{Name: "readiness-publication", Namespace: "default", UID: "its-uid", Generation: 1},
+			Spec: workloads.InstanceSetSpec{
+				EnableInstanceAPI: ptr.To(instanceAPI), Replicas: ptr.To[int32](1), PodManagementPolicy: appsv1.ParallelPodManagement,
+				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "readiness-publication"}},
+				Template: corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "readiness-publication"}}, Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "db", Image: "db:v1"}}}},
+			},
+		}
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&workloads.InstanceSet{}, &workloads.Instance{}, &corev1.Pod{}).WithObjects(its).Build()
+		key := client.ObjectKeyFromObject(its)
+		run := func(c client.Client) (ctrl.Result, error) {
+			if instanceAPI {
+				return (&InstanceSetReconciler2{Client: c, Scheme: scheme, Recorder: record.NewFakeRecorder(1000)}).Reconcile(context.Background(), ctrl.Request{NamespacedName: key})
+			}
+			return (&InstanceSetReconciler{Client: c, Scheme: scheme, Recorder: record.NewFakeRecorder(1000)}).Reconcile(context.Background(), ctrl.Request{NamespacedName: key})
+		}
+		for i := 0; i < 10; i++ {
+			_, err := run(cli)
+			Expect(err).ShouldNot(HaveOccurred())
+			if instanceAPI {
+				instances := &workloads.InstanceList{}
+				Expect(cli.List(context.Background(), instances)).Should(Succeed())
+				for j := range instances.Items {
+					inst := &instances.Items[j]
+					if inst.UID == "" {
+						inst.UID = types.UID(inst.Name)
+						inst.Generation = 1
+						Expect(cli.Update(context.Background(), inst)).Should(Succeed())
+					}
+					_, err := (&InstanceReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(1000)}).Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(inst)})
+					Expect(err).ShouldNot(HaveOccurred())
+				}
+			}
+			pods := &corev1.PodList{}
+			Expect(cli.List(context.Background(), pods)).Should(Succeed())
+			for j := range pods.Items {
+				pod := &pods.Items[j]
+				pod.Status.Phase = corev1.PodRunning
+				pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: metav1.NewTime(time.Now().Add(-time.Hour))}}
+				pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "db", Image: "db:v1", Ready: true}}
+				Expect(cli.Status().Update(context.Background(), pod)).Should(Succeed())
+			}
+		}
+		Expect(cli.Get(context.Background(), key, its)).Should(Succeed())
+		Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceReady))).Should(BeTrue())
+		Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable))).Should(BeTrue())
+		return cli, key, run
+	}
+
+	DescribeTable("blocks child repair until a changed readiness observation persists", func(instanceAPI, conflict bool) {
+		cli, key, run := newFixture(instanceAPI)
+		its := &workloads.InstanceSet{}
+		Expect(cli.Get(context.Background(), key, its)).Should(Succeed())
+		its.Spec.Replicas = ptr.To[int32](2)
+		its.Generation++
+		Expect(cli.Update(context.Background(), its)).Should(Succeed())
+		failure := errors.New("readiness publication failed")
+		if conflict {
+			failure = apierrors.NewConflict(workloads.Resource("instancesets"), its.Name, failure)
+		}
+		writes := 0
+		faulty := interceptor.NewClient(cli, interceptor.Funcs{
+			Create: func(ctx context.Context, delegate client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+				writes++
+				return delegate.Create(ctx, obj, opts...)
+			},
+			SubResourceUpdate: func(_ context.Context, _ client.Client, sub string, obj client.Object, _ ...client.SubResourceUpdateOption) error {
+				Expect(sub).Should(Equal("status"))
+				Expect(obj).Should(BeAssignableToTypeOf(&workloads.InstanceSet{}))
+				return failure
+			},
+		})
+		result, err := run(faulty)
+		if conflict {
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(result.Requeue).Should(BeTrue())
+		} else {
+			Expect(errors.Is(err, failure)).Should(BeTrue())
+		}
+		Expect(writes).Should(BeZero())
+		Expect(cli.Get(context.Background(), key, its)).Should(Succeed())
+		Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceReady))).Should(BeTrue())
+		Expect(its.Status.ObservedGeneration).Should(BeNumerically("<", its.Generation))
+
+		_, err = run(cli)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(cli.Get(context.Background(), key, its)).Should(Succeed())
+		condition := meta.FindStatusCondition(its.Status.Conditions, string(workloads.InstanceReady))
+		Expect(condition.Status).Should(Equal(metav1.ConditionFalse))
+		Expect(condition.ObservedGeneration).Should(Equal(its.Generation))
+		Expect(its.Status.ObservedGeneration).Should(BeNumerically("<", its.Generation))
+		_, err = run(cli)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(cli.Get(context.Background(), key, its)).Should(Succeed())
+		Expect(its.Status.ObservedGeneration).Should(Equal(its.Generation))
+		if instanceAPI {
+			instances := &workloads.InstanceList{}
+			Expect(cli.List(context.Background(), instances)).Should(Succeed())
+			Expect(instances.Items).Should(HaveLen(2))
+		} else {
+			pods := &corev1.PodList{}
+			Expect(cli.List(context.Background(), pods)).Should(Succeed())
+			Expect(pods.Items).Should(HaveLen(2))
+		}
+	},
+		Entry("legacy status error", false, false),
+		Entry("legacy optimistic conflict", false, true),
+		Entry("Instance API status error", true, false),
+		Entry("Instance API optimistic conflict", true, true),
+	)
+
+	DescribeTable("keeps the published deficit when child creation fails", func(instanceAPI bool) {
+		cli, key, run := newFixture(instanceAPI)
+		its := &workloads.InstanceSet{}
+		Expect(cli.Get(context.Background(), key, its)).Should(Succeed())
+		its.Spec.Replicas = ptr.To[int32](2)
+		its.Generation++
+		Expect(cli.Update(context.Background(), its)).Should(Succeed())
+		_, err := run(cli)
+		Expect(err).ShouldNot(HaveOccurred())
+		failure := errors.New("child create failed")
+		fired := false
+		faulty := interceptor.NewClient(cli, interceptor.Funcs{Create: func(ctx context.Context, delegate client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+			switch obj.(type) {
+			case *corev1.Pod, *workloads.Instance:
+				fired = true
+				return failure
+			}
+			return delegate.Create(ctx, obj, opts...)
+		}})
+		_, err = run(faulty)
+		Expect(errors.Is(err, failure)).Should(BeTrue())
+		Expect(fired).Should(BeTrue())
+		Expect(cli.Get(context.Background(), key, its)).Should(Succeed())
+		Expect(meta.IsStatusConditionFalse(its.Status.Conditions, string(workloads.InstanceReady))).Should(BeTrue())
+		Expect(meta.FindStatusCondition(its.Status.Conditions, string(workloads.InstanceReady)).ObservedGeneration).Should(Equal(its.Generation))
+	}, Entry("legacy", false), Entry("Instance API", true))
+
+	DescribeTable("publishes the current generation without resetting healthy condition times", func(instanceAPI bool) {
+		cli, key, run := newFixture(instanceAPI)
+		its := &workloads.InstanceSet{}
+		Expect(cli.Get(context.Background(), key, its)).Should(Succeed())
+		before := metav1.NewTime(time.Now().Add(-time.Hour).Truncate(time.Second))
+		for i := range its.Status.Conditions {
+			its.Status.Conditions[i].LastTransitionTime = before
+		}
+		Expect(cli.Status().Update(context.Background(), its)).Should(Succeed())
+		its.Spec.Paused = true
+		its.Generation++
+		Expect(cli.Update(context.Background(), its)).Should(Succeed())
+		result, err := run(cli)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(result.RequeueAfter).Should(BeNumerically(">", 0))
+		Expect(cli.Get(context.Background(), key, its)).Should(Succeed())
+		Expect(its.Status.ObservedGeneration).Should(BeNumerically("<", its.Generation))
+		for _, kind := range []workloads.ConditionType{workloads.InstanceReady, workloads.InstanceAvailable} {
+			condition := meta.FindStatusCondition(its.Status.Conditions, string(kind))
+			Expect(condition.Status).Should(Equal(metav1.ConditionTrue))
+			Expect(condition.ObservedGeneration).Should(Equal(its.Generation))
+			Expect(condition.LastTransitionTime.Equal(&before)).Should(BeTrue())
+		}
+		_, err = run(cli)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(cli.Get(context.Background(), key, its)).Should(Succeed())
+		Expect(its.Status.ObservedGeneration).Should(Equal(its.Generation))
+	}, Entry("legacy", false), Entry("Instance API", true))
+
+	DescribeTable("allows repair when only the deficit message changes", func(instanceAPI bool) {
+		cli, key, run := newFixture(instanceAPI)
+		its := &workloads.InstanceSet{}
+		Expect(cli.Get(context.Background(), key, its)).Should(Succeed())
+		its.Spec.Replicas = ptr.To[int32](2)
+		its.Generation++
+		Expect(cli.Update(context.Background(), its)).Should(Succeed())
+		for i := 0; i < 2; i++ {
+			_, err := run(cli)
+			Expect(err).ShouldNot(HaveOccurred())
+		}
+		var child client.Object = &corev1.Pod{}
+		if instanceAPI {
+			child = &workloads.Instance{}
+		}
+		Expect(cli.Get(context.Background(), client.ObjectKey{Namespace: key.Namespace, Name: its.Name + "-0"}, child)).Should(Succeed())
+		child.SetFinalizers(nil)
+		Expect(cli.Update(context.Background(), child)).Should(Succeed())
+		Expect(cli.Delete(context.Background(), child)).Should(Succeed())
+		created := false
+		observed := interceptor.NewClient(cli, interceptor.Funcs{Create: func(ctx context.Context, delegate client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+			if obj.GetName() == child.GetName() {
+				created = true
+			}
+			return delegate.Create(ctx, obj, opts...)
+		}})
+		_, err := run(observed)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(created).Should(BeTrue())
+		Expect(cli.Get(context.Background(), key, its)).Should(Succeed())
+		Expect(meta.IsStatusConditionFalse(its.Status.Conditions, string(workloads.InstanceReady))).Should(BeTrue())
+	}, Entry("legacy", false), Entry("Instance API", true))
+
+})
+
+func publishLegacyInstanceSetReadiness(t GinkgoTInterface, cli client.Client, name string) {
+	t.Helper()
+	podsBefore, claimsBefore := &corev1.PodList{}, &corev1.PersistentVolumeClaimList{}
+	if err := cli.List(context.Background(), podsBefore); err != nil {
+		t.Fatal(err)
+	}
+	if err := cli.List(context.Background(), claimsBefore); err != nil {
+		t.Fatal(err)
+	}
+	key := client.ObjectKey{Namespace: "default", Name: name}
+	reconciler := &InstanceSetReconciler{Client: cli, Scheme: cli.Scheme(), Recorder: record.NewFakeRecorder(1000)}
+	if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: key}); err != nil {
+		t.Fatal(err)
+	}
+	its := &workloads.InstanceSet{}
+	if err := cli.Get(context.Background(), key, its); err != nil {
+		t.Fatal(err)
+	}
+	for _, kind := range []workloads.ConditionType{workloads.InstanceReady, workloads.InstanceAvailable} {
+		condition := meta.FindStatusCondition(its.Status.Conditions, string(kind))
+		if condition == nil || condition.ObservedGeneration != its.Generation {
+			t.Fatalf("%s was not published for generation %d: %#v", kind, its.Generation, condition)
+		}
+	}
+	podsAfter, claimsAfter := &corev1.PodList{}, &corev1.PersistentVolumeClaimList{}
+	if err := cli.List(context.Background(), podsAfter); err != nil {
+		t.Fatal(err)
+	}
+	if err := cli.List(context.Background(), claimsAfter); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(podsBefore.Items, podsAfter.Items) || !reflect.DeepEqual(claimsBefore.Items, claimsAfter.Items) {
+		t.Fatal("readiness publication changed Pods or PVCs")
 	}
 }

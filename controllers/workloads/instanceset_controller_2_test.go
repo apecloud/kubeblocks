@@ -90,7 +90,7 @@ func TestInstanceSetPropagatesAvailabilityPolicy(t *testing.T) {
 		its.Spec.Paused = true
 		its.Spec.MinReadySeconds = 30
 	})
-	for i := 0; i < 2; i++ {
+	for i := 0; i < 3; i++ {
 		if _, err := reconcileSetStopParent(parentClient); err != nil {
 			t.Fatal(err)
 		}
@@ -103,7 +103,7 @@ func TestInstanceSetPropagatesAvailabilityPolicy(t *testing.T) {
 		t.Fatalf("parent accepted availability under the old child policy: %#v", its.Status)
 	}
 	mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Paused = false })
-	for i := 0; i < 2; i++ {
+	for i := 0; i < 4; i++ {
 		if _, err := reconcileSetStopParent(parentClient); err != nil {
 			t.Fatal(err)
 		}
@@ -725,12 +725,32 @@ func (w *failSetStopStatusWriter) Update(ctx context.Context, obj client.Object,
 }
 
 func TestInstanceSetStopRecoversAfterParentStatusFailure(t *testing.T) {
-	for _, stopping := range []bool{true, false} {
-		t.Run(fmt.Sprintf("stop=%t", stopping), func(t *testing.T) {
+	for _, scenario := range []struct {
+		name         string
+		stopping     bool
+		afterHandoff bool
+	}{
+		{name: "stop=true", stopping: true},
+		{name: "stop=false"},
+		{name: "stop=true/after-handoff", stopping: true, afterHandoff: true},
+		{name: "stop=false/after-handoff", afterHandoff: true},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			stopping := scenario.stopping
 			its := setStopFixture()
 			cli := newSetStopClient(t, its)
 			reconcileSetStop(t, cli, 5)
 			claims := bindSetStopClaims(t, cli)
+			assertStorageUnchanged := func() {
+				t.Helper()
+				currentClaims := &corev1.PersistentVolumeClaimList{}
+				if err := cli.List(context.Background(), currentClaims); err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(currentClaims.Items, claims) {
+					t.Fatal("parent status failure/recovery changed storage")
+				}
+			}
 			markSetStopPodsReady(t, cli)
 			reconcileSetStop(t, cli, 3)
 			if !stopping {
@@ -754,13 +774,16 @@ func TestInstanceSetStopRecoversAfterParentStatusFailure(t *testing.T) {
 			}
 			beforeStatus := readSetStop(t, cli).Status
 			faulty := &failSetStopStatusClient{Client: cli, fail: true}
-			if _, err := reconcileSetStopParent(faulty); !errors.Is(err, errSetStopStatusWrite) || faulty.fail {
-				t.Fatalf("expected parent status fault after child handoff, got %v", err)
+			if !scenario.afterHandoff {
+				if _, err := reconcileSetStopParent(faulty); !errors.Is(err, errSetStopStatusWrite) || faulty.fail {
+					t.Fatalf("expected parent condition publication fault before child handoff, got %v", err)
+				}
+				if !reflect.DeepEqual(readSetStop(t, cli).Status, beforeStatus) {
+					t.Fatal("failed parent status write changed the persisted status")
+				}
+				assertStorageUnchanged()
 			}
-			if !reflect.DeepEqual(readSetStop(t, cli).Status, beforeStatus) {
-				t.Fatal("failed parent status write changed the persisted status")
-			}
-			assertOneHandoff := func() {
+			assertHandoffs := func(want int) {
 				t.Helper()
 				handoffs := 0
 				for _, child := range listSetStopChildren(t, cli) {
@@ -774,15 +797,33 @@ func TestInstanceSetStopRecoversAfterParentStatusFailure(t *testing.T) {
 						}
 					}
 				}
-				if handoffs != 1 {
-					t.Fatalf("parent fault/retry admitted %d children into a one-slot budget", handoffs)
+				if handoffs != want {
+					t.Fatalf("parent fault/retry admitted %d children, want %d", handoffs, want)
 				}
 			}
-			assertOneHandoff()
-			if _, err := reconcileSetStopParent(cli); err != nil {
+			assertHandoffs(0)
+			publishSetStopConditions(t, cli)
+			assertHandoffs(0)
+			if scenario.afterHandoff {
+				beforeStatus = readSetStop(t, cli).Status
+				if _, err := reconcileSetStopParent(faulty); !errors.Is(err, errSetStopStatusWrite) || faulty.fail {
+					t.Fatalf("expected parent status fault after child handoff, got %v", err)
+				}
+				if !reflect.DeepEqual(readSetStop(t, cli).Status, beforeStatus) {
+					t.Fatal("failed post-handoff write changed the persisted parent status")
+				}
+			} else if _, err := reconcileSetStopParent(cli); err != nil {
 				t.Fatal(err)
 			}
-			assertOneHandoff()
+			assertHandoffs(1)
+			assertStorageUnchanged()
+			for i := 0; i < 2; i++ {
+				if _, err := reconcileSetStopParent(cli); err != nil {
+					t.Fatal(err)
+				}
+				assertHandoffs(1)
+				assertStorageUnchanged()
+			}
 			if stopping {
 				reconcileSetStop(t, cli, 10)
 				if len(listSetStopPods(t, cli)) != 0 || readSetStop(t, cli).Status.Replicas != 0 {
@@ -815,13 +856,7 @@ func TestInstanceSetStopRecoversAfterParentStatusFailure(t *testing.T) {
 					}
 				}
 			}
-			currentClaims := &corev1.PersistentVolumeClaimList{}
-			if err := cli.List(context.Background(), currentClaims); err != nil {
-				t.Fatal(err)
-			}
-			if !reflect.DeepEqual(currentClaims.Items, claims) {
-				t.Fatal("parent status failure/recovery changed storage")
-			}
+			assertStorageUnchanged()
 		})
 	}
 }
@@ -896,6 +931,7 @@ func TestInstanceSetStopResumeDuringPodObservationDelay(t *testing.T) {
 		t.Fatal(err)
 	}
 	mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(true) })
+	publishSetStopConditions(t, cli)
 	if _, err := reconcileSetStopParent(cli); err != nil {
 		t.Fatal(err)
 	}
@@ -912,6 +948,7 @@ func TestInstanceSetStopResumeDuringPodObservationDelay(t *testing.T) {
 		its.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
 	})
 	wrapped.delayPodObservation = false
+	publishSetStopConditions(t, cli)
 	wrapped.beforePodDelete = func() error { _, err := reconcileSetStopParent(cli); return err }
 	controller := &InstanceReconciler{Client: cli, Scheme: cli.Scheme(), Recorder: record.NewFakeRecorder(1000)}
 	conflictResult, err := controller.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(stopped)})
@@ -1002,6 +1039,10 @@ func TestInstanceSetStopClearsAppliedStatus(t *testing.T) {
 		its.Spec.Stop = ptr.To(true)
 		its.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
 	})
+	publishSetStopConditions(t, cli)
+	if readSetStop(t, cli).Status.UpdatedReplicas != before.UpdatedReplicas {
+		t.Fatal("condition publication changed applied replica status")
+	}
 	for i := 0; i < 2; i++ {
 		if _, err := reconcileSetStopParent(cli); err != nil {
 			t.Fatal(err)
@@ -1239,6 +1280,7 @@ func TestInstanceSetStopScaleRetirement(t *testing.T) {
 			its.Spec.Replicas = ptr.To(int32(1))
 			its.Spec.Template.Spec.Containers[0].Image = "db:latest"
 		})
+		publishSetStopConditions(t, cli)
 		wrapped := cli.(*setStopClient)
 		wrapped.childWrites = 0
 		wrapped.failChildWriteAt = 3
@@ -1446,6 +1488,7 @@ func TestInstanceSetStopParallelPartialWriteKeepsBudget(t *testing.T) {
 		its.Spec.Stop = ptr.To(true)
 		its.Spec.ParallelPodManagementConcurrency = ptr.To(intstr.FromInt(2))
 	})
+	publishSetStopConditions(t, cli)
 	wrapped := cli.(*setStopClient)
 	wrapped.childWrites = 0
 	wrapped.failChildWriteAt = 2
@@ -1483,6 +1526,7 @@ func TestInstanceSetStopParallelPartialWriteKeepsBudget(t *testing.T) {
 	mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
 		its.Spec.Template.Spec.Containers[0].Image = "db:latest"
 	})
+	publishSetStopConditions(t, cli)
 	wrapped.resumeWrites = 0
 	wrapped.failResumeWriteAt = 2
 	if _, err := reconcileSetStopParent(cli); !errors.Is(err, errSetStopResumeWrite) || wrapped.resumeWrites != 2 {
@@ -1613,6 +1657,7 @@ func TestInstanceSetStopScaleReversalKeepsDeletionPolicy(t *testing.T) {
 				its.Spec.Replicas = ptr.To(int32(1))
 				its.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
 			})
+			publishSetStopConditions(t, cli)
 			if _, err := reconcileSetStopParent(cli); err != nil {
 				t.Fatal(err)
 			}
@@ -1631,6 +1676,7 @@ func TestInstanceSetStopScaleReversalKeepsDeletionPolicy(t *testing.T) {
 				its.Spec.Replicas = ptr.To(int32(2))
 				its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 			})
+			publishSetStopConditions(t, cli)
 			if _, err := reconcileSetStopParent(cli); err != nil {
 				t.Fatal(err)
 			}
@@ -1805,6 +1851,7 @@ func TestInstanceSetStopWaitsForDeletionObservation(t *testing.T) {
 		its.Spec.Replicas = ptr.To(int32(1))
 		its.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
 	})
+	publishSetStopConditions(t, cli)
 	reconcileParent()
 	for _, name := range []string{"demo-0", "demo-1"} {
 		reconcileInstance(name)
@@ -1836,6 +1883,7 @@ func TestInstanceSetStopWaitsForDeletionObservation(t *testing.T) {
 		t.Fatalf("fixture did not keep the Pod Running before deletion was observed: %v", err)
 	}
 	mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(true) })
+	publishSetStopConditions(t, cli)
 	reconcileParent()
 	if err := cli.Get(ctx, key, inst); err != nil || !ptr.Deref(inst.Spec.Stop, false) || inst.Generation <= generation || inst.Status.ObservedGeneration == inst.Generation {
 		t.Fatalf("deleting Instance Stop handoff did not invalidate the pre-deletion observation: %v", err)
@@ -2155,6 +2203,7 @@ func TestInstanceRetentionScaleReversal(t *testing.T) {
 				its.Spec.PodManagementPolicy = scenario.policy
 				its.Spec.ParallelPodManagementConcurrency = ptr.To(intstr.FromInt32(1))
 			})
+			publishSetStopConditions(t, cli)
 			if _, err := reconcileRetentionSet(cli); err != nil {
 				t.Fatal(err)
 			}
@@ -2250,6 +2299,9 @@ func TestInstanceRetentionPartialHandoff(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
+				if !deleting {
+					publishSetStopConditions(t, cli)
+				}
 				faulty := &retentionWriteFailureClient{Client: cli, failure: failure}
 				result, err := reconcileRetentionSet(faulty)
 				if apierrors.IsConflict(failure) {
@@ -2316,10 +2368,12 @@ func TestInstanceRetentionPartialHandoff(t *testing.T) {
 func TestInstanceRetentionPartialScaleReversal(t *testing.T) {
 	cli := retentionFixture(t, 4)
 	changeRetentionSet(t, cli, func(its *workloads.InstanceSet) { its.Spec.Replicas = ptr.To(int32(2)) })
+	publishSetStopConditions(t, cli)
 	if _, err := reconcileRetentionSet(cli); err != nil {
 		t.Fatal(err)
 	}
 	changeRetentionSet(t, cli, func(its *workloads.InstanceSet) { its.Spec.Replicas = ptr.To(int32(4)) })
+	publishSetStopConditions(t, cli)
 	failure := errors.New("injected scale reversal update failure")
 	if _, err := reconcileRetentionSet(&retentionWriteFailureClient{Client: cli, failure: failure}); !errors.Is(err, failure) {
 		t.Fatalf("expected partial reversal failure, got %v", err)
@@ -2406,6 +2460,7 @@ func TestInstanceRetentionScaleDownAdmission(t *testing.T) {
 				its.Spec.ParallelPodManagementConcurrency = ptr.To(intstr.FromInt(1))
 				its.Spec.Replicas = ptr.To(int32(0))
 			})
+			publishSetStopConditions(t, cli)
 			if _, err := reconcileRetentionSet(cli); err != nil {
 				t.Fatal(err)
 			}
@@ -2417,6 +2472,7 @@ func TestInstanceRetentionScaleDownAdmission(t *testing.T) {
 			changeRetentionSet(t, cli, func(its *workloads.InstanceSet) {
 				its.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled = kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType
 			})
+			publishSetStopConditions(t, cli)
 			if _, err := reconcileRetentionSet(cli); err != nil {
 				t.Fatal(err)
 			}
@@ -2433,5 +2489,25 @@ func TestInstanceRetentionScaleDownAdmission(t *testing.T) {
 			}
 			checkRetentionDeleted(t, cli, 0)
 		})
+	}
+}
+
+func publishSetStopConditions(t *testing.T, cli client.Client) {
+	t.Helper()
+	before := readSetStop(t, cli)
+	children := listSetStopChildren(t, cli)
+	result, err := reconcileSetStopParent(cli)
+	if err != nil {
+		t.Fatal(err)
+	}
+	after := readSetStop(t, cli)
+	if result.RequeueAfter <= 0 || after.Status.ObservedGeneration != before.Status.ObservedGeneration || !reflect.DeepEqual(children, listSetStopChildren(t, cli)) {
+		t.Fatal("condition publication changed the revision observation or child resources")
+	}
+	for _, kind := range []string{string(workloads.InstanceReady), string(workloads.InstanceAvailable)} {
+		condition := meta.FindStatusCondition(after.Status.Conditions, kind)
+		if condition == nil || condition.ObservedGeneration != after.Generation {
+			t.Fatalf("condition %s was not published for generation %d", kind, after.Generation)
+		}
 	}
 }

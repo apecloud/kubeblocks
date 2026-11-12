@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset2
 
 import (
+	"slices"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -34,6 +35,72 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
 )
+
+func TestStatusConditionsRequireExpectedInstances(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		replicas       *int32
+		ready, failed  []string
+		named, healthy bool
+	}{
+		{name: "no instances", replicas: ptr.To[int32](2)},
+		{name: "healthy subset", replicas: ptr.To[int32](2), ready: []string{"demo-0"}},
+		{name: "wrong identity replaces a missing target", replicas: ptr.To[int32](2), ready: []string{"demo-0", "demo-2"}},
+		{name: "old default identity cannot replace named target", replicas: ptr.To[int32](2), ready: []string{"demo-0", "demo-1"}, named: true},
+		{name: "all targets healthy", replicas: ptr.To[int32](2), ready: []string{"demo-0", "demo-1"}, healthy: true},
+		{name: "failed target", replicas: ptr.To[int32](1), failed: []string{"demo-0"}},
+		{name: "failed extra does not block healthy target", replicas: ptr.To[int32](1), ready: []string{"demo-0"}, failed: []string{"demo-1"}, healthy: true},
+		{name: "zero target with failed extra", replicas: ptr.To[int32](0), failed: []string{"demo-0"}, healthy: true},
+		{name: "default target is one", ready: []string{"demo-0"}, healthy: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			its := &workloads.InstanceSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", Generation: 1},
+				Spec: workloads.InstanceSetSpec{Replicas: tc.replicas,
+					Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "db", Image: "db:v1"}}}}},
+				Status: workloads.InstanceSetStatus{ObservedGeneration: 1},
+			}
+			if tc.named {
+				its.Spec.Instances = []workloads.InstanceTemplate{{Name: "named", Replicas: ptr.To[int32](1)}}
+			}
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			for _, name := range append(append([]string(nil), tc.ready...), tc.failed...) {
+				inst := &workloads.Instance{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default", Generation: 1},
+					Status: workloads.InstanceStatus2{ObservedGeneration: 1, CurrentState: workloads.InstanceCurrentStatePresent}}
+				if slices.Contains(tc.ready, name) {
+					for _, kind := range []workloads.ConditionType{workloads.InstanceReady, workloads.InstanceAvailable} {
+						meta.SetStatusCondition(&inst.Status.Conditions, metav1.Condition{Type: string(kind), Status: metav1.ConditionTrue, ObservedGeneration: 1, Reason: "Healthy"})
+					}
+				} else {
+					meta.SetStatusCondition(&inst.Status.Conditions, metav1.Condition{Type: string(workloads.InstanceFailure), Status: metav1.ConditionTrue, ObservedGeneration: 1, Reason: "Failed"})
+				}
+				if err := tree.Add(inst); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			for _, kind := range []workloads.ConditionType{workloads.InstanceReady, workloads.InstanceAvailable} {
+				condition := meta.FindStatusCondition(its.Status.Conditions, string(kind))
+				want := metav1.ConditionFalse
+				if tc.healthy {
+					want = metav1.ConditionTrue
+				}
+				if condition == nil || condition.Status != want {
+					t.Errorf("%s = %#v, want %s", kind, condition, want)
+				}
+			}
+			if its.Status.Replicas != int32(len(tc.ready)+len(tc.failed)) || its.Status.ReadyReplicas != int32(len(tc.ready)) || its.Status.AvailableReplicas != int32(len(tc.ready)) {
+				t.Errorf("runtime counts must retain extra instances: %#v", its.Status)
+			}
+			if meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceFailure)) != (len(tc.failed) > 0) {
+				t.Error("failure reporting must retain extra instances")
+			}
+		})
+	}
+}
 
 func TestStatusReconcilerAggregatesInstanceRestoreConditions(t *testing.T) {
 	newFixture := func() (*workloads.InstanceSet, *kubebuilderx.ObjectTree) {
@@ -907,6 +974,12 @@ func TestStatusReconcilerPublishesTransferredFlatAllocation(t *testing.T) {
 	}
 	if its.Status.ReadyReplicas != 0 || len(its.Status.InstanceStatus) != 2 {
 		t.Fatalf("incorrect absent transfer status: %#v", its.Status)
+	}
+	for _, kind := range []workloads.ConditionType{workloads.InstanceReady, workloads.InstanceAvailable} {
+		condition := meta.FindStatusCondition(its.Status.Conditions, string(kind))
+		if condition == nil || condition.Status != metav1.ConditionFalse {
+			t.Fatalf("missing transferred target must be unhealthy: %#v", condition)
+		}
 	}
 	for name, template := range map[string]string{"demo-0": "b", "demo-1": "a"} {
 		status := its.FindInstanceStatus(name)

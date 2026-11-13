@@ -2114,6 +2114,36 @@ func legacyStopRecoveryHold(t *testing.T, cli client.Client) {
 	}
 }
 
+func TestLegacyInstanceSetRepairsMissingPodWhileWaitingAvailable(t *testing.T) {
+	cli := legacyStopRecoveryFixture(t, 2, 3600)
+	legacyStopRecoveryReady(t, cli)
+	claims := legacyStopRecoveryClaims(t, cli)
+	pod := legacyStopRecoveryPods(t, cli)[0]
+	key := client.ObjectKeyFromObject(&pod)
+	pod.Finalizers = nil
+	if err := cli.Update(context.Background(), &pod); err != nil {
+		t.Fatal(err)
+	}
+	if err := cli.Delete(context.Background(), &pod); err != nil {
+		t.Fatal(err)
+	}
+	result := legacyStopRecoveryReconcile(t, cli, 1)
+	if result.RequeueAfter != time.Second {
+		t.Fatalf("availability waiting lost its retry: %#v", result)
+	}
+	if err := cli.Get(context.Background(), key, &corev1.Pod{}); err != nil {
+		t.Fatalf("availability waiting blocked missing Pod repair: %v", err)
+	}
+	its := legacyStopRecoverySet(t, cli)
+	if its.Status.ReadyReplicas != 1 || its.Status.AvailableReplicas != 0 ||
+		!meta.IsStatusConditionFalse(its.Status.Conditions, string(workloads.InstanceReady)) {
+		t.Fatalf("repair did not preserve the observed readiness deficit: %#v", its.Status)
+	}
+	if !reflect.DeepEqual(claims, legacyStopRecoveryClaims(t, cli)) {
+		t.Fatal("Pod repair changed storage")
+	}
+}
+
 func TestLegacyInstanceSetStopRecoveryMinReadySeconds(t *testing.T) {
 	cli := legacyStopRecoveryFixture(t, 2, 3600)
 	legacyStopRecoveryReady(t, cli)

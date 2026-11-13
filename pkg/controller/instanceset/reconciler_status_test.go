@@ -28,6 +28,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -275,6 +276,40 @@ var _ = Describe("status reconciler test", func() {
 			Expect(its.Status.Conditions[2].Type).Should(BeEquivalentTo(workloads.InstanceFailure))
 			Expect(its.Status.Conditions[2].Reason).Should(BeEquivalentTo(workloads.ReasonInstanceFailure))
 			Expect(its.Status.Conditions[2].Message).Should(BeEquivalentTo(message))
+		})
+
+		It("keeps extra Pod failures out of assigned readiness", func() {
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+			reconcilePods(tree)
+			pods := tree.List(&corev1.Pod{})
+			for _, object := range pods {
+				makePodAvailableWithRevision(object.(*corev1.Pod), "old-revision", true)
+			}
+			extra := pods[0].(*corev1.Pod).DeepCopy()
+			extra.Name = its.Name + "-99"
+			extra.Status.Phase = corev1.PodFailed
+			extra.Status.Conditions[0].Status = corev1.ConditionFalse
+			Expect(tree.Add(extra)).To(Succeed())
+			_, err := NewStatusReconciler().Reconcile(tree)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(its.Status.Replicas).To(Equal(int32(4)))
+			Expect(its.Status.ReadyReplicas).To(Equal(int32(3)))
+			Expect(its.Status.AvailableReplicas).To(Equal(int32(3)))
+			Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceReady))).To(BeTrue())
+			Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable))).To(BeTrue())
+			failure := meta.FindStatusCondition(its.Status.Conditions, string(workloads.InstanceFailure))
+			Expect(failure).NotTo(BeNil())
+			Expect(failure.Message).To(ContainSubstring(extra.Name))
+
+			By("an explicit zero target also ignores remaining Pods for readiness")
+			*its.Spec.Replicas = 0
+			_, err = NewStatusReconciler().Reconcile(tree)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceReady))).To(BeTrue())
+			Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable))).To(BeTrue())
+			Expect(meta.FindStatusCondition(its.Status.Conditions, string(workloads.InstanceFailure))).To(Equal(failure))
 		})
 
 		It("updates image in-place", func() {

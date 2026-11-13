@@ -69,8 +69,16 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	replicas := int32(0)
 	currentReplicas, updatedReplicas := int32(0), int32(0)
 	readyReplicas, availableReplicas := int32(0), int32(0)
-	notReadyNames := sets.New[string]()
-	notAvailableNames := sets.New[string]()
+	itsExt, err := buildInstanceSetExt(its, tree)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	assignments, err := buildInstanceName2TemplateMap(itsExt)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	notReadyNames := sets.KeySet(assignments)
+	notAvailableNames := notReadyNames.Clone()
 	currentRevisions := map[string]string{}
 
 	template2TemplatesStatus := map[string]*workloads.InstanceTemplateStatus{}
@@ -101,7 +109,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 		currentRevisions[pod.Name] = getPodRevision(pod)
 		if isCreated(pod) {
-			notReadyNames.Insert(pod.Name)
 			replicas++
 			template2TemplatesStatus[templateName].Replicas++
 		}
@@ -112,8 +119,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			if intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
 				availableReplicas++
 				template2TemplatesStatus[templateName].AvailableReplicas++
-			} else {
-				notAvailableNames.Insert(pod.Name)
+				notAvailableNames.Delete(pod.Name)
 			}
 		}
 		if isCreated(pod) && !isTerminating(pod) {
@@ -163,13 +169,13 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 	}
 
-	readyCondition, err := buildReadyCondition(its, readyReplicas >= replicas, notReadyNames)
+	readyCondition, err := buildReadyCondition(its, notReadyNames.Len() == 0, notReadyNames)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
 	meta.SetStatusCondition(&its.Status.Conditions, *readyCondition)
 
-	availableCondition, err := buildAvailableCondition(its, availableReplicas >= replicas, notAvailableNames)
+	availableCondition, err := buildAvailableCondition(its, notAvailableNames.Len() == 0, notAvailableNames)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}

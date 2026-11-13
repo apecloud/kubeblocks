@@ -23,6 +23,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 )
 
 type validationReconciler struct{}
@@ -37,6 +38,10 @@ func (r *validationReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kube
 func (r *validationReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	if err := instancetemplate.ValidateInstanceTemplates(tree.GetRoot().(*workloads.InstanceSet), tree); err != nil {
 		return kubebuilderx.Commit, err
+	}
+	its := tree.GetRoot().(*workloads.InstanceSet)
+	if err := workloadlifecycle.Validate(its); err != nil {
+		return lifecycleWait(tree, its, err)
 	}
 	return kubebuilderx.Continue, nil
 }

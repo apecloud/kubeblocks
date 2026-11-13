@@ -76,13 +76,13 @@ func Validate(its *workloads.InstanceSet) error {
 
 // Register records a complete current allocation before any runtime is created.
 // Existing resources prevent a lost observation from being classified as a fresh bootstrap.
-func Register(its *workloads.InstanceSet, assignments []instancetemplate.Assignment, runtimeNames, resourceNames sets.Set[string]) bool {
+func Register(its, original *workloads.InstanceSet, assignments []instancetemplate.Assignment, runtimeNames, resourceNames sets.Set[string]) bool {
 	if !Enabled(its) {
 		return false
 	}
-	bootstrap := its.Status.ObservedGeneration == 0 && len(its.Status.InstanceStatus) == 0 && runtimeNames.Len() == 0 && resourceNames.Len() == 0
+	bootstrap := original.Status.ObservedGeneration == 0 && len(original.Status.InstanceStatus) == 0 && runtimeNames.Len() == 0 && resourceNames.Len() == 0
 	known := sets.New[string]()
-	for _, s := range its.Status.InstanceStatus {
+	for _, s := range original.Status.InstanceStatus {
 		known.Insert(s.PodName)
 	}
 	changed := false
@@ -90,17 +90,16 @@ func Register(its *workloads.InstanceSet, assignments []instancetemplate.Assignm
 		if known.Has(a.InstanceName) {
 			continue
 		}
-		status := workloads.InstanceStatus{PodName: a.InstanceName, TemplateName: ptr.To(a.TemplateName), DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStateAbsent}
+		status := its.FindInstanceStatus(a.InstanceName)
+		if status == nil {
+			its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{PodName: a.InstanceName, TemplateName: ptr.To(a.TemplateName), DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStateAbsent})
+			status = &its.Status.InstanceStatus[len(its.Status.InstanceStatus)-1]
+		}
 		if !bootstrap && !runtimeNames.Has(a.InstanceName) {
 			if its.Spec.LifecycleActions.MemberJoin != nil {
 				status.MemberJoined = ptr.To(false)
 			}
 		}
-		its.Status.InstanceStatus = append(its.Status.InstanceStatus, status)
-		changed = true
-	}
-	if bootstrap && len(assignments) == 0 {
-		its.Status.ObservedGeneration = its.Generation
 		changed = true
 	}
 	return changed
@@ -120,9 +119,8 @@ func NeedsMemberRetirement(its *workloads.InstanceSet, status *workloads.Instanc
 	return Enabled(its) && its.Spec.LifecycleActions.MemberJoin != nil && status != nil && ptr.Deref(status.MemberJoined, false)
 }
 
-// CriticalStatusChanged reports facts that must be committed before changing runtime inputs or membership.
-// Ordinary health, revision, and progress observations do not stop the reconciliation chain.
-func CriticalStatusChanged(previous, current []workloads.InstanceStatus) bool {
+// MembershipChanged reports allocation and membership changes that alignment must commit before proceeding.
+func MembershipChanged(previous, current []workloads.InstanceStatus) bool {
 	if len(previous) != len(current) {
 		return true
 	}
@@ -134,7 +132,7 @@ func CriticalStatusChanged(previous, current []workloads.InstanceStatus) bool {
 			}
 			found = true
 			if status.EffectiveDesiredState() != old.EffectiveDesiredState() || !ptr.Equal(status.TemplateName, old.TemplateName) ||
-				status.Provisioned != old.Provisioned || !sameBoolResult(status.DataLoaded, old.DataLoaded) || !sameBoolResult(status.MemberJoined, old.MemberJoined) {
+				!ptr.Equal(status.MemberJoined, old.MemberJoined) {
 				return true
 			}
 			break
@@ -144,9 +142,6 @@ func CriticalStatusChanged(previous, current []workloads.InstanceStatus) bool {
 		}
 	}
 	return false
-}
-func sameBoolResult(a, b *bool) bool {
-	return (a == nil && b == nil) || (a != nil && b != nil && *a == *b)
 }
 
 func ValidateExecution(action *apps.Action, target *corev1.Pod, pods []*corev1.Pod) (*publiclifecycle.Options, error) {

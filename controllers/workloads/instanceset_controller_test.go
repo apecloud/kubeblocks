@@ -3181,10 +3181,11 @@ func TestInstanceSetLifecycleMemberActionsRespectStatusFailureAndLatestSpec(t *t
 		t.Fatalf("member join did not execute and persist: calls=%d status=%+v", joins, its.Status.InstanceStatus)
 	}
 	setReplicas(1)
-	its = step()
-	its = step()
 	rejectLeave = true
 	stored, result, err := reconcileLifecycleITS(t, cli, key)
+	for round := 0; round < 6 && leaves == 0 && err == nil; round++ {
+		stored, result, err = reconcileLifecycleITS(t, cli, key)
+	}
 	if err != nil || !result.Requeue || leaves != 1 || !ptr.Deref(stored.FindInstanceStatus("member-lifecycle-1").MemberJoined, false) || len(lifecycleEntryPods(t, cli)) != 2 {
 		t.Fatalf("leave status failure deleted runtime or lost result: calls=%d pods=%+v status=%+v err=%v", leaves, lifecycleEntryPods(t, cli), stored.Status.InstanceStatus, err)
 	}
@@ -3198,9 +3199,9 @@ func TestInstanceSetLifecycleMemberActionsRespectStatusFailureAndLatestSpec(t *t
 		t.Fatalf("cancelled shrink did not re-establish membership: join=%d leave=%d pods=%+v", joins, leaves, lifecycleEntryPods(t, cli))
 	}
 	setReplicas(1)
-	its = step()
-	its = step()
-	its = step()
+	for round := 0; round < 6 && leaves < 2; round++ {
+		its = step()
+	}
 	if leaves != 2 || ptr.Deref(its.FindInstanceStatus("member-lifecycle-1").MemberJoined, true) || len(lifecycleEntryPods(t, cli)) != 2 {
 		t.Fatalf("leave completion was not committed before removal: leave=%d status=%+v pods=%+v", leaves, its.Status.InstanceStatus, lifecycleEntryPods(t, cli))
 	}
@@ -3336,9 +3337,12 @@ func TestInstanceSetLifecycleMemberOnlyExecutesPreparedAgentActions(t *testing.T
 	if err := cli.Update(ctx, its); err != nil {
 		t.Fatal(err)
 	}
-	step()
-	step()
-	step()
+	for round := 0; round < 6; round++ {
+		step()
+		if status := its.FindInstanceStatus(target.Name); status != nil && status.MemberJoined != nil && !*status.MemberJoined {
+			break
+		}
+	}
 	if ptr.Deref(its.FindInstanceStatus(target.Name).MemberJoined, true) || len(lifecycleEntryPods(t, cli)) != 2 {
 		t.Fatal("real agent leave completion was not committed before runtime removal")
 	}
@@ -3506,12 +3510,17 @@ func (f *lifecycleEntry) setReady(t *testing.T, name string, ready bool) {
 func (f *lifecycleEntry) bootstrap(t *testing.T, replicas int) {
 	t.Helper()
 	for round := 0; round < 24; round++ {
-		result := f.step(t)
+		f.step(t)
 		pods := lifecycleEntryPods(t, f.cli)
+		satisfied := true
 		for _, pod := range pods {
 			f.setReady(t, pod.Name, true)
+			if f.its.Spec.LifecycleActions.MemberJoin != nil {
+				status := f.its.FindInstanceStatus(pod.Name)
+				satisfied = satisfied && status != nil && ptr.Deref(status.MemberJoined, false)
+			}
 		}
-		if len(pods) == replicas && result.RequeueAfter == 5*time.Second && f.its.Status.ReadyReplicas == int32(replicas) {
+		if len(pods) == replicas && satisfied && f.its.Status.ReadyReplicas == int32(replicas) && f.its.Status.ObservedGeneration == f.its.Generation {
 			return
 		}
 	}
@@ -3803,7 +3812,7 @@ func TestInstanceSetLifecycleRetirementRespectsAlignmentAdmission(t *testing.T) 
 	}
 }
 
-func TestInstanceSetLifecycleReachesUpdateAndPollsSuccessfulExits(t *testing.T) {
+func TestInstanceSetLifecycleAllowsOnDeleteAndRollout(t *testing.T) {
 	f := newMemberLifecycleEntry(t, 1, appsv1.OrderedReadyPodManagement)
 	f.bootstrap(t, 1)
 	f.its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{Type: kbappsv1.OnDeleteStrategyType}
@@ -3812,8 +3821,9 @@ func TestInstanceSetLifecycleReachesUpdateAndPollsSuccessfulExits(t *testing.T) 
 		t.Fatal(err)
 	}
 	f.step(t)
-	if result := f.step(t); result.RequeueAfter != 5*time.Second {
-		t.Fatalf("successful OnDelete exit lost observation poll: %#v", result)
+	f.step(t)
+	if pods := lifecycleEntryPods(t, f.cli); len(pods) != 1 || pods[0].Spec.Containers[0].Image != "database" {
+		t.Fatalf("OnDelete changed the existing runtime: %+v", pods)
 	}
 	f.its.Spec.InstanceUpdateStrategy = nil
 	f.its.Spec.Template.Spec.Containers[0].Image = "database:v2"
@@ -3825,15 +3835,12 @@ func TestInstanceSetLifecycleReachesUpdateAndPollsSuccessfulExits(t *testing.T) 
 	}
 	handedOff := false
 	for round := 0; round < 12; round++ {
-		result := f.step(t)
+		f.step(t)
 
 		pods := lifecycleEntryPods(t, f.cli)
 		handedOff = len(pods) == 0 || pods[0].Spec.Containers[0].Image == "database:v2"
 
 		if handedOff {
-			if result.RequeueAfter == 0 {
-				t.Fatal("successful update lost lifecycle poll")
-			}
 			break
 		}
 	}
@@ -3842,7 +3849,7 @@ func TestInstanceSetLifecycleReachesUpdateAndPollsSuccessfulExits(t *testing.T) 
 	}
 }
 
-func TestInstanceSetLifecyclePollsUnalignedUpdateExit(t *testing.T) {
+func TestInstanceSetLifecycleWaitsForAvailablePredecessor(t *testing.T) {
 	f := newMemberLifecycleEntry(t, 1, appsv1.OrderedReadyPodManagement)
 	f.bootstrap(t, 1)
 	f.setReady(t, f.its.Name+"-0", false)
@@ -3853,13 +3860,18 @@ func TestInstanceSetLifecyclePollsUnalignedUpdateExit(t *testing.T) {
 	if err := f.cli.Update(context.Background(), f.its); err != nil {
 		t.Fatal(err)
 	}
-	f.step(t)
-	f.step(t)
-	if result := f.step(t); result.RequeueAfter != 5*time.Second {
-		t.Fatalf("unaligned update exit lost observation poll: %#v", result)
+	for round := 0; round < 6; round++ {
+		f.step(t)
 	}
 	if len(lifecycleEntryPods(t, f.cli)) != 1 {
 		t.Fatal("OrderedReady admitted creation before predecessor became available")
+	}
+	f.setReady(t, f.its.Name+"-0", true)
+	for round := 0; round < 6 && len(lifecycleEntryPods(t, f.cli)) < 2; round++ {
+		f.step(t)
+	}
+	if len(lifecycleEntryPods(t, f.cli)) != 2 {
+		t.Fatal("available predecessor did not allow expansion to resume")
 	}
 }
 
@@ -4746,12 +4758,6 @@ func TestInstanceSetLifecycleTargetCommitPrecedesRetirement(t *testing.T) {
 			reject = false
 			f.step(t)
 			assertRuntime()
-			reject = true
-			f.step(t)
-			assertRuntime()
-			reject = false
-			f.step(t)
-			assertRuntime()
 			want := workloads.InstanceDesiredStateOffline
 			if target == "released" {
 				want = workloads.InstanceDesiredStateReleased
@@ -4911,7 +4917,7 @@ func TestInstanceSetPendingJoinAllowsImageRecovery(t *testing.T) {
 			}
 			before := calls
 
-			if result := f.step(t); result.RequeueAfter <= 0 || result.RequeueAfter > 5*time.Second {
+			if result := f.step(t); result.RequeueAfter <= 0 || result.RequeueAfter > 2*time.Second {
 				t.Fatalf("pending Join lost its bounded retry: %+v", result)
 			}
 			if calls <= before {

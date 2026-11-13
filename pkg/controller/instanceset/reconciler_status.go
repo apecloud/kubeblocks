@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -38,7 +37,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancestatus"
-	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -52,11 +50,7 @@ func NewStatusReconciler() kubebuilderx.Reconciler {
 }
 
 func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
-	if tree.GetRoot() == nil {
-		return kubebuilderx.ConditionUnsatisfied
-	}
-	its := tree.GetRoot().(*workloads.InstanceSet)
-	if !model.IsObjectStatusUpdating(its) && !lifecycleStatusEnabled(its) {
+	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
 	return kubebuilderx.ConditionSatisfied
@@ -64,14 +58,13 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
-	previous := its.DeepCopy().Status.InstanceStatus
-	summarizeStatus := model.IsObjectStatusUpdating(its)
-	if lifecycleStatusEnabled(its) {
-		if result, err := observeLifecycleStatus(tree); err != nil || result != kubebuilderx.Continue {
-			return result, err
+	for _, obj := range tree.List(&corev1.Pod{}) {
+		if status := its.FindInstanceStatus(obj.GetName()); status != nil {
+			status.Provisioned = true
 		}
 	}
-	if !summarizeStatus {
+	// Runtime observations do not depend on publication of the new revision targets.
+	if model.IsObjectUpdating(its) {
 		return kubebuilderx.Continue, nil
 	}
 
@@ -224,10 +217,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if err = setInstanceStatus(tree, its, podList); err != nil {
 		return kubebuilderx.Continue, err
 	}
-	if lifecycleStatusEnabled(its) && workloadlifecycle.CriticalStatusChanged(previous, its.Status.InstanceStatus) {
-		return kubebuilderx.RetryAfter(time.Second), nil
-	}
-
 	if !stopping && its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
 		return kubebuilderx.ContinueWithRetryAfter(time.Second), nil
 	}
@@ -568,20 +557,6 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	if err != nil {
 		return err
 	}
-	if workloadlifecycle.Enabled(its) && its.Spec.LifecycleActions.MemberJoin != nil {
-		for i := range statuses {
-			status := &statuses[i]
-			if _, active := desiredNames[status.PodName]; !active {
-				continue
-			}
-			previous := its.FindInstanceStatus(status.PodName)
-			if previous != nil && previous.EffectiveDesiredState() == workloads.InstanceDesiredStateReleased {
-				// Leave may have succeeded without its result being committed. Re-establish
-				// membership when this identity is allocated again, including while stopped.
-				status.MemberJoined = ptr.To(false)
-			}
-		}
-	}
 	its.Status.InstanceStatus = statuses
 	return nil
 }
@@ -713,8 +688,4 @@ func isPVCExpansionRunning(pvc *corev1.PersistentVolumeClaim) bool {
 	requested, requestedOK := pvc.Spec.Resources.Requests[corev1.ResourceStorage]
 	capacity, capacityOK := pvc.Status.Capacity[corev1.ResourceStorage]
 	return requestedOK && capacityOK && capacity.Cmp(requested) < 0
-}
-
-func lifecycleStatusEnabled(its *workloads.InstanceSet) bool {
-	return workloadlifecycle.Enabled(its) && !model.IsObjectDeleting(its) && !model.IsReconciliationPaused(its)
 }

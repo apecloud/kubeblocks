@@ -34,48 +34,64 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-func observeLifecycleStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
+func reconcileMemberStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its := tree.GetRoot().(*workloads.InstanceSet)
-	if err := workloadlifecycle.Validate(its); err != nil {
-		return lifecycleWait(tree, its, err)
+	original, ok := tree.GetOriginalRoot().(*workloads.InstanceSet)
+	if !ok {
+		return kubebuilderx.Continue, fmt.Errorf("member alignment requires a prepared object tree")
 	}
 	assignments, _, err := instancetemplate.BuildAssignments(tree, its)
 	if err != nil {
 		if instancetemplate.IsAssignmentIncomplete(err) {
-			if its.Generation != its.Status.ObservedGeneration {
-				return kubebuilderx.Continue, nil
-			}
 			return lifecycleWait(tree, its, err)
 		}
 		return kubebuilderx.Continue, err
 	}
-	pods := make([]*corev1.Pod, 0)
 	names := sets.New[string]()
 	resources := sets.New[string]()
 	for _, obj := range tree.List(&corev1.Pod{}) {
-		pod := obj.(*corev1.Pod)
-		pods = append(pods, pod)
-		names.Insert(pod.Name)
+		names.Insert(obj.GetName())
 	}
 	for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
 		resources.Insert(obj.GetLabels()[constant.KBAppPodNameLabelKey])
 	}
-	registered := workloadlifecycle.Register(its, assignments, names, resources)
-	previous := its.DeepCopy().Status.InstanceStatus
-	for _, pod := range pods {
-		if status := its.FindInstanceStatus(pod.Name); status != nil {
-			status.Provisioned = true
-			if its.Spec.LifecycleActions.MemberJoin != nil && status.MemberJoined == nil {
-				status.MemberJoined = ptr.To(true)
+	registered := workloadlifecycle.Register(its, original, assignments, names, resources)
+	desired := make(map[string]string, len(assignments))
+	for _, assignment := range assignments {
+		desired[assignment.InstanceName] = assignment.TemplateName
+	}
+	offline := sets.New(its.Spec.OfflineInstances...)
+	for i := range its.Status.InstanceStatus {
+		status := &its.Status.InstanceStatus[i]
+		template, allocated := desired[status.PodName]
+		switch {
+		case allocated:
+			status.DesiredState = workloads.InstanceDesiredStateActive
+			if isStopRequested(its) {
+				status.DesiredState = workloads.InstanceDesiredStateOffline
 			}
+			status.TemplateName = ptr.To(template)
+		case offline.Has(status.PodName):
+			status.DesiredState = workloads.InstanceDesiredStateOffline
+		default:
+			status.DesiredState = workloads.InstanceDesiredStateReleased
+		}
+		if !allocated || its.Spec.LifecycleActions.MemberJoin == nil {
+			continue
+		}
+		previous := original.FindInstanceStatus(status.PodName)
+		if previous != nil && previous.EffectiveDesiredState() == workloads.InstanceDesiredStateReleased {
+			// A cancelled shrink may have completed Leave without saving its result.
+			status.MemberJoined = ptr.To(false)
+		} else if names.Has(status.PodName) && status.MemberJoined == nil {
+			status.MemberJoined = ptr.To(true)
 		}
 	}
-	if !model.IsObjectStatusUpdating(its) && (registered || workloadlifecycle.CriticalStatusChanged(previous, its.Status.InstanceStatus)) {
+	if registered || workloadlifecycle.MembershipChanged(original.Status.InstanceStatus, its.Status.InstanceStatus) {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	return kubebuilderx.Continue, nil

@@ -51,7 +51,13 @@ var _ = Describe("revision update reconciler test", func() {
 			its.Status.ObservedGeneration = 1
 			tree := kubebuilderx.NewObjectTree()
 			tree.SetRoot(its)
-			Expect(NewStatusReconciler().PreCondition(tree)).Should(Equal(kubebuilderx.ConditionUnsatisfied))
+			Expect(NewStatusReconciler().PreCondition(tree)).Should(Equal(kubebuilderx.ConditionSatisfied))
+			its.Status.UpdateRevision = "published"
+			res, err := NewStatusReconciler().Reconcile(tree)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(res).To(Equal(kubebuilderx.Continue))
+			Expect(its.Status.ObservedGeneration).To(Equal(int64(1)))
+			Expect(its.Status.UpdateRevision).To(Equal("published"))
 			Expect(NewRevisionUpdateReconciler().PreCondition(tree)).Should(Equal(kubebuilderx.ConditionSatisfied))
 
 			its.Status.ObservedGeneration = its.Generation
@@ -192,9 +198,15 @@ func TestRevisionUpdateInvalidatesOnlyAffectedLegacyInstances(t *testing.T) {
 			its.Generation++
 			tt.mutate(its)
 
-			if NewStatusReconciler().PreCondition(tree) != kubebuilderx.ConditionUnsatisfied {
-				t.Fatal("status reconciler must remain before revision update and wait for the new generation target")
+			publishedGeneration, publishedRevision := its.Status.ObservedGeneration, its.Status.UpdateRevision
+			if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
 			}
+			if its.Status.ObservedGeneration != publishedGeneration || its.Status.UpdateRevision != publishedRevision {
+				t.Fatal("runtime observation changed revision publication")
+			}
+			assertLegacyUpToDate(t, its, "demo-0", true)
+			assertLegacyUpToDate(t, its, "demo-1", true)
 			if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 				t.Fatal(err)
 			}
@@ -226,9 +238,14 @@ func TestRevisionUpdateInvalidatesMissingLegacyPod(t *testing.T) {
 	its.Spec.Instances[0].Resources = &corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")},
 	}
-	if NewStatusReconciler().PreCondition(tree) != kubebuilderx.ConditionUnsatisfied {
-		t.Fatal("status reconciler must wait for revision publication")
+	publishedGeneration, publishedRevision := its.Status.ObservedGeneration, its.Status.UpdateRevision
+	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
 	}
+	if its.Status.ObservedGeneration != publishedGeneration || its.Status.UpdateRevision != publishedRevision {
+		t.Fatal("runtime observation changed revision publication")
+	}
+	assertLegacyUpToDate(t, its, "demo-0", true)
 	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)
 	}

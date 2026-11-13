@@ -81,6 +81,10 @@ func (c *controller) Prepare(reader TreeLoader) Controller {
 		return c
 	}
 	c.tree, c.err = c.oldTree.DeepCopy()
+	if c.err != nil {
+		return c
+	}
+	c.tree.originalRoot = c.oldTree.GetRoot()
 
 	// init placement
 	c.ctx = intoContext(c.ctx, placement(c.oldTree.GetRoot()))

@@ -52,7 +52,7 @@ func testAction(command string) *apps.Action {
 func TestRegistrationSeparatesBootstrapAndLaterAllocation(t *testing.T) {
 	its := memberWorkload()
 	assignments := []instancetemplate.Assignment{{InstanceName: "demo-0"}, {InstanceName: "demo-1", TemplateName: "alternate"}}
-	if !Register(its, assignments, sets.New[string](), sets.New[string]()) {
+	if !Register(its, its.DeepCopy(), assignments, sets.New[string](), sets.New[string]()) {
 		t.Fatal("bootstrap not registered")
 	}
 	for _, status := range its.Status.InstanceStatus {
@@ -61,7 +61,7 @@ func TestRegistrationSeparatesBootstrapAndLaterAllocation(t *testing.T) {
 		}
 	}
 	assignments = append(assignments, instancetemplate.Assignment{InstanceName: "demo-2"})
-	if !Register(its, assignments, sets.New[string](), sets.New[string]()) {
+	if !Register(its, its.DeepCopy(), assignments, sets.New[string](), sets.New[string]()) {
 		t.Fatal("new identity not registered")
 	}
 	status := its.FindInstanceStatus("demo-2")
@@ -69,14 +69,15 @@ func TestRegistrationSeparatesBootstrapAndLaterAllocation(t *testing.T) {
 		t.Fatalf("new empty allocation not tracked: %+v", status)
 	}
 	its = memberWorkload()
-	if !Register(its, nil, sets.New[string](), sets.New[string]()) || its.Status.ObservedGeneration != 1 {
-		t.Fatal("zero bootstrap did not record processed generation")
+	if Register(its, its.DeepCopy(), nil, sets.New[string](), sets.New[string]()) || its.Status.ObservedGeneration != 0 {
+		t.Fatal("empty allocation changed revision publication")
 	}
-	if !Register(its, assignments[:1], sets.New[string](), sets.New[string]()) || its.FindInstanceStatus("demo-0").MemberJoined == nil {
+	its.Status.ObservedGeneration = its.Generation
+	if !Register(its, its.DeepCopy(), assignments[:1], sets.New[string](), sets.New[string]()) || its.FindInstanceStatus("demo-0").MemberJoined == nil {
 		t.Fatal("zero replica increase was treated as bootstrap")
 	}
 	its = memberWorkload()
-	Register(its, assignments, sets.New("demo-1"), sets.New("demo-0"))
+	Register(its, its.DeepCopy(), assignments, sets.New("demo-1"), sets.New("demo-0"))
 	if its.FindInstanceStatus("demo-1").MemberJoined != nil {
 		t.Fatal("unobserved old resources were classified as empty")
 	}

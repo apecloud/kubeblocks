@@ -58,6 +58,11 @@ func (r *instanceAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree
 
 func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	if workloadlifecycle.Enabled(its) {
+		if result, err := reconcileMemberStatus(tree); err != nil || result != kubebuilderx.Continue {
+			return result, err
+		}
+	}
 	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
 	if err != nil {
 		return kubebuilderx.Continue, err
@@ -309,7 +314,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	if memberWaiting {
-		return kubebuilderx.Continue, nil
+		return kubebuilderx.ContinueWithRetryAfter(2 * time.Second), nil
 	}
 	if result, err := retire(retirementNames); err != nil || result != kubebuilderx.Continue {
 		return result, err

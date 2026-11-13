@@ -21,6 +21,7 @@ package instanceset
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -30,12 +31,14 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	apps "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
-	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
+	publiclifecycle "github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 )
 
 func reconcileMemberStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
@@ -59,7 +62,7 @@ func reconcileMemberStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, 
 	for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
 		resources.Insert(obj.GetLabels()[constant.KBAppPodNameLabelKey])
 	}
-	registered := workloadlifecycle.Register(its, original, assignments, names, resources)
+	registered := registerMemberStatus(its, original, assignments, names, resources)
 	desired := make(map[string]string, len(assignments))
 	for _, assignment := range assignments {
 		desired[assignment.InstanceName] = assignment.TemplateName
@@ -91,7 +94,7 @@ func reconcileMemberStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, 
 			status.MemberJoined = ptr.To(true)
 		}
 	}
-	if registered || workloadlifecycle.MembershipChanged(original.Status.InstanceStatus, its.Status.InstanceStatus) {
+	if registered || membershipChanged(original.Status.InstanceStatus, its.Status.InstanceStatus) {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	return kubebuilderx.Continue, nil
@@ -99,13 +102,13 @@ func reconcileMemberStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, 
 
 func reconcileMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod, join bool, reader client.Reader) (kubebuilderx.Result, error) {
 	status := its.FindInstanceStatus(pod.Name)
-	if status == nil || !workloadlifecycle.Enabled(its) || isStopRequested(its) {
+	if status == nil || !memberActionsEnabled(its) || isStopRequested(its) {
 		return kubebuilderx.Continue, nil
 	}
 	if join && (its.Spec.LifecycleActions.MemberJoin == nil || status.MemberJoined == nil || *status.MemberJoined) {
 		return kubebuilderx.Continue, nil
 	}
-	if !join && !workloadlifecycle.NeedsMemberRetirement(its, status) {
+	if !join && !needsMemberRetirement(its, status) {
 		return kubebuilderx.Continue, nil
 	}
 	if join || its.Spec.LifecycleActions.MemberLeave != nil {
@@ -121,7 +124,7 @@ func reconcileMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, 
 		if leave {
 			action = its.Spec.LifecycleActions.MemberLeave
 		}
-		opts, err := workloadlifecycle.ValidateExecution(action, pod, pods)
+		opts, err := validateMemberExecution(action, pod, pods)
 		if err != nil {
 			return lifecycleWait(tree, its, err)
 		}
@@ -137,7 +140,7 @@ func reconcileMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, 
 				}
 			}
 			if exclusive {
-				opts, err := workloadlifecycle.ValidateExecution(its.Spec.LifecycleActions.Switchover, pod, pods)
+				opts, err := validateMemberExecution(its.Spec.LifecycleActions.Switchover, pod, pods)
 				if err != nil {
 					return lifecycleWait(tree, its, err)
 				}
@@ -168,4 +171,142 @@ func lifecycleWait(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, er
 	}
 	meta.SetStatusCondition(&its.Status.Conditions, metav1.Condition{Type: "InstanceLifecycle", Status: metav1.ConditionFalse, ObservedGeneration: its.Generation, Reason: "Waiting", Message: err.Error()})
 	return kubebuilderx.RetryAfter(2 * time.Second), nil
+}
+
+func memberActionsEnabled(its *workloads.InstanceSet) bool {
+	a := its.Spec.LifecycleActions
+	return a != nil && (a.MemberJoin != nil || a.MemberLeave != nil)
+}
+
+func memberRetirementBlocked(its *workloads.InstanceSet, old *workloads.InstanceStatus) bool {
+	if !memberActionsEnabled(its) || old == nil {
+		return false
+	}
+	established := ptr.Deref(old.MemberJoined, false) || (old.MemberJoined == nil && old.Provisioned)
+	return slices.ContainsFunc(its.Status.InstanceStatus, func(status workloads.InstanceStatus) bool {
+		if status.EffectiveDesiredState() != workloads.InstanceDesiredStateActive {
+			return false
+		}
+		pendingJoin := established && its.Spec.LifecycleActions.MemberJoin != nil && status.MemberJoined != nil && !*status.MemberJoined
+		return pendingJoin
+	})
+}
+
+func validateMemberActions(its *workloads.InstanceSet) error {
+	if !memberActionsEnabled(its) {
+		return nil
+	}
+	a := its.Spec.LifecycleActions
+	for _, action := range []*apps.Action{a.MemberJoin, a.MemberLeave, a.Switchover} {
+		if action != nil && !action.Defined() {
+			return fmt.Errorf("configured lifecycle actions must define an execution handler")
+		}
+		if action != nil && action.PreCondition != nil && *action.PreCondition != apps.ImmediatelyPreConditionType {
+			return fmt.Errorf("workload-owned actions support only Immediately preconditions; runtime availability is observed by the workload controller")
+		}
+		if action != nil && action.NonBlocking {
+			return fmt.Errorf("workload-owned lifecycle actions must use blocking execution")
+		}
+	}
+	return nil
+}
+
+// registerMemberStatus records a complete current allocation before any runtime is created.
+// Existing resources prevent a lost observation from being classified as a fresh bootstrap.
+func registerMemberStatus(its, original *workloads.InstanceSet, assignments []instancetemplate.Assignment, runtimeNames, resourceNames sets.Set[string]) bool {
+	if !memberActionsEnabled(its) {
+		return false
+	}
+	bootstrap := original.Status.ObservedGeneration == 0 && len(original.Status.InstanceStatus) == 0 && runtimeNames.Len() == 0 && resourceNames.Len() == 0
+	known := sets.New[string]()
+	for _, s := range original.Status.InstanceStatus {
+		known.Insert(s.PodName)
+	}
+	changed := false
+	for _, a := range assignments {
+		if known.Has(a.InstanceName) {
+			continue
+		}
+		status := its.FindInstanceStatus(a.InstanceName)
+		if status == nil {
+			its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{PodName: a.InstanceName, TemplateName: ptr.To(a.TemplateName), DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStateAbsent})
+			status = &its.Status.InstanceStatus[len(its.Status.InstanceStatus)-1]
+		}
+		if !bootstrap && !runtimeNames.Has(a.InstanceName) {
+			if its.Spec.LifecycleActions.MemberJoin != nil {
+				status.MemberJoined = ptr.To(false)
+			}
+		}
+		changed = true
+	}
+	return changed
+}
+
+func needsMemberLeave(its *workloads.InstanceSet, status *workloads.InstanceStatus) bool {
+	if !memberActionsEnabled(its) || its.Spec.LifecycleActions.MemberLeave == nil || status == nil {
+		return false
+	}
+	return ptr.Deref(status.MemberJoined, false) || (status.MemberJoined == nil && status.Provisioned)
+}
+
+func needsMemberRetirement(its *workloads.InstanceSet, status *workloads.InstanceStatus) bool {
+	if needsMemberLeave(its, status) {
+		return true
+	}
+	return memberActionsEnabled(its) && its.Spec.LifecycleActions.MemberJoin != nil && status != nil && ptr.Deref(status.MemberJoined, false)
+}
+
+// membershipChanged reports allocation and membership changes that alignment must commit before proceeding.
+func membershipChanged(previous, current []workloads.InstanceStatus) bool {
+	if len(previous) != len(current) {
+		return true
+	}
+	for _, status := range current {
+		found := false
+		for _, old := range previous {
+			if status.PodName != old.PodName {
+				continue
+			}
+			found = true
+			if status.EffectiveDesiredState() != old.EffectiveDesiredState() || !ptr.Equal(status.TemplateName, old.TemplateName) ||
+				!ptr.Equal(status.MemberJoined, old.MemberJoined) {
+				return true
+			}
+			break
+		}
+		if !found {
+			return true
+		}
+	}
+	return false
+}
+
+func validateMemberExecution(action *apps.Action, target *corev1.Pod, pods []*corev1.Pod) (*publiclifecycle.Options, error) {
+	if target == nil {
+		return nil, fmt.Errorf("member target runtime is absent")
+	}
+	if len(pods) == 0 {
+		return nil, fmt.Errorf("no available executor for member action")
+	}
+	selected, err := publiclifecycle.SelectTargetPods(pods, target, action)
+	if err != nil {
+		return nil, err
+	}
+	if len(selected) == 0 {
+		return nil, fmt.Errorf("no available executor for member action")
+	}
+	for _, pod := range selected {
+		port, err := intctrlutil.GetPortByName(*pod, kbagent.ContainerName, kbagent.DefaultHTTPPortName)
+		if err != nil || port <= 0 || pod.Status.PodIP == "" || pod.DeletionTimestamp != nil {
+			return nil, fmt.Errorf("instance %s has no available agent endpoint", pod.Name)
+		}
+	}
+	selector := action.TargetPodSelector
+	if selector == "" && action.Exec != nil {
+		selector = action.Exec.TargetPodSelector
+	}
+	if selector == apps.AnyReplica {
+		return &publiclifecycle.Options{TargetPodName: selected[0].Name}, nil
+	}
+	return nil, nil
 }

@@ -36,7 +36,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -58,7 +57,7 @@ func (r *instanceAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree
 
 func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
-	if workloadlifecycle.Enabled(its) {
+	if memberActionsEnabled(its) {
 		if result, err := reconcileMemberStatus(tree); err != nil || result != kubebuilderx.Continue {
 			return result, err
 		}
@@ -132,7 +131,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	}
 	retirementNames := deleteNameSet.Clone()
 	for _, status := range its.Status.InstanceStatus {
-		if !newNameSet.Has(status.PodName) && workloadlifecycle.NeedsMemberRetirement(its, &status) {
+		if !newNameSet.Has(status.PodName) && needsMemberRetirement(its, &status) {
 			retirementNames.Insert(status.PodName)
 		}
 	}
@@ -152,7 +151,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		for _, name := range candidates {
 			pod := oldInstanceMap[name]
 			absent := pod == nil
-			if absent && !workloadlifecycle.NeedsMemberRetirement(its, its.FindInstanceStatus(name)) {
+			if absent && !needsMemberRetirement(its, its.FindInstanceStatus(name)) {
 				continue
 			}
 			if !isOrderedReady && concurrency <= 0 {
@@ -164,12 +163,12 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 					its.Name,
 					pod.Name)
 			}
-			if workloadlifecycle.Enabled(its) && !isStopRequested(its) {
-				if workloadlifecycle.RetirementBlocked(its, its.FindInstanceStatus(name)) {
+			if memberActionsEnabled(its) && !isStopRequested(its) {
+				if memberRetirementBlocked(its, its.FindInstanceStatus(name)) {
 					waiting = true
 					continue
 				}
-				if workloadlifecycle.NeedsMemberRetirement(its, its.FindInstanceStatus(name)) {
+				if needsMemberRetirement(its, its.FindInstanceStatus(name)) {
 					if absent {
 						pod = &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: its.Namespace}}
 					}
@@ -182,7 +181,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 			if err := tree.Delete(pod); err != nil {
 				return kubebuilderx.Continue, err
 			}
-			if workloadlifecycle.Enabled(its) {
+			if memberActionsEnabled(its) {
 				return kubebuilderx.RetryAfter(time.Second), nil
 			}
 
@@ -202,11 +201,11 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 				if name == "" || !names.Has(name) {
 					continue
 				}
-				if workloadlifecycle.Enabled(its) && workloadlifecycle.RetirementBlocked(its, its.FindInstanceStatus(name)) {
+				if memberActionsEnabled(its) && memberRetirementBlocked(its, its.FindInstanceStatus(name)) {
 					waiting = true
 					continue
 				}
-				if workloadlifecycle.Enabled(its) && workloadlifecycle.NeedsMemberRetirement(its, its.FindInstanceStatus(name)) {
+				if memberActionsEnabled(its) && needsMemberRetirement(its, its.FindInstanceStatus(name)) {
 					continue
 				}
 				if retiredNames.Has(name) || (!oldNameSet.Has(name) && metav1.IsControlledBy(obj, its)) {
@@ -222,11 +221,11 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		}
 		return kubebuilderx.Continue, nil
 	}
-	if workloadlifecycle.Enabled(its) && !isStopRequested(its) {
+	if memberActionsEnabled(its) && !isStopRequested(its) {
 		independentNames := sets.New[string]()
 		for name := range retirementNames {
 			status := its.FindInstanceStatus(name)
-			if status != nil && !workloadlifecycle.NeedsLeave(its, status) && (status.MemberJoined != nil && !*status.MemberJoined) {
+			if status != nil && !needsMemberLeave(its, status) && (status.MemberJoined != nil && !*status.MemberJoined) {
 				independentNames.Insert(name)
 			}
 		}
@@ -310,7 +309,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		}
 	}
 
-	if workloadlifecycle.Enabled(its) && runtimeChanged {
+	if memberActionsEnabled(its) && runtimeChanged {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	if memberWaiting {
@@ -320,7 +319,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		return result, err
 	}
 
-	if workloadlifecycle.Enabled(its) {
+	if memberActionsEnabled(its) {
 		meta.RemoveStatusCondition(&its.Status.Conditions, "InstanceLifecycle")
 	}
 	return kubebuilderx.Continue, nil

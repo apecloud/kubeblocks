@@ -59,7 +59,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
@@ -4073,7 +4072,7 @@ func TestInstanceSetLifecycleLeaveWaitsWithoutExecutor(t *testing.T) {
 			for round := 0; round < 6; round++ {
 				result := f.step(t)
 				status := f.its.FindInstanceStatus(key.Name)
-				if !workloadlifecycle.NeedsLeave(f.its, status) || result.RequeueAfter == 0 || len(agent.calls) != 0 {
+				if status == nil || !ptr.Deref(status.MemberJoined, false) || result.RequeueAfter == 0 || len(agent.calls) != 0 {
 					t.Fatalf("missing executor lost the pending Leave or retry: status=%#v result=%#v calls=%v", status, result, agent.calls)
 				}
 			}
@@ -4141,7 +4140,8 @@ func TestInstanceSetLifecycleWarningOnlyWhenWaitMessageChanges(t *testing.T) {
 		if condition == nil || condition.Status != metav1.ConditionFalse || condition.Reason != "Waiting" || condition.ObservedGeneration != f.its.Generation || !strings.Contains(condition.Message, failure.Error()) {
 			t.Fatalf("waiting did not persist the current lifecycle failure: %#v", condition)
 		}
-		if !result.Requeue || result.RequeueAfter != retryAfter || !workloadlifecycle.NeedsLeave(f.its, f.its.FindInstanceStatus(name)) || len(lifecycleEntryPods(t, f.cli)) != 1 {
+		memberStatus := f.its.FindInstanceStatus(name)
+		if !result.Requeue || result.RequeueAfter != retryAfter || memberStatus == nil || !ptr.Deref(memberStatus.MemberJoined, false) || len(lifecycleEntryPods(t, f.cli)) != 1 {
 			t.Fatalf("waiting lost the pending Leave, runtime, or retry: status=%#v result=%#v", f.its.Status, result)
 		}
 		return condition.Message
@@ -4243,7 +4243,8 @@ func TestInstanceSetLifecycleStopScaleThenResume(t *testing.T) {
 						f.setReady(t, current.Name, true)
 					}
 				}
-				if failed.calls == 0 || !workloadlifecycle.NeedsLeave(f.its, f.its.FindInstanceStatus(key.Name)) {
+				memberStatus := f.its.FindInstanceStatus(key.Name)
+				if failed.calls == 0 || memberStatus == nil || !ptr.Deref(memberStatus.MemberJoined, false) {
 					t.Fatalf("resumed runtime did not retry the failed Leave: calls=%d status=%#v", failed.calls, f.its.FindInstanceStatus(key.Name))
 				}
 				pvcKey := client.ObjectKey{Namespace: key.Namespace, Name: "data-" + key.Name}

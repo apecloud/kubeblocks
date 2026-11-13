@@ -12,8 +12,10 @@ spec:
     parameters:
       server: {{ `{{ .Parameters.nfsServer }}` }}
       share: {{ `{{ .Parameters.nfsShare }}` }}
-      subDir: {{ `{{ .Parameters.nfsSubDir }}` }}
       mountPermissions: "0777"
+      {{ `{{- if .Parameters.nfsSubDir }}` }}
+      subDir: {{ `{{ .Parameters.nfsSubDir | quote }}` }}
+      {{ `{{- end }}` }}
     {{ `{{- if .Parameters.nfsMountOptions }}` }}
     {{ `{{- $options := splitList " " .Parameters.nfsMountOptions }}` }}
     mountOptions: {{ `{{ $options | toJson }}` }}
@@ -32,7 +34,7 @@ spec:
           default: "/"
         nfsSubDir:
           type: string
-          description: "sub directory under nfs share"
+          description: "optional subdirectory under the NFS share; omit it to use the share itself"
         nfsMountOptions:
           type: string
           description: "extra mount options"

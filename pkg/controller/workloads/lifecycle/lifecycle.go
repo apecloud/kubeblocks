@@ -21,10 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package lifecycle
 
 import (
-	"encoding/json"
 	"fmt"
 	"slices"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -36,7 +34,6 @@ import (
 	publiclifecycle "github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
-	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
 func Enabled(its *workloads.InstanceSet) bool {
@@ -121,102 +118,6 @@ func NeedsMemberRetirement(its *workloads.InstanceSet, status *workloads.Instanc
 		return true
 	}
 	return Enabled(its) && its.Spec.LifecycleActions.MemberJoin != nil && status != nil && ptr.Deref(status.MemberJoined, false)
-}
-
-// ConfigurePod merges member actions into the agent server supplied by the caller.
-func ConfigurePod(its *workloads.InstanceSet, pod *corev1.Pod) error {
-	if !Enabled(its) {
-		return nil
-	}
-	if err := Validate(its); err != nil {
-		return err
-	}
-	i := slices.IndexFunc(pod.Spec.Containers, func(c corev1.Container) bool { return c.Name == kbagent.ContainerName })
-	if i < 0 {
-		return fmt.Errorf("instance %s requires a prepared kbagent server container", pod.Name)
-	}
-	return mergeActions(&pod.Spec.Containers[i], its.Spec.LifecycleActions)
-}
-
-func setEnv(c *corev1.Container, env corev1.EnvVar) {
-	i := slices.IndexFunc(c.Env, func(e corev1.EnvVar) bool { return e.Name == env.Name })
-	if i < 0 {
-		c.Env = append(c.Env, env)
-	} else {
-		c.Env[i] = env
-	}
-}
-
-func mergeActions(container *corev1.Container, a *workloads.LifecycleActions) error {
-	var actions []proto.Action
-	var streaming []string
-	for _, e := range container.Env {
-		if e.Name == "KB_AGENT_ACTION" && e.Value != "" {
-			if err := json.Unmarshal([]byte(e.Value), &actions); err != nil {
-				return err
-			}
-		}
-		if e.Name == "KB_AGENT_STREAMING" && e.Value != "" {
-			streaming = strings.Split(e.Value, ",")
-		}
-	}
-	defs := []struct {
-		name   string
-		action *apps.Action
-	}{{"memberJoin", a.MemberJoin}, {"memberLeave", a.MemberLeave}, {"switchover", a.Switchover}}
-	for _, def := range defs {
-		action := Action(def.name, def.action)
-		if action == nil {
-			continue
-		}
-		i := slices.IndexFunc(actions, func(a proto.Action) bool { return a.Name == def.name })
-		if i < 0 {
-			actions = append(actions, *action)
-		} else {
-			actions[i] = *action
-		}
-		if def.action.Exec != nil {
-			for _, env := range def.action.Exec.Env {
-				setEnv(container, env)
-			}
-		}
-	}
-	envs, err := kbagent.BuildEnv4Server(actions, nil, streaming)
-	if err != nil {
-		return err
-	}
-	for _, env := range envs {
-		if env.Name != "KB_AGENT_PROBE" {
-			setEnv(container, env)
-		}
-	}
-	return nil
-}
-
-// Action translates the public Action API without depending on the Component controller.
-func Action(name string, action *apps.Action) *proto.Action {
-	if !action.Defined() {
-		return nil
-	}
-	a := &proto.Action{Name: name, NonBlocking: action.NonBlocking, TimeoutSeconds: action.TimeoutSeconds}
-	if action.Exec != nil {
-		a.Exec = &proto.ExecAction{Commands: action.Exec.Command, Args: action.Exec.Args}
-	}
-	if action.HTTP != nil {
-		h := action.HTTP
-		a.HTTP = &proto.HTTPAction{Port: h.Port, Host: h.Host, Scheme: h.Scheme, Path: h.Path, Method: h.Method, Body: h.Body}
-		for _, header := range h.Headers {
-			a.HTTP.Headers = append(a.HTTP.Headers, proto.HTTPHeader{Name: header.Name, Value: header.Value})
-		}
-	}
-	if action.GRPC != nil {
-		g := action.GRPC
-		a.GRPC = &proto.GRPCAction{Port: g.Port, Host: g.Host, Service: g.Service, Method: g.Method, Request: g.Request, Response: proto.GRPCResponse{Status: g.Response.Status, Message: g.Response.Message}}
-	}
-	if action.RetryPolicy != nil {
-		a.RetryPolicy = publiclifecycle.BuildKBAgentRetryPolicy(action.RetryPolicy)
-	}
-	return a
 }
 
 // CriticalStatusChanged reports facts that must be committed before changing runtime inputs or membership.

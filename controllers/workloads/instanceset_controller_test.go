@@ -3209,7 +3209,7 @@ func TestInstanceSetLifecycleMemberActionsRespectStatusFailureAndLatestSpec(t *t
 	}
 }
 
-func TestInstanceSetLifecycleMemberOnlyExecutesGeneratedAgentActions(t *testing.T) {
+func TestInstanceSetLifecycleMemberOnlyExecutesPreparedAgentActions(t *testing.T) {
 	ctx := context.Background()
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -3221,21 +3221,29 @@ func TestInstanceSetLifecycleMemberOnlyExecutesGeneratedAgentActions(t *testing.
 	}
 	logPath := filepath.Join(t.TempDir(), "membership")
 	its := newMemberLifecycleITS(1)
+	its.Labels = map[string]string{constant.AppInstanceLabelKey: "member", constant.KBAppComponentLabelKey: "lifecycle"}
 	its.Spec.VolumeClaimTemplates = nil
 	its.Spec.Template.Spec.Containers[0].VolumeMounts = nil
+	joinCommand := []string{"sh", "-c", "printf 'join %s %s\\n' \"$KB_JOIN_MEMBER_POD_NAME\" \"$KB_JOIN_MEMBER_POD_FQDN\" >> \"$1\"", "sh", logPath}
+	leaveCommand := []string{"sh", "-c", "printf 'leave %s %s\\n' \"$KB_LEAVE_MEMBER_POD_NAME\" \"$KB_LEAVE_MEMBER_POD_FQDN\" >> \"$1\"", "sh", logPath}
 	its.Spec.LifecycleActions = &workloads.LifecycleActions{
-		MemberJoin:  &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"sh", "-c", "printf 'join\\n' >> \"$1\"", "sh", logPath}}},
-		MemberLeave: &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"sh", "-c", "printf 'leave\\n' >> \"$1\"", "sh", logPath}}},
+		MemberJoin:  &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: joinCommand}},
+		MemberLeave: &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: leaveCommand}},
 	}
-	existingEnv, err := kbagent.BuildEnv4Server([]kbaproto.Action{{Name: "reconfigure", Exec: &kbaproto.ExecAction{Commands: []string{"true"}}}}, []kbaproto.Probe{{Instance: "existing", Action: "reconfigure"}}, nil)
+	preparedEnv, err := kbagent.BuildEnv4Server([]kbaproto.Action{
+		{Name: "reconfigure", Exec: &kbaproto.ExecAction{Commands: []string{"true"}}},
+		{Name: "memberJoin", Exec: &kbaproto.ExecAction{Commands: joinCommand}},
+		{Name: "memberLeave", Exec: &kbaproto.ExecAction{Commands: leaveCommand}},
+	}, []kbaproto.Probe{{Instance: "existing", Action: "reconfigure"}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	its.Spec.Template.Spec.InitContainers = nil
 	its.Spec.Template.Spec.Containers[1] = corev1.Container{
-		Name: kbagent.ContainerName, Image: "tools", Env: existingEnv,
+		Name: kbagent.ContainerName, Image: "tools", Env: preparedEnv,
 		Ports: []corev1.ContainerPort{{Name: kbagent.DefaultHTTPPortName, ContainerPort: int32(port)}},
 	}
+	preparedAgent := its.Spec.Template.Spec.Containers[1].DeepCopy()
 	cli := newLifecycleEntryClient(t, its, interceptor.Funcs{})
 	key := client.ObjectKeyFromObject(its)
 	step := func() {
@@ -3282,6 +3290,9 @@ func TestInstanceSetLifecycleMemberOnlyExecutesGeneratedAgentActions(t *testing.
 		if container.Name != kbagent.ContainerName {
 			continue
 		}
+		if !reflect.DeepEqual(&container, preparedAgent) {
+			t.Fatalf("created Pod changed the prepared agent configuration: got=%+v want=%+v", container, *preparedAgent)
+		}
 		for _, env := range container.Env {
 			switch env.Name {
 			case "KB_AGENT_ACTION":
@@ -3296,7 +3307,7 @@ func TestInstanceSetLifecycleMemberOnlyExecutesGeneratedAgentActions(t *testing.
 		}
 	}
 	if len(actions) != 3 || len(probes) != 1 || probes[0].Action != "reconfigure" || len(target.Spec.InitContainers) != 0 {
-		t.Fatalf("member-only setup discarded existing agent configuration or added a data worker: actions=%+v probes=%+v init=%+v", actions, probes, target.Spec.InitContainers)
+		t.Fatalf("created Pod lost prepared actions or probes or added a data worker: actions=%+v probes=%+v init=%+v", actions, probes, target.Spec.InitContainers)
 	}
 	services, err := kbaservice.New(ctrl.Log, actions, probes, nil)
 	if err != nil {
@@ -3331,8 +3342,13 @@ func TestInstanceSetLifecycleMemberOnlyExecutesGeneratedAgentActions(t *testing.
 		t.Fatal("real agent leave completion was not committed before runtime removal")
 	}
 	output, err := os.ReadFile(logPath)
-	if err != nil || string(output) != "join\nleave\n" {
-		t.Fatalf("generated member commands did not execute: output=%q err=%v", output, err)
+	want := fmt.Sprintf("join %s %s\nleave %s %s\n", target.Name, intctrlutil.PodFQDN(its.Namespace, its.Name, target.Name), target.Name, intctrlutil.PodFQDN(its.Namespace, its.Name, target.Name))
+	if err != nil || string(output) != want {
+		t.Fatalf("prepared member commands did not receive current targets: output=%q want=%q err=%v", output, want, err)
+	}
+	step()
+	if len(lifecycleEntryPods(t, cli)) != 1 {
+		t.Fatal("persisted leave completion did not permit runtime removal")
 	}
 }
 

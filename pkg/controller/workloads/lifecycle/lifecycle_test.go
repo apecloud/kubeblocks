@@ -21,9 +21,7 @@ package lifecycle
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"reflect"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -49,15 +47,6 @@ func memberPod() *corev1.Pod {
 }
 func testAction(command string) *apps.Action {
 	return &apps.Action{Exec: &apps.ExecAction{Command: []string{"/bin/sh", "-c", command}}}
-}
-
-func envValue(c corev1.Container, name string) string {
-	for _, env := range c.Env {
-		if env.Name == name {
-			return env.Value
-		}
-	}
-	return ""
 }
 
 func TestRegistrationSeparatesBootstrapAndLaterAllocation(t *testing.T) {
@@ -90,28 +79,6 @@ func TestRegistrationSeparatesBootstrapAndLaterAllocation(t *testing.T) {
 	Register(its, assignments, sets.New("demo-1"), sets.New("demo-0"))
 	if its.FindInstanceStatus("demo-1").MemberJoined != nil {
 		t.Fatal("unobserved old resources were classified as empty")
-	}
-}
-
-func TestMemberOnlyMergesActionsAndPreservesServerConfiguration(t *testing.T) {
-	its := memberWorkload()
-	pod := memberPod()
-	existing, _ := json.Marshal([]proto.Action{{Name: "reconfigure", Exec: &proto.ExecAction{Commands: []string{"old"}}}})
-	pod.Spec.InitContainers = nil
-	pod.Spec.Containers[1] = corev1.Container{Name: kbagent.ContainerName, Image: "tools", Env: []corev1.EnvVar{{Name: "KB_AGENT_ACTION", Value: string(existing)}, {Name: "KB_AGENT_PROBE", Value: "existing-probe"}, {Name: "BUSINESS", Value: "keep"}}}
-	if err := ConfigurePod(its, pod); err != nil {
-		t.Fatal(err)
-	}
-	server := pod.Spec.Containers[1]
-	var actions []proto.Action
-	if err := json.Unmarshal([]byte(envValue(server, "KB_AGENT_ACTION")), &actions); err != nil || len(actions) != 3 {
-		t.Fatalf("actions not merged: %+v %v", actions, err)
-	}
-	if actions[0].Name != "reconfigure" || envValue(server, "KB_AGENT_PROBE") != "existing-probe" || envValue(server, "BUSINESS") != "keep" || len(pod.Spec.InitContainers) != 0 {
-		t.Fatal("member-only configuration discarded existing server context")
-	}
-	if _, err := ValidateExecution(its.Spec.LifecycleActions.MemberJoin, pod, []*corev1.Pod{pod}); err == nil {
-		t.Fatal("missing agent endpoint would record success")
 	}
 }
 
@@ -178,6 +145,10 @@ func TestValidatedExecutionPreservesActionSelection(t *testing.T) {
 }
 
 func TestValidatedExecutionWaitsWithoutExecutors(t *testing.T) {
+	pod := memberPod()
+	if _, err := ValidateExecution(testAction("join"), pod, []*corev1.Pod{pod}); err == nil {
+		t.Fatal("missing agent endpoint would record success")
+	}
 	for _, legacy := range []bool{false, true} {
 		t.Run(fmt.Sprintf("legacy=%t", legacy), func(t *testing.T) {
 			defer func() {
@@ -199,8 +170,8 @@ func TestValidatedExecutionWaitsWithoutExecutors(t *testing.T) {
 }
 
 func TestValidationRejectsUnownedPreconditionsAndNonblockingActions(t *testing.T) {
-	if err := ConfigurePod(memberWorkload(), memberPod()); err != nil {
-		t.Fatalf("blocking actions did not configure a bootstrap Pod: %v", err)
+	if err := Validate(memberWorkload()); err != nil {
+		t.Fatalf("blocking actions were rejected: %v", err)
 	}
 	for _, condition := range []apps.PreConditionType{apps.RuntimeReadyPreConditionType, apps.ComponentReadyPreConditionType, apps.ClusterReadyPreConditionType} {
 		its := memberWorkload()
@@ -220,35 +191,12 @@ func TestValidationRejectsUnownedPreconditionsAndNonblockingActions(t *testing.T
 			its.Spec.LifecycleActions.Switchover = testAction("true")
 			its.Spec.LifecycleActions.Switchover.NonBlocking = true
 		}
-		pod := memberPod()
-		before := pod.DeepCopy()
-		if err := ConfigurePod(its, pod); err == nil {
+		if err := Validate(its); err == nil {
 			t.Fatalf("accepted nonblocking %s without a completion contract", name)
 		}
-		if !reflect.DeepEqual(before, pod) {
-			t.Fatalf("invalid %s action changed the Pod", name)
-		}
 	}
-}
-
-func TestConfigurePodRegistersSwitchover(t *testing.T) {
 	its := memberWorkload()
 	its.Spec.LifecycleActions.Switchover = testAction("switch")
-	pod := memberPod()
-	if err := ConfigurePod(its, pod); err != nil {
-		t.Fatal(err)
-	}
-	var actions []proto.Action
-	if err := json.Unmarshal([]byte(envValue(pod.Spec.Containers[1], "KB_AGENT_ACTION")), &actions); err != nil {
-		t.Fatal(err)
-	}
-	found := false
-	for _, action := range actions {
-		found = found || action.Name == "switchover"
-	}
-	if !found {
-		t.Fatal("prepared agent server is missing the configured switchover")
-	}
 	its.Spec.LifecycleActions.Switchover.PreCondition = ptr.To(apps.ComponentReadyPreConditionType)
 	if err := Validate(its); err == nil {
 		t.Fatal("new switchover accepts a Component dependency")

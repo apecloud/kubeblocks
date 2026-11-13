@@ -52,6 +52,8 @@ type Observation struct {
 
 // Input contains the independently produced desired and observed dimensions used to build InstanceStatus.
 type Input struct {
+	// RequireMemberLeave retains provisioned identities whose bootstrap membership is unknown.
+	RequireMemberLeave bool
 	Previous           []workloads.InstanceStatus
 	DesiredAssignments []TemplateAssignment
 	Offline            []string
@@ -79,8 +81,8 @@ func ConfigsApplied(desired []workloads.ConfigTemplate, observed []workloads.Ins
 	return true
 }
 
-// Build merges InstanceStatus by PodName. It carries only retained template identity from Previous;
-// all observed revision, health, and runtime fields are rebuilt from Observations.
+// Build merges InstanceStatus by PodName, carrying retained identity and recorded progress from Previous.
+// Observed revision, health, and runtime fields are rebuilt from Observations.
 func Build(input Input) ([]workloads.InstanceStatus, error) {
 	previousByName, err := indexPrevious(input.Previous)
 	if err != nil {
@@ -135,13 +137,23 @@ func Build(input Input) ([]workloads.InstanceStatus, error) {
 		names[name] = struct{}{}
 	}
 
-	// Previous is intentionally excluded from the output identity set. It may retain template identity for a
-	// desired or observed instance, but must not keep a fully released and disappeared instance alive forever.
+	for name, old := range previousByName {
+		if ptr.Deref(old.MemberJoined, false) || (input.RequireMemberLeave && old.Provisioned && old.MemberJoined == nil) {
+			names[name] = struct{}{}
+		}
+	}
 	statuses := make([]workloads.InstanceStatus, 0, len(names))
 	for name := range names {
 		status := workloads.InstanceStatus{PodName: name, CurrentState: workloads.InstanceCurrentStateAbsent}
+		if old := previousByName[name]; old != nil {
+			status.Provisioned = old.Provisioned
+			if old.MemberJoined != nil {
+				status.MemberJoined = ptr.To(*old.MemberJoined)
+			}
+		}
 		observation := observationsByName[name]
 		if observation != nil {
+			status.Provisioned = true
 			status.CurrentState = observation.State
 			status.CurrentRevision = observation.Revision
 		}
@@ -168,8 +180,6 @@ func Build(input Input) ([]workloads.InstanceStatus, error) {
 			}
 		}
 
-		// Terminating observations retain only lifecycle state and revision. Runtime health belongs to a usable,
-		// present instance and must be cleared rather than inherited from its previous status.
 		if observation != nil && observation.State == workloads.InstanceCurrentStatePresent {
 			status.Ready = observation.Ready
 			status.Available = observation.Ready && observation.Available

@@ -37,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -65,6 +66,22 @@ var _ = Describe("instance util test", func() {
 			Expect(result.Spec.Containers[0].Resources.Requests).ShouldNot(HaveKey(corev1.ResourceMemory))
 			Expect(result.Spec.Containers[0].Resources.Limits).ShouldNot(HaveKey(corev1.ResourceCPU))
 			Expect(result.Spec.Containers[0].Resources.Limits).ShouldNot(HaveKey(corev1.ResourceMemory))
+		})
+
+		It("includes prepared agent actions in the template revision", func() {
+			oldEnv, err := kbagent.BuildEnv4Server([]proto.Action{{Name: "memberJoin", Exec: &proto.ExecAction{Commands: []string{"join-v1"}}}}, nil, nil)
+			Expect(err).ShouldNot(HaveOccurred())
+			oldTemplate := &corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: kbagent.ContainerName, Env: oldEnv}}}}
+			newTemplate := oldTemplate.DeepCopy()
+			newTemplate.Spec.Containers[0].Env, err = kbagent.BuildEnv4Server([]proto.Action{{Name: "memberJoin", Exec: &proto.ExecAction{Commands: []string{"join-v2"}}}}, nil, nil)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			parent := builder.NewInstanceSetBuilder(namespace, name).SetUID(uid).GetObject()
+			oldRevision, err := buildInstanceTemplateRevision(oldTemplate, parent, nil)
+			Expect(err).ShouldNot(HaveOccurred())
+			newRevision, err := buildInstanceTemplateRevision(newTemplate, parent, nil)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(newRevision).ShouldNot(Equal(oldRevision))
 		})
 
 		It("keeps the custom-image tini copy migration revision-compatible", func() {
@@ -292,7 +309,7 @@ var _ = Describe("instance util test", func() {
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 
 			By("replicas alignment")
-			reconciler = NewReplicasAlignmentReconciler()
+			reconciler = NewReplicasAlignmentReconciler(nil)
 			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))

@@ -73,6 +73,7 @@ type ObjectTree struct {
 	logr.Logger
 
 	root            client.Object
+	originalRoot    client.Object
 	children        model.ObjectSnapshot
 	childrenOptions map[model.GVKNObjKey]ObjectOptions
 
@@ -171,6 +172,7 @@ func (t *ObjectTree) DeepCopy() (*ObjectTree, error) {
 		childrenOptions[key] = options
 	}
 	out.children = children
+	out.originalRoot = t.originalRoot
 	out.childrenOptions = childrenOptions
 	out.finalizer = t.finalizer
 	out.Context = t.Context
@@ -197,6 +199,15 @@ func (t *ObjectTree) GetWithOption(object client.Object) (client.Object, ObjectO
 
 func (t *ObjectTree) GetRoot() client.Object {
 	return t.root
+}
+
+// GetOriginalRoot returns a copy of the root loaded by Prepare, before any reconciler changes.
+// It returns nil for a tree that has not been prepared.
+func (t *ObjectTree) GetOriginalRoot() client.Object {
+	if t.originalRoot == nil {
+		return nil
+	}
+	return t.originalRoot.DeepCopyObject().(client.Object)
 }
 
 func (t *ObjectTree) SetRoot(root client.Object) {

@@ -50,7 +50,7 @@ func NewStatusReconciler() kubebuilderx.Reconciler {
 }
 
 func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
-	if tree.GetRoot() == nil || !model.IsObjectStatusUpdating(tree.GetRoot()) {
+	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
 	return kubebuilderx.ConditionSatisfied
@@ -58,6 +58,16 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	for _, obj := range tree.List(&corev1.Pod{}) {
+		if status := its.FindInstanceStatus(obj.GetName()); status != nil {
+			status.Provisioned = true
+		}
+	}
+	// Runtime observations do not depend on publication of the new revision targets.
+	if model.IsObjectUpdating(its) {
+		return kubebuilderx.Continue, nil
+	}
+
 	stopping := isStopRequested(its)
 	// 1. get all pods
 	pods := tree.List(&corev1.Pod{})
@@ -207,7 +217,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if err = setInstanceStatus(tree, its, podList); err != nil {
 		return kubebuilderx.Continue, err
 	}
-
 	if !stopping && its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
 		return kubebuilderx.ContinueWithRetryAfter(time.Second), nil
 	}
@@ -537,6 +546,7 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	syncObservationPVCStatus(tree, observations)
 
 	statuses, err := instancestatus.Build(instancestatus.Input{
+		RequireMemberLeave: its.Spec.LifecycleActions != nil && its.Spec.LifecycleActions.MemberLeave != nil,
 		Previous:           its.Status.InstanceStatus,
 		DesiredAssignments: desiredTemplateAssignments,
 		Offline:            offlineNames,

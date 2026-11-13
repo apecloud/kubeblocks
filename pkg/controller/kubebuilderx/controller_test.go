@@ -22,6 +22,7 @@ package kubebuilderx
 import (
 	"context"
 	"fmt"
+	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -202,3 +203,35 @@ func (d *dummyReconciler) Reconcile(tree *ObjectTree) (Result, error) {
 }
 
 var _ Reconciler = &dummyReconciler{}
+
+func TestOriginalRootPreservesLoadedValues(t *testing.T) {
+	tree := NewObjectTree()
+	if tree.GetOriginalRoot() != nil {
+		t.Fatal("an unprepared tree has an original root")
+	}
+	root := builder.NewPodBuilder("default", "original").GetObject()
+	root.Labels = map[string]string{"value": "loaded"}
+	tree.SetRoot(root)
+	cli := fake.NewClientBuilder().WithObjects(root).Build()
+	c := NewController(context.Background(), cli, ctrl.Request{}, nil, logr.Discard()).
+		Prepare(&dummyLoader{tree: tree}).(*controller)
+	if c.err != nil {
+		t.Fatal(c.err)
+	}
+	c.tree.GetRoot().SetLabels(map[string]string{"value": "changed"})
+	original := c.tree.GetOriginalRoot()
+	if original.GetLabels()["value"] != "loaded" {
+		t.Fatal("the original root contains a reconciler's changes")
+	}
+	original.GetLabels()["value"] = "changed copy"
+	if c.tree.GetOriginalRoot().GetLabels()["value"] != "loaded" || c.oldTree.GetRoot().GetLabels()["value"] != "loaded" {
+		t.Fatal("changing the returned copy mutated the loaded root")
+	}
+	copy, err := c.tree.DeepCopy()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if copy.GetOriginalRoot().GetLabels()["value"] != "loaded" || copy.GetRoot().GetLabels()["value"] != "changed" {
+		t.Fatal("copying the working tree lost its original or current values")
+	}
+}

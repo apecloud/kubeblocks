@@ -120,6 +120,11 @@ func RetryAfter(after time.Duration) Result {
 	return Result{Next: rtry, RetryAfter: after}
 }
 
+// ContinueWithRetryAfter continues reconciliation and schedules a retry after commit.
+func ContinueWithRetryAfter(after time.Duration) Result {
+	return Result{Next: cntn, RetryAfter: after}
+}
+
 func (t *ObjectTree) DeepCopy() (*ObjectTree, error) {
 	out := new(ObjectTree)
 	if t.root != nil {

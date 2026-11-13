@@ -193,7 +193,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	setInstanceStatus(its, podList)
 
 	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
-		return kubebuilderx.RetryAfter(time.Second), nil
+		return kubebuilderx.ContinueWithRetryAfter(time.Second), nil
 	}
 	return kubebuilderx.Continue, nil
 }

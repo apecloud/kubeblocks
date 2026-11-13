@@ -21,6 +21,7 @@ package kubebuilderx
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -28,10 +29,13 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/go-logr/logr"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -44,6 +48,60 @@ var _ = Describe("controller test", func() {
 	)
 
 	Context("Dummy Controller", func() {
+		DescribeTable("retains explicitly requested Continue wakeups", func(next Result, stepErr error, wantAfter time.Duration) {
+			root := builder.NewPodBuilder(namespace, name).GetObject()
+			cli := fake.NewClientBuilder().WithObjects(root).Build()
+			tree := NewObjectTree()
+			tree.SetRoot(root)
+			tree.EventRecorder = record.NewFakeRecorder(100)
+			ctrlr := NewController(ctx, cli, ctrl.Request{}, tree.EventRecorder, logger).
+				Prepare(&dummyLoader{tree: tree}).
+				Do(&dummyReconciler{res: ContinueWithRetryAfter(time.Second)}, &dummyReconciler{res: next, err: stepErr}).
+				Do(&dummyReconciler{res: Continue})
+			if next.Next != cntn {
+				ctrlr = ctrlr.Do(&dummyReconciler{err: fmt.Errorf("step after Retry or Commit must not run")})
+			}
+			res, err := ctrlr.Commit()
+			if stepErr != nil {
+				Expect(err).To(Equal(stepErr))
+				Expect(res).To(BeZero())
+				return
+			}
+			Expect(err).NotTo(HaveOccurred())
+			Expect(res.RequeueAfter).To(Equal(wantAfter))
+			Expect(res.Requeue).To(BeTrue())
+			committed := builder.NewConfigMapBuilder("hello", "world").GetObject()
+			Expect(cli.Get(ctx, client.ObjectKeyFromObject(committed), committed)).To(Succeed())
+		},
+			Entry("Continue preserves the wakeup", Continue, nil, time.Second),
+			Entry("an earlier Continue delay wins", ContinueWithRetryAfter(500*time.Millisecond), nil, 500*time.Millisecond),
+			Entry("Retry stops and preserves the earlier wakeup", RetryAfter(2*time.Second), nil, time.Second),
+			Entry("immediate Retry takes priority", RetryAfter(0), nil, time.Duration(0)),
+			Entry("Commit stops and preserves the wakeup", Commit, nil, time.Second),
+			Entry("a later error takes priority", Continue, fmt.Errorf("later step failed"), time.Duration(0)),
+		)
+
+		DescribeTable("preserves commit failure handling with a pending wakeup", func(commitErr error, wantResult ctrl.Result) {
+			root := builder.NewPodBuilder(namespace, name).GetObject()
+			cli := fake.NewClientBuilder().WithObjects(root).WithInterceptorFuncs(interceptor.Funcs{
+				Create: func(context.Context, client.WithWatch, client.Object, ...client.CreateOption) error { return commitErr },
+			}).Build()
+			tree := NewObjectTree()
+			tree.SetRoot(root)
+			tree.EventRecorder = record.NewFakeRecorder(100)
+			res, err := NewController(ctx, cli, ctrl.Request{}, tree.EventRecorder, logger).
+				Prepare(&dummyLoader{tree: tree}).Do(&dummyReconciler{res: ContinueWithRetryAfter(time.Second)}).Commit()
+			Expect(res).To(Equal(wantResult))
+			if apierrors.IsConflict(commitErr) {
+				Expect(err).NotTo(HaveOccurred())
+			} else {
+				Expect(errors.Is(err, commitErr)).To(BeTrue())
+			}
+		},
+			Entry("an error is returned without a delayed retry", fmt.Errorf("create failed"), ctrl.Result{}),
+			Entry("a conflict retries immediately", apierrors.NewConflict(schema.GroupResource{Resource: "configmaps"}, "world", fmt.Errorf("conflict")), ctrl.Result{Requeue: true}),
+		)
+
 		It("should work well", func() {
 			ctx := context.Background()
 			cli := fake.NewFakeClient()
@@ -106,7 +164,8 @@ var _ = Describe("controller test", func() {
 			newTree = NewObjectTree()
 			Expect(cli.Get(ctx, client.ObjectKeyFromObject(root), root)).Should(Succeed())
 			newTree.SetRoot(root)
-			res, err = controller.Prepare(&dummyLoader{tree: newTree}).Do(&dummyReconciler{res: RetryAfter(time.Second)}).Commit()
+			res, err = controller.Prepare(&dummyLoader{tree: newTree}).Do(&dummyReconciler{res: RetryAfter(time.Second)}, &dummyReconciler{err: fmt.Errorf("must not run after Retry")}).
+				Do(&dummyReconciler{err: fmt.Errorf("must not run after Retry")}).Commit()
 			Expect(err).Should(BeNil())
 			Expect(res.Requeue).Should(BeTrue())
 			Expect(res.RequeueAfter).Should(Equal(time.Second))

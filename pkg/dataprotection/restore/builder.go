@@ -191,6 +191,29 @@ func (r *restoreJobBuilder) attachBackupRepo() *restoreJobBuilder {
 	return r
 }
 
+// mergeRestoreJobEnv merges an environment layer on top of the existing
+// layers. The last occurrence of a name wins and keeps its position in the
+// highest-priority layer. Besides making the precedence deterministic, this
+// matters for Kubernetes env expansion: a higher-priority value that refers
+// to lower-layer variables must appear after those dependencies instead of
+// replacing a lower-priority value in place.
+func mergeRestoreJobEnv(base, override []corev1.EnvVar) []corev1.EnvVar {
+	merged := make([]corev1.EnvVar, 0, len(base)+len(override))
+	merged = append(merged, base...)
+	merged = append(merged, override...)
+	last := make(map[string]int, len(merged))
+	for i := range merged {
+		last[merged[i].Name] = i
+	}
+	result := make([]corev1.EnvVar, 0, len(last))
+	for i := range merged {
+		if last[merged[i].Name] == i {
+			result = append(result, merged[i])
+		}
+	}
+	return result
+}
+
 // addCommonEnv adds the common envs for each restore job.
 func (r *restoreJobBuilder) addCommonEnv(sourceTargetPodName string) *restoreJobBuilder {
 	backup := r.backupSet.Backup
@@ -241,13 +264,13 @@ func (r *restoreJobBuilder) addCommonEnv(sourceTargetPodName string) *restoreJob
 		r.env = append(r.env, utils.BuildEnvByParameters(r.restore.Spec.Parameters)...)
 	}
 	// append actionSet env
-	r.env = append(r.env, actionSetEnv...)
+	r.env = mergeRestoreJobEnv(r.env, actionSetEnv)
 	backupMethod := r.backupSet.Backup.Status.BackupMethod
 	if backupMethod != nil && len(backupMethod.Env) > 0 {
-		r.env = utils.MergeEnv(r.env, backupMethod.Env)
+		r.env = mergeRestoreJobEnv(r.env, backupMethod.Env)
 	}
 	// merge the restore env
-	r.env = utils.MergeEnv(r.env, r.restore.Spec.Env)
+	r.env = mergeRestoreJobEnv(r.env, r.restore.Spec.Env)
 	return r
 }
 
@@ -263,6 +286,10 @@ func (r *restoreJobBuilder) addTargetPodAndCredentialEnv(pod *corev1.Pod,
 		env = pod.Spec.Containers[0].Env
 		r.envFrom = pod.Spec.Containers[0].EnvFrom
 	}
+	env = mergeRestoreJobEnv(env, []corev1.EnvVar{
+		{Name: dptypes.DPTargetPodName, Value: pod.Name},
+		{Name: dptypes.DPTargetPodRole, Value: pod.Labels[constant.RoleLabelKey]},
+	})
 	addDBHostEnv := func() {
 		env = append(env, corev1.EnvVar{Name: dptypes.DPDBHost, Value: intctrlutil.BuildPodHostDNS(pod)})
 	}
@@ -306,7 +333,11 @@ func (r *restoreJobBuilder) addTargetPodAndCredentialEnv(pod *corev1.Pod,
 			addDBHostEnv()
 		}
 	}
-	r.env = utils.MergeEnv(r.env, env)
+	// The target workload environment is inherited as the lowest-priority
+	// layer. DP built-ins above have already replaced any stale target values;
+	// common, ActionSet, BackupMethod, and Restore env assembled in r.env then
+	// override the inherited layer in their documented order.
+	r.env = mergeRestoreJobEnv(env, r.env)
 	return r
 }
 

@@ -203,7 +203,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	if !stopping && its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
-		return kubebuilderx.RetryAfter(time.Second), nil
+		return kubebuilderx.ContinueWithRetryAfter(time.Second), nil
 	}
 
 	// serviceaccount name migration process

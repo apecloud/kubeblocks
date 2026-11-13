@@ -162,7 +162,7 @@ var _ = Describe("status reconciler test", func() {
 			}
 			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
-			Expect(res).Should(Equal(kubebuilderx.RetryAfter(time.Second)))
+			Expect(res).Should(Equal(kubebuilderx.ContinueWithRetryAfter(time.Second)))
 			Expect(its.Status.Replicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.ReadyReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(0))

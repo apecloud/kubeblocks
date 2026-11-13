@@ -789,6 +789,42 @@ func pvcLifecycleReady(t *testing.T, cli client.Client) {
 	pvcLifecycleReconcile(t, cli, 2)
 }
 
+func TestInstanceSetRepairsMissingPodWhileWaitingAvailable(t *testing.T) {
+	for _, slots := range []int{1, 2} {
+		t.Run(fmt.Sprintf("%d slots", slots), func(t *testing.T) {
+			g := NewWithT(t)
+			cli := pvcLifecycleFixture(t, 2)
+			pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
+				its.Spec.MinReadySeconds = 3600
+				its.Spec.ParallelPodManagementConcurrency = ptr.To(intstr.FromInt(slots))
+			})
+			pvcLifecycleReconcile(t, cli, 2)
+			pvcLifecycleReady(t, cli)
+			claims := pvcLifecycleClaims(t, cli)
+			pod := pvcLifecyclePods(t, cli)[0]
+			key := client.ObjectKeyFromObject(&pod)
+			pod.Finalizers = nil
+			g.Expect(cli.Update(context.Background(), &pod)).To(Succeed())
+			g.Expect(cli.Delete(context.Background(), &pod)).To(Succeed())
+			reconciler := &InstanceSetReconciler{Client: cli, Scheme: cli.Scheme(), Recorder: record.NewFakeRecorder(1000)}
+			result, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(pvcLifecycleSet(t, cli))})
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(result.RequeueAfter).To(Equal(time.Second))
+			err = cli.Get(context.Background(), key, &corev1.Pod{})
+			if slots == 1 {
+				g.Expect(apierrors.IsNotFound(err)).To(BeTrue(), "the existing unavailable Pod occupies the only slot")
+			} else {
+				g.Expect(err).NotTo(HaveOccurred())
+			}
+			its := pvcLifecycleSet(t, cli)
+			g.Expect(its.Status.ReadyReplicas).To(Equal(int32(1)))
+			g.Expect(its.Status.AvailableReplicas).To(BeZero())
+			g.Expect(pvcLifecycleClaims(t, cli)).To(Equal(claims))
+
+		})
+	}
+}
+
 func TestInstanceSetRetainedClaimsAfterRecreation(t *testing.T) {
 	cli := pvcLifecycleFixture(t, 2)
 	pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {

@@ -97,7 +97,14 @@ func (c *controller) Do(reconcilers ...Reconciler) Controller {
 	case !result.Satisfied:
 		return c
 	}
+	after := c.res.RetryAfter
 	c.res, c.err = reconciler.Reconcile(c.tree)
+	if c.res.Next == rtry && c.res.RetryAfter <= 0 {
+		return c
+	}
+	if after > 0 && (c.res.RetryAfter <= 0 || after < c.res.RetryAfter) {
+		c.res.RetryAfter = after
+	}
 
 	return c.Do(reconcilers[1:]...)
 }
@@ -126,7 +133,7 @@ func (c *controller) Commit() (ctrl.Result, error) {
 		}
 		return ctrl.Result{}, c.err
 	}
-	if c.res.Next == rtry {
+	if c.res.Next == rtry || c.res.RetryAfter > 0 {
 		return ctrl.Result{Requeue: true, RequeueAfter: c.res.RetryAfter}, nil
 	}
 	return ctrl.Result{}, nil

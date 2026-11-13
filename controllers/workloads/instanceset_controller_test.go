@@ -35,6 +35,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1075,4 +1076,41 @@ func TestInstanceSetPVCOfflineRetirementPolicy(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestInstanceSetConditionsRequireAssignedPods(t *testing.T) {
+	g := NewWithT(t)
+	cli := pvcLifecycleFixture(t, 3)
+	pvcLifecycleReady(t, cli)
+	claims := pvcLifecycleClaims(t, cli)
+	pods := pvcLifecyclePods(t, cli)
+	pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) {
+		its.Spec.Paused = true
+		its.Spec.Replicas = ptr.To(int32(2))
+	})
+	pvcLifecycleReconcile(t, cli, 2)
+	// After scaling down, Pod 2 is extra; deleting Pod 1 leaves a healthy but wrong pair.
+	for i, index := range []int{1, 2, 0} {
+		pod := &pods[index]
+		pod.Finalizers = nil
+		g.Expect(cli.Update(context.Background(), pod)).To(Succeed())
+		g.Expect(cli.Delete(context.Background(), pod)).To(Succeed())
+		pvcLifecycleReconcile(t, cli, 1)
+		its := pvcLifecycleSet(t, cli)
+		g.Expect(its.Status.ObservedGeneration).To(Equal(its.Generation))
+		g.Expect(its.Status.Replicas).To(Equal(int32(2 - i)))
+		g.Expect(its.Status.ReadyReplicas).To(Equal(int32(2 - i)))
+		for _, conditionType := range []string{string(workloads.InstanceReady), string(workloads.InstanceAvailable)} {
+			condition := meta.FindStatusCondition(its.Status.Conditions, conditionType)
+			g.Expect(condition).NotTo(BeNil())
+			g.Expect(condition.Status).To(Equal(metav1.ConditionFalse))
+			g.Expect(condition.Message).To(ContainSubstring("pvc-lifecycle-1"))
+		}
+	}
+	pvcLifecycleChange(t, cli, func(its *workloads.InstanceSet) { its.Spec.Replicas = ptr.To(int32(0)) })
+	pvcLifecycleReconcile(t, cli, 2)
+	its := pvcLifecycleSet(t, cli)
+	g.Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceReady))).To(BeTrue())
+	g.Expect(meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable))).To(BeTrue())
+	g.Expect(pvcLifecycleClaims(t, cli)).To(Equal(claims))
 }

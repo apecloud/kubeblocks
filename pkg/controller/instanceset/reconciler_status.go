@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -566,6 +567,20 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	})
 	if err != nil {
 		return err
+	}
+	if workloadlifecycle.Enabled(its) && its.Spec.LifecycleActions.MemberJoin != nil {
+		for i := range statuses {
+			status := &statuses[i]
+			if _, active := desiredNames[status.PodName]; !active {
+				continue
+			}
+			previous := its.FindInstanceStatus(status.PodName)
+			if previous != nil && previous.EffectiveDesiredState() == workloads.InstanceDesiredStateReleased {
+				// Leave may have succeeded without its result being committed. Re-establish
+				// membership when this identity is allocated again, including while stopped.
+				status.MemberJoined = ptr.To(false)
+			}
+		}
 	}
 	its.Status.InstanceStatus = statuses
 	return nil

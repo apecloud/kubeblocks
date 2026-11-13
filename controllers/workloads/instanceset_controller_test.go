@@ -3191,10 +3191,11 @@ func TestInstanceSetLifecycleMemberActionsRespectStatusFailureAndLatestSpec(t *t
 	its = stored
 	setReplicas(2)
 	rejectLeave = false
-	its = step()
-	its = step()
-	if leaves != 1 || joins != 1 || len(lifecycleEntryPods(t, cli)) != 2 {
-		t.Fatalf("retry acted on obsolete shrink: join=%d leave=%d pods=%+v", joins, leaves, lifecycleEntryPods(t, cli))
+	for i := 0; i < 6 && joins < 2; i++ {
+		its = step()
+	}
+	if leaves != 1 || joins != 2 || len(lifecycleEntryPods(t, cli)) != 2 {
+		t.Fatalf("cancelled shrink did not re-establish membership: join=%d leave=%d pods=%+v", joins, leaves, lifecycleEntryPods(t, cli))
 	}
 	setReplicas(1)
 	its = step()
@@ -4075,6 +4076,9 @@ func TestInstanceSetLifecycleLeaveWaitsWithoutExecutor(t *testing.T) {
 			}
 
 			f.bootstrap(t, 1)
+			if !reflect.DeepEqual(agent.calls, []string{"memberJoin"}) || !ptr.Deref(f.its.FindInstanceStatus(key.Name).MemberJoined, false) {
+				t.Fatalf("reallocated executor did not re-establish membership: calls=%v status=%#v", agent.calls, f.its.FindInstanceStatus(key.Name))
+			}
 			f.its.Spec.Replicas = ptr.To[int32](0)
 			f.its.Generation++
 			if err := f.cli.Update(ctx, f.its); err != nil {
@@ -4083,7 +4087,7 @@ func TestInstanceSetLifecycleLeaveWaitsWithoutExecutor(t *testing.T) {
 			for round := 0; round < 16; round++ {
 				f.step(t)
 			}
-			if len(agent.calls) != 1 || agent.calls[0] != "memberLeave" || f.its.FindInstanceStatus(key.Name) != nil {
+			if !reflect.DeepEqual(agent.calls, []string{"memberJoin", "memberLeave"}) || f.its.FindInstanceStatus(key.Name) != nil {
 				t.Fatalf("restored executor did not finish Leave: calls=%v status=%#v", agent.calls, f.its.FindInstanceStatus(key.Name))
 			}
 			if err := f.cli.Get(ctx, pvcKey, &corev1.PersistentVolumeClaim{}); !apierrors.IsNotFound(err) {
@@ -5054,5 +5058,118 @@ func TestInstanceSetRetirementPreservesParentRuntimeHistory(t *testing.T) {
 				t.Fatalf("native had no executor but claimed Leave: %v", agent.calls)
 			}
 		})
+	}
+}
+
+func TestInstanceSetLifecycleCancelAfterUncommittedLeave(t *testing.T) {
+	ctx := context.Background()
+	f := newMemberLifecycleEntry(t, 2, appsv1.ParallelPodManagement)
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := listener.Addr().(*net.TCPAddr).Port
+	if err := listener.Close(); err != nil {
+		t.Fatal(err)
+	}
+	statePath := filepath.Join(t.TempDir(), "member-state")
+	if err := os.WriteFile(statePath, []byte("joined"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	joinCommand := []string{"sh", "-c", "printf joined > \"$1\"", "sh", statePath}
+	leaveCommand := []string{"sh", "-c", "printf left > \"$1\"", "sh", statePath}
+	actions := []kbaproto.Action{
+		{Name: "memberJoin", Exec: &kbaproto.ExecAction{Commands: joinCommand}},
+		{Name: "memberLeave", Exec: &kbaproto.ExecAction{Commands: leaveCommand}},
+	}
+	env, err := kbagent.BuildEnv4Server(actions, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.its.Spec.Template.Spec.Containers[1].Env = env
+	f.its.Spec.Template.Spec.Containers[1].Ports = []corev1.ContainerPort{{Name: kbagent.DefaultHTTPPortName, ContainerPort: int32(port)}}
+	f.its.Spec.LifecycleActions.MemberJoin = &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: joinCommand}}
+	f.its.Spec.LifecycleActions.MemberLeave = &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: leaveCommand}}
+	if err := f.cli.Update(ctx, f.its); err != nil {
+		t.Fatal(err)
+	}
+	services, err := kbaservice.New(ctrl.Log, actions, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := kbaserver.NewHTTPServer(ctrl.Log, kbaserver.Config{Address: "127.0.0.1", Port: port}, services)
+	if err := server.StartNonBlocking(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = server.Close() })
+	agentClient, err := kbacli.NewClient(func() (string, int32, error) { return "127.0.0.1", int32(port), nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	kbacli.SetMockClient(agentClient, nil)
+	t.Cleanup(kbacli.UnsetMockClient)
+	f.bootstrap(t, 2)
+	second := f.its.Name + "-1"
+	rejected := false
+	actualConflict := false
+	rejoinRejected := false
+	base := f.cli
+	f.cli = interceptor.NewClient(base.(client.WithWatch), interceptor.Funcs{SubResourceUpdate: func(ctx context.Context, delegate client.Client, subresource string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+		if its, ok := obj.(*workloads.InstanceSet); ok && subresource == "status" && !rejected {
+			if status := its.FindInstanceStatus(second); status != nil && status.MemberJoined != nil && !*status.MemberJoined {
+				// Cancellation restores the allocation while the Leave result is being committed.
+				rejected = true
+				latest := &workloads.InstanceSet{}
+				if err := delegate.Get(ctx, client.ObjectKeyFromObject(its), latest); err != nil {
+					return err
+				}
+				latest.Spec.Replicas = ptr.To[int32](2)
+				latest.Generation++
+				if err := delegate.Update(ctx, latest); err != nil {
+					return err
+				}
+				err := delegate.SubResource(subresource).Update(ctx, obj, opts...)
+				actualConflict = apierrors.IsConflict(err)
+				return err
+			}
+		}
+		if its, ok := obj.(*workloads.InstanceSet); ok && subresource == "status" && rejected && !rejoinRejected {
+			status := its.FindInstanceStatus(second)
+			if status != nil && status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive && status.MemberJoined != nil && !*status.MemberJoined {
+				rejoinRejected = true
+				return apierrors.NewConflict(schema.GroupResource{Group: workloads.GroupVersion.Group, Resource: "instancesets"}, its.Name, fmt.Errorf("rejoin registration conflict"))
+			}
+		}
+		return delegate.SubResource(subresource).Update(ctx, obj, opts...)
+	}})
+	f.its.Spec.Replicas = ptr.To[int32](1)
+	f.its.Generation++
+	if err := f.cli.Update(ctx, f.its); err != nil {
+		t.Fatal(err)
+	}
+	for round := 0; round < 16 && !rejected; round++ {
+		f.step(t)
+	}
+	state, err := os.ReadFile(statePath)
+	if err != nil || !rejected || !actualConflict || string(state) != "left" || !ptr.Deref(f.its.FindInstanceStatus(second).MemberJoined, false) || len(lifecycleEntryPods(t, f.cli)) != 2 {
+		t.Fatalf("did not reach effect/status gap: cancelled=%t actualConflict=%t state=%q err=%v status=%+v", rejected, actualConflict, state, err, f.its.Status)
+	}
+	if ptr.Deref(f.its.Spec.Replicas, int32(0)) != 2 {
+		t.Fatal("cancellation did not publish its desired allocation")
+	}
+	for round := 0; round < 12 && !rejoinRejected; round++ {
+		f.step(t)
+	}
+	state, err = os.ReadFile(statePath)
+	if err != nil || !rejoinRejected || string(state) != "left" || len(lifecycleEntryPods(t, f.cli)) != 2 {
+		t.Fatalf("Join ran before rejoin registration was committed: rejected=%t state=%q pods=%d err=%v", rejoinRejected, state, len(lifecycleEntryPods(t, f.cli)), err)
+	}
+	for round := 0; round < 24; round++ {
+		f.step(t)
+	}
+	state, err = os.ReadFile(statePath)
+	status := f.its.FindInstanceStatus(second)
+	if err != nil || string(state) != "joined" || status == nil || !ptr.Deref(status.MemberJoined, false) {
+		t.Fatalf("cancelled shrink retained a runtime and reported joined after real Leave: agent-state=%q actualConflict=%t read-error=%v pods=%d ready=%d observed=%d generation=%d joined=%t status=%+v", state, actualConflict, err, len(lifecycleEntryPods(t, f.cli)), f.its.Status.ReadyReplicas, f.its.Status.ObservedGeneration, f.its.Generation, ptr.Deref(status.MemberJoined, false), status)
 	}
 }

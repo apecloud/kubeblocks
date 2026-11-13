@@ -637,7 +637,7 @@ type InstanceStatus struct {
 	DataLoaded *bool `json:"dataLoaded,omitempty"`
 
 	// MemberJoined records whether the configured membership step is satisfied. nil means no result is tracked
-	// and does not prove absence, false means not joined, and true means joined, including initial instances
+	// and does not prove absence, false means membership must be established or re-established, and true means joined, including initial instances
 	// that need no join action. A successful leave records false. Runtime health and role do not complete a pending join.
 	//
 	// +optional

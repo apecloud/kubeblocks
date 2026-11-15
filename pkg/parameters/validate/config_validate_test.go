@@ -21,6 +21,7 @@ package validate
 
 import (
 	"errors"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -190,4 +191,75 @@ func TestSchemaValidatorUsesSchemaInJSON(t *testing.T) {
 
 	require.NoError(t, validator.Validate("maxmemory-samples: 5"))
 	require.ErrorContains(t, validator.Validate("maxmemory-samples: 0"), "failed to schema validate for config file")
+}
+
+func TestSchemaValidatorLargeIntegerMaximumPrecision(t *testing.T) {
+	maximum := math.Exp2(63)
+	composedSchemas := []struct {
+		name   string
+		schema apiext.JSONSchemaProps
+	}{
+		{
+			name: "parent type",
+			schema: apiext.JSONSchemaProps{
+				Type: "integer",
+				AllOf: []apiext.JSONSchemaProps{{
+					Maximum:          &maximum,
+					ExclusiveMaximum: true,
+				}},
+			},
+		},
+		{
+			name: "sibling type",
+			schema: apiext.JSONSchemaProps{
+				AllOf: []apiext.JSONSchemaProps{
+					{Type: "integer"},
+					{Maximum: &maximum, ExclusiveMaximum: true},
+				},
+			},
+		},
+	}
+
+	for _, tt := range composedSchemas {
+		t.Run(tt.name, func(t *testing.T) {
+			validator := &schemaValidator{
+				cfgType: parametersv1alpha1.YAML,
+				schema: &apiext.JSONSchemaProps{
+					Type:       "object",
+					Properties: map[string]apiext.JSONSchemaProps{"x": tt.schema},
+				},
+			}
+			require.NoError(t, validator.Validate("x: 9223372036854775807"))
+			require.Error(t, validator.Validate("x: 9223372036854775808"))
+		})
+	}
+
+	userMax := float64(1e19)
+	for _, tt := range []struct {
+		name      string
+		exclusive bool
+		valid     string
+		invalid   string
+	}{
+		{name: "inclusive", valid: "10000000000000000000", invalid: "10000000000000000001"},
+		{name: "exclusive", exclusive: true, valid: "9999999999999999999", invalid: "10000000000000000000"},
+	} {
+		t.Run("custom "+tt.name, func(t *testing.T) {
+			validator := &schemaValidator{
+				cfgType: parametersv1alpha1.YAML,
+				schema: &apiext.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiext.JSONSchemaProps{
+						"x": {
+							Type:             "integer",
+							Maximum:          &userMax,
+							ExclusiveMaximum: tt.exclusive,
+						},
+					},
+				},
+			}
+			require.NoError(t, validator.Validate("x: "+tt.valid))
+			require.Error(t, validator.Validate("x: "+tt.invalid))
+		})
+	}
 }

@@ -16,7 +16,6 @@
           }
         },
         "mysqlld": {
-          "description": "mysql config validator",
           "type": "object",
           "required": [
             "automatic_sp_privileges",
@@ -57,7 +56,9 @@
               "minimum": 4096
             },
             "caching_sha2_password_private_key_path": {
-              "$ref": "#/components/schemas/MysqlSchema.mysqlld.KeyPath"
+              "description": "custom format, reference Regular expressions",
+              "type": "string",
+              "pattern": "^[a-z][a-zA-Z0-9]+.pem$"
             },
             "flush_time": {
               "type": "integer",
@@ -67,7 +68,9 @@
             },
             "group_concat_max_len": {
               "type": "integer",
-              "default": 1024
+              "default": 1024,
+              "minimum": 4,
+              "exclusiveMinimum": true
             },
             "gtid_mode": {
               "type": "string",

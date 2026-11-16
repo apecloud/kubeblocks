@@ -3419,6 +3419,105 @@ func TestInstanceSetLifecycleStopAndOffline(t *testing.T) {
 	}
 }
 
+func TestInstanceSetLeaveOnlyStopRetainsPendingRetirement(t *testing.T) {
+	for _, scaleIn := range []bool{false, true} {
+		t.Run(fmt.Sprintf("scaleIn=%t", scaleIn), func(t *testing.T) {
+			ctx := context.Background()
+			f := newMemberLifecycleEntry(t, 2, appsv1.ParallelPodManagement)
+			f.its.Spec.LifecycleActions.MemberJoin = nil
+			f.its.Spec.LifecycleActions.MemberLeave.TargetPodSelector = kbappsv1.AnyReplica
+			if err := f.cli.Update(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			f.bootstrap(t, 2)
+			name := f.its.Name + "-1"
+			agent := &memberLifecycleAgent{}
+			kbacli.SetMockClient(agent, nil)
+			defer kbacli.UnsetMockClient()
+			rejected := false
+			base := f.cli
+			f.cli = interceptor.NewClient(base.(client.WithWatch), interceptor.Funcs{SubResourceUpdate: func(ctx context.Context, delegate client.Client, subresource string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+				if its, ok := obj.(*workloads.InstanceSet); ok && subresource == "status" && !rejected {
+					status := its.FindInstanceStatus(name)
+					if status != nil && status.MemberLeft != nil && !*status.MemberLeft {
+						rejected = true
+						return apierrors.NewConflict(schema.GroupResource{Group: workloads.GroupVersion.Group, Resource: "instancesets"}, its.Name, fmt.Errorf("stopped exit registration conflict"))
+					}
+				}
+				return delegate.SubResource(subresource).Update(ctx, obj, opts...)
+			}})
+			if scaleIn {
+				f.its.Spec.Replicas = ptr.To[int32](1)
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+			}
+			// Stop keeps the scaling configuration already published to the workload.
+			f.its.Spec.Stop = ptr.To(true)
+			f.its.Generation++
+			if err := f.cli.Update(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			for round := 0; round < 12; round++ {
+				wasRejected := rejected
+				result := f.step(t)
+				if rejected && !wasRejected {
+					status := f.its.FindInstanceStatus(name)
+					if status == nil || !status.Provisioned || status.MemberLeft != nil {
+						t.Fatalf("failed exit registration lost saved runtime history: %+v", status)
+					}
+					if !result.Requeue || len(lifecycleEntryPods(t, f.cli)) != 2 {
+						t.Fatal("failed exit registration did not wait before removing Pods")
+					}
+				}
+			}
+			if len(agent.calls) != 0 || len(lifecycleEntryPods(t, f.cli)) != 0 {
+				t.Fatalf("Stop executed member actions or retained Pods: calls=%v", agent.calls)
+			}
+			status := f.its.FindInstanceStatus(name)
+			if status == nil || !status.Provisioned || status.MemberJoined != nil {
+				t.Fatalf("Stop lost tracked runtime history or invented membership: %+v", status)
+			}
+			if scaleIn {
+				if !rejected || status.MemberLeft == nil || *status.MemberLeft {
+					t.Fatalf("Stop lost the pending exit after a registration conflict: %+v", status)
+				}
+			} else if rejected || status.MemberLeft != nil {
+				t.Fatalf("ordinary Stop registered a member exit: %+v", status)
+			}
+			f.its.Spec.Stop = ptr.To(false)
+			f.its.Generation++
+			if err := f.cli.Update(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			for round := 0; round < 24; round++ {
+				f.step(t)
+				for _, pod := range lifecycleEntryPods(t, f.cli) {
+					f.setReady(t, pod.Name, true)
+				}
+			}
+			wantReplicas := 2
+			if scaleIn {
+				wantReplicas = 1
+				if len(agent.calls) != 1 || agent.calls[0] != "memberLeave" || f.its.FindInstanceStatus(name) != nil {
+					t.Fatalf("Resume did not finish the interrupted withdrawal: calls=%v status=%+v", agent.calls, f.its.Status.InstanceStatus)
+				}
+			} else if len(agent.calls) != 0 {
+				t.Fatalf("ordinary Stop/Resume executed member actions: %v", agent.calls)
+			}
+			if len(lifecycleEntryPods(t, f.cli)) != wantReplicas || len(f.its.Status.InstanceStatus) != wantReplicas {
+				t.Fatalf("Resume did not converge resources and records: %+v", f.its.Status)
+			}
+			for _, status := range f.its.Status.InstanceStatus {
+				if status.MemberJoined != nil || status.MemberLeft != nil {
+					t.Fatalf("Resume changed a retained instance's membership result: %+v", status)
+				}
+			}
+		})
+	}
+}
+
 func TestInstanceSetLifecycleRegistersCompleteFlatMultitemplateAllocation(t *testing.T) {
 	ctx := context.Background()
 	its := newMemberLifecycleITS(3)

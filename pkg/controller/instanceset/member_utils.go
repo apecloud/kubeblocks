@@ -43,9 +43,6 @@ import (
 
 func prepareMemberLeave(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its := tree.GetRoot().(*workloads.InstanceSet)
-	if isStopRequested(its) {
-		return kubebuilderx.Continue, nil
-	}
 	assignments, _, err := instancetemplate.BuildAssignments(tree, its)
 	if err != nil {
 		if instancetemplate.IsAssignmentIncomplete(err) {

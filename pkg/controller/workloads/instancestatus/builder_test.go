@@ -448,13 +448,12 @@ func TestBuildReleasedRetentionUsesMembership(t *testing.T) {
 	}
 }
 
-func TestBuildRetainsUnknownProvisionedMembershipUntilLeave(t *testing.T) {
-	input := Input{RequireMemberLeave: true, Previous: []workloads.InstanceStatus{{PodName: "bootstrap-0", Provisioned: true, MemberJoined: nil}}}
+func TestBuildRetainsUnconfirmedExitUntilLeave(t *testing.T) {
+	input := Input{Previous: []workloads.InstanceStatus{{PodName: "bootstrap-0", Provisioned: true, MemberJoined: ptr.To(false), MemberLeft: ptr.To(false)}}}
 	statuses, err := Build(input)
-	if err != nil || len(statuses) != 1 || statuses[0].DesiredState != workloads.InstanceDesiredStateReleased || statuses[0].MemberJoined != nil {
-		t.Fatalf("unknown membership lost before leave: %+v %v", statuses, err)
+	if err != nil || len(statuses) != 1 || statuses[0].DesiredState != workloads.InstanceDesiredStateReleased || statuses[0].MemberLeft == nil || *statuses[0].MemberLeft {
+		t.Fatalf("unconfirmed exit lost before leave: %+v %v", statuses, err)
 	}
-	statuses[0].MemberJoined = ptr.To(false)
 	statuses[0].MemberLeft = ptr.To(true)
 	input.Previous = statuses
 	statuses, err = Build(input)

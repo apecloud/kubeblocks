@@ -67,6 +67,22 @@ func reconcileMemberStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, 
 	for _, assignment := range assignments {
 		desired[assignment.InstanceName] = assignment.TemplateName
 	}
+	// Status aggregation may omit an absent instance before its exit is registered.
+	// Preserve its saved membership facts until alignment commits the exit progress.
+	for _, previous := range original.Status.InstanceStatus {
+		_, allocated := desired[previous.PodName]
+		if allocated || its.FindInstanceStatus(previous.PodName) != nil || !needsMemberLeave(its, &previous) {
+			continue
+		}
+		its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{
+			PodName:      previous.PodName,
+			TemplateName: previous.TemplateName,
+			CurrentState: workloads.InstanceCurrentStateAbsent,
+			Provisioned:  previous.Provisioned,
+			MemberJoined: previous.MemberJoined,
+			MemberLeft:   previous.MemberLeft,
+		})
+	}
 	offline := sets.New(its.Spec.OfflineInstances...)
 	for i := range its.Status.InstanceStatus {
 		status := &its.Status.InstanceStatus[i]
@@ -82,6 +98,9 @@ func reconcileMemberStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, 
 			status.DesiredState = workloads.InstanceDesiredStateOffline
 		default:
 			status.DesiredState = workloads.InstanceDesiredStateReleased
+		}
+		if !allocated && status.MemberLeft == nil && needsMemberLeave(its, status) {
+			status.MemberLeft = ptr.To(false)
 		}
 		untracked := status.MemberJoined == nil && status.MemberLeft == nil
 		if allocated && untracked && names.Has(status.PodName) && its.Spec.LifecycleActions.MemberJoin != nil {
@@ -104,10 +123,6 @@ func reconcileMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, 
 	}
 	if !join && !needsMemberRetirement(its, status) {
 		return kubebuilderx.Continue, nil
-	}
-	if !join && needsMemberLeave(its, status) && status.MemberLeft == nil {
-		status.MemberLeft = ptr.To(false)
-		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	if join || its.Spec.LifecycleActions.MemberLeave != nil {
 		pods := make([]*corev1.Pod, 0)

@@ -3929,18 +3929,7 @@ func TestInstanceSetLifecycleAllocationSwitchSeparatesCreationAndMemberResult(t 
 	f.cli = faulty
 	result := f.step(t)
 	old := f.its.FindInstanceStatus(f.its.Name + "-1")
-	if !result.Requeue || len(agent.calls) != 1 || old == nil || old.MemberLeft != nil || len(lifecycleEntryPods(t, f.cli)) != 3 {
-		t.Fatalf("uncommitted exit progress ran Leave or changed runtime: calls=%v status=%#v", agent.calls, old)
-	}
-	f.step(t)
-	old = f.its.FindInstanceStatus(f.its.Name + "-1")
-	if old == nil || old.MemberLeft == nil || *old.MemberLeft || len(agent.calls) != 1 {
-		t.Fatalf("exit progress was not saved before Leave: calls=%v status=%#v", agent.calls, old)
-	}
-	faulty.failStatus = true
-	result = f.step(t)
-	old = f.its.FindInstanceStatus(f.its.Name + "-1")
-	if !result.Requeue || len(agent.calls) != 2 || agent.calls[1] != "memberLeave" || old == nil || !ptr.Deref(old.MemberJoined, false) || len(lifecycleEntryPods(t, f.cli)) != 3 {
+	if !result.Requeue || len(agent.calls) != 2 || agent.calls[1] != "memberLeave" || old == nil || !ptr.Deref(old.MemberJoined, false) || old.MemberLeft == nil || *old.MemberLeft || len(lifecycleEntryPods(t, f.cli)) != 3 {
 		t.Fatalf("member result conflict leaked runtime mutation: calls=%v status=%#v result=%#v", agent.calls, f.its.Status.InstanceStatus, result)
 	}
 	f.step(t)
@@ -4808,6 +4797,13 @@ func TestInstanceSetLifecycleTargetCommitPrecedesRetirement(t *testing.T) {
 			if status == nil || status.EffectiveDesiredState() != want || status.EffectiveCurrentState() != workloads.InstanceCurrentStatePresent {
 				t.Fatalf("target did not commit independently of runtime: %#v", status)
 			}
+			if target == "stop" {
+				if status.MemberLeft != nil {
+					t.Fatal("ordinary Stop registered a membership exit")
+				}
+			} else if status.MemberLeft == nil || *status.MemberLeft {
+				t.Fatalf("withdrawal was saved without pending exit progress: %+v", status)
+			}
 		})
 	}
 }
@@ -5358,7 +5354,7 @@ func TestInstanceSetCancelledExpansionRemovesUnconfirmedMember(t *testing.T) {
 					actualConflict = apierrors.IsConflict(err)
 					return err
 				}
-				if cancelled && !lostPod && !cancellationRejected && status != nil && status.MemberLeft != nil && !*status.MemberLeft {
+				if cancelled && !cancellationRejected && status != nil && status.MemberLeft != nil && !*status.MemberLeft {
 					cancellationRejected = true
 					return apierrors.NewConflict(schema.GroupResource{Group: workloads.GroupVersion.Group, Resource: "instancesets"}, its.Name, fmt.Errorf("exit progress conflict"))
 				}
@@ -5386,7 +5382,11 @@ func TestInstanceSetCancelledExpansionRemovesUnconfirmedMember(t *testing.T) {
 			for round := 0; round < 24; round++ {
 				f.step(t)
 				if cancellationRejected && !checkedCancellation {
-					if !members[second] || len(calls) != 1 || len(lifecycleEntryPods(t, f.cli)) != 2 {
+					wantPods := 2
+					if lostPod {
+						wantPods = 1
+					}
+					if !members[second] || len(calls) != 1 || len(lifecycleEntryPods(t, f.cli)) != wantPods {
 						t.Fatal("Leave ran before exit progress was saved")
 					}
 					checkedCancellation = true
@@ -5405,7 +5405,7 @@ func TestInstanceSetCancelledExpansionRemovesUnconfirmedMember(t *testing.T) {
 			if !reflect.DeepEqual(members, map[string]bool{first: true}) || !reflect.DeepEqual(calls, wantCalls) || len(lifecycleEntryPods(t, f.cli)) != 1 || f.its.FindInstanceStatus(second) != nil {
 				t.Fatalf("cancelled expansion left a member or resource behind: members=%v calls=%v want=%v pods=%d status=%+v", members, calls, wantCalls, len(lifecycleEntryPods(t, f.cli)), f.its.FindInstanceStatus(second))
 			}
-			if !lostPod && (!checkedRetained || !checkedCancellation) {
+			if !checkedCancellation || (!lostPod && !checkedRetained) {
 				t.Fatal("cancellation and Leave result conflicts were not both exercised")
 			}
 			if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: "data-" + second}, &corev1.PersistentVolumeClaim{}); !apierrors.IsNotFound(err) {

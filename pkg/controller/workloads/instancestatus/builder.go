@@ -182,6 +182,8 @@ func Build(input Input) ([]workloads.InstanceStatus, error) {
 			}
 		}
 
+		// Terminating observations retain only lifecycle state and revision. Runtime health belongs to a usable,
+		// present instance and must be cleared rather than inherited from its previous status.
 		if observation != nil && observation.State == workloads.InstanceCurrentStatePresent {
 			status.Ready = observation.Ready
 			status.Available = observation.Ready && observation.Available

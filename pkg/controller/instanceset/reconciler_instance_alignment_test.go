@@ -40,7 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
-	publiclifecycle "github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
+	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
@@ -249,7 +249,7 @@ func TestValidatedExecutionPreservesActionSelection(t *testing.T) {
 			if tc.name == "single all" && opts != nil {
 				t.Fatal("AllReplicas lost its aggregate-error semantics")
 			}
-			lfa, err := publiclifecycle.New(its.Namespace, "", "", &apps.ComponentLifecycleActions{MemberJoin: tc.action}, its.Spec.LifecycleActions.TemplateVars, pods[0], pods)
+			lfa, err := lifecycle.New(its.Namespace, "", "", &apps.ComponentLifecycleActions{MemberJoin: tc.action}, its.Spec.LifecycleActions.TemplateVars, pods[0], pods)
 			if err != nil {
 				t.Fatal(err)
 			}

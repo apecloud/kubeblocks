@@ -40,7 +40,7 @@ func (r *validationReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebui
 	}
 	its := tree.GetRoot().(*workloads.InstanceSet)
 	if err := validateMemberActions(its); err != nil {
-		return lifecycleWait(tree, its, err)
+		return memberActionWait(tree, its, err)
 	}
 	return kubebuilderx.Continue, nil
 }

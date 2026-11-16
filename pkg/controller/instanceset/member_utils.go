@@ -36,7 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
-	publiclifecycle "github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
+	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
 )
@@ -49,7 +49,7 @@ func prepareMemberLeave(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, err
 	assignments, _, err := instancetemplate.BuildAssignments(tree, its)
 	if err != nil {
 		if instancetemplate.IsAssignmentIncomplete(err) {
-			return lifecycleWait(tree, its, err)
+			return memberActionWait(tree, its, err)
 		}
 		return kubebuilderx.Continue, err
 	}
@@ -97,11 +97,11 @@ func reconcileMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, 
 		}
 		opts, err := validateMemberExecution(action, pod, pods)
 		if err != nil {
-			return lifecycleWait(tree, its, err)
+			return memberActionWait(tree, its, err)
 		}
 		lfa, err := newLifecycleAction(its, tree, pod)
 		if err != nil {
-			return lifecycleWait(tree, its, err)
+			return memberActionWait(tree, its, err)
 		}
 		if leave && its.Spec.LifecycleActions.Switchover != nil {
 			exclusive := false
@@ -113,12 +113,12 @@ func reconcileMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, 
 			if exclusive {
 				opts, err := validateMemberExecution(its.Spec.LifecycleActions.Switchover, pod, pods)
 				if err != nil {
-					return lifecycleWait(tree, its, err)
+					return memberActionWait(tree, its, err)
 				}
 				if err := lfa.Switchover(tree.Context, reader, opts, ""); err != nil {
-					return lifecycleWait(tree, its, err)
+					return memberActionWait(tree, its, err)
 				}
-				return lifecycleWait(tree, its, fmt.Errorf("waiting for %s to relinquish its exclusive role", pod.Name))
+				return memberActionWait(tree, its, fmt.Errorf("waiting for %s to relinquish its exclusive role", pod.Name))
 			}
 		}
 		if join {
@@ -127,7 +127,7 @@ func reconcileMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, 
 			err = lfa.MemberLeave(tree.Context, reader, opts)
 		}
 		if err != nil {
-			return lifecycleWait(tree, its, err)
+			return memberActionWait(tree, its, err)
 		}
 	}
 	status.MemberJoined = ptr.To(join)
@@ -140,7 +140,7 @@ func reconcileMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, 
 	return kubebuilderx.RetryAfter(time.Second), nil
 }
 
-func lifecycleWait(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, err error) (kubebuilderx.Result, error) {
+func memberActionWait(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, err error) (kubebuilderx.Result, error) {
 	previous := meta.FindStatusCondition(its.Status.Conditions, "InstanceLifecycle")
 	if tree.EventRecorder != nil && (previous == nil || previous.Message != err.Error()) {
 		tree.EventRecorder.Event(its, corev1.EventTypeWarning, "InstanceLifecycle", err.Error())
@@ -210,14 +210,14 @@ func needsMemberRetirement(its *workloads.InstanceSet, status *workloads.Instanc
 	return memberActionsEnabled(its) && its.Spec.LifecycleActions.MemberJoin != nil && status != nil && ptr.Deref(status.MemberJoined, false)
 }
 
-func validateMemberExecution(action *apps.Action, target *corev1.Pod, pods []*corev1.Pod) (*publiclifecycle.Options, error) {
+func validateMemberExecution(action *apps.Action, target *corev1.Pod, pods []*corev1.Pod) (*lifecycle.Options, error) {
 	if target == nil {
 		return nil, fmt.Errorf("member target runtime is absent")
 	}
 	if len(pods) == 0 {
 		return nil, fmt.Errorf("no available executor for member action")
 	}
-	selected, err := publiclifecycle.SelectTargetPods(pods, target, action)
+	selected, err := lifecycle.SelectTargetPods(pods, target, action)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +235,7 @@ func validateMemberExecution(action *apps.Action, target *corev1.Pod, pods []*co
 		selector = action.Exec.TargetPodSelector
 	}
 	if selector == apps.AnyReplica {
-		return &publiclifecycle.Options{TargetPodName: selected[0].Name}, nil
+		return &lifecycle.Options{TargetPodName: selected[0].Name}, nil
 	}
 	return nil, nil
 }

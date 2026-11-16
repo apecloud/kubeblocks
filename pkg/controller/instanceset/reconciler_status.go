@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -58,14 +59,21 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
-	provisionedChanged := false
+	changed := false
+	if memberActionsEnabled(its) {
+		var err error
+		changed, err = updateInstanceAllocation(tree, its)
+		if err != nil {
+			return kubebuilderx.Continue, err
+		}
+	}
 	for _, obj := range tree.List(&corev1.Pod{}) {
 		if status := its.FindInstanceStatus(obj.GetName()); status != nil && !status.Provisioned {
 			status.Provisioned = true
-			provisionedChanged = true
+			changed = true
 		}
 	}
-	if provisionedChanged {
+	if changed {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	// Runtime observations do not depend on publication of the new revision targets.
@@ -461,6 +469,71 @@ func instancePodFailed(pod *corev1.Pod) bool {
 	}
 	isFailed, isTimedOut, _ := intctrlutil.IsPodFailedAndTimedOut(pod)
 	return isFailed && isTimedOut
+}
+
+// updateInstanceAllocation registers identities before revision publication and full status aggregation.
+func updateInstanceAllocation(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) (bool, error) {
+	assignments, _, err := instancetemplate.BuildAssignments(tree, its)
+	if err != nil {
+		if instancetemplate.IsAssignmentIncomplete(err) {
+			// Allow revision and alignment to converge before registering a complete allocation.
+			return false, nil
+		}
+		return false, err
+	}
+	pods := tree.List(&corev1.Pod{})
+	runtimeNames := sets.New[string]()
+	for _, pod := range pods {
+		runtimeNames.Insert(pod.GetName())
+	}
+	bootstrap := its.Status.ObservedGeneration == 0 && len(its.Status.InstanceStatus) == 0 &&
+		len(pods) == 0 && len(tree.List(&corev1.PersistentVolumeClaim{})) == 0
+	changed := false
+	desired := make(map[string]string, len(assignments))
+	for _, assignment := range assignments {
+		desired[assignment.InstanceName] = assignment.TemplateName
+		if its.FindInstanceStatus(assignment.InstanceName) != nil {
+			continue
+		}
+		status := workloads.InstanceStatus{
+			PodName: assignment.InstanceName, TemplateName: ptr.To(assignment.TemplateName),
+			DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStateAbsent,
+		}
+		if !bootstrap && !runtimeNames.Has(assignment.InstanceName) && its.Spec.LifecycleActions.MemberJoin != nil {
+			status.MemberJoined = ptr.To(false)
+		}
+		its.Status.InstanceStatus = append(its.Status.InstanceStatus, status)
+		changed = true
+	}
+	offline := sets.New(its.Spec.OfflineInstances...)
+	for i := range its.Status.InstanceStatus {
+		status := &its.Status.InstanceStatus[i]
+		template, allocated := desired[status.PodName]
+		desiredState := workloads.InstanceDesiredStateReleased
+		switch {
+		case allocated:
+			desiredState = workloads.InstanceDesiredStateActive
+			if isStopRequested(its) {
+				desiredState = workloads.InstanceDesiredStateOffline
+			}
+			if status.TemplateName == nil || *status.TemplateName != template {
+				status.TemplateName = ptr.To(template)
+				changed = true
+			}
+		case offline.Has(status.PodName):
+			desiredState = workloads.InstanceDesiredStateOffline
+		}
+		if status.EffectiveDesiredState() != desiredState {
+			status.DesiredState = desiredState
+			changed = true
+		}
+		untracked := status.MemberJoined == nil && status.MemberLeft == nil
+		if allocated && untracked && runtimeNames.Has(status.PodName) && its.Spec.LifecycleActions.MemberJoin != nil {
+			status.MemberJoined = ptr.To(true)
+			changed = true
+		}
+	}
+	return changed, nil
 }
 
 func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []*corev1.Pod) error {

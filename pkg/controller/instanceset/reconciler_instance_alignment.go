@@ -58,7 +58,7 @@ func (r *instanceAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree
 func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 	if memberActionsEnabled(its) {
-		if result, err := reconcileMemberStatus(tree); err != nil || result != kubebuilderx.Continue {
+		if result, err := prepareMemberLeave(tree); err != nil || result != kubebuilderx.Continue {
 			return result, err
 		}
 	}

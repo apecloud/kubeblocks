@@ -41,11 +41,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
 )
 
-func reconcileMemberStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
+func prepareMemberLeave(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its := tree.GetRoot().(*workloads.InstanceSet)
-	original, ok := tree.GetOriginalRoot().(*workloads.InstanceSet)
-	if !ok {
-		return kubebuilderx.Continue, fmt.Errorf("member alignment requires a prepared object tree")
+	if isStopRequested(its) {
+		return kubebuilderx.Continue, nil
 	}
 	assignments, _, err := instancetemplate.BuildAssignments(tree, its)
 	if err != nil {
@@ -54,60 +53,19 @@ func reconcileMemberStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, 
 		}
 		return kubebuilderx.Continue, err
 	}
-	names := sets.New[string]()
-	resources := sets.New[string]()
-	for _, obj := range tree.List(&corev1.Pod{}) {
-		names.Insert(obj.GetName())
-	}
-	for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
-		resources.Insert(obj.GetLabels()[constant.KBAppPodNameLabelKey])
-	}
-	registered := registerMemberStatus(its, original, assignments, names, resources)
-	desired := make(map[string]string, len(assignments))
+	allocated := sets.New[string]()
 	for _, assignment := range assignments {
-		desired[assignment.InstanceName] = assignment.TemplateName
+		allocated.Insert(assignment.InstanceName)
 	}
-	// Status aggregation may omit an absent instance before its exit is registered.
-	// Preserve its saved membership facts until alignment commits the exit progress.
-	for _, previous := range original.Status.InstanceStatus {
-		_, allocated := desired[previous.PodName]
-		if allocated || its.FindInstanceStatus(previous.PodName) != nil || !needsMemberLeave(its, &previous) {
-			continue
-		}
-		its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{
-			PodName:      previous.PodName,
-			TemplateName: previous.TemplateName,
-			CurrentState: workloads.InstanceCurrentStateAbsent,
-			Provisioned:  previous.Provisioned,
-			MemberJoined: previous.MemberJoined,
-			MemberLeft:   previous.MemberLeft,
-		})
-	}
-	offline := sets.New(its.Spec.OfflineInstances...)
+	changed := false
 	for i := range its.Status.InstanceStatus {
 		status := &its.Status.InstanceStatus[i]
-		template, allocated := desired[status.PodName]
-		switch {
-		case allocated:
-			status.DesiredState = workloads.InstanceDesiredStateActive
-			if isStopRequested(its) {
-				status.DesiredState = workloads.InstanceDesiredStateOffline
-			}
-			status.TemplateName = ptr.To(template)
-		case offline.Has(status.PodName):
-			status.DesiredState = workloads.InstanceDesiredStateOffline
-		default:
-			status.DesiredState = workloads.InstanceDesiredStateReleased
-		}
-		if !allocated && status.MemberLeft == nil && needsMemberLeave(its, status) {
+		if !allocated.Has(status.PodName) && status.MemberLeft == nil && needsMemberLeave(its, status) {
 			status.MemberLeft = ptr.To(false)
-		}
-		untracked := status.MemberJoined == nil && status.MemberLeft == nil
-		if allocated && untracked && names.Has(status.PodName) && its.Spec.LifecycleActions.MemberJoin != nil {
-			status.MemberJoined = ptr.To(true)
+			changed = true
 		}
 	}
-	if registered || membershipChanged(original.Status.InstanceStatus, its.Status.InstanceStatus) {
+	if changed {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	return kubebuilderx.Continue, nil
@@ -235,37 +193,6 @@ func validateMemberActions(its *workloads.InstanceSet) error {
 	return nil
 }
 
-// registerMemberStatus records a complete current allocation before any runtime is created.
-// Existing resources prevent a lost observation from being classified as a fresh bootstrap.
-func registerMemberStatus(its, original *workloads.InstanceSet, assignments []instancetemplate.Assignment, runtimeNames, resourceNames sets.Set[string]) bool {
-	if !memberActionsEnabled(its) {
-		return false
-	}
-	bootstrap := original.Status.ObservedGeneration == 0 && len(original.Status.InstanceStatus) == 0 && runtimeNames.Len() == 0 && resourceNames.Len() == 0
-	known := sets.New[string]()
-	for _, s := range original.Status.InstanceStatus {
-		known.Insert(s.PodName)
-	}
-	changed := false
-	for _, a := range assignments {
-		if known.Has(a.InstanceName) {
-			continue
-		}
-		status := its.FindInstanceStatus(a.InstanceName)
-		if status == nil {
-			its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{PodName: a.InstanceName, TemplateName: ptr.To(a.TemplateName), DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStateAbsent})
-			status = &its.Status.InstanceStatus[len(its.Status.InstanceStatus)-1]
-		}
-		if !bootstrap && !runtimeNames.Has(a.InstanceName) {
-			if its.Spec.LifecycleActions.MemberJoin != nil {
-				status.MemberJoined = ptr.To(false)
-			}
-		}
-		changed = true
-	}
-	return changed
-}
-
 func needsMemberLeave(its *workloads.InstanceSet, status *workloads.InstanceStatus) bool {
 	if !memberActionsEnabled(its) || its.Spec.LifecycleActions.MemberLeave == nil || status == nil {
 		return false
@@ -281,31 +208,6 @@ func needsMemberRetirement(its *workloads.InstanceSet, status *workloads.Instanc
 		return true
 	}
 	return memberActionsEnabled(its) && its.Spec.LifecycleActions.MemberJoin != nil && status != nil && ptr.Deref(status.MemberJoined, false)
-}
-
-// membershipChanged reports allocation and membership changes that alignment must commit before proceeding.
-func membershipChanged(previous, current []workloads.InstanceStatus) bool {
-	if len(previous) != len(current) {
-		return true
-	}
-	for _, status := range current {
-		found := false
-		for _, old := range previous {
-			if status.PodName != old.PodName {
-				continue
-			}
-			found = true
-			if status.EffectiveDesiredState() != old.EffectiveDesiredState() || !ptr.Equal(status.TemplateName, old.TemplateName) ||
-				!ptr.Equal(status.MemberJoined, old.MemberJoined) || !ptr.Equal(status.MemberLeft, old.MemberLeft) {
-				return true
-			}
-			break
-		}
-		if !found {
-			return true
-		}
-	}
-	return false
 }
 
 func validateMemberExecution(action *apps.Action, target *corev1.Pod, pods []*corev1.Pod) (*publiclifecycle.Options, error) {

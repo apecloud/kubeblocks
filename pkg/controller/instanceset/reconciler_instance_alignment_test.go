@@ -32,7 +32,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -40,7 +39,6 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	publiclifecycle "github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
@@ -204,40 +202,6 @@ func memberPod() *corev1.Pod {
 }
 func testAction(command string) *apps.Action {
 	return &apps.Action{Exec: &apps.ExecAction{Command: []string{"/bin/sh", "-c", command}}}
-}
-
-func TestRegistrationSeparatesBootstrapAndLaterAllocation(t *testing.T) {
-	its := memberWorkload()
-	assignments := []instancetemplate.Assignment{{InstanceName: "demo-0"}, {InstanceName: "demo-1", TemplateName: "alternate"}}
-	if !registerMemberStatus(its, its.DeepCopy(), assignments, sets.New[string](), sets.New[string]()) {
-		t.Fatal("bootstrap not registered")
-	}
-	for _, status := range its.Status.InstanceStatus {
-		if status.MemberJoined != nil || status.Provisioned {
-			t.Fatalf("bootstrap invented results: %+v", status)
-		}
-	}
-	assignments = append(assignments, instancetemplate.Assignment{InstanceName: "demo-2"})
-	if !registerMemberStatus(its, its.DeepCopy(), assignments, sets.New[string](), sets.New[string]()) {
-		t.Fatal("new identity not registered")
-	}
-	status := its.FindInstanceStatus("demo-2")
-	if status.MemberJoined == nil || *status.MemberJoined {
-		t.Fatalf("new empty allocation not tracked: %+v", status)
-	}
-	its = memberWorkload()
-	if registerMemberStatus(its, its.DeepCopy(), nil, sets.New[string](), sets.New[string]()) || its.Status.ObservedGeneration != 0 {
-		t.Fatal("empty allocation changed revision publication")
-	}
-	its.Status.ObservedGeneration = its.Generation
-	if !registerMemberStatus(its, its.DeepCopy(), assignments[:1], sets.New[string](), sets.New[string]()) || its.FindInstanceStatus("demo-0").MemberJoined == nil {
-		t.Fatal("zero replica increase was treated as bootstrap")
-	}
-	its = memberWorkload()
-	registerMemberStatus(its, its.DeepCopy(), assignments, sets.New("demo-1"), sets.New("demo-0"))
-	if its.FindInstanceStatus("demo-1").MemberJoined != nil {
-		t.Fatal("unobserved old resources were classified as empty")
-	}
 }
 
 type memberAgent struct{ calls int }

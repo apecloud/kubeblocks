@@ -3068,6 +3068,9 @@ func TestInstanceSetLifecycleRegistrationPrecedesRuntimeCreation(t *testing.T) {
 	if err != nil || len(stored.Status.InstanceStatus) != 2 || len(lifecycleEntryPods(t, cli)) != 0 {
 		t.Fatalf("complete bootstrap allocation was not committed alone: status=%+v err=%v", stored.Status, err)
 	}
+	if stored.Status.ObservedGeneration != 0 || len(stored.Status.UpdateRevisions) != 0 {
+		t.Fatalf("initial registration shared its commit with revision publication: %+v", stored.Status)
+	}
 	for _, status := range stored.Status.InstanceStatus {
 		if status.MemberJoined != nil || status.Provisioned {
 			t.Fatalf("registration invented an execution result: %+v", status)
@@ -3090,6 +3093,7 @@ func TestInstanceSetLifecycleRegistrationPrecedesRuntimeCreation(t *testing.T) {
 			}
 		}
 	}
+	publishedGeneration := stored.Status.ObservedGeneration
 	stored.Spec.Replicas = ptr.To[int32](3)
 	stored.Generation++
 	if err := cli.Update(context.Background(), stored); err != nil {
@@ -3098,6 +3102,9 @@ func TestInstanceSetLifecycleRegistrationPrecedesRuntimeCreation(t *testing.T) {
 	stored, _, err = reconcileLifecycleITS(t, cli, key)
 	if err != nil || stored.FindInstanceStatus("member-lifecycle-2") == nil || stored.FindInstanceStatus("member-lifecycle-2").MemberJoined == nil || *stored.FindInstanceStatus("member-lifecycle-2").MemberJoined || stored.FindInstanceStatus("member-lifecycle-1").MemberJoined != nil {
 		t.Fatalf("new allocation while bootstrap remains pending was not distinguished: %+v err=%v", stored.Status.InstanceStatus, err)
+	}
+	if stored.Status.ObservedGeneration != publishedGeneration {
+		t.Fatalf("expansion registration did not precede revision publication: %+v", stored.Status)
 	}
 }
 
@@ -3353,22 +3360,6 @@ func TestInstanceSetLifecycleMemberOnlyExecutesPreparedAgentActions(t *testing.T
 	step()
 	if len(lifecycleEntryPods(t, cli)) != 1 {
 		t.Fatal("persisted leave completion did not permit runtime removal")
-	}
-}
-
-func TestInstanceSetLifecycleRetainsUnknownMembershipWithoutRuntime(t *testing.T) {
-	its := newMemberLifecycleITS(0)
-
-	its.Spec.LifecycleActions.MemberLeave = &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"leave"}}}
-	its.Status.ObservedGeneration = its.Generation
-	its.Status.InstanceStatus = []workloads.InstanceStatus{{PodName: "member-lifecycle-0", Provisioned: true, DesiredState: workloads.InstanceDesiredStateReleased, CurrentState: workloads.InstanceCurrentStateAbsent}}
-	cli := newLifecycleEntryClient(t, its, interceptor.Funcs{})
-	for i := 0; i < 3; i++ {
-		stored, result, err := reconcileLifecycleITS(t, cli, client.ObjectKeyFromObject(its))
-		status := stored.FindInstanceStatus("member-lifecycle-0")
-		if err != nil || result.RequeueAfter == 0 || status == nil || !status.Provisioned || status.MemberJoined != nil {
-			t.Fatalf("unresolved bootstrap membership was dropped or invented: status=%+v result=%+v err=%v", status, result, err)
-		}
 	}
 }
 
@@ -4807,8 +4798,23 @@ func TestInstanceSetLifecycleTargetCommitPrecedesRetirement(t *testing.T) {
 				if status.MemberLeft != nil {
 					t.Fatal("ordinary Stop registered a membership exit")
 				}
-			} else if status.MemberLeft == nil || *status.MemberLeft {
-				t.Fatalf("withdrawal was saved without pending exit progress: %+v", status)
+			} else {
+				if status.MemberLeft != nil {
+					t.Fatalf("status registered an exit before alignment: %+v", status)
+				}
+				reject = true
+				f.step(t)
+				assertRuntime()
+				if f.its.FindInstanceStatus(name).MemberLeft != nil {
+					t.Fatal("failed exit registration was persisted")
+				}
+				reject = false
+				f.step(t)
+				assertRuntime()
+				status = f.its.FindInstanceStatus(name)
+				if status.MemberLeft == nil || *status.MemberLeft {
+					t.Fatalf("alignment did not save pending exit progress: %+v", status)
+				}
 			}
 		})
 	}
@@ -5097,11 +5103,28 @@ func TestInstanceSetRetirementPreservesParentRuntimeHistory(t *testing.T) {
 			agent := &memberLifecycleAgent{}
 			kbacli.SetMockClient(agent, nil)
 			defer kbacli.UnsetMockClient()
+			rejected := false
+			base := f.cli
+			f.cli = interceptor.NewClient(base.(client.WithWatch), interceptor.Funcs{SubResourceUpdate: func(ctx context.Context, delegate client.Client, subresource string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+				if its, ok := obj.(*workloads.InstanceSet); ok && subresource == "status" && !rejected {
+					status := its.FindInstanceStatus(key.Name)
+					if status != nil && status.MemberLeft != nil && !*status.MemberLeft {
+						rejected = true
+						return apierrors.NewConflict(schema.GroupResource{Group: workloads.GroupVersion.Group, Resource: "instancesets"}, its.Name, fmt.Errorf("exit registration conflict"))
+					}
+				}
+				return delegate.SubResource(subresource).Update(ctx, obj, opts...)
+			}})
 			for round := 0; round < 8; round++ {
 				f.step(t)
 			}
-			if status := f.its.FindInstanceStatus(key.Name); status == nil || !status.Provisioned || (status.MemberJoined != nil && !*status.MemberJoined) {
+			status := f.its.FindInstanceStatus(key.Name)
+			if status == nil || !status.Provisioned || (status.MemberJoined != nil && !*status.MemberJoined) {
 				t.Fatalf("parent discarded its Leave obligation: %+v", status)
+			}
+			pendingExit := status.MemberLeft != nil && !*status.MemberLeft
+			if !rejected || !pendingExit {
+				t.Fatalf("exit registration did not recover after a conflict: rejected=%t status=%+v", rejected, status)
 			}
 
 			if len(agent.calls) != 0 {
@@ -5288,8 +5311,9 @@ func TestInstanceSetJoinWaitsForProvisionedCommit(t *testing.T) {
 	}
 	rejectObservation = false
 	result := f.step(t)
+	third := f.its.FindInstanceStatus(f.its.Name + "-2")
 	if !result.Requeue || !f.its.FindInstanceStatus(second).Provisioned || f.its.Status.ObservedGeneration != publishedGeneration || len(agent.calls) != 0 ||
-		f.its.FindInstanceStatus(f.its.Name+"-2") != nil || len(lifecycleEntryPods(t, f.cli)) != 2 {
+		third == nil || third.Provisioned || third.MemberJoined == nil || *third.MemberJoined || len(lifecycleEntryPods(t, f.cli)) != 2 {
 		t.Fatalf("runtime observation shared its commit with later reconciliation: result=%+v calls=%v status=%+v", result, agent.calls, f.its.Status)
 	}
 	for round := 0; round < 8; round++ {

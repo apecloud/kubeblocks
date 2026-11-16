@@ -43,6 +43,27 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
+func TestStatusCommitsProvisionedBeforeRevisionPublication(t *testing.T) {
+	its := builder.NewInstanceSetBuilder("default", "status-commit").GetObject()
+	its.Generation = 2
+	its.Status.ObservedGeneration = 1
+	its.Status.InstanceStatus = []workloads.InstanceStatus{{PodName: "status-commit-0"}}
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	if err := tree.Add(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: its.Namespace, Name: "status-commit-0"}}); err != nil {
+		t.Fatal(err)
+	}
+	r := NewStatusReconciler()
+	result, err := r.Reconcile(tree)
+	if err != nil || result != kubebuilderx.RetryAfter(time.Second) || !its.Status.InstanceStatus[0].Provisioned || its.Status.ObservedGeneration != 1 {
+		t.Fatalf("new runtime observation did not stop for its own commit: result=%+v status=%+v err=%v", result, its.Status, err)
+	}
+	result, err = r.Reconcile(tree)
+	if err != nil || result != kubebuilderx.Continue {
+		t.Fatalf("unchanged runtime observation kept blocking reconciliation: result=%+v err=%v", result, err)
+	}
+}
+
 func TestStatusConditionsRequireExpectedInstances(t *testing.T) {
 	for _, tc := range []struct {
 		name           string

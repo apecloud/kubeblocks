@@ -4404,6 +4404,12 @@ func TestInstanceSetReconcilePersistsTrackedFactsAfterRuntimeRemoval(t *testing.
 		reconcile()
 		assertPersistedMemberFacts(t, its, facts)
 		status := its.FindInstanceStatus("tracked-0")
+		if status == nil || !status.Provisioned {
+			t.Fatalf("runtime history was not saved before the full summary: %+v", status)
+		}
+		reconcile()
+		assertPersistedMemberFacts(t, its, facts)
+		status = its.FindInstanceStatus("tracked-0")
 		if status == nil || !status.Provisioned || status.CurrentState != workloads.InstanceCurrentStatePresent || status.CurrentRevision != "observed" {
 			t.Fatalf("Reconcile did not commit the observed runtime fact: %#v", status)
 		}
@@ -5257,6 +5263,12 @@ func TestInstanceSetJoinWaitsForProvisionedCommit(t *testing.T) {
 	for round := 0; round < 8 && len(lifecycleEntryPods(t, f.cli)) < 2; round++ {
 		f.step(t)
 	}
+	publishedGeneration := f.its.Status.ObservedGeneration
+	f.its.Spec.Replicas = ptr.To[int32](3)
+	f.its.Generation++
+	if err := f.cli.Update(context.Background(), f.its); err != nil {
+		t.Fatal(err)
+	}
 	f.setReady(t, second, true)
 	rejectObservation := true
 	base := f.cli
@@ -5275,6 +5287,11 @@ func TestInstanceSetJoinWaitsForProvisionedCommit(t *testing.T) {
 		}
 	}
 	rejectObservation = false
+	result := f.step(t)
+	if !result.Requeue || !f.its.FindInstanceStatus(second).Provisioned || f.its.Status.ObservedGeneration != publishedGeneration || len(agent.calls) != 0 ||
+		f.its.FindInstanceStatus(f.its.Name+"-2") != nil || len(lifecycleEntryPods(t, f.cli)) != 2 {
+		t.Fatalf("runtime observation shared its commit with later reconciliation: result=%+v calls=%v status=%+v", result, agent.calls, f.its.Status)
+	}
 	for round := 0; round < 8; round++ {
 		f.step(t)
 	}

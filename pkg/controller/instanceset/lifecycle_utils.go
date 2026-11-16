@@ -283,7 +283,7 @@ func needsMemberRetirement(its *workloads.InstanceSet, status *workloads.Instanc
 	return memberActionsEnabled(its) && its.Spec.LifecycleActions.MemberJoin != nil && status != nil && ptr.Deref(status.MemberJoined, false)
 }
 
-// membershipChanged reports allocation, runtime history, and membership changes that alignment must commit before proceeding.
+// membershipChanged reports allocation and membership changes that alignment must commit before proceeding.
 func membershipChanged(previous, current []workloads.InstanceStatus) bool {
 	if len(previous) != len(current) {
 		return true
@@ -296,7 +296,7 @@ func membershipChanged(previous, current []workloads.InstanceStatus) bool {
 			}
 			found = true
 			if status.EffectiveDesiredState() != old.EffectiveDesiredState() || !ptr.Equal(status.TemplateName, old.TemplateName) ||
-				!ptr.Equal(status.MemberJoined, old.MemberJoined) || !ptr.Equal(status.MemberLeft, old.MemberLeft) || status.Provisioned != old.Provisioned {
+				!ptr.Equal(status.MemberJoined, old.MemberJoined) || !ptr.Equal(status.MemberLeft, old.MemberLeft) {
 				return true
 			}
 			break

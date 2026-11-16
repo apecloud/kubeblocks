@@ -58,10 +58,15 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	provisionedChanged := false
 	for _, obj := range tree.List(&corev1.Pod{}) {
-		if status := its.FindInstanceStatus(obj.GetName()); status != nil {
+		if status := its.FindInstanceStatus(obj.GetName()); status != nil && !status.Provisioned {
 			status.Provisioned = true
+			provisionedChanged = true
 		}
+	}
+	if provisionedChanged {
+		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	// Runtime observations do not depend on publication of the new revision targets.
 	if model.IsObjectUpdating(its) {
@@ -217,6 +222,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if err = setInstanceStatus(tree, its, podList); err != nil {
 		return kubebuilderx.Continue, err
 	}
+
 	if !stopping && its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
 		return kubebuilderx.ContinueWithRetryAfter(time.Second), nil
 	}

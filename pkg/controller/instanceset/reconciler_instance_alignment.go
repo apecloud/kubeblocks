@@ -242,7 +242,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 			pod := oldInstanceMap[name]
 			if !runtimeChanged && !memberWaiting {
 				if result, err := reconcileMember(tree, its, pod, true, r.reader); err != nil || result != kubebuilderx.Continue {
-					if status := its.FindInstanceStatus(name); err == nil && status != nil && status.MemberJoined != nil && !*status.MemberJoined {
+					if err == nil && needsMemberJoin(its, its.FindInstanceStatus(name)) {
 						memberWaiting = true
 					} else {
 						return result, err

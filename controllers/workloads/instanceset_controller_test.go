@@ -3404,6 +3404,26 @@ func TestInstanceSetLifecycleStopAndOffline(t *testing.T) {
 			if len(agent.calls) != want {
 				t.Fatalf("wrong actions: %v", agent.calls)
 			}
+			if stop && status.MemberLeft != nil {
+				t.Fatal("Stop recorded a membership exit")
+			}
+			if stop {
+				f.its.Spec.Stop = ptr.To(false)
+				f.its.Generation++
+				if err := f.cli.Update(context.Background(), f.its); err != nil {
+					t.Fatal(err)
+				}
+				for i := 0; i < 24; i++ {
+					f.step(t)
+					for _, pod := range lifecycleEntryPods(t, f.cli) {
+						f.setReady(t, pod.Name, true)
+					}
+				}
+				status = f.its.FindInstanceStatus(f.its.Name + "-0")
+				if status == nil || !ptr.Deref(status.MemberJoined, false) || status.MemberLeft != nil || len(agent.calls) != 0 || len(lifecycleEntryPods(t, f.cli)) != 1 {
+					t.Fatalf("ordinary Stop/Resume changed membership: calls=%v status=%+v", agent.calls, status)
+				}
+			}
 		})
 	}
 }
@@ -3909,13 +3929,24 @@ func TestInstanceSetLifecycleAllocationSwitchSeparatesCreationAndMemberResult(t 
 	f.cli = faulty
 	result := f.step(t)
 	old := f.its.FindInstanceStatus(f.its.Name + "-1")
+	if !result.Requeue || len(agent.calls) != 1 || old == nil || old.MemberLeft != nil || len(lifecycleEntryPods(t, f.cli)) != 3 {
+		t.Fatalf("uncommitted exit progress ran Leave or changed runtime: calls=%v status=%#v", agent.calls, old)
+	}
+	f.step(t)
+	old = f.its.FindInstanceStatus(f.its.Name + "-1")
+	if old == nil || old.MemberLeft == nil || *old.MemberLeft || len(agent.calls) != 1 {
+		t.Fatalf("exit progress was not saved before Leave: calls=%v status=%#v", agent.calls, old)
+	}
+	faulty.failStatus = true
+	result = f.step(t)
+	old = f.its.FindInstanceStatus(f.its.Name + "-1")
 	if !result.Requeue || len(agent.calls) != 2 || agent.calls[1] != "memberLeave" || old == nil || !ptr.Deref(old.MemberJoined, false) || len(lifecycleEntryPods(t, f.cli)) != 3 {
 		t.Fatalf("member result conflict leaked runtime mutation: calls=%v status=%#v result=%#v", agent.calls, f.its.Status.InstanceStatus, result)
 	}
 	f.step(t)
 	old = f.its.FindInstanceStatus(f.its.Name + "-1")
 	wantCalls := 3
-	if len(agent.calls) != wantCalls || old == nil || old.MemberJoined == nil || *old.MemberJoined || len(lifecycleEntryPods(t, f.cli)) != 3 {
+	if len(agent.calls) != wantCalls || old == nil || old.MemberJoined == nil || *old.MemberJoined || !ptr.Deref(old.MemberLeft, false) || len(lifecycleEntryPods(t, f.cli)) != 3 {
 		t.Fatalf("member result retry did not commit alone: calls=%v status=%#v", agent.calls, f.its.Status.InstanceStatus)
 	}
 }
@@ -5079,6 +5110,14 @@ func TestInstanceSetRetirementPreservesParentRuntimeHistory(t *testing.T) {
 }
 
 func TestInstanceSetLifecycleCancelAfterUncommittedLeave(t *testing.T) {
+	for _, offline := range []bool{false, true} {
+		t.Run(fmt.Sprintf("offline=%t", offline), func(t *testing.T) {
+			testInstanceSetCancelAfterUncommittedLeave(t, offline)
+		})
+	}
+}
+
+func testInstanceSetCancelAfterUncommittedLeave(t *testing.T, offline bool) {
 	ctx := context.Background()
 	f := newMemberLifecycleEntry(t, 2, appsv1.ParallelPodManagement)
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -5129,7 +5168,8 @@ func TestInstanceSetLifecycleCancelAfterUncommittedLeave(t *testing.T) {
 	second := f.its.Name + "-1"
 	rejected := false
 	actualConflict := false
-	rejoinRejected := false
+	restoreRejected := false
+	joinResultRejected := false
 	base := f.cli
 	f.cli = interceptor.NewClient(base.(client.WithWatch), interceptor.Funcs{SubResourceUpdate: func(ctx context.Context, delegate client.Client, subresource string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
 		if its, ok := obj.(*workloads.InstanceSet); ok && subresource == "status" && !rejected {
@@ -5141,6 +5181,7 @@ func TestInstanceSetLifecycleCancelAfterUncommittedLeave(t *testing.T) {
 					return err
 				}
 				latest.Spec.Replicas = ptr.To[int32](2)
+				latest.Spec.OfflineInstances = nil
 				latest.Generation++
 				if err := delegate.Update(ctx, latest); err != nil {
 					return err
@@ -5150,16 +5191,26 @@ func TestInstanceSetLifecycleCancelAfterUncommittedLeave(t *testing.T) {
 				return err
 			}
 		}
-		if its, ok := obj.(*workloads.InstanceSet); ok && subresource == "status" && rejected && !rejoinRejected {
+		if its, ok := obj.(*workloads.InstanceSet); ok && subresource == "status" && rejected && !restoreRejected {
 			status := its.FindInstanceStatus(second)
-			if status != nil && status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive && status.MemberJoined != nil && !*status.MemberJoined {
-				rejoinRejected = true
-				return apierrors.NewConflict(schema.GroupResource{Group: workloads.GroupVersion.Group, Resource: "instancesets"}, its.Name, fmt.Errorf("rejoin registration conflict"))
+			if status != nil && status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive {
+				restoreRejected = true
+				return apierrors.NewConflict(schema.GroupResource{Group: workloads.GroupVersion.Group, Resource: "instancesets"}, its.Name, fmt.Errorf("restored allocation conflict"))
+			}
+		}
+		if its, ok := obj.(*workloads.InstanceSet); ok && subresource == "status" && restoreRejected && !joinResultRejected {
+			status := its.FindInstanceStatus(second)
+			if status != nil && status.MemberLeft == nil && ptr.Deref(status.MemberJoined, false) {
+				joinResultRejected = true
+				return apierrors.NewConflict(schema.GroupResource{Group: workloads.GroupVersion.Group, Resource: "instancesets"}, its.Name, fmt.Errorf("Join result conflict"))
 			}
 		}
 		return delegate.SubResource(subresource).Update(ctx, obj, opts...)
 	}})
 	f.its.Spec.Replicas = ptr.To[int32](1)
+	if offline {
+		f.its.Spec.OfflineInstances = []string{second}
+	}
 	f.its.Generation++
 	if err := f.cli.Update(ctx, f.its); err != nil {
 		t.Fatal(err)
@@ -5171,22 +5222,26 @@ func TestInstanceSetLifecycleCancelAfterUncommittedLeave(t *testing.T) {
 	if err != nil || !rejected || !actualConflict || string(state) != "left" || !ptr.Deref(f.its.FindInstanceStatus(second).MemberJoined, false) || len(lifecycleEntryPods(t, f.cli)) != 2 {
 		t.Fatalf("did not reach effect/status gap: cancelled=%t actualConflict=%t state=%q err=%v status=%+v", rejected, actualConflict, state, err, f.its.Status)
 	}
+	status := f.its.FindInstanceStatus(second)
+	if status.MemberLeft == nil || *status.MemberLeft {
+		t.Fatalf("unconfirmed Leave lost its saved progress: %+v", status)
+	}
 	if ptr.Deref(f.its.Spec.Replicas, int32(0)) != 2 {
 		t.Fatal("cancellation did not publish its desired allocation")
 	}
-	for round := 0; round < 12 && !rejoinRejected; round++ {
+	for round := 0; round < 12 && !restoreRejected; round++ {
 		f.step(t)
 	}
 	state, err = os.ReadFile(statePath)
-	if err != nil || !rejoinRejected || string(state) != "left" || len(lifecycleEntryPods(t, f.cli)) != 2 {
-		t.Fatalf("Join ran before rejoin registration was committed: rejected=%t state=%q pods=%d err=%v", rejoinRejected, state, len(lifecycleEntryPods(t, f.cli)), err)
+	if err != nil || !restoreRejected || string(state) != "left" || len(lifecycleEntryPods(t, f.cli)) != 2 {
+		t.Fatalf("Join ran before the restored allocation was committed: rejected=%t state=%q pods=%d err=%v", restoreRejected, state, len(lifecycleEntryPods(t, f.cli)), err)
 	}
 	for round := 0; round < 24; round++ {
 		f.step(t)
 	}
 	state, err = os.ReadFile(statePath)
-	status := f.its.FindInstanceStatus(second)
-	if err != nil || string(state) != "joined" || status == nil || !ptr.Deref(status.MemberJoined, false) {
+	status = f.its.FindInstanceStatus(second)
+	if err != nil || string(state) != "joined" || !joinResultRejected || status == nil || !ptr.Deref(status.MemberJoined, false) || status.MemberLeft != nil {
 		t.Fatalf("cancelled shrink retained a runtime and reported joined after real Leave: agent-state=%q actualConflict=%t read-error=%v pods=%d ready=%d observed=%d generation=%d joined=%t status=%+v", state, actualConflict, err, len(lifecycleEntryPods(t, f.cli)), f.its.Status.ReadyReplicas, f.its.Status.ObservedGeneration, f.its.Generation, ptr.Deref(status.MemberJoined, false), status)
 	}
 }
@@ -5303,11 +5358,11 @@ func TestInstanceSetCancelledExpansionRemovesUnconfirmedMember(t *testing.T) {
 					actualConflict = apierrors.IsConflict(err)
 					return err
 				}
-				if cancelled && !lostPod && !cancellationRejected && status != nil && status.MemberJoined == nil {
+				if cancelled && !lostPod && !cancellationRejected && status != nil && status.MemberLeft != nil && !*status.MemberLeft {
 					cancellationRejected = true
-					return apierrors.NewConflict(schema.GroupResource{Group: workloads.GroupVersion.Group, Resource: "instancesets"}, its.Name, fmt.Errorf("cancellation status conflict"))
+					return apierrors.NewConflict(schema.GroupResource{Group: workloads.GroupVersion.Group, Resource: "instancesets"}, its.Name, fmt.Errorf("exit progress conflict"))
 				}
-				if cancelled && !lostPod && !leaveResultRejected && status != nil && status.MemberJoined != nil && !*status.MemberJoined && !members[second] {
+				if cancelled && !lostPod && !leaveResultRejected && status != nil && ptr.Deref(status.MemberLeft, false) && !members[second] {
 					leaveResultRejected = true
 					return apierrors.NewConflict(schema.GroupResource{Group: workloads.GroupVersion.Group, Resource: "instancesets"}, its.Name, fmt.Errorf("Leave result conflict"))
 				}
@@ -5332,7 +5387,7 @@ func TestInstanceSetCancelledExpansionRemovesUnconfirmedMember(t *testing.T) {
 				f.step(t)
 				if cancellationRejected && !checkedCancellation {
 					if !members[second] || len(calls) != 1 || len(lifecycleEntryPods(t, f.cli)) != 2 {
-						t.Fatal("Leave ran before cancellation status was saved")
+						t.Fatal("Leave ran before exit progress was saved")
 					}
 					checkedCancellation = true
 				}

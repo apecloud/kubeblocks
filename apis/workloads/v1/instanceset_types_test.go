@@ -57,7 +57,7 @@ func TestLifecycleActionsAPIRoundTrip(t *testing.T) {
 	}
 	for _, withActions := range []bool{false, true} {
 		for _, result := range []*bool{nil, ptr.To(false), ptr.To(true)} {
-			object := &InstanceSet{Status: InstanceSetStatus{InstanceStatus: []InstanceStatus{{PodName: "replica-1", Provisioned: true, DataLoaded: result, MemberJoined: result}}}}
+			object := &InstanceSet{Status: InstanceSetStatus{InstanceStatus: []InstanceStatus{{PodName: "replica-1", Provisioned: true, DataLoaded: result, MemberJoined: result, MemberLeft: result}}}}
 			if withActions {
 				object.Spec.LifecycleActions = actions.DeepCopy()
 			}
@@ -76,7 +76,7 @@ func TestLifecycleActionsAPIRoundTrip(t *testing.T) {
 			if !withActions && bytes.Contains(data, []byte(`"lifecycleActions"`)) {
 				t.Fatal("absent actions serialized as enabled")
 			}
-			if result == nil && (bytes.Contains(data, []byte(`"dataLoaded"`)) || bytes.Contains(data, []byte(`"memberJoined"`))) {
+			if result == nil && (bytes.Contains(data, []byte(`"dataLoaded"`)) || bytes.Contains(data, []byte(`"memberJoined"`)) || bytes.Contains(data, []byte(`"memberLeft"`))) {
 				t.Fatal("unknown result serialized as tracked")
 			}
 			instance := &Instance{Spec: InstanceSpec{LifecycleActions: object.Spec.LifecycleActions}, Status: InstanceStatus2{Provisioned: true, DataLoaded: result, MemberJoined: result}}
@@ -109,14 +109,15 @@ func TestLifecycleActionsAPIRoundTrip(t *testing.T) {
 }
 
 func TestInstanceLifecycleStatusDeepCopy(t *testing.T) {
-	its := &InstanceSet{Status: InstanceSetStatus{InstanceStatus: []InstanceStatus{{PodName: "replica-1", Provisioned: true, DataLoaded: ptr.To(false), MemberJoined: ptr.To(false)}}}}
+	its := &InstanceSet{Status: InstanceSetStatus{InstanceStatus: []InstanceStatus{{PodName: "replica-1", Provisioned: true, DataLoaded: ptr.To(false), MemberJoined: ptr.To(false), MemberLeft: ptr.To(false)}}}}
 	inst := &Instance{Status: InstanceStatus2{Provisioned: true, DataLoaded: ptr.To(false), MemberJoined: ptr.To(false)}}
 	itsCopy, instCopy := its.DeepCopy(), inst.DeepCopy()
 	*itsCopy.Status.InstanceStatus[0].DataLoaded = true
 	*itsCopy.Status.InstanceStatus[0].MemberJoined = true
+	*itsCopy.Status.InstanceStatus[0].MemberLeft = true
 	*instCopy.Status.DataLoaded = true
 	*instCopy.Status.MemberJoined = true
-	if *its.Status.InstanceStatus[0].DataLoaded || *its.Status.InstanceStatus[0].MemberJoined || *inst.Status.DataLoaded || *inst.Status.MemberJoined {
+	if *its.Status.InstanceStatus[0].DataLoaded || *its.Status.InstanceStatus[0].MemberJoined || *its.Status.InstanceStatus[0].MemberLeft || *inst.Status.DataLoaded || *inst.Status.MemberJoined {
 		t.Fatal("deepcopy aliases lifecycle result pointers")
 	}
 }
@@ -181,6 +182,15 @@ func TestLifecycleActionsGeneratedSchemas(t *testing.T) {
 			}
 		}
 	}
+	memberLeft, ok := statusSchemas[0].Properties["memberLeft"]
+	if !ok || memberLeft.Type != "boolean" || memberLeft.Default != nil {
+		t.Fatalf("invalid MemberLeft schema: %+v", memberLeft)
+	}
+	for _, required := range statusSchemas[0].Required {
+		if required == "memberLeft" {
+			t.Fatal("MemberLeft must be optional")
+		}
+	}
 	its := &InstanceSet{Spec: InstanceSetSpec{
 		Replicas: ptr.To[int32](1),
 		Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "data-copy"}},
@@ -192,7 +202,7 @@ func TestLifecycleActionsGeneratedSchemas(t *testing.T) {
 			DataDump:    &Action{Exec: &apps.ExecAction{Command: []string{"dump"}}},
 			DataLoad:    &Action{Exec: &apps.ExecAction{Command: []string{"load"}}},
 		},
-	}, Status: InstanceSetStatus{InstanceStatus: []InstanceStatus{{PodName: "replica-1", Provisioned: true, DataLoaded: ptr.To(false), MemberJoined: ptr.To(true)}}}}
+	}, Status: InstanceSetStatus{InstanceStatus: []InstanceStatus{{PodName: "replica-1", Provisioned: true, DataLoaded: ptr.To(false), MemberJoined: ptr.To(true), MemberLeft: ptr.To(false)}}}}
 	inst := &Instance{Spec: InstanceSpec{Template: its.Spec.Template, Selector: its.Spec.Selector, LifecycleActions: its.Spec.LifecycleActions},
 		Status: InstanceStatus2{Provisioned: true, DataLoaded: ptr.To(false), MemberJoined: ptr.To(true)}}
 	for _, tc := range []struct {

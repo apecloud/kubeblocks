@@ -380,7 +380,7 @@ func TestBuildPreservesTrackedFactsAcrossRuntimeStates(t *testing.T) {
 	for _, tracked := range []*bool{nil, ptr.To(false), ptr.To(true)} {
 		for _, state := range []workloads.InstanceCurrentState{workloads.InstanceCurrentStatePresent, workloads.InstanceCurrentStateTerminating, workloads.InstanceCurrentStateAbsent} {
 			for _, offline := range []bool{false, true} {
-				input := Input{Previous: []workloads.InstanceStatus{{PodName: "demo-0", Provisioned: true, MemberJoined: tracked,
+				input := Input{Previous: []workloads.InstanceStatus{{PodName: "demo-0", Provisioned: true, MemberJoined: tracked, MemberLeft: ptr.To(false),
 					CurrentRevision: "stale", Ready: true, Available: true, Failed: true, Role: "stale", Configs: []workloads.InstanceConfigStatus{{Name: "stale"}}, VolumeExpansion: true}}}
 				if offline {
 					input.Offline = []string{"demo-0"}
@@ -397,6 +397,9 @@ func TestBuildPreservesTrackedFactsAcrossRuntimeStates(t *testing.T) {
 				status := result[0]
 				if !status.Provisioned || !reflect.DeepEqual(status.MemberJoined, tracked) {
 					t.Fatalf("tracked facts changed: %#v", status)
+				}
+				if status.MemberLeft == nil || *status.MemberLeft || status.MemberLeft == input.Previous[0].MemberLeft {
+					t.Fatalf("exit progress was lost or aliases the input: %+v", status)
 				}
 				if status.Ready || status.Available || status.Failed || status.Role != "" || len(status.Configs) != 0 || status.VolumeExpansion {
 					t.Fatalf("stale runtime fields survived a fresh observation: %#v", status)
@@ -452,6 +455,7 @@ func TestBuildRetainsUnknownProvisionedMembershipUntilLeave(t *testing.T) {
 		t.Fatalf("unknown membership lost before leave: %+v %v", statuses, err)
 	}
 	statuses[0].MemberJoined = ptr.To(false)
+	statuses[0].MemberLeft = ptr.To(true)
 	input.Previous = statuses
 	statuses, err = Build(input)
 	if err != nil || len(statuses) != 0 {

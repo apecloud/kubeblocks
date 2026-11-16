@@ -70,7 +70,6 @@ func reconcileMemberStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, 
 	offline := sets.New(its.Spec.OfflineInstances...)
 	for i := range its.Status.InstanceStatus {
 		status := &its.Status.InstanceStatus[i]
-		previous := original.FindInstanceStatus(status.PodName)
 		template, allocated := desired[status.PodName]
 		switch {
 		case allocated:
@@ -84,21 +83,8 @@ func reconcileMemberStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, 
 		default:
 			status.DesiredState = workloads.InstanceDesiredStateReleased
 		}
-		if !allocated {
-			if needsUnconfirmedJoinCleanup(its, previous) {
-				// An unconfirmed Join may have succeeded before its result was saved.
-				// Discard that result so Leave is confirmed before resources are released.
-				status.MemberJoined = nil
-			}
-			continue
-		}
-		if its.Spec.LifecycleActions.MemberJoin == nil {
-			continue
-		}
-		if previous != nil && previous.EffectiveDesiredState() == workloads.InstanceDesiredStateReleased {
-			// A cancelled shrink may have completed Leave without saving its result.
-			status.MemberJoined = ptr.To(false)
-		} else if names.Has(status.PodName) && status.MemberJoined == nil {
+		untracked := status.MemberJoined == nil && status.MemberLeft == nil
+		if allocated && untracked && names.Has(status.PodName) && its.Spec.LifecycleActions.MemberJoin != nil {
 			status.MemberJoined = ptr.To(true)
 		}
 	}
@@ -113,11 +99,15 @@ func reconcileMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, 
 	if status == nil || !memberActionsEnabled(its) || isStopRequested(its) {
 		return kubebuilderx.Continue, nil
 	}
-	if join && (its.Spec.LifecycleActions.MemberJoin == nil || status.MemberJoined == nil || *status.MemberJoined) {
+	if join && !needsMemberJoin(its, status) {
 		return kubebuilderx.Continue, nil
 	}
 	if !join && !needsMemberRetirement(its, status) {
 		return kubebuilderx.Continue, nil
+	}
+	if !join && needsMemberLeave(its, status) && status.MemberLeft == nil {
+		status.MemberLeft = ptr.To(false)
+		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	if join || its.Spec.LifecycleActions.MemberLeave != nil {
 		pods := make([]*corev1.Pod, 0)
@@ -168,6 +158,11 @@ func reconcileMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, 
 		}
 	}
 	status.MemberJoined = ptr.To(join)
+	if join {
+		status.MemberLeft = nil
+	} else if its.Spec.LifecycleActions.MemberLeave != nil {
+		status.MemberLeft = ptr.To(true)
+	}
 	meta.RemoveStatusCondition(&its.Status.Conditions, "InstanceLifecycle")
 	return kubebuilderx.RetryAfter(time.Second), nil
 }
@@ -186,28 +181,23 @@ func memberActionsEnabled(its *workloads.InstanceSet) bool {
 	return a != nil && (a.MemberJoin != nil || a.MemberLeave != nil)
 }
 
-func needsUnconfirmedJoinCleanup(its *workloads.InstanceSet, previous *workloads.InstanceStatus) bool {
-	if previous == nil || !previous.Provisioned || previous.EffectiveDesiredState() != workloads.InstanceDesiredStateActive {
+func needsMemberJoin(its *workloads.InstanceSet, status *workloads.InstanceStatus) bool {
+	if !memberActionsEnabled(its) || its.Spec.LifecycleActions.MemberJoin == nil || status == nil {
 		return false
 	}
-	actions := its.Spec.LifecycleActions
-	if actions.MemberJoin == nil || actions.MemberLeave == nil {
-		return false
-	}
-	return previous.MemberJoined != nil && !*previous.MemberJoined
+	return status.MemberLeft != nil || (status.MemberJoined != nil && !*status.MemberJoined)
 }
 
 func memberRetirementBlocked(its *workloads.InstanceSet, old *workloads.InstanceStatus) bool {
 	if !memberActionsEnabled(its) || old == nil {
 		return false
 	}
-	established := ptr.Deref(old.MemberJoined, false) || (old.MemberJoined == nil && old.Provisioned)
+	established := ptr.Deref(old.MemberJoined, false) || (old.Provisioned && !ptr.Deref(old.MemberLeft, false))
 	return slices.ContainsFunc(its.Status.InstanceStatus, func(status workloads.InstanceStatus) bool {
 		if status.EffectiveDesiredState() != workloads.InstanceDesiredStateActive {
 			return false
 		}
-		pendingJoin := established && its.Spec.LifecycleActions.MemberJoin != nil && status.MemberJoined != nil && !*status.MemberJoined
-		return pendingJoin
+		return established && needsMemberJoin(its, &status)
 	})
 }
 
@@ -265,7 +255,10 @@ func needsMemberLeave(its *workloads.InstanceSet, status *workloads.InstanceStat
 	if !memberActionsEnabled(its) || its.Spec.LifecycleActions.MemberLeave == nil || status == nil {
 		return false
 	}
-	return ptr.Deref(status.MemberJoined, false) || (status.MemberJoined == nil && status.Provisioned)
+	if status.MemberLeft != nil {
+		return !*status.MemberLeft
+	}
+	return ptr.Deref(status.MemberJoined, false) || status.Provisioned
 }
 
 func needsMemberRetirement(its *workloads.InstanceSet, status *workloads.InstanceStatus) bool {
@@ -288,7 +281,7 @@ func membershipChanged(previous, current []workloads.InstanceStatus) bool {
 			}
 			found = true
 			if status.EffectiveDesiredState() != old.EffectiveDesiredState() || !ptr.Equal(status.TemplateName, old.TemplateName) ||
-				!ptr.Equal(status.MemberJoined, old.MemberJoined) || status.Provisioned != old.Provisioned {
+				!ptr.Equal(status.MemberJoined, old.MemberJoined) || !ptr.Equal(status.MemberLeft, old.MemberLeft) || status.Provisioned != old.Provisioned {
 				return true
 			}
 			break

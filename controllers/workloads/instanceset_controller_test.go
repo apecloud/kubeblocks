@@ -4431,7 +4431,7 @@ func assertPersistedMemberFacts(t *testing.T, its *workloads.InstanceSet, facts 
 	}
 }
 
-func TestInstanceSetPendingMembersAllowCancellationAndOffline(t *testing.T) {
+func TestInstanceSetPendingMembersWaitForRetirementConfirmation(t *testing.T) {
 	for _, offline := range []bool{false, true} {
 		t.Run(fmt.Sprintf("offline=%t", offline), func(t *testing.T) {
 			initial := 1
@@ -4480,12 +4480,22 @@ func TestInstanceSetPendingMembersAllowCancellationAndOffline(t *testing.T) {
 					t.Fatalf("Offline did not join replacements then retire: %v %v", err, agent.calls)
 				}
 			} else {
-				if err := f.cli.Get(context.Background(), client.ObjectKey{Namespace: f.its.Namespace, Name: removed}, &corev1.Pod{}); !apierrors.IsNotFound(err) {
-					t.Fatalf("pending Join blocked cancellation: %v", err)
+				if err := f.cli.Get(context.Background(), client.ObjectKey{Namespace: f.its.Namespace, Name: removed}, &corev1.Pod{}); err != nil {
+					t.Fatalf("unconfirmed membership released the Pod before Leave: %v", err)
 				}
 				status := f.its.FindInstanceStatus(pending)
 				if status == nil || ptr.Deref(status.MemberJoined, true) || len(agent.calls) != 0 {
 					t.Fatalf("pending membership changed during cancellation: %#v calls=%v", status, agent.calls)
+				}
+				for i := 0; i < 24; i++ {
+					for _, pod := range lifecycleEntryPods(t, f.cli) {
+						f.setReady(t, pod.Name, true)
+					}
+					f.step(t)
+				}
+				if err := f.cli.Get(context.Background(), client.ObjectKey{Namespace: f.its.Namespace, Name: removed}, &corev1.Pod{}); !apierrors.IsNotFound(err) ||
+					!reflect.DeepEqual(agent.calls, []string{"memberJoin", "memberLeave"}) || !ptr.Deref(f.its.FindInstanceStatus(pending).MemberJoined, false) {
+					t.Fatalf("partial cancellation did not confirm membership and clean up: %v calls=%v status=%+v", err, agent.calls, f.its.Status.InstanceStatus)
 				}
 			}
 		})
@@ -5178,5 +5188,174 @@ func TestInstanceSetLifecycleCancelAfterUncommittedLeave(t *testing.T) {
 	status := f.its.FindInstanceStatus(second)
 	if err != nil || string(state) != "joined" || status == nil || !ptr.Deref(status.MemberJoined, false) {
 		t.Fatalf("cancelled shrink retained a runtime and reported joined after real Leave: agent-state=%q actualConflict=%t read-error=%v pods=%d ready=%d observed=%d generation=%d joined=%t status=%+v", state, actualConflict, err, len(lifecycleEntryPods(t, f.cli)), f.its.Status.ReadyReplicas, f.its.Status.ObservedGeneration, f.its.Generation, ptr.Deref(status.MemberJoined, false), status)
+	}
+}
+
+func TestInstanceSetJoinWaitsForProvisionedCommit(t *testing.T) {
+	f := newMemberLifecycleEntry(t, 1, appsv1.ParallelPodManagement)
+	f.bootstrap(t, 1)
+	second := f.its.Name + "-1"
+	agent := &memberLifecycleAgent{}
+	kbacli.SetMockClient(agent, nil)
+	defer kbacli.UnsetMockClient()
+	f.its.Spec.Replicas = ptr.To[int32](2)
+	f.its.Generation++
+	if err := f.cli.Update(context.Background(), f.its); err != nil {
+		t.Fatal(err)
+	}
+	for round := 0; round < 8 && len(lifecycleEntryPods(t, f.cli)) < 2; round++ {
+		f.step(t)
+	}
+	f.setReady(t, second, true)
+	rejectObservation := true
+	base := f.cli
+	f.cli = interceptor.NewClient(base.(client.WithWatch), interceptor.Funcs{SubResourceUpdate: func(ctx context.Context, delegate client.Client, subresource string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+		if its, ok := obj.(*workloads.InstanceSet); ok && subresource == "status" && rejectObservation {
+			if status := its.FindInstanceStatus(second); status != nil && status.Provisioned {
+				return apierrors.NewConflict(schema.GroupResource{Group: workloads.GroupVersion.Group, Resource: "instancesets"}, its.Name, fmt.Errorf("runtime observation conflict"))
+			}
+		}
+		return delegate.SubResource(subresource).Update(ctx, obj, opts...)
+	}})
+	for round := 0; round < 2; round++ {
+		result := f.step(t)
+		if !result.Requeue || f.its.FindInstanceStatus(second).Provisioned || len(agent.calls) != 0 || len(lifecycleEntryPods(t, f.cli)) != 2 {
+			t.Fatalf("Join preceded its saved runtime history: result=%+v calls=%v status=%+v", result, agent.calls, f.its.Status.InstanceStatus)
+		}
+	}
+	rejectObservation = false
+	for round := 0; round < 8; round++ {
+		f.step(t)
+	}
+	status := f.its.FindInstanceStatus(second)
+	if status == nil || !status.Provisioned || !ptr.Deref(status.MemberJoined, false) || !reflect.DeepEqual(agent.calls, []string{"memberJoin"}) {
+		t.Fatalf("Join did not recover after runtime history was saved: calls=%v status=%+v", agent.calls, status)
+	}
+}
+
+func TestInstanceSetCancelledExpansionRemovesUnconfirmedMember(t *testing.T) {
+	for _, lostPod := range []bool{false, true} {
+		t.Run(fmt.Sprintf("lostPod=%t", lostPod), func(t *testing.T) {
+			ctx := context.Background()
+			f := newMemberLifecycleEntry(t, 1, appsv1.ParallelPodManagement)
+			if lostPod {
+				f.its.Spec.LifecycleActions.MemberLeave.TargetPodSelector = kbappsv1.AnyReplica
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+			}
+			f.bootstrap(t, 1)
+			first, second := f.its.Name+"-0", f.its.Name+"-1"
+			members := map[string]bool{first: true}
+			var calls []string
+			agent := kbacli.NewMockClient(gomock.NewController(t))
+			agent.EXPECT().Action(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, req kbaproto.ActionRequest) (kbaproto.ActionResponse, error) {
+				var target string
+				switch req.Action {
+				case "memberJoin":
+					target = req.Parameters["KB_JOIN_MEMBER_POD_NAME"]
+					members[target] = true
+				case "memberLeave":
+					target = req.Parameters["KB_LEAVE_MEMBER_POD_NAME"]
+					delete(members, target)
+				default:
+					t.Fatalf("unexpected action: %+v", req)
+				}
+				if target != second {
+					t.Fatalf("unexpected member target: %s", target)
+				}
+				calls = append(calls, req.Action)
+				return kbaproto.ActionResponse{}, nil
+			}).AnyTimes()
+			kbacli.SetMockClient(agent, nil)
+			defer kbacli.UnsetMockClient()
+
+			cancelled, actualConflict, leaveResultRejected, cancellationRejected := false, false, false, false
+			base := f.cli
+			f.cli = interceptor.NewClient(base.(client.WithWatch), interceptor.Funcs{SubResourceUpdate: func(ctx context.Context, delegate client.Client, subresource string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+				its, ok := obj.(*workloads.InstanceSet)
+				if !ok || subresource != "status" {
+					return delegate.SubResource(subresource).Update(ctx, obj, opts...)
+				}
+				status := its.FindInstanceStatus(second)
+				if !cancelled && status != nil && ptr.Deref(status.MemberJoined, false) {
+					// Publish the cancellation while the successful Join result is being saved.
+					latest := &workloads.InstanceSet{}
+					if err := delegate.Get(ctx, client.ObjectKeyFromObject(its), latest); err != nil {
+						return err
+					}
+					latest.Spec.Replicas = ptr.To[int32](1)
+					latest.Generation++
+					if err := delegate.Update(ctx, latest); err != nil {
+						return err
+					}
+					cancelled = true
+					if lostPod {
+						pod := &corev1.Pod{}
+						if err := delegate.Get(ctx, client.ObjectKey{Namespace: its.Namespace, Name: second}, pod); err != nil {
+							return err
+						}
+						if err := delegate.Delete(ctx, pod); err != nil {
+							return err
+						}
+					}
+					err := delegate.SubResource(subresource).Update(ctx, obj, opts...)
+					actualConflict = apierrors.IsConflict(err)
+					return err
+				}
+				if cancelled && !lostPod && !cancellationRejected && status != nil && status.MemberJoined == nil {
+					cancellationRejected = true
+					return apierrors.NewConflict(schema.GroupResource{Group: workloads.GroupVersion.Group, Resource: "instancesets"}, its.Name, fmt.Errorf("cancellation status conflict"))
+				}
+				if cancelled && !lostPod && !leaveResultRejected && status != nil && status.MemberJoined != nil && !*status.MemberJoined && !members[second] {
+					leaveResultRejected = true
+					return apierrors.NewConflict(schema.GroupResource{Group: workloads.GroupVersion.Group, Resource: "instancesets"}, its.Name, fmt.Errorf("Leave result conflict"))
+				}
+				return delegate.SubResource(subresource).Update(ctx, obj, opts...)
+			}})
+			f.its.Spec.Replicas = ptr.To[int32](2)
+			f.its.Generation++
+			if err := f.cli.Update(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			for round := 0; round < 24 && !cancelled; round++ {
+				f.step(t)
+				for _, pod := range lifecycleEntryPods(t, f.cli) {
+					f.setReady(t, pod.Name, true)
+				}
+			}
+			if !cancelled || !actualConflict || !members[second] {
+				t.Fatalf("did not reach successful Join followed by cancellation and a real status conflict: cancelled=%t conflict=%t members=%v calls=%v", cancelled, actualConflict, members, calls)
+			}
+			checkedRetained, checkedCancellation := false, false
+			for round := 0; round < 24; round++ {
+				f.step(t)
+				if cancellationRejected && !checkedCancellation {
+					if !members[second] || len(calls) != 1 || len(lifecycleEntryPods(t, f.cli)) != 2 {
+						t.Fatal("Leave ran before cancellation status was saved")
+					}
+					checkedCancellation = true
+				}
+				if leaveResultRejected && !checkedRetained {
+					if len(lifecycleEntryPods(t, f.cli)) != 2 {
+						t.Fatal("failed Leave result commit removed the runtime")
+					}
+					checkedRetained = true
+				}
+			}
+			wantCalls := []string{"memberJoin", "memberLeave"}
+			if !lostPod {
+				wantCalls = append(wantCalls, "memberLeave")
+			}
+			if !reflect.DeepEqual(members, map[string]bool{first: true}) || !reflect.DeepEqual(calls, wantCalls) || len(lifecycleEntryPods(t, f.cli)) != 1 || f.its.FindInstanceStatus(second) != nil {
+				t.Fatalf("cancelled expansion left a member or resource behind: members=%v calls=%v want=%v pods=%d status=%+v", members, calls, wantCalls, len(lifecycleEntryPods(t, f.cli)), f.its.FindInstanceStatus(second))
+			}
+			if !lostPod && (!checkedRetained || !checkedCancellation) {
+				t.Fatal("cancellation and Leave result conflicts were not both exercised")
+			}
+			if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: "data-" + second}, &corev1.PersistentVolumeClaim{}); !apierrors.IsNotFound(err) {
+				t.Fatalf("completed cancellation retained the released PVC: %v", err)
+			}
+		})
 	}
 }

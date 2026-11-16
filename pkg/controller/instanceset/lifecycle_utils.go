@@ -70,6 +70,7 @@ func reconcileMemberStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, 
 	offline := sets.New(its.Spec.OfflineInstances...)
 	for i := range its.Status.InstanceStatus {
 		status := &its.Status.InstanceStatus[i]
+		previous := original.FindInstanceStatus(status.PodName)
 		template, allocated := desired[status.PodName]
 		switch {
 		case allocated:
@@ -83,10 +84,17 @@ func reconcileMemberStatus(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, 
 		default:
 			status.DesiredState = workloads.InstanceDesiredStateReleased
 		}
-		if !allocated || its.Spec.LifecycleActions.MemberJoin == nil {
+		if !allocated {
+			if needsUnconfirmedJoinCleanup(its, previous) {
+				// An unconfirmed Join may have succeeded before its result was saved.
+				// Discard that result so Leave is confirmed before resources are released.
+				status.MemberJoined = nil
+			}
 			continue
 		}
-		previous := original.FindInstanceStatus(status.PodName)
+		if its.Spec.LifecycleActions.MemberJoin == nil {
+			continue
+		}
 		if previous != nil && previous.EffectiveDesiredState() == workloads.InstanceDesiredStateReleased {
 			// A cancelled shrink may have completed Leave without saving its result.
 			status.MemberJoined = ptr.To(false)
@@ -178,6 +186,17 @@ func memberActionsEnabled(its *workloads.InstanceSet) bool {
 	return a != nil && (a.MemberJoin != nil || a.MemberLeave != nil)
 }
 
+func needsUnconfirmedJoinCleanup(its *workloads.InstanceSet, previous *workloads.InstanceStatus) bool {
+	if previous == nil || !previous.Provisioned || previous.EffectiveDesiredState() != workloads.InstanceDesiredStateActive {
+		return false
+	}
+	actions := its.Spec.LifecycleActions
+	if actions.MemberJoin == nil || actions.MemberLeave == nil {
+		return false
+	}
+	return previous.MemberJoined != nil && !*previous.MemberJoined
+}
+
 func memberRetirementBlocked(its *workloads.InstanceSet, old *workloads.InstanceStatus) bool {
 	if !memberActionsEnabled(its) || old == nil {
 		return false
@@ -256,7 +275,7 @@ func needsMemberRetirement(its *workloads.InstanceSet, status *workloads.Instanc
 	return memberActionsEnabled(its) && its.Spec.LifecycleActions.MemberJoin != nil && status != nil && ptr.Deref(status.MemberJoined, false)
 }
 
-// membershipChanged reports allocation and membership changes that alignment must commit before proceeding.
+// membershipChanged reports allocation, runtime history, and membership changes that alignment must commit before proceeding.
 func membershipChanged(previous, current []workloads.InstanceStatus) bool {
 	if len(previous) != len(current) {
 		return true
@@ -269,7 +288,7 @@ func membershipChanged(previous, current []workloads.InstanceStatus) bool {
 			}
 			found = true
 			if status.EffectiveDesiredState() != old.EffectiveDesiredState() || !ptr.Equal(status.TemplateName, old.TemplateName) ||
-				!ptr.Equal(status.MemberJoined, old.MemberJoined) {
+				!ptr.Equal(status.MemberJoined, old.MemberJoined) || status.Provisioned != old.Provisioned {
 				return true
 			}
 			break

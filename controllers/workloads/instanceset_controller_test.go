@@ -4095,6 +4095,104 @@ func TestInstanceSetRuntimeReadyMemberJoin(t *testing.T) {
 	}
 }
 
+func TestInstanceSetRuntimeReadyReplacement(t *testing.T) {
+	for _, policy := range []appsv1.PodManagementPolicyType{appsv1.OrderedReadyPodManagement, appsv1.ParallelPodManagement} {
+		t.Run(string(policy), func(t *testing.T) {
+			ctx := context.Background()
+			f := newMemberLifecycleEntry(t, 2, policy)
+			f.its.Labels = constant.GetCompLabels("member", "lifecycle")
+			f.its.Spec.LifecycleActions.MemberJoin.PreCondition = ptr.To(kbappsv1.RuntimeReadyPreConditionType)
+			f.its.Spec.LifecycleActions.MemberLeave = nil
+			if err := f.cli.Update(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			f.bootstrap(t, 2)
+			oldName, newName := f.its.Name+"-1", f.its.Name+"-2"
+			oldKey := client.ObjectKey{Namespace: f.its.Namespace, Name: oldName}
+			calls := 0
+			agent := kbacli.NewMockClient(gomock.NewController(t))
+			agent.EXPECT().Action(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, req kbaproto.ActionRequest) (kbaproto.ActionResponse, error) {
+				if req.Action != "memberJoin" || req.Parameters["KB_JOIN_MEMBER_POD_NAME"] != newName {
+					t.Fatalf("unexpected member action: %+v", req)
+				}
+				if err := f.cli.Get(ctx, oldKey, &corev1.Pod{}); !apierrors.IsNotFound(err) {
+					t.Fatalf("RuntimeReady Join ran before the old Pod was released: %v", err)
+				}
+				calls++
+				return kbaproto.ActionResponse{}, nil
+			}).AnyTimes()
+			kbacli.SetMockClient(agent, nil)
+			defer kbacli.UnsetMockClient()
+			retirementRejected, joinRejected := false, false
+			base := f.cli
+			f.cli = interceptor.NewClient(base.(client.WithWatch), interceptor.Funcs{SubResourceUpdate: func(ctx context.Context, delegate client.Client, subresource string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+				if its, ok := obj.(*workloads.InstanceSet); ok && subresource == "status" {
+					old := its.FindInstanceStatus(oldName)
+					if !retirementRejected && old != nil && old.MemberJoined != nil && !*old.MemberJoined {
+						retirementRejected = true
+						return apierrors.NewConflict(schema.GroupResource{Group: workloads.GroupVersion.Group, Resource: "instancesets"}, its.Name, fmt.Errorf("retirement result conflict"))
+					}
+					current := its.FindInstanceStatus(newName)
+					if !joinRejected && current != nil && ptr.Deref(current.MemberJoined, false) {
+						joinRejected = true
+						return apierrors.NewConflict(schema.GroupResource{Group: workloads.GroupVersion.Group, Resource: "instancesets"}, its.Name, fmt.Errorf("Join result conflict"))
+					}
+				}
+				return delegate.SubResource(subresource).Update(ctx, obj, opts...)
+			}})
+			// Scale in the named instance and scale out one replica in the same operation.
+			f.its.Spec.OfflineInstances = []string{oldName}
+			f.its.Generation++
+			if err := f.cli.Update(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			// Observe the new Pod while it is still unready, so old readiness cannot mask the wait.
+			for round := 0; round < 8; round++ {
+				f.step(t)
+			}
+			pending := f.its.FindInstanceStatus(newName)
+			if calls != 0 || retirementRejected || len(lifecycleEntryPods(t, f.cli)) != 3 || pending == nil || !pending.Provisioned || pending.Available {
+				t.Fatalf("unavailable replacement did not retain the old instance: calls=%d status=%+v", calls, f.its.Status)
+			}
+			if err := f.cli.Get(ctx, oldKey, &corev1.Pod{}); err != nil {
+				t.Fatal(err)
+			}
+			f.setReady(t, newName, true)
+			f.setReady(t, f.its.Name+"-0", false)
+			for round := 0; round < 4; round++ {
+				f.step(t)
+			}
+			if retirementRejected || calls != 0 || len(lifecycleEntryPods(t, f.cli)) != 3 {
+				t.Fatal("retirement advanced while a desired instance was unavailable")
+			}
+			f.setReady(t, f.its.Name+"-0", true)
+			for round := 0; round < 24; round++ {
+				wasRetirementRejected, wasJoinRejected := retirementRejected, joinRejected
+				result := f.step(t)
+				if retirementRejected && !wasRetirementRejected {
+					old := f.its.FindInstanceStatus(oldName)
+					if !result.Requeue || calls != 0 || old == nil || !ptr.Deref(old.MemberJoined, false) || len(lifecycleEntryPods(t, f.cli)) != 3 {
+						t.Fatalf("failed retirement commit released resources: calls=%d status=%+v", calls, f.its.Status)
+					}
+				}
+				if joinRejected && !wasJoinRejected {
+					current := f.its.FindInstanceStatus(newName)
+					if !result.Requeue || calls != 1 || current == nil || current.MemberJoined == nil || *current.MemberJoined || len(lifecycleEntryPods(t, f.cli)) != 2 {
+						t.Fatalf("failed Join commit lost pending membership or recreated the old Pod: calls=%d status=%+v", calls, f.its.Status)
+					}
+				}
+			}
+			current, old := f.its.FindInstanceStatus(newName), f.its.FindInstanceStatus(oldName)
+			if !retirementRejected || !joinRejected || calls != 2 || current == nil || !ptr.Deref(current.MemberJoined, false) || !f.its.IsInstancesReady() {
+				t.Fatalf("RuntimeReady replacement did not recover and converge: retirementRejected=%t joinRejected=%t calls=%d status=%+v", retirementRejected, joinRejected, calls, f.its.Status)
+			}
+			if old == nil || old.EffectiveCurrentState() != workloads.InstanceCurrentStateAbsent || old.MemberJoined == nil || *old.MemberJoined || len(lifecycleEntryPods(t, f.cli)) != 2 {
+				t.Fatalf("completed replacement retained the old runtime or membership: %+v", f.its.Status)
+			}
+		})
+	}
+}
+
 func TestInstanceSetLifecycleStopInterruptsExpansion(t *testing.T) {
 	ctx := context.Background()
 	f := newMemberLifecycleEntry(t, 1, appsv1.OrderedReadyPodManagement)

@@ -158,16 +158,40 @@ func needsMemberJoin(its *workloads.InstanceSet, status *workloads.InstanceStatu
 	return status.MemberLeft != nil || (status.MemberJoined != nil && !*status.MemberJoined)
 }
 
+func memberJoinRequiresRuntimeReady(its *workloads.InstanceSet) bool {
+	if !memberActionsEnabled(its) || its.Spec.LifecycleActions.MemberJoin == nil {
+		return false
+	}
+	return ptr.Deref(its.Spec.LifecycleActions.MemberJoin.PreCondition, "") == apps.RuntimeReadyPreConditionType
+}
+
 func memberRetirementBlocked(its *workloads.InstanceSet, old *workloads.InstanceStatus) bool {
 	if !memberActionsEnabled(its) || old == nil {
 		return false
 	}
 	established := ptr.Deref(old.MemberJoined, false) || (old.Provisioned && !ptr.Deref(old.MemberLeft, false))
+	if !established {
+		return false
+	}
+	pendingJoin := slices.ContainsFunc(its.Status.InstanceStatus, func(status workloads.InstanceStatus) bool {
+		if status.EffectiveDesiredState() != workloads.InstanceDesiredStateActive {
+			return false
+		}
+		return needsMemberJoin(its, &status)
+	})
+	if !pendingJoin {
+		return false
+	}
+	if !memberJoinRequiresRuntimeReady(its) {
+		return true
+	}
+	// RuntimeReady requires excess Pods to be released before Join. Keep the old
+	// member until all desired instances are available, then allow that release.
 	return slices.ContainsFunc(its.Status.InstanceStatus, func(status workloads.InstanceStatus) bool {
 		if status.EffectiveDesiredState() != workloads.InstanceDesiredStateActive {
 			return false
 		}
-		return established && needsMemberJoin(its, &status)
+		return !status.Available
 	})
 }
 

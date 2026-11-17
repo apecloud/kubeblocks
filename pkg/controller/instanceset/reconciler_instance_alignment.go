@@ -96,6 +96,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	}
 	createNameSet := newNameSet.Difference(oldNameSet)
 	deleteNameSet := oldNameSet.Difference(newNameSet)
+	joinAfterRetirement := memberJoinRequiresRuntimeReady(its) && len(deleteNameSet) > 0
 
 	// default OrderedReady policy
 	isOrderedReady := true
@@ -241,7 +242,9 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if _, ok := createNameSet[name]; !ok {
 			pod := oldInstanceMap[name]
 			if !runtimeChanged && !memberWaiting {
-				if result, err := reconcileMember(tree, its, pod, true, r.reader); err != nil || result != kubebuilderx.Continue {
+				if joinAfterRetirement && needsMemberJoin(its, its.FindInstanceStatus(name)) {
+					memberWaiting = true
+				} else if result, err := reconcileMember(tree, its, pod, true, r.reader); err != nil || result != kubebuilderx.Continue {
 					if err == nil && needsMemberJoin(its, its.FindInstanceStatus(name)) {
 						memberWaiting = true
 					} else {
@@ -312,11 +315,14 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	if memberActionsEnabled(its) && runtimeChanged {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
-	if memberWaiting {
+	if memberWaiting && !joinAfterRetirement {
 		return kubebuilderx.ContinueWithRetryAfter(2 * time.Second), nil
 	}
 	if result, err := retire(retirementNames); err != nil || result != kubebuilderx.Continue {
 		return result, err
+	}
+	if memberWaiting {
+		return kubebuilderx.ContinueWithRetryAfter(2 * time.Second), nil
 	}
 
 	if memberActionsEnabled(its) {

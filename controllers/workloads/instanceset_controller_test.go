@@ -5715,16 +5715,26 @@ func TestInstanceSetCancelledExpansionRemovesUnconfirmedMember(t *testing.T) {
 }
 
 func TestInstanceSetRuntimeReadyRetirementInterruption(t *testing.T) {
+	oldResize := intctrlutil.SupportResizeSubResource
+	intctrlutil.SupportResizeSubResource = func() (bool, error) { return false, nil }
+	defer func() { intctrlutil.SupportResizeSubResource = oldResize }()
+
 	for _, policy := range []appsv1.PodManagementPolicyType{appsv1.OrderedReadyPodManagement, appsv1.ParallelPodManagement} {
-		for _, scenario := range []string{"cancel-before-join", "cancel-after-result-conflict", "cancel-after-join", "stop-delete", "stop-retain"} {
+		for _, scenario := range []string{"cancel-before-join", "cancel-after-result-conflict", "cancel-after-join", "stop-delete", "stop-retain", "stop-delete-image-repair", "stop-retain-image-repair"} {
 			t.Run(fmt.Sprintf("%s/%s", policy, scenario), func(t *testing.T) {
 				ctx := context.Background()
 				f := newMemberLifecycleEntry(t, 2, policy)
+				repairImage := strings.HasSuffix(scenario, "-image-repair")
+				if repairImage {
+					f.its.Spec.Template.Spec.Containers[0].Image = "database:v1"
+					f.its.Spec.PodUpdatePolicy = kbappsv1.PreferInPlacePodUpdatePolicyType
+					f.its.Spec.PodUpgradePolicy = kbappsv1.PreferInPlacePodUpdatePolicyType
+				}
 				f.its.Labels = constant.GetCompLabels("member", "lifecycle")
 				f.its.Spec.LifecycleActions.MemberJoin.PreCondition = ptr.To(kbappsv1.RuntimeReadyPreConditionType)
 				f.its.Spec.LifecycleActions.MemberLeave = nil
 				retention := kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType
-				if scenario == "stop-retain" {
+				if strings.HasPrefix(scenario, "stop-retain") {
 					retention = kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType
 				}
 				f.its.Spec.PersistentVolumeClaimRetentionPolicy = &workloads.PersistentVolumeClaimRetentionPolicy{WhenScaled: retention}
@@ -5822,10 +5832,48 @@ func TestInstanceSetRuntimeReadyRetirementInterruption(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
+				if repairImage {
+					// Resume creates both desired Pods, but the new member cannot start
+					// until its failing image is corrected through the normal update path.
+					for round := 0; round < 16; round++ {
+						f.step(t)
+						for _, pod := range lifecycleEntryPods(t, f.cli) {
+							if pod.Name != newName {
+								f.setReady(t, pod.Name, true)
+							}
+						}
+					}
+					pod := &corev1.Pod{}
+					if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: newName}, pod); err != nil {
+						t.Fatal(err)
+					}
+					pod.Status = corev1.PodStatus{Phase: corev1.PodPending,
+						ContainerStatuses: []corev1.ContainerStatus{{Name: "db", Image: "database:v1", State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: "ImagePullBackOff"}}}}}
+					if err := f.cli.Status().Update(ctx, pod); err != nil {
+						t.Fatal(err)
+					}
+					if len(lifecycleEntryPods(t, f.cli)) != 2 || len(agent.calls) != 0 {
+						t.Fatal("did not reach aligned Pods with a pending member")
+					}
+					f.its.Spec.Template.Spec.Containers[0].Image = "database:v2"
+					f.its.Generation++
+					if err := f.cli.Update(ctx, f.its); err != nil {
+						t.Fatal(err)
+					}
+				}
 				for round := 0; round < 40; round++ {
 					f.step(t)
 					for _, pod := range lifecycleEntryPods(t, f.cli) {
-						f.setReady(t, pod.Name, true)
+						if !repairImage || pod.Name != newName || pod.Spec.Containers[0].Image == "database:v2" {
+							f.setReady(t, pod.Name, true)
+						}
+					}
+				}
+				if repairImage {
+					for _, pod := range lifecycleEntryPods(t, f.cli) {
+						if pod.Spec.Containers[0].Image != "database:v2" {
+							t.Fatalf("retirement cleanup blocked image repair: pod=%s image=%s", pod.Name, pod.Spec.Containers[0].Image)
+						}
 					}
 				}
 				status := f.its.FindInstanceStatus(wantName)

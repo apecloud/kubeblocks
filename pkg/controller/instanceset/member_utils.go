@@ -166,11 +166,7 @@ func memberJoinRequiresRuntimeReady(its *workloads.InstanceSet) bool {
 }
 
 func memberRetirementBlocked(its *workloads.InstanceSet, old *workloads.InstanceStatus) bool {
-	if !memberActionsEnabled(its) || old == nil {
-		return false
-	}
-	established := ptr.Deref(old.MemberJoined, false) || (old.Provisioned && !ptr.Deref(old.MemberLeft, false))
-	if !established {
+	if !needsMemberRetirement(its, old) {
 		return false
 	}
 	pendingJoin := slices.ContainsFunc(its.Status.InstanceStatus, func(status workloads.InstanceStatus) bool {

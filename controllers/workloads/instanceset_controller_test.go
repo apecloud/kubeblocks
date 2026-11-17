@@ -5713,3 +5713,144 @@ func TestInstanceSetCancelledExpansionRemovesUnconfirmedMember(t *testing.T) {
 		})
 	}
 }
+
+func TestInstanceSetRuntimeReadyRetirementInterruption(t *testing.T) {
+	for _, policy := range []appsv1.PodManagementPolicyType{appsv1.OrderedReadyPodManagement, appsv1.ParallelPodManagement} {
+		for _, scenario := range []string{"cancel-before-join", "cancel-after-result-conflict", "cancel-after-join", "stop-delete", "stop-retain"} {
+			t.Run(fmt.Sprintf("%s/%s", policy, scenario), func(t *testing.T) {
+				ctx := context.Background()
+				f := newMemberLifecycleEntry(t, 2, policy)
+				f.its.Labels = constant.GetCompLabels("member", "lifecycle")
+				f.its.Spec.LifecycleActions.MemberJoin.PreCondition = ptr.To(kbappsv1.RuntimeReadyPreConditionType)
+				f.its.Spec.LifecycleActions.MemberLeave = nil
+				retention := kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType
+				if scenario == "stop-retain" {
+					retention = kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType
+				}
+				f.its.Spec.PersistentVolumeClaimRetentionPolicy = &workloads.PersistentVolumeClaimRetentionPolicy{WhenScaled: retention}
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				f.bootstrap(t, 2)
+				oldName, newName := f.its.Name+"-1", f.its.Name+"-2"
+				oldKey := client.ObjectKey{Namespace: f.its.Namespace, Name: oldName}
+				agent := &memberLifecycleAgent{}
+				kbacli.SetMockClient(agent, nil)
+				defer kbacli.UnsetMockClient()
+				rejected := false
+				base := f.cli
+				f.cli = interceptor.NewClient(base.(client.WithWatch), interceptor.Funcs{SubResourceUpdate: func(ctx context.Context, delegate client.Client, subresource string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+					if its, ok := obj.(*workloads.InstanceSet); ok && subresource == "status" && scenario == "cancel-after-result-conflict" && !rejected {
+						if status := its.FindInstanceStatus(newName); status != nil && ptr.Deref(status.MemberJoined, false) {
+							rejected = true
+							return apierrors.NewConflict(schema.GroupResource{Group: workloads.GroupVersion.Group, Resource: "instancesets"}, its.Name, fmt.Errorf("Join result conflict"))
+						}
+					}
+					return delegate.SubResource(subresource).Update(ctx, obj, opts...)
+				}})
+				f.its.Spec.OfflineInstances = []string{oldName}
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				for round := 0; round < 8; round++ {
+					f.step(t)
+				}
+				f.setReady(t, newName, true)
+				removed := false
+				for round := 0; round < 12; round++ {
+					f.step(t)
+					if err := f.cli.Get(ctx, oldKey, &corev1.Pod{}); apierrors.IsNotFound(err) {
+						removed = true
+						break
+					} else if err != nil {
+						t.Fatal(err)
+					}
+				}
+				if !removed || len(agent.calls) != 0 {
+					t.Fatalf("did not reach old-Pod removal before Join: removed=%t calls=%v", removed, agent.calls)
+				}
+				wantName := newName
+				wantCalls := 1
+				switch scenario {
+				case "cancel-before-join":
+					f.step(t)
+					if len(agent.calls) != 0 || f.its.FindInstanceStatus(oldName).EffectiveCurrentState() != workloads.InstanceCurrentStateAbsent {
+						t.Fatal("did not observe old-Pod absence before Join")
+					}
+				case "cancel-after-result-conflict":
+					for round := 0; round < 8 && !rejected; round++ {
+						f.step(t)
+					}
+					if !rejected || len(agent.calls) != 1 || ptr.Deref(f.its.FindInstanceStatus(newName).MemberJoined, false) {
+						t.Fatal("did not reach successful Join followed by an uncommitted result")
+					}
+					wantCalls = 2
+				case "cancel-after-join":
+					for round := 0; round < 8 && !ptr.Deref(f.its.FindInstanceStatus(newName).MemberJoined, false); round++ {
+						f.step(t)
+					}
+					if len(agent.calls) != 1 || !ptr.Deref(f.its.FindInstanceStatus(newName).MemberJoined, false) {
+						t.Fatal("control did not reach committed Join")
+					}
+					wantCalls = 2
+				}
+				if strings.HasPrefix(scenario, "cancel-") {
+					// horizontalScaling.Cancel restores the original allocation.
+					f.its.Spec.OfflineInstances = nil
+					f.its.Generation++
+					if err := f.cli.Update(ctx, f.its); err != nil {
+						t.Fatal(err)
+					}
+					wantName = oldName
+				} else {
+					// Component Stop keeps the published allocation; Start only clears Stop.
+					f.its.Spec.Stop = ptr.To(true)
+					f.its.Generation++
+					if err := f.cli.Update(ctx, f.its); err != nil {
+						t.Fatal(err)
+					}
+					for round := 0; round < 12; round++ {
+						f.step(t)
+					}
+					if len(agent.calls) != 0 || len(lifecycleEntryPods(t, f.cli)) != 0 {
+						t.Fatal("Stop invoked membership or retained Pods")
+					}
+					f.its.Spec.Stop = nil
+					f.its.Generation++
+					if err := f.cli.Update(ctx, f.its); err != nil {
+						t.Fatal(err)
+					}
+				}
+				for round := 0; round < 40; round++ {
+					f.step(t)
+					for _, pod := range lifecycleEntryPods(t, f.cli) {
+						f.setReady(t, pod.Name, true)
+					}
+				}
+				status := f.its.FindInstanceStatus(wantName)
+				if len(lifecycleEntryPods(t, f.cli)) != 2 || len(agent.calls) != wantCalls || status == nil || !ptr.Deref(status.MemberJoined, false) || !f.its.IsInstancesReady() {
+					t.Fatalf("interruption did not recover: calls=%v pods=%d target=%+v status=%+v", agent.calls, len(lifecycleEntryPods(t, f.cli)), status, f.its.Status)
+				}
+				retiredName := oldName
+				if strings.HasPrefix(scenario, "cancel-") {
+					retiredName = newName
+					if f.its.FindInstanceStatus(retiredName) != nil {
+						t.Fatal("cancelled allocation retained a completed retirement record")
+					}
+				}
+				if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: retiredName}, &corev1.Pod{}); !apierrors.IsNotFound(err) {
+					t.Fatalf("completed retirement retained the Pod: %v", err)
+				}
+				claimKey := client.ObjectKey{Namespace: f.its.Namespace, Name: "data-" + retiredName}
+				claimErr := f.cli.Get(ctx, claimKey, &corev1.PersistentVolumeClaim{})
+				if retention == kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType && !apierrors.IsNotFound(claimErr) {
+					t.Fatalf("completed retirement did not delete storage: %v", claimErr)
+				}
+				if retention == kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType && claimErr != nil {
+					t.Fatalf("completed retirement did not retain storage: %v", claimErr)
+				}
+			})
+		}
+	}
+}

@@ -222,19 +222,6 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		}
 		return kubebuilderx.Continue, nil
 	}
-	if memberActionsEnabled(its) && !isStopRequested(its) {
-		independentNames := sets.New[string]()
-		for name := range retirementNames {
-			status := its.FindInstanceStatus(name)
-			if status != nil && !needsMemberLeave(its, status) && (status.MemberJoined != nil && !*status.MemberJoined) {
-				independentNames.Insert(name)
-			}
-		}
-		if result, err := retire(independentNames); err != nil || result != kubebuilderx.Continue {
-			return result, err
-		}
-	}
-
 	runtimeChanged := false
 	memberWaiting := false
 	var currentAlignedNameList []string
@@ -314,6 +301,19 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 
 	if memberActionsEnabled(its) && runtimeChanged {
 		return kubebuilderx.RetryAfter(time.Second), nil
+	}
+	// Cleanup may wait for desired instances to be available, so create their resources first.
+	if memberActionsEnabled(its) && !isStopRequested(its) {
+		independentNames := sets.New[string]()
+		for name := range retirementNames {
+			status := its.FindInstanceStatus(name)
+			if status != nil && !needsMemberLeave(its, status) && (status.MemberJoined != nil && !*status.MemberJoined) {
+				independentNames.Insert(name)
+			}
+		}
+		if result, err := retire(independentNames); err != nil || result != kubebuilderx.Continue {
+			return result, err
+		}
 	}
 	if memberWaiting && !joinAfterRetirement {
 		return kubebuilderx.ContinueWithRetryAfter(2 * time.Second), nil

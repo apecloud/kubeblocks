@@ -173,7 +173,11 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 					if absent {
 						pod = &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: its.Namespace}}
 					}
-					return reconcileMember(tree, its, pod, false, r.reader)
+					result, err := reconcileMember(tree, its, pod, false, r.reader)
+					if err == nil && needsMemberRetirement(its, its.FindInstanceStatus(name)) {
+						return kubebuilderx.ContinueWithRetryAfter(result.RetryAfter), nil
+					}
+					return result, err
 				}
 			}
 			if absent {
@@ -218,7 +222,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		}
 
 		if waiting {
-			return kubebuilderx.RetryAfter(time.Second), nil
+			return kubebuilderx.ContinueWithRetryAfter(time.Second), nil
 		}
 		return kubebuilderx.Continue, nil
 	}

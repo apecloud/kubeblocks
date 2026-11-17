@@ -4096,6 +4096,10 @@ func TestInstanceSetRuntimeReadyMemberJoin(t *testing.T) {
 }
 
 func TestInstanceSetRuntimeReadyReplacement(t *testing.T) {
+	oldResize := intctrlutil.SupportResizeSubResource
+	intctrlutil.SupportResizeSubResource = func() (bool, error) { return false, nil }
+	defer func() { intctrlutil.SupportResizeSubResource = oldResize }()
+
 	for _, policy := range []appsv1.PodManagementPolicyType{appsv1.OrderedReadyPodManagement, appsv1.ParallelPodManagement} {
 		t.Run(string(policy), func(t *testing.T) {
 			ctx := context.Background()
@@ -4103,6 +4107,9 @@ func TestInstanceSetRuntimeReadyReplacement(t *testing.T) {
 			f.its.Labels = constant.GetCompLabels("member", "lifecycle")
 			f.its.Spec.LifecycleActions.MemberJoin.PreCondition = ptr.To(kbappsv1.RuntimeReadyPreConditionType)
 			f.its.Spec.LifecycleActions.MemberLeave = nil
+			f.its.Spec.Template.Spec.Containers[0].Image = "database:v1"
+			f.its.Spec.PodUpdatePolicy = kbappsv1.PreferInPlacePodUpdatePolicyType
+			f.its.Spec.PodUpgradePolicy = kbappsv1.PreferInPlacePodUpdatePolicyType
 			if err := f.cli.Update(ctx, f.its); err != nil {
 				t.Fatal(err)
 			}
@@ -4157,6 +4164,42 @@ func TestInstanceSetRuntimeReadyReplacement(t *testing.T) {
 			if err := f.cli.Get(ctx, oldKey, &corev1.Pod{}); err != nil {
 				t.Fatal(err)
 			}
+			newKey := client.ObjectKey{Namespace: f.its.Namespace, Name: newName}
+			pod := &corev1.Pod{}
+			if err := f.cli.Get(ctx, newKey, pod); err != nil {
+				t.Fatal(err)
+			}
+			pod.Status = corev1.PodStatus{Phase: corev1.PodPending,
+				ContainerStatuses: []corev1.ContainerStatus{{Name: "db", Image: "database:v1", State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: "ImagePullBackOff"}}}}}
+			if err := f.cli.Status().Update(ctx, pod); err != nil {
+				t.Fatal(err)
+			}
+			f.its.Spec.Template.Spec.Containers[0].Image = "database:v2"
+			f.its.Generation++
+			if err := f.cli.Update(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			var result ctrl.Result
+			for round := 0; round < 12; round++ {
+				result = f.step(t)
+			}
+			if err := f.cli.Get(ctx, newKey, pod); err != nil {
+				t.Fatal(err)
+			}
+			if pod.Spec.Containers[0].Image != "database:v2" || result.RequeueAfter <= 0 || result.RequeueAfter > 2*time.Second {
+				t.Fatalf("retained member blocked Pending Pod repair or lost its retry: image=%s result=%+v", pod.Spec.Containers[0].Image, result)
+			}
+			for _, name := range []string{f.its.Name + "-0", oldName} {
+				if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: name}, pod); err != nil {
+					t.Fatal(err)
+				}
+				if pod.Spec.Containers[0].Image != "database:v1" {
+					t.Fatalf("Pending Pod repair updated a healthy or retiring member: %s", name)
+				}
+			}
+			if calls != 0 || retirementRejected || ptr.Deref(f.its.FindInstanceStatus(newName).MemberJoined, false) {
+				t.Fatal("repair advanced membership before the replacement became available")
+			}
 			f.setReady(t, newName, true)
 			f.setReady(t, f.its.Name+"-0", false)
 			for round := 0; round < 4; round++ {
@@ -4179,6 +4222,11 @@ func TestInstanceSetRuntimeReadyReplacement(t *testing.T) {
 					current := f.its.FindInstanceStatus(newName)
 					if !result.Requeue || calls != 1 || current == nil || current.MemberJoined == nil || *current.MemberJoined || len(lifecycleEntryPods(t, f.cli)) != 2 {
 						t.Fatalf("failed Join commit lost pending membership or recreated the old Pod: calls=%d status=%+v", calls, f.its.Status)
+					}
+				}
+				for _, pod := range lifecycleEntryPods(t, f.cli) {
+					if pod.Spec.Containers[0].Image == "database:v2" {
+						f.setReady(t, pod.Name, true)
 					}
 				}
 			}
@@ -5900,5 +5948,253 @@ func TestInstanceSetRuntimeReadyRetirementInterruption(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestInstanceSetPendingReplacementRespectsAdmissionAndOnDelete(t *testing.T) {
+	oldResize := intctrlutil.SupportResizeSubResource
+	intctrlutil.SupportResizeSubResource = func() (bool, error) { return false, nil }
+	defer func() { intctrlutil.SupportResizeSubResource = oldResize }()
+
+	for _, policy := range []appsv1.PodManagementPolicyType{appsv1.OrderedReadyPodManagement, appsv1.ParallelPodManagement} {
+		for _, tc := range []struct {
+			name     string
+			replicas int32
+			onDelete bool
+		}{
+			{"partial-creation", 3, false},
+			{"on-delete", 2, true},
+		} {
+			t.Run(fmt.Sprintf("%s/%s", policy, tc.name), func(t *testing.T) {
+				ctx := context.Background()
+				f := newMemberLifecycleEntry(t, 2, policy)
+				f.its.Labels = constant.GetCompLabels("member", "lifecycle")
+				f.its.Spec.LifecycleActions.MemberJoin.PreCondition = ptr.To(kbappsv1.RuntimeReadyPreConditionType)
+				f.its.Spec.LifecycleActions.MemberLeave = nil
+				f.its.Spec.Template.Spec.Containers[0].Image = "database:v1"
+				f.its.Spec.PodUpdatePolicy = kbappsv1.PreferInPlacePodUpdatePolicyType
+				f.its.Spec.PodUpgradePolicy = kbappsv1.PreferInPlacePodUpdatePolicyType
+				if tc.onDelete {
+					f.its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{Type: kbappsv1.OnDeleteStrategyType}
+				}
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				f.bootstrap(t, 2)
+				oldName, newName := f.its.Name+"-1", f.its.Name+"-2"
+				agent := &memberLifecycleAgent{}
+				kbacli.SetMockClient(agent, nil)
+				defer kbacli.UnsetMockClient()
+				f.its.Spec.OfflineInstances = []string{oldName}
+				f.its.Spec.Replicas = ptr.To(tc.replicas)
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				for round := 0; round < 12; round++ {
+					f.step(t)
+				}
+				pod := &corev1.Pod{}
+				newKey := client.ObjectKey{Namespace: f.its.Namespace, Name: newName}
+				if err := f.cli.Get(ctx, newKey, pod); err != nil {
+					t.Fatal(err)
+				}
+				pod.Status = corev1.PodStatus{Phase: corev1.PodPending,
+					ContainerStatuses: []corev1.ContainerStatus{{Name: "db", Image: "database:v1", State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: "ImagePullBackOff"}}}}}
+				if err := f.cli.Status().Update(ctx, pod); err != nil {
+					t.Fatal(err)
+				}
+				f.its.Spec.Template.Spec.Containers[0].Image = "database:v2"
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				for round := 0; round < 12; round++ {
+					f.step(t)
+				}
+				if len(lifecycleEntryPods(t, f.cli)) != 3 || len(agent.calls) != 0 {
+					t.Fatal("Pending Pod repair bypassed creation admission or advanced membership")
+				}
+				if err := f.cli.Get(ctx, newKey, pod); err != nil {
+					t.Fatal(err)
+				}
+				wantImage := "database:v2"
+				if tc.onDelete {
+					wantImage = "database:v1"
+				}
+				if pod.Spec.Containers[0].Image != wantImage {
+					t.Fatalf("Pending replacement did not respect update strategy: image=%s want=%s", pod.Spec.Containers[0].Image, wantImage)
+				}
+				for _, name := range []string{f.its.Name + "-0", oldName} {
+					current := &corev1.Pod{}
+					if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: name}, current); err != nil {
+						t.Fatal(err)
+					}
+					if current.Spec.Containers[0].Image != "database:v1" {
+						t.Fatalf("Pending repair updated a healthy or retiring member: %s", name)
+					}
+				}
+				if tc.onDelete {
+					// RuntimeReady also requires the desired images to be applied.
+					// OnDelete leaves both desired Pods for the user to replace.
+					if err := f.cli.Delete(ctx, pod); err != nil {
+						t.Fatal(err)
+					}
+					current := &corev1.Pod{}
+					if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-0"}, current); err != nil {
+						t.Fatal(err)
+					}
+					if err := f.cli.Delete(ctx, current); err != nil {
+						t.Fatal(err)
+					}
+				}
+				for round := 0; round < 40; round++ {
+					f.step(t)
+					for _, current := range lifecycleEntryPods(t, f.cli) {
+						if current.Spec.Containers[0].Image == "database:v2" {
+							f.setReady(t, current.Name, true)
+						}
+					}
+				}
+				if len(lifecycleEntryPods(t, f.cli)) != int(tc.replicas) || len(agent.calls) != int(tc.replicas)-1 || !f.its.IsInstancesReady() {
+					t.Fatalf("replacement failed to converge after repair: calls=%v status=%+v", agent.calls, f.its.Status)
+				}
+				if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: oldName}, &corev1.Pod{}); !apierrors.IsNotFound(err) {
+					t.Fatalf("completed replacement retained the old Pod: %v", err)
+				}
+				if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: "data-" + oldName}, &corev1.PersistentVolumeClaim{}); !apierrors.IsNotFound(err) {
+					t.Fatalf("completed replacement retained the old PVC: %v", err)
+				}
+			})
+		}
+	}
+}
+
+func TestInstanceSetPendingPodRecoveryDuringLeaveRetry(t *testing.T) {
+	oldResize := intctrlutil.SupportResizeSubResource
+	intctrlutil.SupportResizeSubResource = func() (bool, error) { return false, nil }
+	defer func() { intctrlutil.SupportResizeSubResource = oldResize }()
+
+	for _, tc := range []struct {
+		policy  appsv1.PodManagementPolicyType
+		lostOld bool
+	}{
+		{appsv1.OrderedReadyPodManagement, false}, {appsv1.OrderedReadyPodManagement, true},
+		{appsv1.ParallelPodManagement, false}, {appsv1.ParallelPodManagement, true},
+	} {
+		t.Run(fmt.Sprintf("%s/lostOld=%t", tc.policy, tc.lostOld), func(t *testing.T) {
+			ctx := context.Background()
+			f := newMemberLifecycleEntry(t, 3, tc.policy)
+			f.its.Labels = constant.GetCompLabels("member", "lifecycle")
+			f.its.Spec.LifecycleActions.MemberLeave.TargetPodSelector = kbappsv1.AnyReplica
+			f.its.Spec.ParallelPodManagementConcurrency = ptr.To(intstr.FromInt(2))
+			f.its.Spec.Template.Spec.Containers[0].Image = "database:v1"
+			if err := f.cli.Update(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			f.bootstrap(t, 3)
+			failLeave, calls := true, 0
+			agent := kbacli.NewMockClient(gomock.NewController(t))
+			agent.EXPECT().Action(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, req kbaproto.ActionRequest) (kbaproto.ActionResponse, error) {
+				if req.Action != "memberLeave" {
+					t.Fatalf("unexpected member action: %s", req.Action)
+				}
+				calls++
+				if failLeave {
+					return kbaproto.ActionResponse{}, errors.New("member leave is unavailable")
+				}
+				return kbaproto.ActionResponse{}, nil
+			}).AnyTimes()
+			kbacli.SetMockClient(agent, nil)
+			defer kbacli.UnsetMockClient()
+			f.its.Spec.Replicas = ptr.To[int32](2)
+			f.its.Generation++
+			if err := f.cli.Update(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			for round := 0; round < 8 && calls == 0; round++ {
+				f.step(t)
+			}
+			if calls == 0 {
+				t.Fatal("did not reach a pending Leave")
+			}
+			if tc.lostOld {
+				oldPod := &corev1.Pod{}
+				if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-2"}, oldPod); err != nil {
+					t.Fatal(err)
+				}
+				if err := f.cli.Delete(ctx, oldPod); err != nil {
+					t.Fatal(err)
+				}
+			}
+			// The desired Pod is lost while the other member is waiting to leave.
+			key := client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-0"}
+			pod := &corev1.Pod{}
+			if err := f.cli.Get(ctx, key, pod); err != nil {
+				t.Fatal(err)
+			}
+			if err := f.cli.Delete(ctx, pod); err != nil {
+				t.Fatal(err)
+			}
+			f.step(t)
+			if err := f.cli.Get(ctx, key, pod); err != nil {
+				t.Fatal(err)
+			}
+			pod.Status = corev1.PodStatus{Phase: corev1.PodPending,
+				ContainerStatuses: []corev1.ContainerStatus{{Name: "db", Image: "database:v1", State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: "ImagePullBackOff"}}}}}
+			if err := f.cli.Status().Update(ctx, pod); err != nil {
+				t.Fatal(err)
+			}
+			f.its.Spec.Template.Spec.Containers[0].Image = "database:v2"
+			f.its.Generation++
+			if err := f.cli.Update(ctx, f.its); err != nil {
+				t.Fatal(err)
+			}
+			var result ctrl.Result
+			for round := 0; round < 12; round++ {
+				result = f.step(t)
+			}
+			if err := f.cli.Get(ctx, key, pod); err != nil {
+				t.Fatal(err)
+			}
+			old := f.its.FindInstanceStatus(f.its.Name + "-2")
+			wantPods := 3
+			if tc.lostOld {
+				wantPods = 2
+			}
+			if pod.Spec.Containers[0].Image != "database:v2" || len(lifecycleEntryPods(t, f.cli)) != wantPods {
+				t.Fatalf("Leave retry blocked runtime repair: image=%s pods=%d", pod.Spec.Containers[0].Image, len(lifecycleEntryPods(t, f.cli)))
+			}
+			if old == nil || !ptr.Deref(old.MemberJoined, false) {
+				t.Fatalf("Leave retry lost the member result: %+v", old)
+			}
+			if old.MemberLeft == nil || *old.MemberLeft {
+				t.Fatalf("Leave retry lost its unfinished exit: %+v", old)
+			}
+			if result.RequeueAfter != 2*time.Second {
+				t.Fatalf("Leave retry lost its delay: %+v", result)
+			}
+			f.setReady(t, key.Name, true)
+			f.step(t)
+			if err := f.cli.Get(ctx, client.ObjectKey{Namespace: f.its.Namespace, Name: f.its.Name + "-1"}, pod); err != nil {
+				t.Fatal(err)
+			}
+			if pod.Spec.Containers[0].Image != "database:v1" {
+				t.Fatal("normal rollout advanced before the pending Leave completed")
+			}
+			failLeave = false
+			before := calls
+			for round := 0; round < 16; round++ {
+				f.step(t)
+				for _, current := range lifecycleEntryPods(t, f.cli) {
+					if current.Spec.Containers[0].Image == "database:v2" {
+						f.setReady(t, current.Name, true)
+					}
+				}
+			}
+			if calls != before+1 || len(lifecycleEntryPods(t, f.cli)) != 2 || f.its.FindInstanceStatus(f.its.Name+"-2") != nil || !f.its.IsInstancesReady() {
+				t.Fatalf("Leave did not converge after repair: calls=%d before=%d status=%+v", calls, before, f.its.Status)
+			}
+		})
 	}
 }

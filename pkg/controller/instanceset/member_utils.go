@@ -180,8 +180,8 @@ func validateMemberActions(its *workloads.InstanceSet) error {
 		if action != nil && !action.Defined() {
 			return fmt.Errorf("configured lifecycle actions must define an execution handler")
 		}
-		if action != nil && action.PreCondition != nil && *action.PreCondition != apps.ImmediatelyPreConditionType {
-			return fmt.Errorf("workload-owned actions support only Immediately preconditions; runtime availability is observed by the workload controller")
+		if action != nil && action.PreCondition != nil && *action.PreCondition != apps.ImmediatelyPreConditionType && *action.PreCondition != apps.RuntimeReadyPreConditionType {
+			return fmt.Errorf("workload-owned actions support only Immediately and RuntimeReady preconditions")
 		}
 		if action != nil && action.NonBlocking {
 			return fmt.Errorf("workload-owned lifecycle actions must use blocking execution")

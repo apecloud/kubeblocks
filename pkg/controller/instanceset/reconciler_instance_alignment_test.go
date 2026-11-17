@@ -292,10 +292,17 @@ func TestValidatedExecutionWaitsWithoutExecutors(t *testing.T) {
 }
 
 func TestValidationRejectsUnownedPreconditionsAndNonblockingActions(t *testing.T) {
-	if err := validateMemberActions(memberWorkload()); err != nil {
-		t.Fatalf("blocking actions were rejected: %v", err)
+	for _, condition := range []*apps.PreConditionType{nil, ptr.To(apps.ImmediatelyPreConditionType), ptr.To(apps.RuntimeReadyPreConditionType)} {
+		its := memberWorkload()
+		its.Spec.LifecycleActions.Switchover = testAction("switch")
+		for _, action := range []*apps.Action{its.Spec.LifecycleActions.MemberJoin, its.Spec.LifecycleActions.MemberLeave, its.Spec.LifecycleActions.Switchover} {
+			action.PreCondition = condition
+		}
+		if err := validateMemberActions(its); err != nil {
+			t.Fatalf("blocking workload-owned actions were rejected: %v", err)
+		}
 	}
-	for _, condition := range []apps.PreConditionType{apps.RuntimeReadyPreConditionType, apps.ComponentReadyPreConditionType, apps.ClusterReadyPreConditionType} {
+	for _, condition := range []apps.PreConditionType{apps.ComponentReadyPreConditionType, apps.ClusterReadyPreConditionType} {
 		its := memberWorkload()
 		its.Spec.LifecycleActions.MemberJoin.PreCondition = ptr.To(condition)
 		if err := validateMemberActions(its); err == nil {

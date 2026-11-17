@@ -4030,7 +4030,72 @@ func TestInstanceSetLifecycleAllocationSwitchSeparatesCreationAndMemberResult(t 
 	}
 }
 
-func TestInstanceSetLifecycleRegistersExpansionWhileStopped(t *testing.T) {
+func TestInstanceSetRuntimeReadyMemberJoin(t *testing.T) {
+	ctx := context.Background()
+	f := newMemberLifecycleEntry(t, 1, appsv1.ParallelPodManagement)
+	f.its.Labels = constant.GetCompLabels("member", "lifecycle")
+	f.its.Spec.LifecycleActions.MemberJoin.PreCondition = ptr.To(kbappsv1.RuntimeReadyPreConditionType)
+	if err := f.cli.Update(ctx, f.its); err != nil {
+		t.Fatal(err)
+	}
+	f.bootstrap(t, 1)
+	agent := &memberLifecycleAgent{}
+	kbacli.SetMockClient(agent, nil)
+	defer kbacli.UnsetMockClient()
+	f.its.Spec.Replicas = ptr.To[int32](2)
+	f.its.Generation++
+	if err := f.cli.Update(ctx, f.its); err != nil {
+		t.Fatal(err)
+	}
+	for round := 0; round < 12 && len(lifecycleEntryPods(t, f.cli)) < 2; round++ {
+		f.step(t)
+	}
+	if len(lifecycleEntryPods(t, f.cli)) != 2 || len(agent.calls) != 0 {
+		t.Fatalf("expansion did not wait for its runtime: calls=%v status=%+v", agent.calls, f.its.Status)
+	}
+	name := f.its.Name + "-1"
+	f.setReady(t, name, true)
+	f.setReady(t, f.its.Name+"-0", false)
+	for round := 0; round < 6; round++ {
+		f.step(t)
+	}
+	condition := meta.FindStatusCondition(f.its.Status.Conditions, "InstanceLifecycle")
+	if len(agent.calls) != 0 || condition == nil || !strings.Contains(condition.Message, "runtime is not ready") {
+		t.Fatalf("RuntimeReady did not wait for the other instance: calls=%v condition=%+v", agent.calls, condition)
+	}
+	// Reject the successful Join result once, after the runtime becomes ready.
+	rejected := false
+	base := f.cli
+	f.cli = interceptor.NewClient(base.(client.WithWatch), interceptor.Funcs{SubResourceUpdate: func(ctx context.Context, delegate client.Client, subresource string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+		if its, ok := obj.(*workloads.InstanceSet); ok && subresource == "status" && !rejected {
+			if status := its.FindInstanceStatus(name); status != nil && ptr.Deref(status.MemberJoined, false) {
+				rejected = true
+				return apierrors.NewConflict(schema.GroupResource{Group: workloads.GroupVersion.Group, Resource: "instancesets"}, its.Name, fmt.Errorf("Join result conflict"))
+			}
+		}
+		return delegate.SubResource(subresource).Update(ctx, obj, opts...)
+	}})
+	f.setReady(t, f.its.Name+"-0", true)
+	for round := 0; round < 12 && !rejected; round++ {
+		f.step(t)
+	}
+	status := f.its.FindInstanceStatus(name)
+	if !rejected || len(agent.calls) != 1 || status == nil || status.MemberJoined == nil || *status.MemberJoined {
+		t.Fatalf("failed Join result commit did not retain pending membership: calls=%v status=%+v", agent.calls, status)
+	}
+	for round := 0; round < 6; round++ {
+		f.step(t)
+	}
+	status = f.its.FindInstanceStatus(name)
+	if status == nil || !ptr.Deref(status.MemberJoined, false) || !f.its.IsInstancesReady() || meta.FindStatusCondition(f.its.Status.Conditions, "InstanceLifecycle") != nil {
+		t.Fatalf("RuntimeReady Join did not recover after the result conflict: %+v", f.its.Status)
+	}
+	if len(agent.calls) != 2 || agent.calls[0] != "memberJoin" || agent.calls[1] != "memberJoin" {
+		t.Fatalf("Join did not retry once and stop after recording success: %v", agent.calls)
+	}
+}
+
+func TestInstanceSetLifecycleStopInterruptsExpansion(t *testing.T) {
 	ctx := context.Background()
 	f := newMemberLifecycleEntry(t, 1, appsv1.OrderedReadyPodManagement)
 
@@ -4038,15 +4103,13 @@ func TestInstanceSetLifecycleRegistersExpansionWhileStopped(t *testing.T) {
 	agent := &memberLifecycleAgent{}
 	kbacli.SetMockClient(agent, nil)
 	defer kbacli.UnsetMockClient()
-	f.its.Spec.Stop = ptr.To(true)
+	f.its.Spec.Replicas = ptr.To[int32](2)
 	f.its.Generation++
 	if err := f.cli.Update(ctx, f.its); err != nil {
 		t.Fatal(err)
 	}
-	for round := 0; round < 8; round++ {
-		f.step(t)
-	}
-	f.its.Spec.Replicas = ptr.To[int32](2)
+	// Stop preserves the expansion already published by Component.
+	f.its.Spec.Stop = ptr.To(true)
 	f.its.Generation++
 	if err := f.cli.Update(ctx, f.its); err != nil {
 		t.Fatal(err)
@@ -4303,7 +4366,7 @@ func TestInstanceSetLifecycleWarningOnlyWhenWaitMessageChanges(t *testing.T) {
 	assertWarnings()
 }
 
-func TestInstanceSetLifecycleStopScaleThenResume(t *testing.T) {
+func TestInstanceSetLifecycleStopInterruptsScaleIn(t *testing.T) {
 	for _, policy := range []appsv1.PodManagementPolicyType{appsv1.OrderedReadyPodManagement, appsv1.ParallelPodManagement} {
 		for _, retention := range []kbappsv1.PersistentVolumeClaimRetentionPolicyType{kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType, kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType} {
 			t.Run(fmt.Sprintf("%s/%s", policy, retention), func(t *testing.T) {
@@ -4320,6 +4383,12 @@ func TestInstanceSetLifecycleStopScaleThenResume(t *testing.T) {
 				failed := &unavailableMemberAgent{}
 				kbacli.SetMockClient(failed, nil)
 				defer kbacli.UnsetMockClient()
+				f.its.Spec.Replicas = ptr.To[int32](1)
+				f.its.Generation++
+				if err := f.cli.Update(ctx, f.its); err != nil {
+					t.Fatal(err)
+				}
+				// Stop preserves the scale-in already published by Component.
 				f.its.Spec.Stop = ptr.To(true)
 				f.its.Generation++
 				if err := f.cli.Update(ctx, f.its); err != nil {
@@ -4330,14 +4399,6 @@ func TestInstanceSetLifecycleStopScaleThenResume(t *testing.T) {
 				}
 				if pods := lifecycleEntryPods(t, f.cli); len(pods) != 0 {
 					t.Fatalf("Stop did not remove all Pods: %v", pods)
-				}
-				f.its.Spec.Replicas = ptr.To[int32](1)
-				f.its.Generation++
-				if err := f.cli.Update(ctx, f.its); err != nil {
-					t.Fatal(err)
-				}
-				for round := 0; round < 8; round++ {
-					f.step(t)
 				}
 				if failed.calls != 0 {
 					t.Fatalf("Stop executed membership actions: %d", failed.calls)

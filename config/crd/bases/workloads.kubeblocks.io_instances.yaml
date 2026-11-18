@@ -538,6 +538,26 @@ spec:
                     restart:
                       description: Specifies whether to restart instances.
                       type: boolean
+                    volume:
+                      description: |-
+                        Volume replaces the ConfigMap reference on an existing volume in the InstanceSet Pod template.
+                        Set Volume only on configs in an InstanceTemplate. The volume options and container mounts
+                        are inherited from the InstanceSet Pod template.
+                      properties:
+                        configMapName:
+                          description: ConfigMapName is the name of the replacement
+                            ConfigMap in the InstanceSet namespace.
+                          minLength: 1
+                          type: string
+                        volumeName:
+                          description: VolumeName is the name of an existing ConfigMap
+                            volume in the InstanceSet Pod template.
+                          minLength: 1
+                          type: string
+                      required:
+                      - configMapName
+                      - volumeName
+                      type: object
                   required:
                   - name
                   type: object

@@ -2835,7 +2835,7 @@ string
 <h3 id="apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
 </p>
 <div>
 <p>ClusterComponentConfig represents a configuration for a component.</p>
@@ -9311,6 +9311,25 @@ Add new or override existing envs.</p>
 <td>
 <em>(Optional)</em>
 <p>Specifies an override for the storage requirements of the instances.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">
+[]ClusterComponentConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Configs overrides managed file configurations for this InstanceTemplate.
+Each entry must name a distinct configuration declared in the ComponentDefinition.
+Each override accepts only name, variables, and configMap.name.
+Variables override inherited values by key. Set configMap.name to select a template
+source in the Component namespace. The settings for applying updates are inherited.
+An omitted or empty list inherits all configurations from the Component.</p>
 </td>
 </tr>
 </tbody>
@@ -19364,10 +19383,50 @@ PodUpdatePolicy is set to StrictInPlace but the pods cannot be updated in-place)
 </td>
 </tr></tbody>
 </table>
+<h3 id="workloads.kubeblocks.io/v1.ConfigMapVolumeBinding">ConfigMapVolumeBinding
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate</a>)
+</p>
+<div>
+<p>ConfigMapVolumeBinding identifies a Pod volume and the ConfigMap to mount in it.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>volumeName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>VolumeName is the name of an existing ConfigMap volume in the InstanceSet Pod template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configMapName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>ConfigMapName is the name of the replacement ConfigMap in the InstanceSet namespace.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSpec">InstanceSpec</a>)
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSpec">InstanceSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
 </p>
 <div>
 </div>
@@ -19388,6 +19447,22 @@ string
 </td>
 <td>
 <p>The name of the config.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volume</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.ConfigMapVolumeBinding">
+ConfigMapVolumeBinding
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Volume replaces the ConfigMap reference on an existing volume in the InstanceSet Pod template.
+Set Volume only on configs in an InstanceTemplate. The volume options and container mounts
+are inherited from the InstanceSet Pod template.</p>
 </td>
 </tr>
 <tr>
@@ -21130,6 +21205,22 @@ map[string]string
 <td>
 <em>(Optional)</em>
 <p>Images for the containers of the instance template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configs</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.ConfigTemplate">
+[]ConfigTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Configs replaces matching entries in the InstanceSet&rsquo;s configs by name.
+Each entry replaces the entire matching config. Entries without an override are inherited.
+An omitted or empty list inherits all entries.</p>
 </td>
 </tr>
 </tbody>

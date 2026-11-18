@@ -461,6 +461,15 @@ type InstanceTemplate struct {
 	//
 	// +optional
 	Images map[string]string `json:"images,omitempty"`
+
+	// Configs replaces matching entries in the InstanceSet's configs by name.
+	// Each entry replaces the entire matching config. Entries without an override are inherited.
+	// An omitted or empty list inherits all entries.
+	//
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	Configs []ConfigTemplate `json:"configs,omitempty"`
 }
 
 func (t *InstanceTemplate) GetName() string {
@@ -559,6 +568,13 @@ type ConfigTemplate struct {
 	// The name of the config.
 	Name string `json:"name"`
 
+	// Volume replaces the ConfigMap reference on an existing volume in the InstanceSet Pod template.
+	// Set Volume only on configs in an InstanceTemplate. The volume options and container mounts
+	// are inherited from the InstanceSet Pod template.
+	//
+	// +optional
+	Volume *ConfigMapVolumeBinding `json:"volume,omitempty"`
+
 	// Represents a checksum or hash of the config content.
 	//
 	// +optional
@@ -590,6 +606,19 @@ type ConfigTemplate struct {
 	//
 	// +optional
 	ReconfigureArgs [][]string `json:"reconfigureArgs,omitempty"`
+}
+
+// ConfigMapVolumeBinding identifies a Pod volume and the ConfigMap to mount in it.
+type ConfigMapVolumeBinding struct {
+	// VolumeName is the name of an existing ConfigMap volume in the InstanceSet Pod template.
+	//
+	// +kubebuilder:validation:MinLength=1
+	VolumeName string `json:"volumeName"`
+
+	// ConfigMapName is the name of the replacement ConfigMap in the InstanceSet namespace.
+	//
+	// +kubebuilder:validation:MinLength=1
+	ConfigMapName string `json:"configMapName"`
 }
 
 // InstanceStatus describes the desired allocation and observed runtime state of an instance identity.

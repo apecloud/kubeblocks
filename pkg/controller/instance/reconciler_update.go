@@ -32,6 +32,7 @@ import (
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -76,11 +77,15 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if inst.Spec.InstanceUpdateStrategyType != nil && *inst.Spec.InstanceUpdateStrategyType == kbappsv1.OnDeleteStrategyType {
 		return kubebuilderx.Continue, nil
 	}
+	desiredPod, err := buildInstancePod(inst, getPodRevision(oldPodList[0]))
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
 
 	// treat old and Pending pod as a special case, as they can be updated without a consequence
 	// podUpdatePolicy is ignored here since in-place update for a pending pod doesn't make much sense.
 	for _, pod := range oldPodList {
-		updatePolicy, _, err := getPodUpdatePolicy(inst, pod)
+		updatePolicy, _, err := getPodUpdatePolicyForDesiredPod(inst, pod, desiredPod)
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
@@ -120,7 +125,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			break
 		}
 
-		updatePolicy, specUpdatePolicy, err := getPodUpdatePolicy(inst, pod)
+		updatePolicy, specUpdatePolicy, err := getPodUpdatePolicyForDesiredPod(inst, pod, desiredPod)
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
@@ -138,7 +143,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			updatePolicy = recreatePolicy
 		}
 
-		allUpdated, err := r.reconfigure(tree, inst, pod)
+		allUpdated, err := r.reconfigure(tree, inst, pod, desiredPod)
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
@@ -148,11 +153,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 
 		switch updatePolicy {
 		case inPlaceUpdatePolicy:
-			newPod, err := buildInstancePod(inst, getPodRevision(pod))
-			if err != nil {
-				return kubebuilderx.Continue, err
-			}
-			newMergedPod := copyAndMerge(pod, newPod)
+			newMergedPod := copyAndMerge(pod, desiredPod)
 			supportResizeSubResource, err := intctrlutil.SupportResizeSubResource()
 			if err != nil {
 				tree.Logger.Error(err, "check support resize sub resource error")
@@ -160,9 +161,9 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			}
 
 			switch {
-			case !equalResourcesInPlaceFields(pod, newPod) && supportResizeSubResource:
+			case !equalResourcesInPlaceFields(pod, desiredPod) && supportResizeSubResource:
 				err = tree.Update(newMergedPod, kubebuilderx.WithSubResource("resize"))
-			case safeMetadataOnlyInPlaceUpdate(pod, newPod), safeKBManagedImageOnlyInPlaceUpdate(pod, newPod):
+			case safeMetadataOnlyInPlaceUpdate(pod, desiredPod), safeKBManagedImageOnlyInPlaceUpdate(pod, desiredPod):
 				err = tree.Update(newMergedPod, kubebuilderx.WithPatch(true))
 			default:
 				if err = r.switchover(tree, inst, newMergedPod.(*corev1.Pod)); err != nil {
@@ -213,8 +214,9 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, inst *workl
 	return nil
 }
 
-func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod) (bool, error) {
-	toUpdate, err := configsToUpdate(inst, pod)
+func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod, desiredPod *corev1.Pod) (bool, error) {
+	configs := instancetemplate.ConfigsForMountedVolumes(inst.Spec.Configs, pod, desiredPod)
+	toUpdate, err := configsToUpdate(configs, pod)
 	if err != nil {
 		return false, err
 	}

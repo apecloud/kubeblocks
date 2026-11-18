@@ -23,6 +23,7 @@ import (
 	"strings"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
@@ -53,5 +54,38 @@ func TestValidationRejectsNodeSelectorOnce(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), constant.NodeSelectorOnceAnnotationKey) {
 		t.Fatalf("expected error to mention %s, got: %v", constant.NodeSelectorOnceAnnotationKey, err)
+	}
+}
+
+func TestValidationRejectsInvalidTemplateConfigs(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*workloads.InstanceSet)
+	}{
+		{name: "unknown config", mutate: func(its *workloads.InstanceSet) {
+			its.Spec.Instances[0].Configs[0].Name = "missing"
+		}},
+		{name: "missing volume on inactive template", mutate: func(its *workloads.InstanceSet) {
+			its.Spec.Instances[0].Replicas = ptr.To[int32](0)
+			its.Spec.Instances[0].Configs[0].Volume.VolumeName = "missing"
+		}},
+		{name: "inherited PVC replaces bound volume", mutate: func(its *workloads.InstanceSet) {
+			its.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "config"}}}
+		}},
+		{name: "global config has parent-only binding", mutate: func(its *workloads.InstanceSet) {
+			its.Spec.Configs[0].Volume = &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "other"}
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			its, tree, _ := newITS2ConfigFixture(t, false)
+			tt.mutate(its)
+			if _, err := NewValidationReconciler().Reconcile(tree); err == nil {
+				t.Fatal("invalid template configuration was accepted")
+			}
+			if len(tree.List(&workloads.Instance{})) != 0 {
+				t.Fatal("invalid configuration created Instances")
+			}
+		})
 	}
 }

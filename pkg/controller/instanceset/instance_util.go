@@ -42,7 +42,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
-	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -676,44 +675,4 @@ func hasConfigRestart(desired []workloads.ConfigTemplate, pod *corev1.Pod) (bool
 		return true, toRestart, nil
 	}
 	return false, nil, nil
-}
-
-// desiredInstanceTemplates is the direct Pod controller's canonical desired member mapping.
-// Config expansion is opt-in here while the Instance-based controller still uses global configs.
-func desiredInstanceTemplates(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) (map[string]*instancetemplate.InstanceTemplateExt, error) {
-	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
-	if err != nil {
-		return nil, err
-	}
-	opts := &instancetemplate.PodNameBuilderOpts{}
-	if tree != nil {
-		opts.EventLogger = tree.EventRecorder
-	}
-	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, opts)
-	if err != nil {
-		return nil, err
-	}
-	templates, err := nameBuilder.BuildInstanceName2TemplateMap()
-	if err != nil {
-		return nil, err
-	}
-	resolved := make(map[string]*instancetemplate.InstanceTemplateExt, len(itsExt.InstanceTemplates))
-	for _, template := range templates {
-		resolved[template.Name] = template
-	}
-	for name, source := range itsExt.InstanceTemplates {
-		template := resolved[name]
-		if template == nil {
-			// Validate bindings for zero-replica templates as well.
-			template = &instancetemplate.InstanceTemplateExt{
-				PodTemplateSpec: its.Spec.Template,
-				VolumeClaimTemplates: append(append([]corev1.PersistentVolumeClaim(nil),
-					its.Spec.VolumeClaimTemplates...), source.VolumeClaimTemplates...),
-			}
-		}
-		if err := instancetemplate.ResolveConfigs(template, its.Spec.Configs, source.Configs); err != nil {
-			return nil, fmt.Errorf("instance template %q: %w", name, err)
-		}
-	}
-	return templates, nil
 }

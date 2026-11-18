@@ -22,7 +22,10 @@ package instancetemplate
 import (
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
+
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
 
 // ResolveConfigs resolves config overrides and their volume bindings together.
@@ -105,4 +108,89 @@ func ResolveConfigs(template *InstanceTemplateExt, configs, overrides []workload
 	template.PodTemplateSpec = *podTemplate
 	template.Configs = effective
 	return nil
+}
+
+// BuildInstanceTemplatesWithConfigs maps desired instance names to effective Pod templates and configs.
+func BuildInstanceTemplatesWithConfigs(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) (map[string]*InstanceTemplateExt, error) {
+	itsExt, err := BuildInstanceSetExt(its, tree)
+	if err != nil {
+		return nil, err
+	}
+	opts := &PodNameBuilderOpts{}
+	if tree != nil {
+		opts.EventLogger = tree.EventRecorder
+	}
+	nameBuilder, err := NewPodNameBuilder(itsExt, opts)
+	if err != nil {
+		return nil, err
+	}
+	templates, err := nameBuilder.BuildInstanceName2TemplateMap()
+	if err != nil {
+		return nil, err
+	}
+	resolved := make(map[string]*InstanceTemplateExt, len(itsExt.InstanceTemplates))
+	for _, template := range templates {
+		resolved[template.Name] = template
+	}
+	for name, source := range itsExt.InstanceTemplates {
+		template := resolved[name]
+		if template == nil {
+			// Validate bindings for zero-replica templates as well.
+			template = buildInstanceTemplateExt(source, its)
+		}
+		if err := ResolveConfigs(template, its.Spec.Configs, source.Configs); err != nil {
+			return nil, fmt.Errorf("instance template %q: %w", name, err)
+		}
+	}
+	return templates, nil
+}
+
+// ChangedConfigMapVolumes identifies desired ConfigMap volume sources that differ from the existing Pod.
+func ChangedConfigMapVolumes(old, desired *corev1.Pod) map[string]bool {
+	previous := make(map[string]string)
+	for _, volume := range old.Spec.Volumes {
+		if volume.ConfigMap != nil {
+			previous[volume.Name] = volume.ConfigMap.Name
+		}
+	}
+	changed := make(map[string]bool)
+	for _, volume := range desired.Spec.Volumes {
+		if volume.ConfigMap != nil {
+			if source, exists := previous[volume.Name]; !exists || source != volume.ConfigMap.Name {
+				changed[volume.Name] = true
+			}
+		}
+	}
+	return changed
+}
+
+// ConfigsForMountedVolumes returns configs that can be applied through the existing Pod's mounts.
+// If a changed volume has no config association, omit unbound configs as well.
+// The replacement Pod starts with the desired files and hashes.
+func ConfigsForMountedVolumes(configs []workloads.ConfigTemplate, old, desired *corev1.Pod) []workloads.ConfigTemplate {
+	changed := ChangedConfigMapVolumes(old, desired)
+	if len(changed) == 0 {
+		return configs
+	}
+	unassociated := make(map[string]bool, len(changed))
+	for name := range changed {
+		unassociated[name] = true
+	}
+	for _, config := range configs {
+		if config.Volume != nil {
+			delete(unassociated, config.Volume.VolumeName)
+		}
+	}
+	mounted := make([]workloads.ConfigTemplate, 0, len(configs))
+	for _, config := range configs {
+		if config.Volume == nil {
+			if len(unassociated) > 0 {
+				continue
+			}
+		} else if changed[config.Volume.VolumeName] {
+			continue
+		}
+		mounted = append(mounted, config)
+	}
+	return mounted
 }

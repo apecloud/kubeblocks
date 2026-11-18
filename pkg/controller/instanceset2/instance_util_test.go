@@ -20,15 +20,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset2
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 
+	"github.com/klauspost/compress/zstd"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
 
 func TestParseParentNameAndOrdinal(t *testing.T) {
@@ -256,5 +261,91 @@ func TestGetInstanceTemplateMap(t *testing.T) {
 func TestGetHeadlessSvcName(t *testing.T) {
 	if got := getHeadlessSvcName("mysql"); got != "mysql-headless" {
 		t.Fatalf("getHeadlessSvcName() = %q, want mysql-headless", got)
+	}
+}
+
+func newITS2ConfigFixture(t *testing.T, compressed bool) (*workloads.InstanceSet, *kubebuilderx.ObjectTree, string) {
+	t.Helper()
+	its := revisionTestInstanceSet()
+	its.Generation = 1
+	its.Spec.Replicas = ptr.To[int32](2)
+	its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+	its.Spec.FlatInstanceOrdinal = compressed
+	its.Spec.Configs = []workloads.ConfigTemplate{
+		{Name: "main", ConfigHash: ptr.To("global")},
+		{Name: "aux", ConfigHash: ptr.To("inherited")},
+	}
+	its.Spec.Template = corev1.PodTemplateSpec{Spec: corev1.PodSpec{
+		Containers: []corev1.Container{{Name: "db", Image: "mysql:8"}},
+		Volumes: []corev1.Volume{{Name: "config", VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "main"}},
+		}}},
+	}}
+	template := workloads.InstanceTemplate{Name: "a", Replicas: ptr.To[int32](1), Configs: []workloads.ConfigTemplate{{
+		Name: "main", ConfigHash: ptr.To("specific"),
+		Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "main-a"},
+	}}}
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	member := "demo-a-0"
+	if compressed {
+		template.Ordinals = workloads.Ordinals{Discrete: []int32{7}}
+		its.Spec.Ordinals = workloads.Ordinals{Discrete: []int32{0}}
+		setITS2CompressedTemplate(t, its, tree, template)
+		member = "demo-7"
+	} else {
+		its.Spec.Instances = []workloads.InstanceTemplate{template}
+	}
+	return its, tree, member
+}
+
+func setITS2CompressedTemplate(t *testing.T, its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree, template workloads.InstanceTemplate) {
+	t.Helper()
+	data, err := json.Marshal([]workloads.InstanceTemplate{template})
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer, err := zstd.NewWriter(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer writer.Close()
+	its.Annotations = map[string]string{templateRefAnnotationKey: `{"demo":"templates"}`}
+	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "templates", Namespace: its.Namespace},
+		BinaryData: map[string][]byte{"instances": writer.EncodeAll(data, nil)}}
+	if err := tree.Add(cm); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func its2ConfigInstances(tree *kubebuilderx.ObjectTree) map[string]*workloads.Instance {
+	instances := map[string]*workloads.Instance{}
+	for _, obj := range tree.List(&workloads.Instance{}) {
+		inst := obj.(*workloads.Instance)
+		instances[inst.Name] = inst
+	}
+	return instances
+}
+
+func assertITS2ConfigIntent(t *testing.T, inst *workloads.Instance, configMap, hash string) {
+	t.Helper()
+	if inst == nil {
+		t.Fatal("expected child Instance")
+	}
+	if got := inst.Spec.Template.Spec.Volumes[0].ConfigMap.Name; got != configMap {
+		t.Fatalf("%s ConfigMap = %q, want %q", inst.Name, got, configMap)
+	}
+	if len(inst.Spec.Configs) != 2 || inst.Spec.Configs[0].Name != "main" ||
+		ptr.Deref(inst.Spec.Configs[0].ConfigHash, "") != hash ||
+		inst.Spec.Configs[1].Name != "aux" || ptr.Deref(inst.Spec.Configs[1].ConfigHash, "") != "inherited" {
+		t.Fatalf("%s configs = %#v, want override %q and inherited aux", inst.Name, inst.Spec.Configs, hash)
+	}
+	for _, config := range inst.Spec.Configs {
+		if config.Volume != nil {
+			t.Fatalf("child %s retained parent volume binding: %#v", inst.Name, config)
+		}
+	}
+	if getInstanceRevision(inst) == "" {
+		t.Fatalf("%s has no Instance revision", inst.Name)
 	}
 }

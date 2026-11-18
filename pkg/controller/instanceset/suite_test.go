@@ -44,6 +44,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -264,7 +265,7 @@ var _ = AfterSuite(func() {
 })
 
 func getPodUpdatePolicyForTest(its *workloads.InstanceSet, pod *corev1.Pod) (podUpdatePolicy, workloads.PodUpdatePolicyType, string, error) {
-	templates, err := desiredInstanceTemplates(its, nil)
+	templates, err := instancetemplate.BuildInstanceTemplatesWithConfigs(its, nil)
 	if err != nil {
 		return noOpsPolicy, "", "", err
 	}

@@ -430,7 +430,7 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod, template *i
 		return noOpsPolicy, "", "", err
 	}
 	specUpdatePolicy := getPodUpdatePolicyInSpec(its, pod, newPod)
-	if configMapSourceChanged(pod, newPod) {
+	if len(instancetemplate.ChangedConfigMapVolumes(pod, newPod)) > 0 {
 		return recreatePolicy, specUpdatePolicy, "config volume source update", nil
 	}
 	configRestart, configs, err := hasConfigRestart(template.Configs, pod)
@@ -489,27 +489,4 @@ func isPodUpdated(its *workloads.InstanceSet, pod *corev1.Pod, template *instanc
 		return false, err
 	}
 	return policy == noOpsPolicy, err
-}
-
-// A replacement ConfigMap cannot be reloaded through the old Pod's mounted volume.
-func configMapSourceChanged(old, desired *corev1.Pod) bool {
-	return len(changedConfigMapVolumes(old, desired)) > 0
-}
-
-func changedConfigMapVolumes(old, desired *corev1.Pod) map[string]bool {
-	previous := make(map[string]string)
-	for _, volume := range old.Spec.Volumes {
-		if volume.ConfigMap != nil {
-			previous[volume.Name] = volume.ConfigMap.Name
-		}
-	}
-	changed := make(map[string]bool)
-	for _, volume := range desired.Spec.Volumes {
-		if volume.ConfigMap != nil {
-			if source, exists := previous[volume.Name]; !exists || source != volume.ConfigMap.Name {
-				changed[volume.Name] = true
-			}
-		}
-	}
-	return changed
 }

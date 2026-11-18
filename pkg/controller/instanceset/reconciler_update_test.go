@@ -919,7 +919,7 @@ func TestDirectConfigOverridesUpdateRouting(t *testing.T) {
 					t.Fatal("recreation bypassed switchover")
 				}
 				runDirectReconciler(t, NewReplicasAlignmentReconciler(), tree)
-				desired, err := desiredInstanceTemplates(its, tree)
+				desired, err := instancetemplate.BuildInstanceTemplatesWithConfigs(its, tree)
 				if err != nil {
 					t.Fatal(err)
 				}

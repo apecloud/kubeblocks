@@ -37,6 +37,7 @@ import (
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -409,7 +410,7 @@ var _ = Describe("instance util test", func() {
 
 func TestDirectConfigOverrideRetainedAndInjectedPods(t *testing.T) {
 	its, tree, pods, member := newDirectConfigFixture(t, "named")
-	desired, err := desiredInstanceTemplates(its, tree)
+	desired, err := instancetemplate.BuildInstanceTemplatesWithConfigs(its, tree)
 	if err != nil {
 		t.Fatal(err)
 	}

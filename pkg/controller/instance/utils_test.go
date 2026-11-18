@@ -256,7 +256,7 @@ func TestConfigsToUpdateTreatsNilAndEmptyConfigHashAsEqual(t *testing.T) {
 		t.Fatalf("configsToPod() error = %v", err)
 	}
 
-	toUpdate, err := configsToUpdate(inst, pod)
+	toUpdate, err := configsToUpdate(inst.Spec.Configs, pod)
 	if err != nil {
 		t.Fatalf("configsToUpdate() error = %v", err)
 	}
@@ -390,7 +390,7 @@ func TestConfigsToUpdateStillReportsRealConfigHashMismatch(t *testing.T) {
 		t.Fatalf("configsToPod() error = %v", err)
 	}
 
-	toUpdate, err := configsToUpdate(inst, pod)
+	toUpdate, err := configsToUpdate(inst.Spec.Configs, pod)
 	if err != nil {
 		t.Fatalf("configsToUpdate() error = %v", err)
 	}

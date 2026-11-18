@@ -28,6 +28,7 @@ import (
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -56,7 +57,7 @@ func (r *instanceAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree
 
 func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
-	nameToTemplateMap, err := desiredInstanceTemplates(its, tree)
+	nameToTemplateMap, err := instancetemplate.BuildInstanceTemplatesWithConfigs(its, tree)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}

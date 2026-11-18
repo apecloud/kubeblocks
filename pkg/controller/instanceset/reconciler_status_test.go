@@ -39,6 +39,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -867,7 +868,7 @@ func newLegacyInstanceStatusFixture(t *testing.T, configs []workloads.ConfigTemp
 	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)
 	}
-	templates, err := desiredInstanceTemplates(its, tree)
+	templates, err := instancetemplate.BuildInstanceTemplatesWithConfigs(its, tree)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -906,7 +907,7 @@ func newLegacyInstanceStatusFixtureFromSet(t *testing.T, its *workloads.Instance
 	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)
 	}
-	templates, err := desiredInstanceTemplates(its, tree)
+	templates, err := instancetemplate.BuildInstanceTemplatesWithConfigs(its, tree)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -949,7 +950,7 @@ func legacyInstanceStatusSet(replicas int32) *workloads.InstanceSet {
 
 func addLegacyPVCs(t *testing.T, tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, capacity resource.Quantity) {
 	t.Helper()
-	templates, err := desiredInstanceTemplates(its, tree)
+	templates, err := instancetemplate.BuildInstanceTemplatesWithConfigs(its, tree)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -996,7 +997,7 @@ func TestDirectConfigOverridesCreationAndConvergence(t *testing.T) {
 			if pods["demo-0"].Spec.Volumes[0].ConfigMap.Name != "main" {
 				t.Fatal("default member binding changed")
 			}
-			desired, err := desiredInstanceTemplates(its, tree)
+			desired, err := instancetemplate.BuildInstanceTemplatesWithConfigs(its, tree)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1033,7 +1034,7 @@ func TestDirectConfigOverridesCreationAndConvergence(t *testing.T) {
 			if revisions[member] != oldRevision {
 				t.Fatal("same-mount dynamic hash changed the Pod revision")
 			}
-			desired, err = desiredInstanceTemplates(its, tree)
+			desired, err = instancetemplate.BuildInstanceTemplatesWithConfigs(its, tree)
 			if err != nil {
 				t.Fatal(err)
 			}

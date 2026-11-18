@@ -21,6 +21,7 @@ package instanceset
 
 import (
 	"fmt"
+	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/utils/ptr"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -404,3 +406,26 @@ var _ = Describe("instance util test", func() {
 		})
 	})
 })
+
+func TestDirectConfigOverrideRetainedAndInjectedPods(t *testing.T) {
+	its, tree, pods, member := newDirectConfigFixture(t, "named")
+	desired, err := desiredInstanceTemplates(its, tree)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pods[member].Spec.Volumes = append(pods[member].Spec.Volumes, corev1.Volume{Name: "admission-config", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "injected"}}}})
+	policy, _, _, err := getPodUpdatePolicy(its, pods[member], desired[member])
+	if err != nil || policy != noOpsPolicy {
+		t.Fatalf("admission ConfigMap volume triggered update: %v, %v", policy, err)
+	}
+	updated, err := isPodUpdated(its, pods[member], nil)
+	if err != nil || !updated {
+		t.Fatalf("retained member without desired template lost previous handling: %v, %v", updated, err)
+	}
+	its.Spec.Replicas = ptr.To[int32](0)
+	its.Status.UpdateRevisions = nil
+	policy, _, reason, err := getPodUpdatePolicy(its, pods[member], nil)
+	if err != nil || policy != recreatePolicy || reason != "0 replica" {
+		t.Fatalf("zero-replica handling changed: %v, %s, %v", policy, reason, err)
+	}
+}

@@ -984,3 +984,66 @@ func assertLegacyUpToDate(t *testing.T, its *workloads.InstanceSet, name string,
 		t.Fatalf("instance %s UpToDate = %#v, want %v", name, status, want)
 	}
 }
+
+func TestDirectConfigOverridesCreationAndConvergence(t *testing.T) {
+	for _, layout := range []string{"named", "compressed named", "compressed flat"} {
+		t.Run(layout, func(t *testing.T) {
+			its, tree, pods, member := newDirectConfigFixture(t, layout)
+			specific := pods[member]
+			if specific.Spec.Volumes[0].ConfigMap.Name != "main-a" || specific.Spec.Volumes[1].ConfigMap.Name != "aux-a" {
+				t.Fatal("member bindings were not expanded on creation")
+			}
+			if pods["demo-0"].Spec.Volumes[0].ConfigMap.Name != "main" {
+				t.Fatal("default member binding changed")
+			}
+			desired, err := desiredInstanceTemplates(its, tree)
+			if err != nil {
+				t.Fatal(err)
+			}
+			hashes, err := configsFromPod(specific)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(hashes) != 2 || *hashes[0].ConfigHash != "aux-old" || *hashes[1].ConfigHash != "main-old" {
+				t.Fatalf("wrong initial hashes: %#v", hashes)
+			}
+			if getPodRevision(specific) == getPodRevision(pods["demo-0"]) {
+				t.Fatal("different mounted source was omitted from initial revision")
+			}
+			for name, pod := range pods {
+				policy, _, _, err := getPodUpdatePolicy(its, pod, desired[name])
+				if err != nil || policy != noOpsPolicy {
+					t.Fatalf("fresh member %s needs update: %v %v", name, policy, err)
+				}
+			}
+			mutateDirectTemplate(t, its, tree, func(tpl *workloads.InstanceTemplate) { tpl.Configs[0].ConfigHash = ptr.To("main-new") })
+			oldRevision := getPodRevision(specific)
+			its.Generation++
+			runDirectReconciler(t, NewRevisionUpdateReconciler(), tree)
+			if its.FindInstanceStatus(member).UpToDate {
+				t.Fatal("member hash change did not invalidate convergence")
+			}
+			if !its.FindInstanceStatus("demo-0").UpToDate {
+				t.Fatal("override invalidated the default member")
+			}
+			revisions, err := GetRevisions(its.Status.UpdateRevisions)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if revisions[member] != oldRevision {
+				t.Fatal("same-mount dynamic hash changed the Pod revision")
+			}
+			desired, err = desiredInstanceTemplates(its, tree)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := configsToPod(desired[member].Configs, specific); err != nil {
+				t.Fatal(err)
+			}
+			runDirectReconciler(t, NewStatusReconciler(), tree)
+			if !its.FindInstanceStatus(member).UpToDate || !its.FindInstanceStatus("demo-0").UpToDate {
+				t.Fatal("effective hashes did not converge per member")
+			}
+		})
+	}
+}

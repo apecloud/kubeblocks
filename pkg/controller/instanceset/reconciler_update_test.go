@@ -21,7 +21,9 @@ package instanceset
 
 import (
 	"context"
+	"reflect"
 	"slices"
+	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -29,6 +31,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -867,4 +870,139 @@ func (s *lifecycleCallSpy) AccountProvision(_ context.Context, _ client.Reader, 
 
 func (s *lifecycleCallSpy) UserDefined(_ context.Context, _ client.Reader, _ *lifecycle.Options, _ string, _ *kbappsv1.Action, _ map[string]string) error {
 	return nil
+}
+
+func TestDirectConfigOverridesUpdateRouting(t *testing.T) {
+	cases := []struct {
+		name      string
+		mutate    func(*workloads.InstanceTemplate)
+		wantCalls []string
+		deleted   bool
+	}{
+		{"source switch preserves other bound reload", func(tpl *workloads.InstanceTemplate) {
+			tpl.Configs[0].Volume.ConfigMapName = "main-new"
+			tpl.Configs[0].ConfigHash = ptr.To("new")
+			tpl.Configs[1].ConfigHash = ptr.To("aux-new")
+			tpl.Configs[1].Restart = ptr.To(true)
+		}, []string{"aux"}, true},
+		{"same mount reload then restart", func(tpl *workloads.InstanceTemplate) {
+			tpl.Configs[0].ConfigHash = ptr.To("new")
+			tpl.Configs[0].Restart = ptr.To(true)
+		}, []string{"main"}, true},
+		{"same mount reload only", func(tpl *workloads.InstanceTemplate) { tpl.Configs[0].ConfigHash = ptr.To("new") }, []string{"main"}, false},
+		{"removed overrides return to inherited mounts", func(tpl *workloads.InstanceTemplate) { tpl.Configs = nil }, nil, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			its, tree, pods, member := newDirectConfigFixture(t, "named")
+			spy := installDirectConfigSpy(t)
+			mutateDirectTemplate(t, its, tree, tc.mutate)
+			its.Generation++
+			runDirectReconciler(t, NewRevisionUpdateReconciler(), tree)
+			runDirectReconciler(t, NewUpdateReconciler(), tree)
+			if !reflect.DeepEqual(spy.configs, tc.wantCalls) {
+				t.Fatalf("reload calls %v, want %v", spy.configs, tc.wantCalls)
+			}
+			obj, err := tree.Get(pods[member])
+			if err != nil {
+				t.Fatal(err)
+			}
+			if (obj == nil) != tc.deleted {
+				t.Fatalf("deleted=%v, want %v", obj == nil, tc.deleted)
+			}
+			obj, err = tree.Get(pods["demo-0"])
+			if err != nil || obj != pods["demo-0"] {
+				t.Fatal("update changed unaffected default member")
+			}
+			if tc.deleted {
+				if spy.switchoverCalls != 1 {
+					t.Fatal("recreation bypassed switchover")
+				}
+				runDirectReconciler(t, NewReplicasAlignmentReconciler(), tree)
+				desired, err := desiredInstanceTemplates(its, tree)
+				if err != nil {
+					t.Fatal(err)
+				}
+				obj, err = tree.Get(pods[member])
+				if err != nil || obj == nil {
+					t.Fatal("member not recreated")
+				}
+				recreated := obj.(*corev1.Pod)
+				pending, err := configsToUpdate(desired[member].Configs, recreated)
+				if err != nil || len(pending) != 0 {
+					t.Fatal("recreated member did not start with effective hashes")
+				}
+				if recreated.Spec.Volumes[0].ConfigMap.Name != desired[member].Spec.Volumes[0].ConfigMap.Name {
+					t.Fatal("recreated member has stale mount")
+				}
+			}
+		})
+	}
+}
+
+func TestDirectConfigOverridePolicyRestrictions(t *testing.T) {
+	for _, upgrade := range []bool{false, true} {
+		t.Run(map[bool]string{false: "strict update", true: "strict upgrade"}[upgrade], func(t *testing.T) {
+			its, tree, pods, member := newDirectConfigFixture(t, "named")
+			spy := installDirectConfigSpy(t)
+			its.Spec.PodUpdatePolicy = kbappsv1.StrictInPlacePodUpdatePolicyType
+			if upgrade {
+				its.Spec.PodUpdatePolicy = kbappsv1.PreferInPlacePodUpdatePolicyType
+				its.Spec.PodUpgradePolicy = kbappsv1.StrictInPlacePodUpdatePolicyType
+			}
+			mutateDirectTemplate(t, its, tree, func(tpl *workloads.InstanceTemplate) {
+				tpl.Configs[0].Volume.ConfigMapName = "new"
+				if upgrade {
+					tpl.Images = map[string]string{"db": "mysql:new"}
+				}
+			})
+			runDirectReconciler(t, NewRevisionUpdateReconciler(), tree)
+			runDirectReconciler(t, NewUpdateReconciler(), tree)
+			obj, err := tree.Get(pods[member])
+			if err != nil || obj == nil {
+				t.Fatal("strict policy allowed recreation")
+			}
+			if !meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceUpdateRestricted)) {
+				t.Fatal("strict policy block was not reported")
+			}
+			if len(spy.configs) != 0 || spy.switchoverCalls != 0 {
+				t.Fatal("strict policy called lifecycle actions")
+			}
+		})
+	}
+}
+
+func TestDirectConfigOverrideMemberPlan(t *testing.T) {
+	its, tree, pods, member := newDirectConfigFixture(t, "named")
+	spy := installDirectConfigSpy(t)
+	its.Spec.Roles = []workloads.ReplicaRole{{Name: "follower", UpdatePriority: 1}, {Name: "leader", UpdatePriority: 2}}
+	its.Spec.MemberUpdateStrategy = ptr.To(workloads.SerialUpdateStrategy)
+	pods[member].Labels[RoleLabelKey] = "follower"
+	pods["demo-0"].Labels[RoleLabelKey] = "leader"
+	its.Spec.Configs[0].ConfigHash = ptr.To("global-new")
+	runDirectReconciler(t, NewRevisionUpdateReconciler(), tree)
+	runDirectReconciler(t, NewUpdateReconciler(), tree)
+	if !reflect.DeepEqual(spy.configs, []string{"global-main"}) {
+		t.Fatalf("member plan used global hashes for overridden member: %v", spy.configs)
+	}
+}
+
+type directConfigSpy struct {
+	lifecycleCallSpy
+	configs []string
+}
+
+func (s *directConfigSpy) Reconfigure(_ context.Context, _ client.Reader, _ *lifecycle.Options, params map[string]string) error {
+	s.configs = append(s.configs, params["id"])
+	return nil
+}
+func installDirectConfigSpy(t *testing.T) *directConfigSpy {
+	t.Helper()
+	spy := &directConfigSpy{}
+	original := newLifecycleAction
+	newLifecycleAction = func(_ *workloads.InstanceSet, _ *kubebuilderx.ObjectTree, _ *corev1.Pod) (lifecycle.Lifecycle, error) {
+		return spy, nil
+	}
+	t.Cleanup(func() { newLifecycleAction = original })
+	return spy
 }

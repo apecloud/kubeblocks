@@ -761,7 +761,7 @@ var _ = Describe("update reconciler test", func() {
 			its.Spec.Template.Annotations[constant.RestartAnnotationKey] = "2026-08-11T12:00:00Z"
 			_, err = NewRevisionUpdateReconciler().Reconcile(tree)
 			Expect(err).ShouldNot(HaveOccurred())
-			policy, _, _, err := getPodUpdatePolicy(its, livePod)
+			policy, _, _, err := getPodUpdatePolicyForTest(its, livePod)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(policy).Should(Equal(recreatePolicy), "an explicit restart must still recreate the Pod")
 		})

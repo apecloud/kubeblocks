@@ -259,3 +259,11 @@ var _ = BeforeSuite(func() {
 var _ = AfterSuite(func() {
 	controller.Finish()
 })
+
+func getPodUpdatePolicyForTest(its *workloads.InstanceSet, pod *corev1.Pod) (podUpdatePolicy, workloads.PodUpdatePolicyType, string, error) {
+	templates, err := desiredInstanceTemplates(its, nil)
+	if err != nil {
+		return noOpsPolicy, "", "", err
+	}
+	return getPodUpdatePolicy(its, pod, templates[pod.Name])
+}

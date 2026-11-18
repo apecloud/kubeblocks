@@ -1,0 +1,108 @@
+/*
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+package instancetemplate
+
+import (
+	"fmt"
+
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+)
+
+// ResolveConfigs resolves config overrides and their volume bindings together.
+// Callers opt in to binding expansion after building the instance Pod template.
+func ResolveConfigs(template *InstanceTemplateExt, configs, overrides []workloads.ConfigTemplate) error {
+	indices := make(map[string]int, len(configs))
+	counts := make(map[string]int, len(configs))
+	effective := make([]workloads.ConfigTemplate, len(configs))
+	for i := range configs {
+		config := &configs[i]
+		if config.Volume != nil {
+			return fmt.Errorf("config %q: volume binding is only supported in instance templates", config.Name)
+		}
+		counts[config.Name]++
+		indices[config.Name] = i
+		effective[i] = *config.DeepCopy()
+	}
+	seen := make(map[string]bool, len(overrides))
+	for i := range overrides {
+		config := &overrides[i]
+		if config.Name == "" {
+			return fmt.Errorf("config override name must not be empty")
+		}
+		if seen[config.Name] {
+			return fmt.Errorf("duplicate config override name %q", config.Name)
+		}
+		seen[config.Name] = true
+		index, exists := indices[config.Name]
+		if !exists {
+			return fmt.Errorf("config override %q does not match an InstanceSet config", config.Name)
+		}
+		if counts[config.Name] > 1 {
+			return fmt.Errorf("config override %q matches multiple InstanceSet configs", config.Name)
+		}
+		effective[index] = *config.DeepCopy()
+	}
+
+	podTemplate := &template.PodTemplateSpec
+	for _, config := range effective {
+		if config.Volume != nil {
+			podTemplate = template.PodTemplateSpec.DeepCopy()
+			break
+		}
+	}
+	destinations := make(map[string]string)
+	for _, config := range effective {
+		binding := config.Volume
+		if binding == nil {
+			continue
+		}
+		if binding.VolumeName == "" || binding.ConfigMapName == "" {
+			return fmt.Errorf("config %q: volume and ConfigMap names must not be empty", config.Name)
+		}
+		for _, claim := range template.VolumeClaimTemplates {
+			if claim.Name == binding.VolumeName {
+				return fmt.Errorf("config %q: volume %q is replaced by a persistent volume claim", config.Name, binding.VolumeName)
+			}
+		}
+		if destination, exists := destinations[binding.VolumeName]; exists && destination != binding.ConfigMapName {
+			return fmt.Errorf("conflicting ConfigMap bindings for volume %q", binding.VolumeName)
+		}
+		destinations[binding.VolumeName] = binding.ConfigMapName
+		found := false
+		for i := range podTemplate.Spec.Volumes {
+			volume := &podTemplate.Spec.Volumes[i]
+			if volume.Name != binding.VolumeName {
+				continue
+			}
+			if volume.ConfigMap == nil {
+				return fmt.Errorf("config %q: volume %q is not a ConfigMap volume", config.Name, binding.VolumeName)
+			}
+			volume.ConfigMap.Name = binding.ConfigMapName
+			found = true
+			break
+		}
+		if !found {
+			return fmt.Errorf("config %q: volume %q does not exist", config.Name, binding.VolumeName)
+		}
+	}
+	template.PodTemplateSpec = *podTemplate
+	template.Configs = effective
+	return nil
+}

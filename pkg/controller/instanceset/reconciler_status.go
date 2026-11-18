@@ -73,6 +73,10 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 		return kubebuilderx.Continue, err
 	}
+	desiredTemplates, err := desiredInstanceTemplates(its, tree)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
 	// 2. calculate status summary
 	updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
 	if err != nil {
@@ -129,7 +133,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			updated := false
 			if !stopping {
 				var err1 error
-				updated, err1 = isPodUpdated(its, pod)
+				updated, err1 = isPodUpdated(its, pod, desiredTemplates[pod.Name])
 				if err1 != nil {
 					return kubebuilderx.Continue, err1
 				}
@@ -514,7 +518,7 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 					observation.UpToDate = !pending
 				}
 				observation.UpToDate = observation.UpToDate && podApplied &&
-					instancestatus.ConfigsApplied(its.Spec.Configs, observation.Configs)
+					instancestatus.ConfigsApplied(template.Configs, observation.Configs)
 			}
 		}
 		observations = append(observations, observation)
@@ -608,18 +612,6 @@ func syncObservationPVCStatus(tree *kubebuilderx.ObjectTree, observations []inst
 	}
 }
 
-func desiredInstanceTemplates(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) (map[string]*instancetemplate.InstanceTemplateExt, error) {
-	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
-	if err != nil {
-		return nil, err
-	}
-	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
-	if err != nil {
-		return nil, err
-	}
-	return nameBuilder.BuildInstanceName2TemplateMap()
-}
-
 func persistentVolumeClaimsByName(tree *kubebuilderx.ObjectTree) map[string]*corev1.PersistentVolumeClaim {
 	result := map[string]*corev1.PersistentVolumeClaim{}
 	if tree == nil {
@@ -633,7 +625,7 @@ func persistentVolumeClaimsByName(tree *kubebuilderx.ObjectTree) map[string]*cor
 }
 
 func isDesiredPodApplied(its *workloads.InstanceSet, pod *corev1.Pod, template *instancetemplate.InstanceTemplateExt) (bool, error) {
-	updated, err := isPodUpdated(its, pod)
+	updated, err := isPodUpdated(its, pod, template)
 	if err != nil || !updated {
 		return updated, err
 	}

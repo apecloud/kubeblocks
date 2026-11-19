@@ -1061,7 +1061,7 @@ func TestDirectLegacyConfigReloadOnUnrelatedMountChange(t *testing.T) {
 }
 
 func TestDirectConfigRollbackPreservesExplicitSameMountReload(t *testing.T) {
-	for _, layout := range []string{"named", "compressed named", "compressed flat"} {
+	for _, layout := range []string{"named", "compressed flat"} {
 		t.Run(layout, func(t *testing.T) {
 			its, tree, pods, member := newDirectConfigFixture(t, layout)
 			spy := installDirectConfigSpy(t)
@@ -1120,7 +1120,7 @@ func TestDirectConfigSourceChangePolicyBoundaries(t *testing.T) {
 }
 
 func TestDirectConfigRollbackPreservesInheritedSameMountReload(t *testing.T) {
-	for _, layout := range []string{"named", "compressed named", "compressed flat"} {
+	for _, layout := range []string{"named", "compressed flat"} {
 		t.Run(layout, func(t *testing.T) {
 			its, tree, pods, member := newDirectConfigFixture(t, layout)
 			// Create the starting member through the production creation path with

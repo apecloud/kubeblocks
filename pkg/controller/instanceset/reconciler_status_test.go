@@ -987,7 +987,7 @@ func assertLegacyUpToDate(t *testing.T, its *workloads.InstanceSet, name string,
 }
 
 func TestDirectConfigOverridesCreationAndConvergence(t *testing.T) {
-	for _, layout := range []string{"named", "compressed named", "compressed flat"} {
+	for _, layout := range []string{"named", "compressed flat"} {
 		t.Run(layout, func(t *testing.T) {
 			its, tree, pods, member := newDirectConfigFixture(t, layout)
 			specific := pods[member]

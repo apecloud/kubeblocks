@@ -35,6 +35,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
@@ -428,5 +429,40 @@ func TestDirectConfigOverrideRetainedAndInjectedPods(t *testing.T) {
 	policy, _, reason, err := getPodUpdatePolicy(its, pods[member], nil)
 	if err != nil || policy != recreatePolicy || reason != "0 replica" {
 		t.Fatalf("zero-replica handling changed: %v, %s, %v", policy, reason, err)
+	}
+}
+
+func TestDirectConfigRestartPolicyWithSourceChange(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		restartConfig int
+		updatePolicy  workloads.PodUpdatePolicyType
+		upgradePolicy workloads.PodUpdatePolicyType
+		wantPolicy    workloads.PodUpdatePolicyType
+		wantReason    string
+	}{
+		{"same mount restart keeps update policy", 1, kbappsv1.StrictInPlacePodUpdatePolicyType, kbappsv1.PreferInPlacePodUpdatePolicyType, kbappsv1.StrictInPlacePodUpdatePolicyType, "config restart: aux"},
+		{"same mount restart takes precedence over upgrade policy", 1, kbappsv1.PreferInPlacePodUpdatePolicyType, kbappsv1.StrictInPlacePodUpdatePolicyType, kbappsv1.PreferInPlacePodUpdatePolicyType, "config restart: aux"},
+		{"replacement mount uses upgrade policy", 0, kbappsv1.PreferInPlacePodUpdatePolicyType, kbappsv1.StrictInPlacePodUpdatePolicyType, kbappsv1.StrictInPlacePodUpdatePolicyType, "config volume source update"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			its, tree, pods, member := newDirectConfigFixture(t, "named")
+			its.Spec.PodUpdatePolicy = tc.updatePolicy
+			its.Spec.PodUpgradePolicy = tc.upgradePolicy
+			mutateDirectTemplate(t, its, tree, func(tpl *workloads.InstanceTemplate) {
+				tpl.Configs[0].Volume.ConfigMapName = "main-new"
+				tpl.Configs[tc.restartConfig].ConfigHash = ptr.To("new")
+				tpl.Configs[tc.restartConfig].Restart = ptr.To(true)
+				tpl.Images = map[string]string{"db": "mysql:new"}
+			})
+			desired, err := instancetemplate.BuildInstanceTemplatesWithConfigs(its, tree)
+			if err != nil {
+				t.Fatal(err)
+			}
+			policy, specPolicy, reason, err := getPodUpdatePolicy(its, pods[member], desired[member])
+			if err != nil || policy != recreatePolicy || specPolicy != tc.wantPolicy || reason != tc.wantReason {
+				t.Fatalf("policy=%v specPolicy=%v reason=%q err=%v", policy, specPolicy, reason, err)
+			}
+		})
 	}
 }

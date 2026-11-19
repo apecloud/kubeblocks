@@ -72,8 +72,8 @@ func TestValidationRejectsInvalidTemplateConfigs(t *testing.T) {
 		{name: "inherited PVC replaces bound volume", mutate: func(its *workloads.InstanceSet) {
 			its.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "config"}}}
 		}},
-		{name: "global config has parent-only binding", mutate: func(its *workloads.InstanceSet) {
-			its.Spec.Configs[0].Volume = &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "other"}
+		{name: "override changes associated volume", mutate: func(its *workloads.InstanceSet) {
+			its.Spec.Instances[0].Configs[0].Volume.VolumeName = "other"
 		}},
 	}
 	for _, tt := range tests {

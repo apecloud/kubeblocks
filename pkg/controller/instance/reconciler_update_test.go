@@ -59,16 +59,13 @@ func TestInstanceConfigUpdateRouting(t *testing.T) {
 			spy.reloadErr = tc.reloadErr
 			if tc.changeSource {
 				inst.Spec.Template.Spec.Volumes[0].ConfigMap.Name = "desired-config"
+				inst.Spec.Configs[0].Volume.ConfigMapName = "desired-config"
 			}
 			if tc.addMount {
 				pod.Spec.Volumes = nil
 				pod.Spec.Containers[0].VolumeMounts = nil
 			}
 			mountChanged := tc.changeSource || tc.addMount
-			if mountChanged {
-				pod.Annotations[constant.CMInsConfigurationHashLabelKey] = `{"removed-config":"old-hash"}`
-				inst.Spec.Template.Annotations = map[string]string{constant.CMInsConfigurationHashLabelKey: `{"removed-config":"old-hash"}`}
-			}
 			if tc.injectedCM {
 				pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{Name: "injected", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "injected-config"}}}})
 			}
@@ -141,6 +138,7 @@ func TestInstanceConfigMountUpdateRestrictions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			inst, pod, tree, spy := newInstanceConfigUpdateFixture(t)
 			inst.Spec.Template.Spec.Volumes[0].ConfigMap.Name = "desired-config"
+			inst.Spec.Configs[0].Volume.ConfigMapName = "desired-config"
 			inst.Spec.Configs[0].ConfigHash = ptr.To("desired-hash")
 			tc.mutate(inst, pod)
 			if _, err := NewUpdateReconciler().Reconcile(tree); err != nil {
@@ -151,6 +149,70 @@ func TestInstanceConfigMountUpdateRestrictions(t *testing.T) {
 			}
 			if meta.IsStatusConditionTrue(inst.Status.Conditions, string(workloads.InstanceUpdateRestricted)) != tc.blocked {
 				t.Fatalf("update restriction condition = %v, want blocked=%v", inst.Status.Conditions, tc.blocked)
+			}
+		})
+	}
+}
+
+func TestInstanceMixedConfigUpdateRouting(t *testing.T) {
+	for _, tc := range []struct {
+		name                            string
+		switchedRestart, mountedRestart bool
+		updatePolicy, upgradePolicy     workloads.PodUpdatePolicyType
+	}{
+		{name: "reload unchanged mount", updatePolicy: kbappsv1.PreferInPlacePodUpdatePolicyType, upgradePolicy: kbappsv1.PreferInPlacePodUpdatePolicyType},
+		{name: "switched config cannot select strict restart policy", switchedRestart: true, updatePolicy: kbappsv1.StrictInPlacePodUpdatePolicyType, upgradePolicy: kbappsv1.PreferInPlacePodUpdatePolicyType},
+		{name: "mounted config restart precedes strict upgrade policy", mountedRestart: true, updatePolicy: kbappsv1.PreferInPlacePodUpdatePolicyType, upgradePolicy: kbappsv1.StrictInPlacePodUpdatePolicyType},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			inst, pod, tree, spy := newInstanceConfigUpdateFixture(t)
+			volume := corev1.Volume{Name: "aux", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "aux-config"}}}}
+			mount := corev1.VolumeMount{Name: "aux", MountPath: "/etc/aux"}
+			inst.Spec.Template.Spec.Volumes = append(inst.Spec.Template.Spec.Volumes, volume)
+			inst.Spec.Template.Spec.Containers[0].VolumeMounts = append(inst.Spec.Template.Spec.Containers[0].VolumeMounts, mount)
+			pod.Spec.Volumes = append(pod.Spec.Volumes, volume)
+			pod.Spec.Containers[0].VolumeMounts = append(pod.Spec.Containers[0].VolumeMounts, mount)
+			inst.Spec.Configs = append(inst.Spec.Configs, workloads.ConfigTemplate{
+				Name: "aux", ConfigHash: ptr.To("old-aux"), Reconfigure: &kbappsv1.Action{}, Parameters: map[string]string{"id": "aux"},
+				Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "aux", ConfigMapName: "aux-config"},
+			})
+			if err := configsToPod(inst.Spec.Configs, pod); err != nil {
+				t.Fatal(err)
+			}
+			inst.Spec.Configs[0].ConfigHash = ptr.To("desired-main")
+			inst.Spec.Configs[0].Restart = ptr.To(tc.switchedRestart)
+			inst.Spec.Configs[0].Volume.ConfigMapName = "desired-config"
+			inst.Spec.Configs[1].ConfigHash = ptr.To("desired-aux")
+			inst.Spec.Configs[1].Restart = ptr.To(tc.mountedRestart)
+			inst.Spec.Template.Spec.Volumes[0].ConfigMap.Name = "desired-config"
+			inst.Spec.Template.Spec.Containers[0].Image = "mysql:new"
+			inst.Spec.PodUpdatePolicy = tc.updatePolicy
+			inst.Spec.PodUpgradePolicy = tc.upgradePolicy
+			if _, err := NewUpdateReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(spy.configs, []string{"aux"}) {
+				t.Fatalf("reloads = %v, want only unchanged mount aux", spy.configs)
+			}
+			if len(tree.List(&corev1.Pod{})) != 0 || spy.switchoverCalls != 1 {
+				t.Fatalf("expected recreation after aux action, Pods=%d, switchover=%d", len(tree.List(&corev1.Pod{})), spy.switchoverCalls)
+			}
+			if meta.IsStatusConditionTrue(inst.Status.Conditions, string(workloads.InstanceUpdateRestricted)) {
+				t.Fatal("mixed update was blocked by the wrong policy")
+			}
+			if _, err := NewAlignmentReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			pods := tree.List(&corev1.Pod{})
+			if len(pods) != 1 {
+				t.Fatalf("expected replacement Pod, got %d", len(pods))
+			}
+			replacement := pods[0].(*corev1.Pod)
+			if replacement.Spec.Volumes[0].ConfigMap.Name != "desired-config" || replacement.Spec.Volumes[1].ConfigMap.Name != "aux-config" {
+				t.Fatalf("replacement mounts = %#v", replacement.Spec.Volumes)
+			}
+			if got := replacement.Annotations[constant.CMInsConfigurationHashLabelKey]; got != `{"aux":"desired-aux","main":"desired-main"}` {
+				t.Fatalf("replacement hashes = %s, want both desired hashes", got)
 			}
 		})
 	}
@@ -180,7 +242,7 @@ func newInstanceConfigUpdateFixture(t *testing.T) (*workloads.Instance, *corev1.
 			Containers: []corev1.Container{{Name: "mysql", Image: "mysql:8.4", VolumeMounts: []corev1.VolumeMount{{Name: "config", MountPath: "/etc/mysql"}}}},
 			Volumes:    []corev1.Volume{{Name: "config", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "old-config"}}}}},
 		}}).
-		SetConfigs([]workloads.ConfigTemplate{{Name: "main", ConfigHash: ptr.To("old-hash"), Reconfigure: &kbappsv1.Action{}, Parameters: map[string]string{"id": "main"}}}).
+		SetConfigs([]workloads.ConfigTemplate{{Name: "main", ConfigHash: ptr.To("old-hash"), Reconfigure: &kbappsv1.Action{}, Parameters: map[string]string{"id": "main"}, Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "old-config"}}}).
 		SetPodUpdatePolicy(kbappsv1.PreferInPlacePodUpdatePolicyType).
 		SetPodUpgradePolicy(kbappsv1.PreferInPlacePodUpdatePolicyType).
 		GetObject()

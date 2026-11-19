@@ -37,7 +37,13 @@ func ResolveConfigs(template *InstanceTemplateExt, configs, overrides []workload
 	for i := range configs {
 		config := &configs[i]
 		if config.Volume != nil {
-			return fmt.Errorf("config %q: volume binding is only supported in instance templates", config.Name)
+			index, err := configVolumeIndex(template, *config)
+			if err != nil {
+				return err
+			}
+			if template.Spec.Volumes[index].ConfigMap.Name != config.Volume.ConfigMapName {
+				return fmt.Errorf("config %q: binding ConfigMap %q does not match volume %q source", config.Name, config.Volume.ConfigMapName, config.Volume.VolumeName)
+			}
 		}
 		counts[config.Name]++
 		indices[config.Name] = i
@@ -60,7 +66,14 @@ func ResolveConfigs(template *InstanceTemplateExt, configs, overrides []workload
 		if counts[config.Name] > 1 {
 			return fmt.Errorf("config override %q matches multiple InstanceSet configs", config.Name)
 		}
+		baseBinding := configs[index].Volume
+		if config.Volume != nil && (baseBinding == nil || config.Volume.VolumeName != baseBinding.VolumeName) {
+			return fmt.Errorf("config override %q: volume must match an explicit InstanceSet config binding", config.Name)
+		}
 		effective[index] = *config.DeepCopy()
+		if effective[index].Volume == nil && baseBinding != nil {
+			effective[index].Volume = baseBinding.DeepCopy()
+		}
 	}
 
 	podTemplate := &template.PodTemplateSpec
@@ -76,38 +89,41 @@ func ResolveConfigs(template *InstanceTemplateExt, configs, overrides []workload
 		if binding == nil {
 			continue
 		}
-		if binding.VolumeName == "" || binding.ConfigMapName == "" {
-			return fmt.Errorf("config %q: volume and ConfigMap names must not be empty", config.Name)
-		}
-		for _, claim := range template.VolumeClaimTemplates {
-			if claim.Name == binding.VolumeName {
-				return fmt.Errorf("config %q: volume %q is replaced by a persistent volume claim", config.Name, binding.VolumeName)
-			}
+		index, err := configVolumeIndex(template, config)
+		if err != nil {
+			return err
 		}
 		if destination, exists := destinations[binding.VolumeName]; exists && destination != binding.ConfigMapName {
 			return fmt.Errorf("conflicting ConfigMap bindings for volume %q", binding.VolumeName)
 		}
 		destinations[binding.VolumeName] = binding.ConfigMapName
-		found := false
-		for i := range podTemplate.Spec.Volumes {
-			volume := &podTemplate.Spec.Volumes[i]
-			if volume.Name != binding.VolumeName {
-				continue
-			}
-			if volume.ConfigMap == nil {
-				return fmt.Errorf("config %q: volume %q is not a ConfigMap volume", config.Name, binding.VolumeName)
-			}
-			volume.ConfigMap.Name = binding.ConfigMapName
-			found = true
-			break
-		}
-		if !found {
-			return fmt.Errorf("config %q: volume %q does not exist", config.Name, binding.VolumeName)
-		}
+		podTemplate.Spec.Volumes[index].ConfigMap.Name = binding.ConfigMapName
 	}
 	template.PodTemplateSpec = *podTemplate
 	template.Configs = effective
 	return nil
+}
+
+func configVolumeIndex(template *InstanceTemplateExt, config workloads.ConfigTemplate) (int, error) {
+	binding := config.Volume
+	if binding.VolumeName == "" || binding.ConfigMapName == "" {
+		return 0, fmt.Errorf("config %q: volume and ConfigMap names must not be empty", config.Name)
+	}
+	for _, claim := range template.VolumeClaimTemplates {
+		if claim.Name == binding.VolumeName {
+			return 0, fmt.Errorf("config %q: volume %q is replaced by a persistent volume claim", config.Name, binding.VolumeName)
+		}
+	}
+	for i, volume := range template.Spec.Volumes {
+		if volume.Name != binding.VolumeName {
+			continue
+		}
+		if volume.ConfigMap == nil {
+			return 0, fmt.Errorf("config %q: volume %q is not a ConfigMap volume", config.Name, binding.VolumeName)
+		}
+		return i, nil
+	}
+	return 0, fmt.Errorf("config %q: volume %q does not exist", config.Name, binding.VolumeName)
 }
 
 // BuildInstanceTemplatesWithConfigs maps desired instance names to effective Pod templates and configs.
@@ -115,6 +131,15 @@ func BuildInstanceTemplatesWithConfigs(its *workloads.InstanceSet, tree *kubebui
 	itsExt, err := BuildInstanceSetExt(its, tree)
 	if err != nil {
 		return nil, err
+	}
+	if len(itsExt.InstanceTemplates) == 0 {
+		template := &InstanceTemplateExt{
+			PodTemplateSpec:      its.Spec.Template,
+			VolumeClaimTemplates: its.Spec.VolumeClaimTemplates,
+		}
+		if err := ResolveConfigs(template, its.Spec.Configs, nil); err != nil {
+			return nil, err
+		}
 	}
 	opts := &PodNameBuilderOpts{}
 	if tree != nil {
@@ -164,30 +189,16 @@ func ChangedConfigMapVolumes(old, desired *corev1.Pod) map[string]bool {
 	return changed
 }
 
-// ConfigsForMountedVolumes returns configs that can be applied through the existing Pod's mounts.
-// If a changed volume has no config association, omit unbound configs as well.
-// The replacement Pod starts with the desired files and hashes.
+// ConfigsForMountedVolumes excludes actions whose explicitly associated volume needs replacement.
+// Unbound legacy configs retain their existing reload behavior.
 func ConfigsForMountedVolumes(configs []workloads.ConfigTemplate, old, desired *corev1.Pod) []workloads.ConfigTemplate {
 	changed := ChangedConfigMapVolumes(old, desired)
 	if len(changed) == 0 {
 		return configs
 	}
-	unassociated := make(map[string]bool, len(changed))
-	for name := range changed {
-		unassociated[name] = true
-	}
-	for _, config := range configs {
-		if config.Volume != nil {
-			delete(unassociated, config.Volume.VolumeName)
-		}
-	}
 	mounted := make([]workloads.ConfigTemplate, 0, len(configs))
 	for _, config := range configs {
-		if config.Volume == nil {
-			if len(unassociated) > 0 {
-				continue
-			}
-		} else if changed[config.Volume.VolumeName] {
+		if config.Volume != nil && changed[config.Volume.VolumeName] {
 			continue
 		}
 		mounted = append(mounted, config)

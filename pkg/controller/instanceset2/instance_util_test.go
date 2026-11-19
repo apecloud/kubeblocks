@@ -272,7 +272,7 @@ func newITS2ConfigFixture(t *testing.T, compressed bool) (*workloads.InstanceSet
 	its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 	its.Spec.FlatInstanceOrdinal = compressed
 	its.Spec.Configs = []workloads.ConfigTemplate{
-		{Name: "main", ConfigHash: ptr.To("global")},
+		{Name: "main", ConfigHash: ptr.To("global"), Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "main"}},
 		{Name: "aux", ConfigHash: ptr.To("inherited")},
 	}
 	its.Spec.Template = corev1.PodTemplateSpec{Spec: corev1.PodSpec{
@@ -340,10 +340,8 @@ func assertITS2ConfigIntent(t *testing.T, inst *workloads.Instance, configMap, h
 		inst.Spec.Configs[1].Name != "aux" || ptr.Deref(inst.Spec.Configs[1].ConfigHash, "") != "inherited" {
 		t.Fatalf("%s configs = %#v, want override %q and inherited aux", inst.Name, inst.Spec.Configs, hash)
 	}
-	for _, config := range inst.Spec.Configs {
-		if config.Volume != nil {
-			t.Fatalf("child %s retained parent volume binding: %#v", inst.Name, config)
-		}
+	if binding := inst.Spec.Configs[0].Volume; binding == nil || binding.VolumeName != "config" || binding.ConfigMapName != configMap {
+		t.Fatalf("child %s lost resolved volume association: %#v", inst.Name, binding)
 	}
 	if getInstanceRevision(inst) == "" {
 		t.Fatalf("%s has no Instance revision", inst.Name)

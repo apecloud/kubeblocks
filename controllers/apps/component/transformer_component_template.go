@@ -209,10 +209,8 @@ func (t *componentFileTemplateTransformer) prepareSpecializedConfigMap(transCtx 
 			return nil, err
 		}
 		current = nil
-	} else {
-		if !isCurrentComponentConfigMap(transCtx.Component, current) {
-			return nil, fmt.Errorf("the ConfigMap name for instance template %s config %s conflicts", instanceName, tpl.Name)
-		}
+	} else if !isCurrentComponentConfigMap(transCtx.Component, current) {
+		return nil, fmt.Errorf("the ConfigMap name for instance template %s config %s conflicts", instanceName, tpl.Name)
 	}
 	if (ptr.Deref(transCtx.SynthesizeComponent.EnableInstanceAPI, false) &&
 		transCtx.Component.Annotations[constant.KBAppMultiClusterPlacementKey] != "") ||

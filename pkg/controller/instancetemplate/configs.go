@@ -22,6 +22,8 @@ package instancetemplate
 import (
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
+
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )

@@ -406,7 +406,7 @@ var _ = Describe("InstanceSet Controller 2", func() {
 			DeferCleanup(func() { intctrlutil.SupportResizeSubResource = supportResize })
 			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
 				f.SetReplicas(2)
-				f.AddConfigs(workloads.ConfigTemplate{Name: "server", ConfigHash: ptr.To("base")})
+				f.AddConfigs(workloads.ConfigTemplate{Name: "server", ConfigHash: ptr.To("base"), Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "shared-config"}})
 				spec := &f.Get().Spec
 				spec.InstanceUpdateStrategy = &kbappsv1.InstanceUpdateStrategy{Type: kbappsv1.RollingUpdateStrategyType}
 				spec.Template.Spec.Volumes = []corev1.Volume{{
@@ -433,7 +433,7 @@ var _ = Describe("InstanceSet Controller 2", func() {
 				volume := And(HaveField("Name", "config"), HaveField("ConfigMap", HaveField("Name", source)))
 				Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, inst *workloads.Instance) {
 					g.Expect(inst.Spec.Template.Spec.Volumes).Should(ContainElement(volume))
-					g.Expect(inst.Spec.Configs).Should(Equal([]workloads.ConfigTemplate{{Name: "server", ConfigHash: ptr.To(hash)}}))
+					g.Expect(inst.Spec.Configs).Should(Equal([]workloads.ConfigTemplate{{Name: "server", ConfigHash: ptr.To(hash), Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: source}}}))
 				})).Should(Succeed())
 				var uid types.UID
 				Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pod *corev1.Pod) {

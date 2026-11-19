@@ -112,9 +112,6 @@ func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree,
 	instName string, template *instancetemplate.InstanceTemplateExt, its *workloads.InstanceSet) (*workloads.Instance, error) {
 	labels := getMatchLabels(its.Name)
 	configs := copyConfigTemplates(template.Configs)
-	for i := range configs {
-		configs[i].Volume = nil
-	}
 	b := builder.NewInstanceBuilder(its.Namespace, instName).
 		AddAnnotationsInMap(template.Annotations).
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(its.Generation, 10)).

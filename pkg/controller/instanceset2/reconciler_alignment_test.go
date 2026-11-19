@@ -47,8 +47,7 @@ func TestAlignmentBuildsInstancesWithEffectiveConfigs(t *testing.T) {
 				t.Fatal("building child Instances changed source InstanceSet spec")
 			}
 
-			// A resolved template is shared by its replicas; clearing the parent-only binding
-			// in the child must leave that template available for the next child build.
+			// Replicas share a resolved template, but each child owns its config association.
 			templates, err := instancetemplate.BuildInstanceTemplatesWithConfigs(its, tree)
 			if err != nil {
 				t.Fatal(err)
@@ -61,6 +60,7 @@ func TestAlignmentBuildsInstancesWithEffectiveConfigs(t *testing.T) {
 					t.Fatal(err)
 				}
 				assertITS2ConfigIntent(t, child, "main-a", "specific")
+				child.Spec.Configs[0].Volume.ConfigMapName = "child-only"
 			}
 			if !reflect.DeepEqual(template.Configs[0], before) || template.Configs[0].Volume == nil {
 				t.Fatal("building child Instance modified the resolved template config")

@@ -335,8 +335,8 @@ func configsToUpdate(desired []workloads.ConfigTemplate, pod *corev1.Pod) ([]wor
 	return toUpdate, nil
 }
 
-func hasConfigRestart(inst *workloads.Instance, pod *corev1.Pod) (bool, []string, error) {
-	toUpdate, err := configsToUpdate(inst.Spec.Configs, pod)
+func hasConfigRestart(configs []workloads.ConfigTemplate, pod *corev1.Pod) (bool, []string, error) {
+	toUpdate, err := configsToUpdate(configs, pod)
 	if err != nil {
 		return false, nil, err
 	}

@@ -666,7 +666,7 @@ func TestHasConfigRestart(t *testing.T) {
 		t.Fatalf("configsToPod() error = %v", err)
 	}
 
-	needRestart, names, err := hasConfigRestart(inst, pod)
+	needRestart, names, err := hasConfigRestart(inst.Spec.Configs, pod)
 	if err != nil {
 		t.Fatalf("hasConfigRestart() error = %v", err)
 	}
@@ -675,7 +675,7 @@ func TestHasConfigRestart(t *testing.T) {
 	}
 
 	pod.Annotations[constant.CMInsConfigurationHashLabelKey] = "not-json"
-	if _, _, err := hasConfigRestart(inst, pod); err == nil {
+	if _, _, err := hasConfigRestart(inst.Spec.Configs, pod); err == nil {
 		t.Fatal("expected invalid config annotation error")
 	}
 }

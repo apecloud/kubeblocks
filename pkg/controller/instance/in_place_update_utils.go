@@ -342,15 +342,16 @@ func getPodUpdatePolicy(inst *workloads.Instance, pod *corev1.Pod) (podUpdatePol
 
 func getPodUpdatePolicyForDesiredPod(inst *workloads.Instance, pod, newPod *corev1.Pod) (podUpdatePolicy, workloads.PodUpdatePolicyType, error) {
 	specUpdatePolicy := getPodUpdatePolicyInSpec(inst, pod, newPod)
-	if len(instancetemplate.ChangedConfigMapVolumes(pod, newPod)) > 0 {
-		return recreatePolicy, specUpdatePolicy, nil
-	}
-	configRestart, _, err := hasConfigRestart(inst, pod)
+	configs := instancetemplate.ConfigsForMountedVolumes(inst.Spec.Configs, pod, newPod)
+	configRestart, _, err := hasConfigRestart(configs, pod)
 	if err != nil {
 		return noOpsPolicy, "", err
 	}
 	if configRestart {
 		return recreatePolicy, inst.Spec.PodUpdatePolicy, nil
+	}
+	if len(instancetemplate.ChangedConfigMapVolumes(pod, newPod)) > 0 {
+		return recreatePolicy, specUpdatePolicy, nil
 	}
 
 	if getPodRevision(pod) != inst.Status.UpdateRevision {

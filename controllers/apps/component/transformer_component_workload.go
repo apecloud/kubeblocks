@@ -45,6 +45,7 @@ import (
 // componentWorkloadTransformer handles component workload generation
 type componentWorkloadTransformer struct {
 	client.Client
+	configProviders []string
 }
 
 var _ graph.Transformer = &componentWorkloadTransformer{}
@@ -92,7 +93,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	if err != nil {
 		return err
 	}
-	return collectInstanceConfigMaps(transCtx, t.Client, protoITS)
+	return collectInstanceConfigMaps(transCtx, t.Client, protoITS, t.configProviders)
 }
 
 func (t *componentWorkloadTransformer) reconcileWorkload(ctx context.Context, cli client.Reader,
@@ -200,8 +201,8 @@ func (t *componentWorkloadTransformer) handleWorkloadStartNStop(transCtx *compon
 	if start || stop {
 		runningITSCopy := runningITS.DeepCopy()
 		// While stopped, normal updates stay deferred, so acknowledge the generation here.
-		// Start only clears Stop here; defer its generation until the normal update publishes
-		// the requested workload, so old readiness cannot complete pending operations.
+		// Start publishes configuration with Stop. Defer its generation until the normal
+		// update publishes the rest of the requested workload.
 		if stop {
 			runningITSCopy.Annotations[constant.KubeBlocksGenerationKey] = (*protoITS).Annotations[constant.KubeBlocksGenerationKey]
 		}

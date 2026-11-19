@@ -2002,7 +2002,7 @@ func TestInstanceAPITransferredIdentityCleanup(t *testing.T) {
 	}
 }
 
-func legacyStopRecoveryFixture(t *testing.T, replicas int32, minReadySeconds int32) client.WithWatch {
+func legacyStopRecoveryFixture(t *testing.T, replicas int32, minReadySeconds int32, customize ...func(*workloads.InstanceSet)) client.WithWatch {
 	t.Helper()
 	scheme := runtime.NewScheme()
 	if err := clientgoscheme.AddToScheme(scheme); err != nil {
@@ -2022,6 +2022,9 @@ func legacyStopRecoveryFixture(t *testing.T, replicas int32, minReadySeconds int
 				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}, Resources: corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}},
 			}}},
 		},
+	}
+	for _, change := range customize {
+		change(its)
 	}
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&workloads.InstanceSet{}, &corev1.Pod{}, &corev1.PersistentVolumeClaim{}).WithObjects(its).Build()
 	legacyStopRecoveryReconcile(t, cli, 4)
@@ -2227,6 +2230,97 @@ func TestLegacyInstanceSetStopRecoveryFlatTemplateChange(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestLegacyInstanceSetStartUsesLatestNamedTemplateConfigs(t *testing.T) {
+	config := func(name, volume, configMap, hash string) workloads.ConfigTemplate {
+		return workloads.ConfigTemplate{Name: name, ConfigHash: ptr.To(hash), Volume: &workloads.ConfigMapVolumeBinding{VolumeName: volume, ConfigMapName: configMap}}
+	}
+	volume := func(name, configMap string) corev1.Volume {
+		return corev1.Volume{Name: name, VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: configMap}}}}
+	}
+	cli := legacyStopRecoveryFixture(t, 1, 0, func(its *workloads.InstanceSet) {
+		its.Spec.Template.Spec.Volumes = []corev1.Volume{volume("main", "default-old")}
+		its.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: "main", MountPath: "/etc/main"}}
+		its.Spec.Configs = []workloads.ConfigTemplate{config("main", "main", "default-old", "default-old-hash")}
+		its.Spec.Instances = []workloads.InstanceTemplate{{Name: "canary", Replicas: ptr.To(int32(1)), Configs: []workloads.ConfigTemplate{config("main", "main", "special-old", "special-old-hash")}}}
+	})
+	legacyStopRecoveryReady(t, cli)
+	initial := legacyStopRecoveryPods(t, cli)[0]
+	claims := legacyStopRecoveryClaims(t, cli)
+	if initial.Name != "legacy-stop-canary-0" || initial.Spec.Volumes[0].ConfigMap.Name != "special-old" {
+		t.Fatal("fixture did not create the named member with its specialized config")
+	}
+	legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(true) })
+	legacyStopRecoveryReconcile(t, cli, 4)
+	stopped := legacyStopRecoverySet(t, cli)
+	status := stopped.FindInstanceStatus(initial.Name)
+	if len(legacyStopRecoveryPods(t, cli)) != 0 || stopped.Status.Replicas != 0 || status == nil || status.TemplateName == nil || *status.TemplateName != "canary" || status.CurrentState != workloads.InstanceCurrentStateAbsent {
+		t.Fatalf("Stop did not remove the Pod while retaining its named identity: %#v", status)
+	}
+	if !reflect.DeepEqual(claims, legacyStopRecoveryClaims(t, cli)) {
+		t.Fatal("Stop changed retained storage")
+	}
+
+	// The Component publishes these files and bindings before releasing Stop.
+	for _, name := range []string{"default-latest", "special-latest", "default-extra", "special-extra"} {
+		cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: initial.Namespace}, Data: map[string]string{"config": name}}
+		if err := cli.Create(context.Background(), cm); err != nil {
+			t.Fatal(err)
+		}
+	}
+	legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) {
+		its.Spec.Template.Spec.Volumes = []corev1.Volume{volume("main", "default-latest"), volume("extra", "default-extra")}
+		its.Spec.Template.Spec.Containers[0].VolumeMounts = append(its.Spec.Template.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{Name: "extra", MountPath: "/etc/extra"})
+		its.Spec.Configs = []workloads.ConfigTemplate{config("main", "main", "default-latest", "default-latest-hash"), config("extra", "extra", "default-extra", "default-extra-hash")}
+		its.Spec.Instances[0].Configs = []workloads.ConfigTemplate{config("main", "main", "special-latest", "special-latest-hash"), config("extra", "extra", "special-extra", "special-extra-hash")}
+	})
+	legacyStopRecoveryReconcile(t, cli, 3)
+	if len(legacyStopRecoveryPods(t, cli)) != 0 || !ptr.Deref(legacyStopRecoverySet(t, cli).Spec.Stop, false) {
+		t.Fatal("publishing configs recreated a stopped Pod")
+	}
+	legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = nil })
+	var created []*corev1.Pod
+	guarded := interceptor.NewClient(cli, interceptor.Funcs{Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+		if pod, ok := obj.(*corev1.Pod); ok {
+			created = append(created, pod.DeepCopy())
+		}
+		return c.Create(ctx, obj, opts...)
+	}})
+	legacyStopRecoveryReconcile(t, guarded, 3)
+	if len(created) != 1 {
+		t.Fatalf("resume created %d Pods, want the first named member", len(created))
+	}
+	resumed := created[0]
+	if resumed.Name != initial.Name || resumed.Labels[instancetemplate.TemplateNameLabelKey] != "canary" {
+		t.Fatal("first resumed Pod lost its named identity")
+	}
+	sources := make(map[string]string)
+	claimName := ""
+	for _, mounted := range resumed.Spec.Volumes {
+		if mounted.ConfigMap != nil {
+			sources[mounted.Name] = mounted.ConfigMap.Name
+		}
+		if mounted.Name == "data" && mounted.PersistentVolumeClaim != nil {
+			claimName = mounted.PersistentVolumeClaim.ClaimName
+		}
+	}
+	if claimName != claims[0].Name {
+		t.Fatal("first resumed Pod did not mount its retained claim")
+	}
+	if !reflect.DeepEqual(sources, map[string]string{"main": "special-latest", "extra": "special-extra"}) || !reflect.DeepEqual(resumed.Spec.Containers[0].VolumeMounts, legacyStopRecoverySet(t, cli).Spec.Template.Spec.Containers[0].VolumeMounts) {
+		t.Fatalf("first resumed Pod did not use latest specialized mounts: %#v", resumed.Spec)
+	}
+	hashes := make(map[string]string)
+	if err := json.Unmarshal([]byte(resumed.Annotations[constant.CMInsConfigurationHashLabelKey]), &hashes); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(hashes, map[string]string{"main": "special-latest-hash", "extra": "special-extra-hash"}) {
+		t.Fatalf("first resumed Pod has stale effective config hashes: %#v", hashes)
+	}
+	if !reflect.DeepEqual(claims, legacyStopRecoveryClaims(t, cli)) {
+		t.Fatal("resume changed retained storage")
 	}
 }
 

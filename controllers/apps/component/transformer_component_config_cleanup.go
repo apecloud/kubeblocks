@@ -37,7 +37,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-func collectInstanceConfigMaps(transCtx *componentTransformContext, cli client.Client, desired *workloads.InstanceSet) error {
+func collectInstanceConfigMaps(transCtx *componentTransformContext, cli client.Client, desired *workloads.InstanceSet, providerContexts []string) error {
 	labels := constant.GetCompLabels(transCtx.SynthesizeComponent.ClusterName, transCtx.SynthesizeComponent.Name)
 	authorities, err := instanceConfigMapAuthorities(transCtx, cli, labels)
 	if err != nil {
@@ -69,7 +69,7 @@ func collectInstanceConfigMaps(transCtx *componentTransformContext, cli client.C
 		if retained.Has(cm.Name) {
 			continue
 		}
-		mirrors, err := instanceConfigMapMirrors(transCtx, cli, cm)
+		mirrors, err := instanceConfigMapMirrors(transCtx, cli, cm, providerContexts)
 		if err != nil {
 			return configMapCollectionWait(err)
 		}
@@ -111,7 +111,7 @@ func collectInstanceConfigMaps(transCtx *componentTransformContext, cli client.C
 
 // The caller has already removed the InstanceSet. Keep its authority records
 // until child runtimes and managed provider copies have disappeared as well.
-func collectDeletingInstanceConfigMaps(transCtx *componentTransformContext, cli client.Client, labels map[string]string) error {
+func collectDeletingInstanceConfigMaps(transCtx *componentTransformContext, cli client.Client, labels map[string]string, providerContexts []string) error {
 	authorities, err := instanceConfigMapAuthorities(transCtx, cli, labels)
 	if err != nil {
 		return err
@@ -129,7 +129,7 @@ func collectDeletingInstanceConfigMaps(transCtx *componentTransformContext, cli 
 	providerObservations := make(map[string]*instanceConfigMapObservations)
 	copies := make([]instanceConfigMapCopy, 0)
 	for _, authority := range authorities {
-		mirrors, err := instanceConfigMapMirrors(transCtx, cli, authority)
+		mirrors, err := instanceConfigMapMirrors(transCtx, cli, authority, providerContexts)
 		if err != nil {
 			return err
 		}
@@ -183,9 +183,14 @@ type instanceConfigMapCopy struct {
 	placement string
 }
 
-func instanceConfigMapMirrors(transCtx *componentTransformContext, cli client.Client, authority *corev1.ConfigMap) ([]instanceConfigMapCopy, error) {
+func instanceConfigMapMirrors(transCtx *componentTransformContext, cli client.Client, authority *corev1.ConfigMap, providerContexts []string) ([]instanceConfigMapCopy, error) {
 	mirrors := make([]instanceConfigMapCopy, 0)
 	placements := configMapPlacements(authority.Annotations[instanceConfigMapPlacementsAnnotationKey])
+	// With no configured providers, routing falls back to the control client.
+	configured := sets.New(providerContexts...)
+	if missing := placements.Difference(configured); len(missing) > 0 {
+		return nil, fmt.Errorf("instance configuration providers are not configured: %v", sets.List(missing))
+	}
 	for _, placement := range sets.List(placements) {
 		current := &corev1.ConfigMap{}
 		ctx := multicluster.IntoContext(transCtx.Context, placement)

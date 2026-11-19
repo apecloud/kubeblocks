@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"maps"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
@@ -50,12 +51,7 @@ const (
 )
 
 func dependOnInstanceConfigMaps(cli model.GraphClient, dag *graph.DAG, its *workloads.InstanceSet) {
-	referenced := instanceConfigMapNames(its)
-	for _, config := range its.Spec.Configs {
-		if config.Volume != nil {
-			referenced.Insert(config.Volume.ConfigMapName)
-		}
-	}
+	referenced := boundConfigMapNames(its)
 	for name := range referenced {
 		cli.DependOn(dag, its, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: its.Namespace, Name: name}})
 	}
@@ -82,19 +78,15 @@ func configMapPlacements(value string) sets.Set[string] {
 // Start retains deferred workload changes, but must publish the files and hashes
 // that the first replacement Pod will use before releasing the Stop barrier.
 func publishStartingInstanceConfigs(target, desired *workloads.InstanceSet) {
-	mounts := sets.New[string]()
-	for _, volume := range target.Spec.Template.Spec.Volumes {
-		if volume.ConfigMap != nil {
-			mounts.Insert(volume.Name)
+	configVolumes := sets.New[string]()
+	for _, its := range []*workloads.InstanceSet{target, desired} {
+		for _, config := range its.Spec.Configs {
+			if config.Volume != nil {
+				configVolumes.Insert(config.Volume.VolumeName)
+			}
 		}
 	}
-	for _, config := range desired.Spec.Configs {
-		if config.Volume != nil && !mounts.Has(config.Volume.VolumeName) {
-			return
-		}
-	}
-	previousConfigMaps := sets.New[string]()
-	retainInstanceSetConfigMaps(previousConfigMaps, target)
+	previousConfigMaps := boundConfigMapNames(target)
 	target.Spec.Configs = desired.Spec.Configs
 	configs := make(map[string][]workloads.ConfigTemplate, len(desired.Spec.Instances))
 	for _, instance := range desired.Spec.Instances {
@@ -103,31 +95,89 @@ func publishStartingInstanceConfigs(target, desired *workloads.InstanceSet) {
 	for i := range target.Spec.Instances {
 		target.Spec.Instances[i].Configs = configs[target.Spec.Instances[i].Name]
 	}
-	for _, config := range desired.Spec.Configs {
-		if config.Volume == nil {
-			continue
-		}
-		for i := range target.Spec.Template.Spec.Volumes {
-			volume := &target.Spec.Template.Spec.Volumes[i]
-			if volume.Name == config.Volume.VolumeName && volume.ConfigMap != nil {
-				volume.ConfigMap.Name = config.Volume.ConfigMapName
-			}
-		}
+
+	targetPod := &target.Spec.Template.Spec
+	desiredPod := &desired.Spec.Template.Spec
+	targetPod.Volumes = projectConfigVolumes(targetPod.Volumes, desiredPod.Volumes, configVolumes, func(v corev1.Volume) string { return v.Name })
+	availableVolumes := sets.New[string]()
+	for _, volume := range targetPod.Volumes {
+		availableVolumes.Insert(volume.Name)
 	}
-	currentConfigMaps := sets.New[string]()
-	retainInstanceSetConfigMaps(currentConfigMaps, target)
-	assistants := make([]corev1.ObjectReference, 0, len(target.Spec.InstanceAssistantObjects))
+	projectConfigMounts(targetPod.Containers, desiredPod.Containers, configVolumes, availableVolumes)
+	projectConfigMounts(targetPod.InitContainers, desiredPod.InitContainers, configVolumes, availableVolumes)
+
+	currentConfigMaps := boundConfigMapNames(target)
+	isManagedConfigMap := func(ref corev1.ObjectReference, names sets.Set[string]) bool {
+		return ref.Kind == "ConfigMap" && (ref.Namespace == "" || ref.Namespace == target.Namespace) && names.Has(ref.Name)
+	}
+	assistants := target.Spec.InstanceAssistantObjects[:0]
 	for _, ref := range target.Spec.InstanceAssistantObjects {
-		if ref.Kind != "ConfigMap" || !previousConfigMaps.Has(ref.Name) {
+		if !isManagedConfigMap(ref, previousConfigMaps) {
 			assistants = append(assistants, ref)
 		}
 	}
 	for _, ref := range desired.Spec.InstanceAssistantObjects {
-		if ref.Kind == "ConfigMap" && currentConfigMaps.Has(ref.Name) {
+		if isManagedConfigMap(ref, currentConfigMaps) && !slices.Contains(assistants, ref) {
 			assistants = append(assistants, ref)
 		}
 	}
 	target.Spec.InstanceAssistantObjects = assistants
+}
+
+func boundConfigMapNames(its *workloads.InstanceSet) sets.Set[string] {
+	names := sets.New[string]()
+	for _, config := range its.Spec.Configs {
+		if config.Volume != nil {
+			names.Insert(config.Volume.ConfigMapName)
+		}
+	}
+	for _, instance := range its.Spec.Instances {
+		for _, config := range instance.Configs {
+			if config.Volume != nil {
+				names.Insert(config.Volume.ConfigMapName)
+			}
+		}
+	}
+	return names
+}
+
+func projectConfigMounts(current, desired []corev1.Container, configVolumes, availableVolumes sets.Set[string]) {
+	for i := range current {
+		_, next := intctrlutil.GetContainerByName(desired, current[i].Name)
+		if next == nil {
+			current[i].VolumeMounts = slices.DeleteFunc(current[i].VolumeMounts, func(m corev1.VolumeMount) bool {
+				return configVolumes.Has(m.Name) && !availableVolumes.Has(m.Name)
+			})
+			continue
+		}
+		current[i].VolumeMounts = projectConfigVolumes(current[i].VolumeMounts, next.VolumeMounts, configVolumes, func(m corev1.VolumeMount) string { return m.Name })
+	}
+}
+
+func projectConfigVolumes[T any](current, desired []T, configVolumes sets.Set[string], name func(T) string) []T {
+	var result []T
+	replacements := make(map[string][]T)
+	for _, item := range desired {
+		volume := name(item)
+		if configVolumes.Has(volume) {
+			replacements[volume] = append(replacements[volume], item)
+		}
+	}
+	for _, item := range current {
+		volume := name(item)
+		if !configVolumes.Has(volume) {
+			result = append(result, item)
+			continue
+		}
+		result = append(result, replacements[volume]...)
+		delete(replacements, volume)
+	}
+	for _, item := range desired {
+		if _, ok := replacements[name(item)]; ok {
+			result = append(result, item)
+		}
+	}
+	return result
 }
 
 func isCurrentComponentConfigMap(comp *appsv1.Component, cm *corev1.ConfigMap) bool {

@@ -41,7 +41,10 @@ import (
 )
 
 // componentDeletionTransformer handles component deletion
-type componentDeletionTransformer struct{ client.Client }
+type componentDeletionTransformer struct {
+	client.Client
+	configProviders []string
+}
 
 var _ graph.Transformer = &componentDeletionTransformer{}
 
@@ -115,7 +118,7 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 		transCtx.Logger.Info(fmt.Sprintf("wait for the workloads to be deleted: %v", workloads))
 		return graph.ErrPrematureStop
 	}
-	if err = collectDeletingInstanceConfigMaps(transCtx, t.Client, matchLabels); err != nil {
+	if err = collectDeletingInstanceConfigMaps(transCtx, t.Client, matchLabels, t.configProviders); err != nil {
 		return err
 	}
 

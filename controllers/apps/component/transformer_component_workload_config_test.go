@@ -41,6 +41,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -74,6 +75,11 @@ func managedInstanceConfig(comp *appsv1.Component, name string) *corev1.ConfigMa
 
 func workloadConfigPlan(t *testing.T, cli client.Client, comp *appsv1.Component, synth *component.SynthesizedComponent, running *workloads.InstanceSet, maps ...*corev1.ConfigMap) (*componentPlan, error) {
 	t.Helper()
+	return workloadConfigPlanWithProviders(t, cli, comp, synth, running, nil, maps...)
+}
+
+func workloadConfigPlanWithProviders(t *testing.T, cli client.Client, comp *appsv1.Component, synth *component.SynthesizedComponent, running *workloads.InstanceSet, providers []string, maps ...*corev1.ConfigMap) (*componentPlan, error) {
+	t.Helper()
 	graphCli := model.NewGraphClient(cli)
 	dag := graph.NewDAG()
 	graphCli.Root(dag, comp, comp, model.ActionStatusPtr())
@@ -98,7 +104,7 @@ func workloadConfigPlan(t *testing.T, cli client.Client, comp *appsv1.Component,
 		}
 		return builder.defaultWalkFunc(v)
 	}}
-	err := (&componentWorkloadTransformer{Client: cli}).Transform(transCtx, dag)
+	err := (&componentWorkloadTransformer{Client: cli, configProviders: providers}).Transform(transCtx, dag)
 	return plan, err
 }
 
@@ -248,7 +254,7 @@ func TestInstanceConfigCollectionRetainsRemotePod(t *testing.T) {
 	oldProvider := fake.NewClientBuilder().WithScheme(scheme).WithObjects(mirrored, pod).Build()
 	newProvider := fake.NewClientBuilder().WithScheme(scheme).Build()
 	cli := multicluster.NewClient(control, map[string]client.Client{"old-provider": oldProvider, "new-provider": newProvider})
-	plan, err := workloadConfigPlan(t, cli, comp, synth, nil)
+	plan, err := workloadConfigPlanWithProviders(t, cli, comp, synth, nil, []string{"old-provider", "new-provider"})
 	if !intctrlutil.IsDelayedRequeueError(err) {
 		t.Fatalf("expected remote reference retry, got %v", err)
 	}
@@ -262,7 +268,7 @@ func TestInstanceConfigCollectionRetainsRemotePod(t *testing.T) {
 	if err := control.Get(context.Background(), client.ObjectKeyFromObject(comp), current); err != nil {
 		t.Fatal(err)
 	}
-	plan, err = workloadConfigPlan(t, cli, comp, synth, current)
+	plan, err = workloadConfigPlanWithProviders(t, cli, comp, synth, current, []string{"old-provider", "new-provider"})
 	if err != nil && !intctrlutil.IsDelayedRequeueError(err) {
 		t.Fatal(err)
 	}
@@ -283,7 +289,7 @@ func TestInstanceConfigCollectionRetainsRemotePod(t *testing.T) {
 		t.Fatal(err)
 	}
 	for pass := 0; pass < 2; pass++ {
-		plan, err = workloadConfigPlan(t, cli, comp, synth, current)
+		plan, err = workloadConfigPlanWithProviders(t, cli, comp, synth, current, []string{"old-provider", "new-provider"})
 		if err != nil && !intctrlutil.IsDelayedRequeueError(err) {
 			t.Fatal(err)
 		}
@@ -303,6 +309,89 @@ func TestInstanceConfigCollectionRetainsRemotePod(t *testing.T) {
 		if err := provider.Get(context.Background(), client.ObjectKeyFromObject(authoritative), &corev1.ConfigMap{}); !apierrors.IsNotFound(err) {
 			t.Fatalf("retired provider CM remains: %v", err)
 		}
+	}
+}
+
+func TestInstanceConfigStartPublishesNewVolumes(t *testing.T) {
+	for _, mode := range []struct {
+		name              string
+		enableInstanceAPI bool
+	}{{"direct Pod", false}, {"Instance", true}} {
+		t.Run(mode.name, func(t *testing.T) {
+			comp, synth, scheme := instanceConfigFixture(t)
+			synth.EnableInstanceAPI = ptr.To(mode.enableInstanceAPI)
+			fileVolume := func(volume, source string) corev1.Volume {
+				return corev1.Volume{Name: volume, VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: source}}}}
+			}
+			config := func(name, volume, source, hash string) workloads.ConfigTemplate {
+				return workloads.ConfigTemplate{Name: name, Volume: &workloads.ConfigMapVolumeBinding{VolumeName: volume, ConfigMapName: source}, ConfigHash: ptr.To(hash)}
+			}
+			configRef := func(name string) corev1.ObjectReference {
+				return corev1.ObjectReference{Kind: "ConfigMap", Namespace: comp.Namespace, Name: name}
+			}
+			synth.Instances = []appsv1.InstanceTemplate{{Name: "canary", Replicas: ptr.To(int32(1))}}
+			synth.InstanceConfigs = map[string][]workloads.ConfigTemplate{
+				"canary": {config("main", "config", "special-config", "old")},
+			}
+			synth.PodSpec.Volumes = append(synth.PodSpec.Volumes, fileVolume("script", "old-script"))
+			synth.PodSpec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: "config", MountPath: "/config"}, {Name: "script", MountPath: "/old-script"}}
+			synth.InstanceAssistantObjects = []corev1.ObjectReference{configRef("default-config"), configRef("old-script")}
+			running, err := component.BuildInstanceSet(synth, &appsv1.ComponentDefinition{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			running = running.DeepCopy()
+			running.Spec.Stop = ptr.To(true)
+
+			synth.Configs = append(synth.Configs, config("extra", "extra", "extra-config", "extra-base"))
+			synth.InstanceConfigs["canary"] = []workloads.ConfigTemplate{
+				config("main", "config", "special-config", "latest"),
+				config("extra", "extra", "special-extra", "extra-latest"),
+			}
+			synth.PodSpec.Volumes[1] = fileVolume("script", "new-script")
+			synth.PodSpec.Volumes = append(synth.PodSpec.Volumes, fileVolume("extra", "extra-config"))
+			synth.PodSpec.Containers[0].Image = "db:new"
+			synth.PodSpec.Containers[0].VolumeMounts[1].MountPath = "/new-script"
+			synth.PodSpec.Containers[0].VolumeMounts = append(synth.PodSpec.Containers[0].VolumeMounts, corev1.VolumeMount{Name: "extra", MountPath: "/extra"})
+			synth.InstanceAssistantObjects = []corev1.ObjectReference{configRef("default-config"), configRef("extra-config"), configRef("new-script")}
+
+			ctx := context.Background()
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(running).Build()
+			maps := []*corev1.ConfigMap{managedInstanceConfig(comp, "special-config"), managedInstanceConfig(comp, "special-extra")}
+			plan, err := workloadConfigPlan(t, cli, comp, synth, running, maps...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := plan.Execute(); err != nil {
+				t.Fatal(err)
+			}
+
+			starting := &workloads.InstanceSet{}
+			if err := cli.Get(ctx, client.ObjectKeyFromObject(running), starting); err != nil {
+				t.Fatal(err)
+			}
+			if ptr.Deref(starting.Spec.Stop, false) || !reflect.DeepEqual(starting.Spec.Instances[0].Configs, synth.InstanceConfigs["canary"]) {
+				t.Fatalf("Start did not publish both latest config bindings: %#v", starting.Spec.Instances[0].Configs)
+			}
+			templates, err := instancetemplate.BuildInstanceTemplatesWithConfigs(starting, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			pod := templates[starting.Name+"-canary-0"].Spec
+			wantVolumes := []corev1.Volume{fileVolume("config", "special-config"), fileVolume("script", "old-script"), fileVolume("extra", "special-extra")}
+			if !reflect.DeepEqual(pod.Volumes, wantVolumes) {
+				t.Fatalf("Start did not project config-only volumes: %#v", pod.Volumes)
+			}
+			container := pod.Containers[0]
+			wantMounts := []corev1.VolumeMount{{Name: "config", MountPath: "/config"}, {Name: "script", MountPath: "/old-script"}, {Name: "extra", MountPath: "/extra"}}
+			if container.Image != "db:old" || !reflect.DeepEqual(container.VolumeMounts, wantMounts) {
+				t.Fatalf("Start did not project config-only mounts: image=%s mounts=%#v", container.Image, container.VolumeMounts)
+			}
+			wantAssistants := []corev1.ObjectReference{configRef("old-script"), configRef("default-config"), configRef("extra-config")}
+			if !reflect.DeepEqual(starting.Spec.InstanceAssistantObjects, wantAssistants) {
+				t.Fatalf("Start lost the script assistant or the new config assistant: %#v", starting.Spec.InstanceAssistantObjects)
+			}
+		})
 	}
 }
 
@@ -372,7 +461,7 @@ func TestInstanceConfigIncompleteObservationDoesNotBlockPublication(t *testing.T
 		}
 		return c.Get(ctx, key, obj, opts...)
 	}})
-	plan, err := workloadConfigPlan(t, cli, comp, synth, running)
+	plan, err := workloadConfigPlanWithProviders(t, cli, comp, synth, running, []string{"unavailable"})
 	if !intctrlutil.IsDelayedRequeueError(err) {
 		t.Fatalf("expected retry: %v", err)
 	}

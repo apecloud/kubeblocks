@@ -27,6 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
@@ -53,7 +54,7 @@ func TestConfigCleanupReadsConsumersWhenScopedMirrorIsAbsent(t *testing.T) {
 			provider := fake.NewClientBuilder().WithScheme(scheme).WithObjects(object).Build()
 			cli := multicluster.NewClient(control, map[string]client.Client{"previous-provider": provider})
 			transCtx := &componentTransformContext{Context: context.Background(), Component: comp, SynthesizeComponent: synth}
-			if err := collectInstanceConfigMaps(transCtx, cli, nil); !intctrlutil.IsDelayedRequeueError(err) {
+			if err := collectInstanceConfigMaps(transCtx, cli, nil, []string{"previous-provider"}); !intctrlutil.IsDelayedRequeueError(err) {
 				t.Fatalf("expected reference wait: %v", err)
 			}
 			if err := control.Get(context.Background(), client.ObjectKeyFromObject(authority), &corev1.ConfigMap{}); err != nil {
@@ -75,7 +76,7 @@ func TestConfigCleanupRemovesMirrorBeforeAuthority(t *testing.T) {
 	cli := multicluster.NewClient(control, map[string]client.Client{"old-provider": provider})
 	transCtx := &componentTransformContext{Context: context.Background(), Component: comp, SynthesizeComponent: synth}
 	for attempt := 0; attempt < 2; attempt++ {
-		if err := collectInstanceConfigMaps(transCtx, cli, nil); !intctrlutil.IsDelayedRequeueError(err) {
+		if err := collectInstanceConfigMaps(transCtx, cli, nil, []string{"old-provider"}); !intctrlutil.IsDelayedRequeueError(err) {
 			t.Fatalf("expected cleanup confirmation: %v", err)
 		}
 		err := control.Get(context.Background(), client.ObjectKeyFromObject(authority), &corev1.ConfigMap{})
@@ -106,7 +107,7 @@ func TestConfigCleanupDefersUnknownOrUnavailableProvider(t *testing.T) {
 			}
 			cli := multicluster.NewClient(control, workers)
 			transCtx := &componentTransformContext{Context: context.Background(), Component: comp, SynthesizeComponent: synth}
-			if err := collectInstanceConfigMaps(transCtx, cli, nil); !intctrlutil.IsDelayedRequeueError(err) {
+			if err := collectInstanceConfigMaps(transCtx, cli, nil, []string{"other", "unavailable"}); !intctrlutil.IsDelayedRequeueError(err) {
 				t.Fatalf("expected incomplete-scope wait: %v", err)
 			}
 			if err := control.Get(context.Background(), client.ObjectKeyFromObject(authority), &corev1.ConfigMap{}); err != nil {
@@ -129,7 +130,7 @@ func TestDeletingConfigCleanupWaitsForAllProviderRuntimes(t *testing.T) {
 	cli := multicluster.NewClient(control, map[string]client.Client{"old-provider": provider})
 	transCtx := &componentTransformContext{Context: context.Background(), Component: comp}
 	labels := constant.GetCompLabels("db", "mysql")
-	if err := collectDeletingInstanceConfigMaps(transCtx, cli, labels); !intctrlutil.IsRequeueError(err) {
+	if err := collectDeletingInstanceConfigMaps(transCtx, cli, labels, []string{"old-provider"}); !intctrlutil.IsRequeueError(err) {
 		t.Fatalf("expected runtime wait: %v", err)
 	}
 	if err := provider.Get(context.Background(), client.ObjectKeyFromObject(mirror), &corev1.ConfigMap{}); err != nil {
@@ -138,13 +139,130 @@ func TestDeletingConfigCleanupWaitsForAllProviderRuntimes(t *testing.T) {
 	if err := provider.Delete(context.Background(), instance); err != nil {
 		t.Fatal(err)
 	}
-	if err := collectDeletingInstanceConfigMaps(transCtx, cli, labels); !intctrlutil.IsRequeueError(err) {
+	if err := collectDeletingInstanceConfigMaps(transCtx, cli, labels, []string{"old-provider"}); !intctrlutil.IsRequeueError(err) {
 		t.Fatalf("expected mirror confirmation wait: %v", err)
 	}
-	if err := collectDeletingInstanceConfigMaps(transCtx, cli, labels); err != nil {
+	if err := collectDeletingInstanceConfigMaps(transCtx, cli, labels, []string{"old-provider"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := control.Get(context.Background(), client.ObjectKeyFromObject(authority), &corev1.ConfigMap{}); err != nil {
 		t.Fatalf("whole-delete helper bypassed source deletion policy: %v", err)
+	}
+}
+
+func TestConfigCleanupRetainsRecordsAfterProviderRemoval(t *testing.T) {
+	for _, deleting := range []bool{false, true} {
+		t.Run(map[bool]string{false: "retired config", true: "component deletion"}[deleting], func(t *testing.T) {
+			comp, synth, scheme := instanceConfigFixture(t)
+			comp.Spec.EnableInstanceAPI = ptr.To(true)
+			synth.EnableInstanceAPI = ptr.To(true)
+			authority := managedInstanceConfig(comp, "retired")
+			authority.Finalizers = []string{constant.DBComponentFinalizerName}
+			authority.Annotations = map[string]string{instanceConfigMapPlacementsAnnotationKey: "old-provider"}
+			mirror := authority.DeepCopy()
+			mirror.OwnerReferences = nil
+			mirror.Finalizers = nil
+			mirror.UID = "mirror-uid"
+			control := fake.NewClientBuilder().WithScheme(scheme).WithObjects(authority).Build()
+			provider := fake.NewClientBuilder().WithScheme(scheme).WithObjects(mirror).Build()
+			transCtx := &componentTransformContext{Context: context.Background(), Component: comp, SynthesizeComponent: synth}
+			collect := func(cli client.Client, providers []string) error {
+				if deleting {
+					return collectDeletingInstanceConfigMaps(transCtx, cli, constant.GetCompLabels("db", "mysql"), providers)
+				}
+				return collectInstanceConfigMaps(transCtx, cli, nil, providers)
+			}
+			// Without a multi-cluster manager the production controller receives this
+			// plain control client, which ignores provider routing options.
+			for attempt := 0; attempt < 2; attempt++ {
+				if err := collect(control, nil); err == nil {
+					t.Fatal("missing provider configuration allowed cleanup")
+				}
+				current := &corev1.ConfigMap{}
+				if err := control.Get(context.Background(), client.ObjectKeyFromObject(authority), current); err != nil {
+					t.Fatalf("lost authority while provider was absent: %v", err)
+				}
+				if len(current.Finalizers) != 1 || current.Annotations[instanceConfigMapPlacementsAnnotationKey] != "old-provider" {
+					t.Fatal("cleanup changed the authority record while its provider was absent")
+				}
+			}
+			configured := multicluster.NewClient(control, map[string]client.Client{"old-provider": provider})
+			if err := collect(configured, []string{"old-provider"}); err == nil {
+				t.Fatal("mirror deletion did not request confirmation")
+			}
+			if err := provider.Get(context.Background(), client.ObjectKeyFromObject(mirror), &corev1.ConfigMap{}); !apierrors.IsNotFound(err) {
+				t.Fatalf("restored provider mirror was not deleted: %v", err)
+			}
+			if err := control.Get(context.Background(), client.ObjectKeyFromObject(authority), &corev1.ConfigMap{}); err != nil {
+				t.Fatalf("authority removed before mirror absence was confirmed: %v", err)
+			}
+			if deleting {
+				if err := collect(configured, []string{"old-provider"}); err != nil {
+					t.Fatalf("whole-deletion cleanup did not resume: %v", err)
+				}
+				if err := control.Get(context.Background(), client.ObjectKeyFromObject(authority), &corev1.ConfigMap{}); err != nil {
+					t.Fatalf("whole-deletion cleanup bypassed authority policy: %v", err)
+				}
+				return
+			}
+			if err := collect(configured, []string{"old-provider"}); !intctrlutil.IsDelayedRequeueError(err) {
+				t.Fatalf("expected finalizer retry: %v", err)
+			}
+			current := &corev1.ConfigMap{}
+			if err := control.Get(context.Background(), client.ObjectKeyFromObject(authority), current); err != nil || len(current.Finalizers) != 0 {
+				t.Fatalf("source finalizer cleanup did not persist: %v", err)
+			}
+			if err := collect(configured, []string{"old-provider"}); !intctrlutil.IsDelayedRequeueError(err) {
+				t.Fatalf("expected guarded-delete confirmation: %v", err)
+			}
+			if err := control.Get(context.Background(), client.ObjectKeyFromObject(authority), &corev1.ConfigMap{}); !apierrors.IsNotFound(err) {
+				t.Fatalf("authority remains after mirror cleanup: %v", err)
+			}
+			if err := collect(configured, []string{"old-provider"}); err != nil {
+				t.Fatalf("cleanup did not converge: %v", err)
+			}
+		})
+	}
+}
+
+func TestConfigCleanupAllowsConfiguredControlProviderAlias(t *testing.T) {
+	for _, deleting := range []bool{false, true} {
+		t.Run(map[bool]string{false: "retired config", true: "component deletion"}[deleting], func(t *testing.T) {
+			comp, synth, scheme := instanceConfigFixture(t)
+			comp.Spec.EnableInstanceAPI = ptr.To(true)
+			synth.EnableInstanceAPI = ptr.To(true)
+			authority := managedInstanceConfig(comp, "retired")
+			authority.Finalizers = []string{constant.DBComponentFinalizerName}
+			authority.Annotations = map[string]string{instanceConfigMapPlacementsAnnotationKey: "control-alias"}
+			control := fake.NewClientBuilder().WithScheme(scheme).WithObjects(authority).Build()
+			cli := multicluster.NewClient(control, map[string]client.Client{"control-alias": control})
+			transCtx := &componentTransformContext{Context: context.Background(), Component: comp, SynthesizeComponent: synth}
+			collect := func() error {
+				if deleting {
+					return collectDeletingInstanceConfigMaps(transCtx, cli, constant.GetCompLabels("db", "mysql"), []string{"control-alias"})
+				}
+				return collectInstanceConfigMaps(transCtx, cli, nil, []string{"control-alias"})
+			}
+			if deleting {
+				if err := collect(); err != nil {
+					t.Fatalf("configured control alias blocked whole deletion: %v", err)
+				}
+				if err := control.Get(context.Background(), client.ObjectKeyFromObject(authority), &corev1.ConfigMap{}); err != nil {
+					t.Fatalf("whole deletion bypassed authority policy: %v", err)
+				}
+				return
+			}
+			for attempt := 0; attempt < 2; attempt++ {
+				if err := collect(); !intctrlutil.IsDelayedRequeueError(err) {
+					t.Fatalf("configured alias blocked cleanup: %v", err)
+				}
+			}
+			if err := control.Get(context.Background(), client.ObjectKeyFromObject(authority), &corev1.ConfigMap{}); !apierrors.IsNotFound(err) {
+				t.Fatalf("authority remains for supported control alias: %v", err)
+			}
+			if err := collect(); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }

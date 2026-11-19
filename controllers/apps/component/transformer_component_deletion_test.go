@@ -73,7 +73,7 @@ func TestComponentDeletionCollectsInstanceConfigMirrorsAfterWorkload(t *testing.
 		dag := graph.NewDAG()
 		graphCli.Root(dag, comp, comp, model.ActionStatusPtr())
 		builder := &componentPlanBuilder{cli: cli, transCtx: transCtx}
-		err := (&componentDeletionTransformer{Client: cli}).Transform(transCtx, dag)
+		err := (&componentDeletionTransformer{Client: cli, configProviders: []string{"removed-provider"}}).Transform(transCtx, dag)
 		if pass == 0 && err != graph.ErrPrematureStop {
 			t.Fatalf("workload deletion did not stop later cleanup: %v", err)
 		}
@@ -113,7 +113,7 @@ func TestComponentDeletionSkipsUnrelatedProviders(t *testing.T) {
 		return c.List(ctx, list, opts...)
 	}})
 	transCtx := &componentTransformContext{Context: context.Background(), Client: cli, Component: comp}
-	if err := collectDeletingInstanceConfigMaps(transCtx, cli, constant.GetCompLabels("db", "mysql")); err != nil {
+	if err := collectDeletingInstanceConfigMaps(transCtx, cli, constant.GetCompLabels("db", "mysql"), nil); err != nil {
 		t.Fatalf("unrelated provider blocked Component cleanup: %v", err)
 	}
 }

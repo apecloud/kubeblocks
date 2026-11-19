@@ -30,7 +30,7 @@ import (
 
 func TestResolveConfigs(t *testing.T) {
 	base := []workloads.ConfigTemplate{
-		{Name: "main", ConfigHash: ptr.To("global"), Restart: ptr.To(true), Parameters: map[string]string{"global": "value"}},
+		{Name: "main", ConfigHash: ptr.To("global"), Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "global"}, Restart: ptr.To(true), Parameters: map[string]string{"global": "value"}},
 		{Name: "other", ConfigHash: ptr.To("other")},
 	}
 	source := InstanceTemplateExt{PodTemplateSpec: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
@@ -57,6 +57,22 @@ func TestResolveConfigs(t *testing.T) {
 			t.Fatal("resolution mutated source")
 		}
 	})
+	t.Run("omitted binding inherits only base association", func(t *testing.T) {
+		got := source
+		override := workloads.ConfigTemplate{Name: "main", ConfigHash: ptr.To("specific")}
+		if err := ResolveConfigs(&got, base, []workloads.ConfigTemplate{override}); err != nil {
+			t.Fatal(err)
+		}
+		expected := override.DeepCopy()
+		expected.Volume = base[0].Volume.DeepCopy()
+		if !reflect.DeepEqual(got.Configs[0], *expected) || !reflect.DeepEqual(got.PodTemplateSpec, source.PodTemplateSpec) {
+			t.Fatal("override did not inherit binding independently of other settings")
+		}
+		got.Configs[0].Volume.ConfigMapName = "mutated"
+		if base[0].Volume.ConfigMapName != "global" {
+			t.Fatal("inherited binding aliases base config")
+		}
+	})
 	for _, overrides := range [][]workloads.ConfigTemplate{nil, {}} {
 		got := source
 		if err := ResolveConfigs(&got, base, overrides); err != nil {
@@ -67,19 +83,49 @@ func TestResolveConfigs(t *testing.T) {
 		}
 	}
 	cases := map[string][]workloads.ConfigTemplate{
-		"empty name":              {{Name: ""}},
-		"duplicate name":          {{Name: "main"}, {Name: "main"}},
-		"unknown config":          {{Name: "missing"}},
-		"unknown volume":          {{Name: "main", Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "missing", ConfigMapName: "new"}}},
-		"non ConfigMap volume":    {{Name: "main", Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "data", ConfigMapName: "new"}}},
-		"empty ConfigMap name":    {{Name: "main", Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config"}}},
-		"conflicting destination": {{Name: "main", Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "one"}}, {Name: "other", Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "two"}}},
+		"empty name":                    {{Name: ""}},
+		"duplicate name":                {{Name: "main"}, {Name: "main"}},
+		"unknown config":                {{Name: "missing"}},
+		"unknown volume":                {{Name: "main", Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "missing", ConfigMapName: "new"}}},
+		"non ConfigMap volume":          {{Name: "main", Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "data", ConfigMapName: "new"}}},
+		"empty ConfigMap name":          {{Name: "main", Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config"}}},
+		"override without base binding": {{Name: "other", Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "new"}}},
 	}
 	for name, overrides := range cases {
 		t.Run(name, func(t *testing.T) {
 			got := source
 			if err := ResolveConfigs(&got, base, overrides); err == nil {
 				t.Fatal("expected invalid override to fail")
+			}
+			if !reflect.DeepEqual(got, source) {
+				t.Fatal("failed resolution published partial state")
+			}
+		})
+	}
+	t.Run("conflicting destinations for shared association", func(t *testing.T) {
+		got := source
+		shared := []workloads.ConfigTemplate{*base[0].DeepCopy(), {Name: "other", Volume: base[0].Volume.DeepCopy()}}
+		override := workloads.ConfigTemplate{Name: "main", Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "specific"}}
+		if err := ResolveConfigs(&got, shared, []workloads.ConfigTemplate{override}); err == nil {
+			t.Fatal("conflicting destinations for a shared volume were accepted")
+		}
+		if !reflect.DeepEqual(got, source) {
+			t.Fatal("failed resolution published partial state")
+		}
+	})
+	for name, binding := range map[string]*workloads.ConfigMapVolumeBinding{
+		"missing volume":         {VolumeName: "missing", ConfigMapName: "global"},
+		"non ConfigMap volume":   {VolumeName: "data", ConfigMapName: "global"},
+		"missing volume name":    {ConfigMapName: "global"},
+		"missing ConfigMap name": {VolumeName: "config"},
+		"different base source":  {VolumeName: "config", ConfigMapName: "different"},
+	} {
+		t.Run("invalid base binding/"+name, func(t *testing.T) {
+			got := source
+			config := *base[0].DeepCopy()
+			config.Volume = binding
+			if err := ResolveConfigs(&got, []workloads.ConfigTemplate{config}, nil); err == nil {
+				t.Fatal("invalid base binding was accepted")
 			}
 			if !reflect.DeepEqual(got, source) {
 				t.Fatal("failed resolution published partial state")

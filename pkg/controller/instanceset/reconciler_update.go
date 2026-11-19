@@ -414,31 +414,16 @@ func parseReplicasNMaxUnavailable(updateStrategy *workloads.InstanceUpdateStrate
 	return replicas, maxUnavailable, nil
 }
 
-// configsForMountedVolumes excludes actions that require a replacement mount while preserving
-// actions for bindings that are still mounted. Removing an override loses its old config-to-volume
-// association; skip unbound actions on the old Pod when such a volume changes. The new Pod
-// starts with the desired files and hashes, so those actions are not replayed after recreation.
+// configsForMountedVolumes excludes actions whose explicitly associated volume needs replacement.
+// Unbound legacy configs retain their existing reload behavior.
 func configsForMountedVolumes(configs []workloads.ConfigTemplate, old, desired *corev1.Pod) []workloads.ConfigTemplate {
 	changed := changedConfigMapVolumes(old, desired)
 	if len(changed) == 0 {
 		return configs
 	}
-	unassociated := make(map[string]bool, len(changed))
-	for name := range changed {
-		unassociated[name] = true
-	}
-	for _, config := range configs {
-		if config.Volume != nil {
-			delete(unassociated, config.Volume.VolumeName)
-		}
-	}
 	mounted := make([]workloads.ConfigTemplate, 0, len(configs))
 	for _, config := range configs {
-		if config.Volume == nil {
-			if len(unassociated) > 0 {
-				continue
-			}
-		} else if changed[config.Volume.VolumeName] {
+		if config.Volume != nil && changed[config.Volume.VolumeName] {
 			continue
 		}
 		mounted = append(mounted, config)

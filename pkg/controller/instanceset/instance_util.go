@@ -679,11 +679,19 @@ func hasConfigRestart(desired []workloads.ConfigTemplate, pod *corev1.Pod) (bool
 }
 
 // desiredInstanceTemplates is the direct Pod controller's canonical desired member mapping.
-// Config expansion is opt-in here while the Instance-based controller still uses global configs.
 func desiredInstanceTemplates(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) (map[string]*instancetemplate.InstanceTemplateExt, error) {
 	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
 	if err != nil {
 		return nil, err
+	}
+	if len(itsExt.InstanceTemplates) == 0 {
+		template := &instancetemplate.InstanceTemplateExt{
+			PodTemplateSpec:      its.Spec.Template,
+			VolumeClaimTemplates: its.Spec.VolumeClaimTemplates,
+		}
+		if err := instancetemplate.ResolveConfigs(template, its.Spec.Configs, nil); err != nil {
+			return nil, err
+		}
 	}
 	opts := &instancetemplate.PodNameBuilderOpts{}
 	if tree != nil {

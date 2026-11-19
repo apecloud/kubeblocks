@@ -37,6 +37,16 @@ func TestDirectConfigOverridesValidateInactiveTemplate(t *testing.T) {
 	}
 }
 
+func TestDirectConfigBindingValidatesEmptyInstanceSet(t *testing.T) {
+	its, tree, _, _ := newDirectConfigFixture(t, "named")
+	its.Spec.Replicas = ptr.To[int32](0)
+	its.Spec.Instances = nil
+	its.Spec.Configs[0].Volume.ConfigMapName = "different"
+	if _, err := NewValidationReconciler().Reconcile(tree); err == nil {
+		t.Fatal("invalid base binding was accepted without instance templates")
+	}
+}
+
 func TestDirectConfigOverridesRejectPVCVolumeCollision(t *testing.T) {
 	for _, inactive := range []bool{false, true} {
 		t.Run(map[bool]string{false: "active inherited claim", true: "inactive template claim"}[inactive], func(t *testing.T) {
@@ -59,6 +69,7 @@ func TestDirectConfigOverridesRejectPVCVolumeCollision(t *testing.T) {
 			}
 			// The existing same-name volume/PVC behavior remains valid without a binding.
 			its.Spec.Instances[0].Configs = nil
+			its.Spec.Configs[0].Volume = nil
 			runDirectReconciler(t, NewValidationReconciler(), tree)
 		})
 	}

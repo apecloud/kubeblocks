@@ -284,8 +284,8 @@ func newDirectConfigFixture(t *testing.T, layout string) (*workloads.InstanceSet
 	action := &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"reload"}}}
 	its.Spec.LifecycleActions = &workloads.LifecycleActions{Switchover: action}
 	its.Spec.Configs = []workloads.ConfigTemplate{
-		{Name: "main", ConfigHash: ptr.To("global"), Reconfigure: action, Parameters: map[string]string{"id": "global-main"}},
-		{Name: "aux", ConfigHash: ptr.To("global-aux"), Reconfigure: action, Parameters: map[string]string{"id": "global-aux"}},
+		{Name: "main", ConfigHash: ptr.To("global"), Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "main"}, Reconfigure: action, Parameters: map[string]string{"id": "global-main"}},
+		{Name: "aux", ConfigHash: ptr.To("global-aux"), Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "aux", ConfigMapName: "aux"}, Reconfigure: action, Parameters: map[string]string{"id": "global-aux"}},
 	}
 	its.Spec.Template.Spec.Volumes = []corev1.Volume{
 		{Name: "config", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "main"}}}},

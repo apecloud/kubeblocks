@@ -464,6 +464,8 @@ type InstanceTemplate struct {
 
 	// Configs replaces matching entries in the InstanceSet's configs by name.
 	// Each entry replaces the entire matching config. Entries without an override are inherited.
+	// A volume override uses the volume name of the matching InstanceSet config.
+	// An override without volume inherits the matching config's volume.
 	// An omitted or empty list inherits all entries.
 	//
 	// +optional
@@ -568,9 +570,7 @@ type ConfigTemplate struct {
 	// The name of the config.
 	Name string `json:"name"`
 
-	// Volume replaces the ConfigMap reference on an existing volume in the InstanceSet Pod template.
-	// Set Volume only on configs in an InstanceTemplate. The volume options and container mounts
-	// are inherited from the InstanceSet Pod template.
+	// Volume identifies the ConfigMap volume for this configuration.
 	//
 	// +optional
 	Volume *ConfigMapVolumeBinding `json:"volume,omitempty"`
@@ -610,12 +610,12 @@ type ConfigTemplate struct {
 
 // ConfigMapVolumeBinding identifies a Pod volume and the ConfigMap to mount in it.
 type ConfigMapVolumeBinding struct {
-	// VolumeName is the name of an existing ConfigMap volume in the InstanceSet Pod template.
+	// VolumeName is the name of the ConfigMap volume in the Pod template.
 	//
 	// +kubebuilder:validation:MinLength=1
 	VolumeName string `json:"volumeName"`
 
-	// ConfigMapName is the name of the replacement ConfigMap in the InstanceSet namespace.
+	// ConfigMapName is the name of the ConfigMap in the Pod namespace.
 	//
 	// +kubebuilder:validation:MinLength=1
 	ConfigMapName string `json:"configMapName"`

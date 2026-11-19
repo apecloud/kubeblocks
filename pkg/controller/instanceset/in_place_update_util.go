@@ -430,15 +430,15 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod, template *i
 		return noOpsPolicy, "", "", err
 	}
 	specUpdatePolicy := getPodUpdatePolicyInSpec(its, pod, newPod)
-	if len(instancetemplate.ChangedConfigMapVolumes(pod, newPod)) > 0 {
-		return recreatePolicy, specUpdatePolicy, "config volume source update", nil
-	}
-	configRestart, configs, err := hasConfigRestart(template.Configs, pod)
+	configRestart, configs, err := hasConfigRestart(instancetemplate.ConfigsForMountedVolumes(template.Configs, pod, newPod), pod)
 	if err != nil {
 		return noOpsPolicy, "", "", err
 	}
 	if configRestart {
 		return recreatePolicy, its.Spec.PodUpdatePolicy, fmt.Sprintf("config restart: %s", strings.Join(configs, ",")), nil
+	}
+	if len(instancetemplate.ChangedConfigMapVolumes(pod, newPod)) > 0 {
+		return recreatePolicy, specUpdatePolicy, "config volume source update", nil
 	}
 
 	if getPodRevision(pod) != updateRevisions[pod.Name] && getPodRevision(pod) != proposedRevisions[pod.Name] {

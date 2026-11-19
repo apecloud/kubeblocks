@@ -1006,3 +1006,183 @@ func installDirectConfigSpy(t *testing.T) *directConfigSpy {
 	t.Cleanup(func() { newLifecycleAction = original })
 	return spy
 }
+
+func TestDirectLegacyConfigReloadOnUnrelatedMountChange(t *testing.T) {
+	its := legacyInstanceStatusSet(1)
+	its.Spec.Instances = nil
+	its.Spec.FlatInstanceOrdinal = false
+	its.Spec.PodUpdatePolicy = kbappsv1.PreferInPlacePodUpdatePolicyType
+	its.Spec.PodUpgradePolicy = kbappsv1.PreferInPlacePodUpdatePolicyType
+	action := &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"reload"}}}
+	its.Spec.LifecycleActions = &workloads.LifecycleActions{Switchover: action}
+	its.Spec.Configs = []workloads.ConfigTemplate{{Name: "aux", ConfigHash: ptr.To("aux-old"), Reconfigure: action, Parameters: map[string]string{"id": "aux"}}}
+	its.Spec.Template.Spec.Volumes = []corev1.Volume{
+		{Name: "main", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "main-old"}}}},
+		{Name: "aux", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "aux"}}}},
+	}
+	its.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: "main", MountPath: "/etc/main"}, {Name: "aux", MountPath: "/etc/aux"}}
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	run := func(rs ...kubebuilderx.Reconciler) {
+		t.Helper()
+		for _, r := range rs {
+			if r.PreCondition(tree) == kubebuilderx.ConditionSatisfied {
+				if _, err := r.Reconcile(tree); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+	}
+	run(NewValidationReconciler(), NewRevisionUpdateReconciler(), NewReplicasAlignmentReconciler())
+	objects := tree.List(&corev1.Pod{})
+	if len(objects) != 1 {
+		t.Fatalf("fixture created %d pods", len(objects))
+	}
+	pod := objects[0].(*corev1.Pod)
+	pod.Status.Phase = corev1.PodRunning
+	pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}
+	run(NewStatusReconciler())
+	spy := installDirectConfigSpy(t)
+	its.Spec.Template.Spec.Volumes[0].ConfigMap.Name = "main-new"
+	its.Spec.Configs[0].ConfigHash = ptr.To("aux-new")
+	its.Spec.Configs[0].Restart = ptr.To(true)
+	its.Generation++
+	run(NewValidationReconciler(), NewStatusReconciler(), NewRevisionUpdateReconciler(), NewUpdateReconciler())
+	obj, err := tree.Get(pod)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if obj != nil {
+		t.Fatal("changed ConfigMap source did not recreate member")
+	}
+	if !reflect.DeepEqual(spy.configs, []string{"aux"}) {
+		t.Fatalf("reloads=%v want inherited aux reload before restart", spy.configs)
+	}
+}
+
+func TestDirectConfigRollbackPreservesExplicitSameMountReload(t *testing.T) {
+	for _, layout := range []string{"named", "compressed named", "compressed flat"} {
+		t.Run(layout, func(t *testing.T) {
+			its, tree, pods, member := newDirectConfigFixture(t, layout)
+			spy := installDirectConfigSpy(t)
+			mutateDirectTemplate(t, its, tree, func(tpl *workloads.InstanceTemplate) {
+				tpl.Configs = tpl.Configs[1:]
+				tpl.Configs[0].ConfigHash = ptr.To("aux-new")
+			})
+			its.Generation++
+			for _, r := range []kubebuilderx.Reconciler{NewValidationReconciler(), NewStatusReconciler(), NewRevisionUpdateReconciler(), NewUpdateReconciler()} {
+				if r.PreCondition(tree) == kubebuilderx.ConditionSatisfied {
+					runDirectReconciler(t, r, tree)
+				}
+			}
+			if !reflect.DeepEqual(spy.configs, []string{"aux"}) {
+				t.Fatalf("calls=%v want aux only", spy.configs)
+			}
+			if obj, err := tree.Get(pods[member]); err != nil || obj != nil {
+				t.Fatalf("source replacement did not delete member: %v %v", obj, err)
+			}
+		})
+	}
+}
+
+func TestDirectConfigSourceChangePolicyBoundaries(t *testing.T) {
+	for _, policy := range []string{"OnDelete", "Stop", "StrictInPlace"} {
+		t.Run(policy, func(t *testing.T) {
+			its, tree, pods, member := newDirectConfigFixture(t, "named")
+			spy := installDirectConfigSpy(t)
+			mutateDirectTemplate(t, its, tree, func(tpl *workloads.InstanceTemplate) {
+				tpl.Configs[0].Volume.ConfigMapName = "main-new"
+				tpl.Configs[0].ConfigHash = ptr.To("main-new")
+			})
+			its.Generation++
+			switch policy {
+			case "OnDelete":
+				its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{Type: kbappsv1.OnDeleteStrategyType}
+			case "Stop":
+				its.Spec.Stop = ptr.To(true)
+			case "StrictInPlace":
+				its.Spec.PodUpdatePolicy = kbappsv1.StrictInPlacePodUpdatePolicyType
+			}
+			for _, r := range []kubebuilderx.Reconciler{NewValidationReconciler(), NewStatusReconciler(), NewRevisionUpdateReconciler(), NewReplicasAlignmentReconciler(), NewUpdateReconciler()} {
+				if r.PreCondition(tree) == kubebuilderx.ConditionSatisfied {
+					runDirectReconciler(t, r, tree)
+				}
+			}
+			if len(spy.configs) != 0 || spy.switchoverCalls != 0 {
+				t.Fatalf("policy executed lifecycle action: configs=%v switchover=%d", spy.configs, spy.switchoverCalls)
+			}
+			obj, err := tree.Get(pods[member])
+			if err != nil || (obj == nil) != (policy == "Stop") {
+				t.Fatalf("member existence violates policy: obj=%v err=%v", obj, err)
+			}
+		})
+	}
+}
+
+func TestDirectConfigRollbackPreservesInheritedSameMountReload(t *testing.T) {
+	for _, layout := range []string{"named", "compressed named", "compressed flat"} {
+		t.Run(layout, func(t *testing.T) {
+			its, tree, pods, member := newDirectConfigFixture(t, layout)
+			// Create the starting member through the production creation path with
+			// only A overridden. B has the inherited action and its inherited mount.
+			its.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: "config", MountPath: "/etc/main"}, {Name: "aux", MountPath: "/etc/aux"}}
+			mutateDirectTemplate(t, its, tree, func(tpl *workloads.InstanceTemplate) {
+				tpl.Configs = tpl.Configs[:1]
+			})
+			if err := tree.Delete(pods[member]); err != nil {
+				t.Fatal(err)
+			}
+			its.Generation++
+			runDirectReconciler(t, NewValidationReconciler(), tree)
+			runDirectReconciler(t, NewRevisionUpdateReconciler(), tree)
+			runDirectReconciler(t, NewReplicasAlignmentReconciler(), tree)
+			obj, err := tree.Get(pods[member])
+			if err != nil || obj == nil {
+				t.Fatal("starting member creation failed")
+			}
+			pod := obj.(*corev1.Pod)
+			pod.Status.Phase = corev1.PodRunning
+			pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}
+			if pod.Spec.Volumes[0].ConfigMap.Name != "main-a" || pod.Spec.Volumes[1].ConfigMap.Name != "aux" {
+				t.Fatal("fixture did not start with overridden A and inherited B mount")
+			}
+			runDirectReconciler(t, NewStatusReconciler(), tree)
+			spy := installDirectConfigSpy(t)
+			mutateDirectTemplate(t, its, tree, func(tpl *workloads.InstanceTemplate) { tpl.Configs = nil })
+			its.Spec.Configs[1].ConfigHash = ptr.To("aux-new")
+			its.Spec.Configs[1].Restart = ptr.To(true)
+			its.Generation++
+			for _, r := range []kubebuilderx.Reconciler{NewValidationReconciler(), NewStatusReconciler(), NewRevisionUpdateReconciler(), NewUpdateReconciler()} {
+				if r.PreCondition(tree) == kubebuilderx.ConditionSatisfied {
+					runDirectReconciler(t, r, tree)
+				}
+			}
+			obj, err = tree.Get(pod)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if obj != nil {
+				t.Fatal("rollback did not recreate member")
+			}
+			runDirectReconciler(t, NewReplicasAlignmentReconciler(), tree)
+			obj, err = tree.Get(pod)
+			if err != nil || obj == nil {
+				t.Fatal("replacement not created")
+			}
+			desired, err := instancetemplate.BuildInstanceTemplatesWithConfigs(its, tree)
+			if err != nil {
+				t.Fatal(err)
+			}
+			pending, err := configsToUpdate(desired[member].Configs, obj.(*corev1.Pod))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(pending) != 0 {
+				t.Fatal("replacement did not start with desired config hashes")
+			}
+			if !reflect.DeepEqual(spy.configs, []string{"global-aux"}) {
+				t.Fatalf("reloads=%v; want inherited B reload for overridden member before restart", spy.configs)
+			}
+		})
+	}
+}

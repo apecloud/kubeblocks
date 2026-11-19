@@ -19407,7 +19407,7 @@ string
 </em>
 </td>
 <td>
-<p>VolumeName is the name of an existing ConfigMap volume in the InstanceSet Pod template.</p>
+<p>VolumeName is the name of the ConfigMap volume in the Pod template.</p>
 </td>
 </tr>
 <tr>
@@ -19418,7 +19418,7 @@ string
 </em>
 </td>
 <td>
-<p>ConfigMapName is the name of the replacement ConfigMap in the InstanceSet namespace.</p>
+<p>ConfigMapName is the name of the ConfigMap in the Pod namespace.</p>
 </td>
 </tr>
 </tbody>
@@ -19460,9 +19460,7 @@ ConfigMapVolumeBinding
 </td>
 <td>
 <em>(Optional)</em>
-<p>Volume replaces the ConfigMap reference on an existing volume in the InstanceSet Pod template.
-Set Volume only on configs in an InstanceTemplate. The volume options and container mounts
-are inherited from the InstanceSet Pod template.</p>
+<p>Volume identifies the ConfigMap volume for this configuration.</p>
 </td>
 </tr>
 <tr>
@@ -21220,6 +21218,8 @@ map[string]string
 <em>(Optional)</em>
 <p>Configs replaces matching entries in the InstanceSet&rsquo;s configs by name.
 Each entry replaces the entire matching config. Entries without an override are inherited.
+A volume override uses the volume name of the matching InstanceSet config.
+An override without volume inherits the matching config&rsquo;s volume.
 An omitted or empty list inherits all entries.</p>
 </td>
 </tr>

@@ -26,6 +26,8 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
 type defaultNameBuilder struct {
@@ -36,7 +38,10 @@ func (s *defaultNameBuilder) BuildInstanceName2TemplateMap() (map[string]*Instan
 	instanceTemplateList := buildInstanceTemplateExts(s.itsExt)
 	allNameTemplateMap := make(map[string]*InstanceTemplateExt)
 	for _, template := range instanceTemplateList {
-		ordinalList := convertOrdinalsToSortedList(s.itsExt.InstanceTemplates[template.Name].Ordinals)
+		ordinalList, err := getOrdinalListByTemplateName(s.itsExt.InstanceSet, template.Name)
+		if err != nil {
+			return nil, err
+		}
 		instanceNames, err := generateInstanceNamesFromTemplate(s.itsExt.InstanceSet.Name, template.Name, template.Replicas, s.itsExt.InstanceSet.Spec.OfflineInstances, ordinalList)
 		if err != nil {
 			return nil, err
@@ -106,6 +111,26 @@ func buildInstanceTemplateExts(itsExt *InstanceSetExt) []*InstanceTemplateExt {
 		instanceTemplateExtList = append(instanceTemplateExtList, templateExt)
 	}
 	return instanceTemplateExtList
+}
+
+func getOrdinalListByTemplateName(its *workloads.InstanceSet, templateName string) ([]int32, error) {
+	ordinals, err := getOrdinalsByTemplateName(its, templateName)
+	if err != nil {
+		return nil, err
+	}
+	return convertOrdinalsToSortedList(ordinals), nil
+}
+
+func getOrdinalsByTemplateName(its *workloads.InstanceSet, templateName string) (workloads.Ordinals, error) {
+	if templateName == DefaultTemplateName {
+		return its.Spec.Ordinals, nil
+	}
+	for _, template := range its.Spec.Instances {
+		if template.Name == templateName {
+			return template.Ordinals, nil
+		}
+	}
+	return workloads.Ordinals{}, fmt.Errorf("template %s not found", templateName)
 }
 
 func generateInstanceNamesFromTemplate(parentName, templateName string, replicas int32, offlineInstances []string, ordinalList []int32) ([]string, error) {

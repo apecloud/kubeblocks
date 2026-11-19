@@ -24,6 +24,7 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -45,12 +46,15 @@ type componentTransformContext struct {
 	Client client.Reader
 	record.EventRecorder
 	logr.Logger
-	CompDef             *appsv1.ComponentDefinition
-	Component           *appsv1.Component
-	ComponentOrig       *appsv1.Component
-	SynthesizeComponent *component.SynthesizedComponent
-	RunningWorkload     *workloads.InstanceSet
-	ProtoWorkload       *workloads.InstanceSet
+	CompDef                    *appsv1.ComponentDefinition
+	Component                  *appsv1.Component
+	ComponentOrig              *appsv1.Component
+	SynthesizeComponent        *component.SynthesizedComponent
+	RunningWorkload            *workloads.InstanceSet
+	ProtoWorkload              *workloads.InstanceSet
+	InstanceConfigMaps         []*corev1.ConfigMap
+	InstanceConfigMapDeletions []instanceConfigMapDeletion
+	instanceConfigMapRequeue   error
 }
 
 func (c *componentTransformContext) GetContext() context.Context {
@@ -79,9 +83,10 @@ type componentPlanBuilder struct {
 
 // clusterPlan a graph.Plan implementation for Cluster reconciliation
 type componentPlan struct {
-	dag      *graph.DAG
-	walkFunc graph.WalkFunc
-	transCtx *componentTransformContext
+	dag           *graph.DAG
+	walkFunc      graph.WalkFunc
+	transCtx      *componentTransformContext
+	cleanupClient client.Client
 }
 
 var _ graph.TransformContext = &componentTransformContext{}
@@ -115,9 +120,10 @@ func (c *componentPlanBuilder) Build() (graph.Plan, error) {
 	c.transCtx.Logger.V(1).Info(fmt.Sprintf("DAG: %s", dag))
 
 	plan := &componentPlan{
-		dag:      dag,
-		walkFunc: c.defaultWalkFuncWithLogging,
-		transCtx: c.transCtx,
+		dag:           dag,
+		walkFunc:      c.defaultWalkFuncWithLogging,
+		transCtx:      c.transCtx,
+		cleanupClient: c.cli,
 	}
 	return plan, err
 }
@@ -127,7 +133,17 @@ func (p *componentPlan) Execute() error {
 	if err != nil {
 		p.transCtx.Logger.Info(fmt.Sprintf("execute error: %s", err.Error()))
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	if err = syncInstanceConfigMaps(p.transCtx.Context, p.cleanupClient, p.transCtx.Component,
+		p.transCtx.ProtoWorkload, p.transCtx.InstanceConfigMaps); err != nil {
+		return err
+	}
+	if len(p.transCtx.InstanceConfigMapDeletions) == 0 {
+		return nil
+	}
+	return deleteInstanceConfigMaps(p.transCtx.Context, p.cleanupClient, p.transCtx.InstanceConfigMapDeletions)
 }
 
 // newComponentPlanBuilder returns a componentPlanBuilder powered PlanBuilder
@@ -173,6 +189,12 @@ func (c *componentPlanBuilder) defaultWalkFunc(v graph.Vertex) error {
 		return fmt.Errorf("vertex action can't be nil")
 	}
 	ctx := c.transCtx.Context
+	if its, ok := vertex.Obj.(*workloads.InstanceSet); ok &&
+		(*vertex.Action == model.CREATE || *vertex.Action == model.UPDATE || *vertex.Action == model.PATCH) {
+		if err := syncInstanceConfigMaps(ctx, c.cli, c.transCtx.Component, its, c.transCtx.InstanceConfigMaps); err != nil {
+			return err
+		}
+	}
 	switch *vertex.Action {
 	case model.CREATE:
 		return c.reconcileCreateObject(ctx, vertex)

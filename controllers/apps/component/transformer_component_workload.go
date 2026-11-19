@@ -77,7 +77,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 				return err
 			}
 			graphCli.Create(dag, protoITS)
-			return nil
+			t.dependOnInstanceConfigMaps(transCtx, graphCli, dag, protoITS)
 		}
 	} else {
 		if protoITS == nil {
@@ -86,7 +86,11 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 			err = t.handleUpdate(transCtx, graphCli, dag, synthesizeComp, comp, runningITS, protoITS)
 		}
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	transCtx.instanceConfigMapRequeue = t.collectInstanceConfigMaps(transCtx, protoITS)
+	return nil
 }
 
 func (t *componentWorkloadTransformer) reconcileWorkload(ctx context.Context, cli client.Reader,
@@ -169,6 +173,7 @@ func (t *componentWorkloadTransformer) handleUpdate(transCtx *componentTransform
 	}
 	if objCopy != nil {
 		cli.Update(dag, nil, objCopy, &model.ReplaceIfExistingOption{})
+		t.dependOnInstanceConfigMaps(transCtx, cli, dag, objCopy)
 		// make sure the workload is updated after the env CM
 		cli.DependOn(dag, &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
@@ -193,6 +198,9 @@ func (t *componentWorkloadTransformer) handleWorkloadStartNStop(transCtx *compon
 		// the requested workload, so old readiness cannot complete pending operations.
 		if stop {
 			runningITSCopy.Annotations[constant.KubeBlocksGenerationKey] = (*protoITS).Annotations[constant.KubeBlocksGenerationKey]
+		}
+		if start {
+			publishStartingInstanceConfigs(runningITSCopy, *protoITS)
 		}
 		*protoITS = runningITSCopy
 	}

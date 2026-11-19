@@ -39,6 +39,12 @@ func InDataContextUnspecified() *ClientOption {
 	}
 }
 
+// InDataContextUnspecifiedWithCompleteList reports unavailable clusters rather than returning a partial list.
+// Returned objects carry their exact provider placement for subsequent writes.
+func InDataContextUnspecifiedWithCompleteList() *ClientOption {
+	return &ClientOption{unspecified: true, completeList: true}
+}
+
 func InUniversalContext() *ClientOption {
 	return &ClientOption{
 		universal: true,
@@ -58,11 +64,12 @@ func MultiCheck() *ClientOption {
 }
 
 type ClientOption struct {
-	control     bool // control plane
-	universal   bool // both control and data planes
-	unspecified bool // data planes, but don't know which ones exactly
-	oneshot     bool
-	multiCheck  bool // only support the Get operation
+	control      bool // control plane
+	universal    bool // both control and data planes
+	unspecified  bool // data planes, but don't know which ones exactly
+	oneshot      bool
+	multiCheck   bool // only support the Get operation
+	completeList bool
 }
 
 func (o *ClientOption) ApplyToGet(*client.GetOptions) {

@@ -20,6 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"context"
+	"strings"
+	"testing"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -31,6 +35,27 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
+
+func TestBuildSynthesizedComponentValidatesInactiveInstanceConfigs(t *testing.T) {
+	comp := &appsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cluster-db", Namespace: "default",
+			Labels:      map[string]string{constant.AppInstanceLabelKey: "cluster"},
+			Annotations: map[string]string{constant.KBAppClusterUIDKey: "uid"},
+		},
+		Spec: appsv1.ComponentSpec{Instances: []appsv1.InstanceTemplate{{
+			Name: "inactive", Replicas: ptr.To(int32(0)),
+			Configs: []appsv1.ClusterComponentConfig{{Name: ptr.To("unknown")}},
+		}}},
+	}
+	def := &appsv1.ComponentDefinition{Spec: appsv1.ComponentDefinitionSpec{
+		Runtime: corev1.PodSpec{Containers: []corev1.Container{{Name: "db", Image: "db:1"}}},
+	}}
+	_, err := BuildSynthesizedComponent(context.Background(), nil, def, comp)
+	if err == nil || !strings.Contains(err.Error(), "instance template inactive: config template unknown is not defined") {
+		t.Fatalf("got error %v, want invalid zero-replica config declaration", err)
+	}
+}
 
 var _ = Describe("synthesized component", func() {
 	var (

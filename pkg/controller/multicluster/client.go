@@ -29,6 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 func NewClient(control client.Client, workers map[string]client.Client) client.Client {
@@ -104,6 +106,15 @@ func (c *clientReader) List(ctx context.Context, list client.ObjectList, opts ..
 		objs := reflect.ValueOf(list).Elem().FieldByName("Items")
 		if !objs.IsZero() {
 			for i := 0; i < objs.Len(); i++ {
+				if o := hasClientOption(opts); o != nil && o.completeList && cc.context != "" {
+					obj := objs.Index(i).Addr().Interface().(client.Object)
+					annotations := maps.Clone(obj.GetAnnotations())
+					if annotations == nil {
+						annotations = map[string]string{}
+					}
+					annotations[constant.KBAppMultiClusterPlacementKey] = cc.context
+					obj.SetAnnotations(annotations)
+				}
 				objects = reflect.Append(objects, objs.Index(i))
 			}
 		}
@@ -112,6 +123,9 @@ func (c *clientReader) List(ctx context.Context, list client.ObjectList, opts ..
 	err := allOf(c.mctx, ctx, nil, request, opts)
 	if objects.Len() != 0 {
 		items.Set(objects)
+	}
+	if o := hasClientOption(opts); o != nil && o.completeList {
+		return err
 	}
 	// TODO: ignore the unavailable error slightly, need to handle it correctly in the future
 	return ignoreUnavailableError(err)

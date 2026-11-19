@@ -169,6 +169,7 @@ func getInstanceTemplates(synthesizedComp *SynthesizedComponent) []workloads.Ins
 			Env:                  instances[i].Env,
 			VolumeClaimTemplates: toPersistentVolumeClaims(synthesizedComp, intctrlutil.ToCoreV1PVCTs(instances[i].VolumeClaimTemplates)),
 			Images:               synthesizedComp.InstanceImages[instances[i].Name],
+			Configs:              synthesizedComp.InstanceConfigs[instances[i].Name],
 		}
 		if ptr.Deref(tpl.Canary, false) {
 			if instanceTemplates[i].Labels == nil {

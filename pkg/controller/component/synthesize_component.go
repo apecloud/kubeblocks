@@ -158,6 +158,11 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	if err = buildSidecars(ctx, cli, synthesizeComp, comp); err != nil {
 		return nil, err
 	}
+	for i := range synthesizeComp.Instances {
+		if _, err = InstanceFileTemplates(synthesizeComp, &synthesizeComp.Instances[i]); err != nil {
+			return nil, err
+		}
+	}
 
 	if err = buildKBAgentContainer(synthesizeComp); err != nil {
 		return nil, errors.Wrap(err, "build kb-agent container failed")

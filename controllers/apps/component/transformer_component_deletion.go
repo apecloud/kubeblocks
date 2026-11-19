@@ -115,6 +115,9 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 		transCtx.Logger.Info(fmt.Sprintf("wait for the workloads to be deleted: %v", workloads))
 		return graph.ErrPrematureStop
 	}
+	if err = collectDeletingInstanceConfigMaps(transCtx, matchLabels); err != nil {
+		return err
+	}
 
 	// secondly, delete the other sub-resources owned by the component
 	snapshot, err1 := model.ReadCacheSnapshot(transCtx, comp, matchLabels, kinds...)

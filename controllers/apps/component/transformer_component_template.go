@@ -106,9 +106,6 @@ func (t *componentFileTemplateTransformer) Transform(ctx graph.TransformContext,
 	t.handleTemplateObjectChanges(transCtx, dag, runningObjs, protoObjs, toCreate, toDelete, toUpdate)
 	instanceCreate, _, instanceUpdate := mapDiff(instanceRunning, instanceDesired)
 	t.handleTemplateObjectChanges(transCtx, dag, instanceRunning, instanceDesired, instanceCreate, nil, instanceUpdate)
-	for _, obj := range instanceDesired {
-		transCtx.InstanceConfigMaps = append(transCtx.InstanceConfigMaps, obj)
-	}
 
 	for _, tpl := range transCtx.SynthesizeComponent.FileTemplates {
 		if obj := t.instanceAssistantObject(transCtx, tpl, protoObjs); obj != nil {
@@ -212,10 +209,16 @@ func (t *componentFileTemplateTransformer) prepareSpecializedConfigMap(transCtx 
 	} else if !isCurrentComponentConfigMap(transCtx.Component, current) {
 		return nil, fmt.Errorf("the ConfigMap name for instance template %s config %s conflicts", instanceName, tpl.Name)
 	}
-	if (ptr.Deref(transCtx.SynthesizeComponent.EnableInstanceAPI, false) &&
-		transCtx.Component.Annotations[constant.KBAppMultiClusterPlacementKey] != "") ||
-		(current != nil && current.Labels[instanceConfigMapMirroredLabelKey] == "true") {
-		desired.Labels[instanceConfigMapMirroredLabelKey] = "true"
+	placements := sets.New[string]()
+	if current != nil {
+		desired.ResourceVersion = current.ResourceVersion
+		placements = configMapPlacements(current.Annotations[instanceConfigMapPlacementsAnnotationKey])
+	}
+	if ptr.Deref(transCtx.SynthesizeComponent.EnableInstanceAPI, false) {
+		placements.Insert(sets.List(configMapPlacements(transCtx.Component.Annotations[constant.KBAppMultiClusterPlacementKey]))...)
+	}
+	if len(placements) > 0 {
+		desired.Annotations[instanceConfigMapPlacementsAnnotationKey] = strings.Join(sets.List(placements), ",")
 	}
 	t.preserveFileTemplateChanges(transCtx, tpl.Name, current, desired)
 	if tpl.ConfigHash != nil {

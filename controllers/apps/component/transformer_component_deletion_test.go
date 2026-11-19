@@ -21,7 +21,6 @@ package component
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -57,7 +56,7 @@ func TestComponentDeletionCollectsInstanceConfigMirrorsAfterWorkload(t *testing.
 	}
 	mirror := managedInstanceConfig(comp, "special")
 	authoritative := mirror.DeepCopy()
-	authoritative.Labels[instanceConfigMapMirroredLabelKey] = "true"
+	authoritative.Annotations = map[string]string{instanceConfigMapPlacementsAnnotationKey: "removed-provider"}
 	mirror.OwnerReferences = nil
 	foreign := mirror.DeepCopy()
 	foreign.Name = "foreign"
@@ -74,14 +73,14 @@ func TestComponentDeletionCollectsInstanceConfigMirrorsAfterWorkload(t *testing.
 		dag := graph.NewDAG()
 		graphCli.Root(dag, comp, comp, model.ActionStatusPtr())
 		builder := &componentPlanBuilder{cli: cli, transCtx: transCtx}
-		err := (&componentDeletionTransformer{}).Transform(transCtx, dag)
+		err := (&componentDeletionTransformer{Client: cli}).Transform(transCtx, dag)
 		if pass == 0 && err != graph.ErrPrematureStop {
 			t.Fatalf("workload deletion did not stop later cleanup: %v", err)
 		}
-		if pass == 1 && !intctrlutil.IsDelayedRequeueError(err) {
+		if pass == 1 && (!intctrlutil.IsRequeueError(err) || intctrlutil.IsDelayedRequeueError(err)) {
 			t.Fatalf("mirror deletion did not retain Component finalizer: %v", err)
 		}
-		plan := &componentPlan{dag: dag, transCtx: transCtx, cleanupClient: cli, walkFunc: builder.defaultWalkFunc}
+		plan := &componentPlan{dag: dag, transCtx: transCtx, walkFunc: builder.defaultWalkFunc}
 		if err := plan.Execute(); err != nil {
 			t.Fatal(err)
 		}
@@ -108,16 +107,13 @@ func TestComponentDeletionSkipsUnrelatedProviders(t *testing.T) {
 	comp, _, scheme := instanceConfigFixture(t)
 	base := fake.NewClientBuilder().WithScheme(scheme).Build()
 	cli := interceptor.NewClient(base, interceptor.Funcs{List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
-		for _, option := range opts {
-			if _, data := option.(*multicluster.ClientOption); data {
-				t.Fatal("single-cluster Component queried unrelated data providers")
-				return errors.New("unrelated provider unavailable")
-			}
+		if placement, _ := multicluster.FromContext(ctx); placement != "" {
+			t.Fatal("single-cluster Component queried unrelated data providers")
 		}
 		return c.List(ctx, list, opts...)
 	}})
 	transCtx := &componentTransformContext{Context: context.Background(), Client: cli, Component: comp}
-	if err := collectDeletingInstanceConfigMaps(transCtx, constant.GetCompLabels("db", "mysql")); err != nil {
+	if err := collectDeletingInstanceConfigMaps(transCtx, cli, constant.GetCompLabels("db", "mysql")); err != nil {
 		t.Fatalf("unrelated provider blocked Component cleanup: %v", err)
 	}
 }

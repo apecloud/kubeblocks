@@ -76,8 +76,11 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 			if err := setCompOwnershipNFinalizer(comp, protoITS); err != nil {
 				return err
 			}
+			if err = t.prepareInstanceConfigMaps(transCtx, graphCli, dag, protoITS); err != nil {
+				return err
+			}
 			graphCli.Create(dag, protoITS)
-			t.dependOnInstanceConfigMaps(transCtx, graphCli, dag, protoITS)
+			dependOnInstanceConfigMaps(graphCli, dag, protoITS)
 		}
 	} else {
 		if protoITS == nil {
@@ -89,8 +92,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	if err != nil {
 		return err
 	}
-	transCtx.instanceConfigMapRequeue = t.collectInstanceConfigMaps(transCtx, protoITS)
-	return nil
+	return collectInstanceConfigMaps(transCtx, t.Client, protoITS)
 }
 
 func (t *componentWorkloadTransformer) reconcileWorkload(ctx context.Context, cli client.Reader,
@@ -171,17 +173,21 @@ func (t *componentWorkloadTransformer) handleUpdate(transCtx *componentTransform
 	if err != nil {
 		return err
 	}
-	if objCopy != nil {
-		cli.Update(dag, nil, objCopy, &model.ReplaceIfExistingOption{})
-		t.dependOnInstanceConfigMaps(transCtx, cli, dag, objCopy)
-		// make sure the workload is updated after the env CM
-		cli.DependOn(dag, &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: synthesizedComp.Namespace,
-				Name:      constant.GenerateClusterComponentEnvPattern(synthesizedComp.ClusterName, synthesizedComp.Name),
-			},
-		})
+	if objCopy == nil {
+		return t.prepareInstanceConfigMaps(transCtx, cli, dag, runningITS)
 	}
+	if err = t.prepareInstanceConfigMaps(transCtx, cli, dag, objCopy); err != nil {
+		return err
+	}
+	cli.Update(dag, nil, objCopy, &model.ReplaceIfExistingOption{})
+	dependOnInstanceConfigMaps(cli, dag, objCopy)
+	// make sure the workload is updated after the env CM
+	cli.DependOn(dag, &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: synthesizedComp.Namespace,
+			Name:      constant.GenerateClusterComponentEnvPattern(synthesizedComp.ClusterName, synthesizedComp.Name),
+		},
+	})
 	return nil
 }
 

@@ -243,6 +243,17 @@ var _ = Describe("file templates transformer test", func() {
 	//	}
 	// }
 
+	instanceConfigMaps := func() []*corev1.ConfigMap {
+		var configs []*corev1.ConfigMap
+		for _, obj := range transCtx.Client.(model.GraphClient).FindAll(dag, &corev1.ConfigMap{}) {
+			cm := obj.(*corev1.ConfigMap)
+			if cm.Labels[instanceConfigMapLabelKey] == "true" {
+				configs = append(configs, cm)
+			}
+		}
+		return configs
+	}
+
 	Context("provision", func() {
 		It("renders named templates with effective resource and service version variables", func() {
 			required := ptr.To(appsv1.VarRequired)
@@ -266,8 +277,8 @@ var _ = Describe("file templates transformer test", func() {
 			checkTemplateObject("logConf", func(obj *corev1.ConfigMap) {
 				Expect(obj.Data["server.conf"]).To(Equal("2147483648/1.0/sidecar"))
 			})
-			Expect(transCtx.InstanceConfigMaps).To(HaveLen(1))
-			obj := transCtx.InstanceConfigMaps[0]
+			Expect(instanceConfigMaps()).To(HaveLen(1))
+			obj := instanceConfigMaps()[0]
 			Expect(obj.Data["server.conf"]).To(Equal("8589934592/2.0/sidecar"))
 			Expect(obj.Labels[instanceConfigMapLabelKey]).To(Equal("true"))
 			Expect(transCtx.SynthesizeComponent.InstanceConfigs["large"][0].Volume).To(Equal(&workloads.ConfigMapVolumeBinding{VolumeName: "logConf", ConfigMapName: obj.Name}))
@@ -284,8 +295,8 @@ var _ = Describe("file templates transformer test", func() {
 			transCtx.SynthesizeComponent.Instances = []appsv1.InstanceTemplate{{Name: "large", Configs: []appsv1.ClusterComponentConfig{{Name: ptr.To("logConf"), ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: alternate.Name}}}, Variables: map[string]string{"PORT": "2000"}}}}}
 
 			Expect((&componentFileTemplateTransformer{}).Transform(transCtx, dag)).To(Succeed())
-			Expect(transCtx.InstanceConfigMaps).To(HaveLen(1))
-			Expect(transCtx.InstanceConfigMaps[0].Data["server.conf"]).To(Equal("alternate/2000/normal"))
+			Expect(instanceConfigMaps()).To(HaveLen(1))
+			Expect(instanceConfigMaps()[0].Data["server.conf"]).To(Equal("alternate/2000/normal"))
 			Expect(transCtx.SynthesizeComponent.InstanceConfigs["large"][0].Parameters).To(HaveKeyWithValue("MODE", "normal"))
 		})
 
@@ -300,7 +311,7 @@ var _ = Describe("file templates transformer test", func() {
 			}
 
 			Expect((&componentFileTemplateTransformer{}).Transform(transCtx, dag)).To(Succeed())
-			Expect(transCtx.InstanceConfigMaps).To(BeEmpty())
+			Expect(instanceConfigMaps()).To(BeEmpty())
 			Expect(transCtx.SynthesizeComponent.InstanceConfigs["same"]).To(BeEmpty())
 			Expect(transCtx.SynthesizeComponent.InstanceConfigs["disabled"]).To(BeEmpty())
 			config := transCtx.SynthesizeComponent.InstanceConfigs["different"][0]
@@ -345,7 +356,6 @@ var _ = Describe("file templates transformer test", func() {
 				}
 				dag = newDAG(transCtx.Client.(model.GraphClient), transCtx.Component)
 				transCtx.SynthesizeComponent.Configs = nil
-				transCtx.InstanceConfigMaps = nil
 			}
 			Expect(transformer.Transform(transCtx, dag)).To(Succeed())
 			persist()
@@ -353,7 +363,7 @@ var _ = Describe("file templates transformer test", func() {
 			Expect(transformer.Transform(transCtx, dag)).To(Succeed())
 			before := transCtx.SynthesizeComponent.InstanceConfigs["large"][0].DeepCopy()
 			Expect(before.Parameters).To(HaveKeyWithValue("KB_CONFIG_FILES_UPDATED", ContainSubstring("/etc/server/server.conf:")))
-			Expect(transCtx.InstanceConfigMaps[0].Annotations).To(HaveKey(fileTemplateChangesAnnotationKey))
+			Expect(instanceConfigMaps()[0].Annotations).To(HaveKey(fileTemplateChangesAnnotationKey))
 			persist()
 			Expect(transformer.Transform(transCtx, dag)).To(Succeed())
 			Expect(transCtx.SynthesizeComponent.InstanceConfigs["large"][0]).To(Equal(*before))

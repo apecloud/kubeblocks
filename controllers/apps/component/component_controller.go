@@ -136,7 +136,7 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			// handle component pre-terminate
 			&componentPreTerminateTransformer{},
 			// handle component deletion
-			&componentDeletionTransformer{},
+			&componentDeletionTransformer{Client: r.Client},
 			// handle finalizers and referenced definition labels
 			&componentMetaTransformer{},
 			// validate referenced componentDefinition objects, and build synthesized component
@@ -182,9 +182,6 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 	if errBuild != nil {
 		return requeueError(errBuild)
-	}
-	if err := planBuilder.(*componentPlanBuilder).transCtx.instanceConfigMapRequeue; err != nil {
-		return requeueError(err)
 	}
 	return intctrlutil.Reconciled()
 }

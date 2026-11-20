@@ -19383,46 +19383,6 @@ PodUpdatePolicy is set to StrictInPlace but the pods cannot be updated in-place)
 </td>
 </tr></tbody>
 </table>
-<h3 id="workloads.kubeblocks.io/v1.ConfigMapVolumeBinding">ConfigMapVolumeBinding
-</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate</a>)
-</p>
-<div>
-<p>ConfigMapVolumeBinding identifies a Pod volume and the ConfigMap to mount in it.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>volumeName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>VolumeName is the name of the ConfigMap volume in the Pod template.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>configMapName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>ConfigMapName is the name of the ConfigMap in the Pod namespace.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate
 </h3>
 <p>
@@ -19453,8 +19413,8 @@ string
 <td>
 <code>volume</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1.ConfigMapVolumeBinding">
-ConfigMapVolumeBinding
+<a href="#workloads.kubeblocks.io/v1.ConfigVolumeBinding">
+ConfigVolumeBinding
 </a>
 </em>
 </td>
@@ -19536,6 +19496,46 @@ map[string]string
 <td>
 <em>(Optional)</em>
 <p>ReconfigureArgs is the runtime argv payload for the reconfigure action.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.ConfigVolumeBinding">ConfigVolumeBinding
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate</a>)
+</p>
+<div>
+<p>ConfigVolumeBinding associates a configuration with a Pod volume and its ConfigMap.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>volumeName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>VolumeName is the name of the ConfigMap volume in the Pod template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configMapName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>ConfigMapName is the name of the ConfigMap in the Pod namespace.</p>
 </td>
 </tr>
 </tbody>

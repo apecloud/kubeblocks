@@ -576,7 +576,7 @@ type ConfigTemplate struct {
 	// Volume identifies the ConfigMap volume for this configuration.
 	//
 	// +optional
-	Volume *ConfigMapVolumeBinding `json:"volume,omitempty"`
+	Volume *ConfigVolumeBinding `json:"volume,omitempty"`
 
 	// Represents a checksum or hash of the config content.
 	//
@@ -611,8 +611,8 @@ type ConfigTemplate struct {
 	ReconfigureArgs [][]string `json:"reconfigureArgs,omitempty"`
 }
 
-// ConfigMapVolumeBinding identifies a Pod volume and the ConfigMap to mount in it.
-type ConfigMapVolumeBinding struct {
+// ConfigVolumeBinding associates a configuration with a Pod volume and its ConfigMap.
+type ConfigVolumeBinding struct {
 	// VolumeName is the name of the ConfigMap volume in the Pod template.
 	//
 	// +kubebuilder:validation:MinLength=1

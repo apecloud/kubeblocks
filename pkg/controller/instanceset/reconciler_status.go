@@ -66,7 +66,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		pod, _ := object.(*corev1.Pod)
 		podList = append(podList, pod)
 	}
-	assignments, _, err := instancetemplate.BuildAssignments(tree, its)
+	assignments, templateNames, err := instancetemplate.BuildAssignments(tree, its)
 	if err != nil {
 		if instancetemplate.IsAssignmentIncomplete(err) {
 			return kubebuilderx.Continue, nil
@@ -209,7 +209,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	// 4. set instance status
-	if err = setInstanceStatus(tree, its, podList, nameToTemplateMap); err != nil {
+	if err = setInstanceStatus(tree, its, podList, assignments, templateNames, nameToTemplateMap); err != nil {
 		return kubebuilderx.Continue, err
 	}
 
@@ -454,11 +454,8 @@ func instancePodFailed(pod *corev1.Pod) bool {
 }
 
 func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []*corev1.Pod,
+	desiredAssignments []instancetemplate.Assignment, templateNames []string,
 	nameToTemplateMap map[string]*instancetemplate.InstanceTemplateExt) error {
-	desiredAssignments, templateNames, err := instancetemplate.BuildAssignments(tree, its)
-	if err != nil {
-		return err
-	}
 	pvcsByName := persistentVolumeClaimsByName(tree)
 	desiredTemplateAssignments := make([]instancestatus.TemplateAssignment, 0, len(desiredAssignments))
 	desiredNames := make(map[string]struct{}, len(desiredAssignments))

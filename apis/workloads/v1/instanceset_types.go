@@ -240,7 +240,8 @@ type InstanceSetSpec struct {
 	// +optional
 	Stop *bool `json:"stop,omitempty"`
 
-	// Describe the configs to be reconfigured.
+	// Configs defines the default configurations and update settings for the InstanceSet.
+	// Each volume association must match a ConfigMap volume and its source in the Pod template.
 	//
 	// +optional
 	Configs []ConfigTemplate `json:"configs,omitempty"`
@@ -462,11 +463,12 @@ type InstanceTemplate struct {
 	// +optional
 	Images map[string]string `json:"images,omitempty"`
 
-	// Configs replaces matching entries in the InstanceSet's configs by name.
-	// Each entry replaces the entire matching config. Entries without an override are inherited.
-	// A volume override uses the volume name of the matching InstanceSet config.
-	// An override without volume inherits the matching config's volume.
-	// An omitted or empty list inherits all entries.
+	// Configs overrides the InstanceSet's configurations by name for this InstanceTemplate.
+	// Each override must match exactly one configuration in the InstanceSet.
+	// Configurations without an override are inherited.
+	// An override replaces the matching configuration's settings and inherits its volume if omitted.
+	// To select a different ConfigMap, use the same volume name as the matching configuration.
+	// Configurations that use the same volume must select the same ConfigMap.
 	//
 	// +optional
 	// +listType=map

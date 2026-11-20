@@ -9324,12 +9324,14 @@ Add new or override existing envs.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Configs overrides managed file configurations for this InstanceTemplate.
-Each entry must name a distinct configuration declared in the ComponentDefinition.
-Each override accepts only name, variables, and configMap.name.
-Variables override inherited values by key. Set configMap.name to select a template
-source in the Component namespace. The settings for applying updates are inherited.
-An omitted or empty list inherits all configurations from the Component.</p>
+<p>Configs overrides managed file configurations for all instances of this template.
+Each entry must name a distinct configuration declared in the ComponentDefinition
+and managed by the Component. Each override accepts only name, variables, and configMap.name.
+Variables replace inherited values by key. Set configMap.name to select a template
+source ConfigMap in the Component namespace.
+Omitted variable keys and the omitted template source are inherited from the Component.
+Restart and reconfigure settings are always inherited.
+Configurations without an override are inherited, including when the list is empty.</p>
 </td>
 </tr>
 </tbody>
@@ -19260,7 +19262,8 @@ If set, all the computing resources will be released.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Describe the configs to be reconfigured.</p>
+<p>Configs defines the default configurations and update settings for the InstanceSet.
+Each volume association must match a ConfigMap volume and its source in the Pod template.</p>
 </td>
 </tr>
 <tr>
@@ -20062,7 +20065,8 @@ If set, all the computing resources will be released.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Describe the configs to be reconfigured.</p>
+<p>Configs defines the default configurations and update settings for the InstanceSet.
+Each volume association must match a ConfigMap volume and its source in the Pod template.</p>
 </td>
 </tr>
 <tr>
@@ -21216,11 +21220,12 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Configs replaces matching entries in the InstanceSet&rsquo;s configs by name.
-Each entry replaces the entire matching config. Entries without an override are inherited.
-A volume override uses the volume name of the matching InstanceSet config.
-An override without volume inherits the matching config&rsquo;s volume.
-An omitted or empty list inherits all entries.</p>
+<p>Configs overrides the InstanceSet&rsquo;s configurations by name for this InstanceTemplate.
+Each override must match exactly one configuration in the InstanceSet.
+Configurations without an override are inherited.
+An override replaces the matching configuration&rsquo;s settings and inherits its volume if omitted.
+To select a different ConfigMap, use the same volume name as the matching configuration.
+Configurations that use the same volume must select the same ConfigMap.</p>
 </td>
 </tr>
 </tbody>

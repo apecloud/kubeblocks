@@ -265,7 +265,7 @@ var _ = AfterSuite(func() {
 })
 
 func getPodUpdatePolicyForTest(its *workloads.InstanceSet, pod *corev1.Pod) (podUpdatePolicy, workloads.PodUpdatePolicyType, string, error) {
-	templates, err := instancetemplate.BuildInstanceTemplatesWithConfigs(its, nil)
+	templates, err := instancetemplate.BuildInstanceTemplateExtMap(its, nil)
 	if err != nil {
 		return noOpsPolicy, "", "", err
 	}

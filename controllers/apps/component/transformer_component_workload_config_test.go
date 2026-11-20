@@ -201,7 +201,7 @@ func TestInstanceConfigCollectionWaitsForReferences(t *testing.T) {
 			objects := []client.Object{cm, running}
 			spec := corev1.PodSpec{Volumes: []corev1.Volume{{Name: "old", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: cm.Name}}}}}}
 			if reference == "published workload" {
-				running.Spec.Instances = []workloads.InstanceTemplate{{Name: "removed", Replicas: ptr.To(int32(0)), Configs: []workloads.ConfigTemplate{{Name: "main", Volume: &workloads.ConfigVolumeBinding{VolumeName: "old", ConfigMapName: cm.Name}}}}}
+				running.Spec.Instances = []workloads.InstanceTemplate{{Name: "removed", Replicas: ptr.To(int32(0)), Configs: []workloads.ConfigTemplate{{Name: "main", Volume: &workloads.ConfigVolumeBinding{ConfigMapName: cm.Name}}}}}
 			}
 			if reference == "instance" {
 				inst := &workloads.Instance{ObjectMeta: metav1.ObjectMeta{Name: comp.Name + "-0", Namespace: comp.Namespace, Labels: constant.GetCompLabels("db", "mysql")}}

@@ -411,7 +411,7 @@ var _ = Describe("instance util test", func() {
 
 func TestDirectConfigOverrideRetainedAndInjectedPods(t *testing.T) {
 	its, tree, pods, member := newDirectConfigFixture(t, "named")
-	desired, err := instancetemplate.BuildInstanceName2TemplateMap(its, tree)
+	desired, err := instancetemplate.BuildInstanceTemplatesWithConfigs(its, tree)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -455,7 +455,7 @@ func TestDirectConfigRestartPolicyWithSourceChange(t *testing.T) {
 				tpl.Configs[tc.restartConfig].Restart = ptr.To(true)
 				tpl.Images = map[string]string{"db": "mysql:new"}
 			})
-			desired, err := instancetemplate.BuildInstanceName2TemplateMap(its, tree)
+			desired, err := instancetemplate.BuildInstanceTemplatesWithConfigs(its, tree)
 			if err != nil {
 				t.Fatal(err)
 			}

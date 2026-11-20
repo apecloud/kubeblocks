@@ -35,8 +35,9 @@ type defaultNameBuilder struct {
 }
 
 func (s *defaultNameBuilder) BuildInstanceName2TemplateMap() (map[string]*InstanceTemplateExt, error) {
+	instanceTemplateList := buildInstanceTemplateExts(s.itsExt)
 	allNameTemplateMap := make(map[string]*InstanceTemplateExt)
-	for _, template := range s.itsExt.InstanceTemplates {
+	for _, template := range instanceTemplateList {
 		ordinalList, err := getOrdinalListByTemplateName(s.itsExt.InstanceSet, template.Name)
 		if err != nil {
 			return nil, err
@@ -58,8 +59,9 @@ func (s *defaultNameBuilder) BuildInstanceName2TemplateMap() (map[string]*Instan
 func (s *defaultNameBuilder) GenerateAllInstanceNames() ([]string, error) {
 	instanceNameList := make([]string, 0)
 	for _, template := range s.itsExt.InstanceTemplates {
-		ordinalList := convertOrdinalsToSortedList(template.ordinals)
-		names, err := generateInstanceNamesFromTemplate(s.itsExt.InstanceSet.Name, template.Name, template.Replicas, s.itsExt.InstanceSet.Spec.OfflineInstances, ordinalList)
+		replicas := template.GetReplicas()
+		ordinalList := convertOrdinalsToSortedList(template.GetOrdinals())
+		names, err := generateInstanceNamesFromTemplate(s.itsExt.InstanceSet.Name, template.GetName(), replicas, s.itsExt.InstanceSet.Spec.OfflineInstances, ordinalList)
 		if err != nil {
 			return nil, err
 		}
@@ -100,6 +102,15 @@ func baseSort(x any, getNameNOrdinalFunc func(i int) (string, int), getRolePrior
 		}
 		return ordinal1 > ordinal2
 	})
+}
+
+func buildInstanceTemplateExts(itsExt *InstanceSetExt) []*InstanceTemplateExt {
+	var instanceTemplateExtList []*InstanceTemplateExt
+	for _, template := range itsExt.InstanceTemplates {
+		templateExt := buildInstanceTemplateExt(template, itsExt.InstanceSet)
+		instanceTemplateExtList = append(instanceTemplateExtList, templateExt)
+	}
+	return instanceTemplateExtList
 }
 
 func getOrdinalListByTemplateName(its *workloads.InstanceSet, templateName string) ([]int32, error) {

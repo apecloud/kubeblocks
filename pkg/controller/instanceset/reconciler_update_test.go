@@ -919,7 +919,7 @@ func TestDirectConfigOverridesUpdateRouting(t *testing.T) {
 					t.Fatal("recreation bypassed switchover")
 				}
 				runDirectReconciler(t, NewReplicasAlignmentReconciler(), tree)
-				desired, err := instancetemplate.BuildInstanceTemplatesWithConfigs(its, tree)
+				desired, err := instancetemplate.BuildInstanceTemplateExtMap(its, tree)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -1169,7 +1169,7 @@ func TestDirectConfigRollbackPreservesInheritedSameMountReload(t *testing.T) {
 			if err != nil || obj == nil {
 				t.Fatal("replacement not created")
 			}
-			desired, err := instancetemplate.BuildInstanceTemplatesWithConfigs(its, tree)
+			desired, err := instancetemplate.BuildInstanceTemplateExtMap(its, tree)
 			if err != nil {
 				t.Fatal(err)
 			}

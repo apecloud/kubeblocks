@@ -134,20 +134,11 @@ func configVolumeIndex(template *InstanceTemplateExt, config workloads.ConfigTem
 	return 0, fmt.Errorf("config %q: volume %q does not exist", config.Name, binding.VolumeName)
 }
 
-// BuildInstanceTemplatesWithConfigs maps desired instance names to effective Pod templates and configs.
-func BuildInstanceTemplatesWithConfigs(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) (map[string]*InstanceTemplateExt, error) {
+// BuildInstanceTemplateExtMap returns effective templates keyed by instance name.
+func BuildInstanceTemplateExtMap(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) (map[string]*InstanceTemplateExt, error) {
 	itsExt, err := BuildInstanceSetExt(its, tree)
 	if err != nil {
 		return nil, err
-	}
-	if len(itsExt.InstanceTemplates) == 0 {
-		template := &InstanceTemplateExt{
-			PodTemplateSpec:      its.Spec.Template,
-			VolumeClaimTemplates: its.Spec.VolumeClaimTemplates,
-		}
-		if err := resolveConfigs(template, its.Spec.Configs, nil); err != nil {
-			return nil, err
-		}
 	}
 	opts := &PodNameBuilderOpts{}
 	if tree != nil {
@@ -156,6 +147,20 @@ func BuildInstanceTemplatesWithConfigs(its *workloads.InstanceSet, tree *kubebui
 	nameBuilder, err := NewPodNameBuilder(itsExt, opts)
 	if err != nil {
 		return nil, err
+	}
+	return buildInstanceTemplateExtMap(itsExt, nameBuilder)
+}
+
+func buildInstanceTemplateExtMap(itsExt *InstanceSetExt, nameBuilder PodNameBuilder) (map[string]*InstanceTemplateExt, error) {
+	its := itsExt.InstanceSet
+	if len(itsExt.InstanceTemplates) == 0 {
+		template := &InstanceTemplateExt{
+			PodTemplateSpec:      its.Spec.Template,
+			VolumeClaimTemplates: its.Spec.VolumeClaimTemplates,
+		}
+		if err := resolveConfigs(template, its.Spec.Configs, nil); err != nil {
+			return nil, err
+		}
 	}
 	templates, err := nameBuilder.BuildInstanceName2TemplateMap()
 	if err != nil {

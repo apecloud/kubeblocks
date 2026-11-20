@@ -452,3 +452,47 @@ var _ = Describe("image util test", func() {
 		}
 	})
 })
+
+func TestLoadRegistryConfigValidatesNewConfig(t *testing.T) {
+	oldInstance := getRegistriesConfig()
+	oldRaw := viper.Get(constant.CfgRegistries)
+	oldToolsImage := viper.GetString(constant.KBToolsImage)
+	defer func() {
+		registriesConfigInstance = oldInstance
+		viper.Set(constant.CfgRegistries, oldRaw)
+		viper.Set(constant.KBToolsImage, oldToolsImage)
+	}()
+	viper.Set(constant.KBToolsImage, "docker.io/apecloud/kubeblocks-tools:1.0.0")
+
+	// Seed a valid current config. The invalid new config below must still be
+	// rejected: validation has to inspect the newly parsed config, not the
+	// already installed one.
+	registriesConfigInstance = &registriesConfig{
+		RegistryConfig: []registryConfig{{From: "docker.io", To: "mirror.local"}},
+	}
+
+	viper.Set(constant.CfgRegistries, map[string]interface{}{
+		"registryConfig": []interface{}{
+			map[string]interface{}{"from": "docker.io", "to": ""},
+		},
+	})
+	if err := LoadRegistryConfig(); err == nil {
+		t.Fatalf("expected an error when the new config has an empty 'to', got nil")
+	}
+	// The invalid config must not be installed.
+	if got := getRegistriesConfig(); len(got.RegistryConfig) != 1 || got.RegistryConfig[0].To != "mirror.local" {
+		t.Fatalf("invalid config should not replace the current one, got %+v", got.RegistryConfig)
+	}
+
+	viper.Set(constant.CfgRegistries, map[string]interface{}{
+		"registryConfig": []interface{}{
+			map[string]interface{}{"from": "docker.io", "to": "example.com"},
+		},
+	})
+	if err := LoadRegistryConfig(); err != nil {
+		t.Fatalf("expected a valid config to load, got %v", err)
+	}
+	if got := getRegistriesConfig(); len(got.RegistryConfig) != 1 || got.RegistryConfig[0].To != "example.com" {
+		t.Fatalf("valid config was not installed, got %+v", got.RegistryConfig)
+	}
+}

@@ -57,19 +57,7 @@ func (r *instanceAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree
 
 func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
-	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
-
-	// 1. build desired name to template map
-	nameBuilder, err := instancetemplate.NewPodNameBuilder(
-		itsExt, &instancetemplate.PodNameBuilderOpts{EventLogger: tree.EventRecorder},
-	)
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
-	nameToTemplateMap, err := nameBuilder.BuildInstanceName2TemplateMap()
+	nameToTemplateMap, err := instancetemplate.BuildInstanceTemplateExtMap(its, tree)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}

@@ -97,7 +97,7 @@ var _ = Describe("instance util test", func() {
 				ConfigHash: ptr.To(""),
 			}}, pod)).Should(Succeed())
 
-			toUpdate, err := configsToUpdate(its, pod)
+			toUpdate, err := configsToUpdate(its.Spec.Configs, pod)
 			Expect(err).Should(BeNil())
 			Expect(toUpdate).Should(BeEmpty())
 		})
@@ -115,7 +115,7 @@ var _ = Describe("instance util test", func() {
 				ConfigHash: ptr.To(""),
 			}}, pod)).Should(Succeed())
 
-			toUpdate, err := configsToUpdate(its, pod)
+			toUpdate, err := configsToUpdate(its.Spec.Configs, pod)
 			Expect(err).Should(BeNil())
 			Expect(toUpdate).Should(HaveLen(1))
 			Expect(toUpdate[0].Name).Should(Equal("valkey-replication-config"))

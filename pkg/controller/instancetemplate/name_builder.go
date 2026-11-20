@@ -21,30 +21,10 @@ package instancetemplate
 
 import (
 	"k8s.io/client-go/tools/record"
-
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
 
 type PodNameBuilderOpts struct {
 	EventLogger record.EventRecorder
-}
-
-// BuildInstanceName2TemplateMap returns the effective template for each desired instance.
-func BuildInstanceName2TemplateMap(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) (map[string]*InstanceTemplateExt, error) {
-	itsExt, err := BuildInstanceSetExt(its, tree)
-	if err != nil {
-		return nil, err
-	}
-	opts := &PodNameBuilderOpts{}
-	if tree != nil {
-		opts.EventLogger = tree.EventRecorder
-	}
-	builder, err := NewPodNameBuilder(itsExt, opts)
-	if err != nil {
-		return nil, err
-	}
-	return builder.BuildInstanceName2TemplateMap()
 }
 
 func NewPodNameBuilder(itsExt *InstanceSetExt, opts *PodNameBuilderOpts) (PodNameBuilder, error) {

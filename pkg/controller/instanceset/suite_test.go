@@ -284,16 +284,16 @@ func newDirectConfigFixture(t *testing.T, layout string) (*workloads.InstanceSet
 	action := &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"reload"}}}
 	its.Spec.LifecycleActions = &workloads.LifecycleActions{Switchover: action}
 	its.Spec.Configs = []workloads.ConfigTemplate{
-		{Name: "main", ConfigHash: ptr.To("global"), Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "main"}, Reconfigure: action, Parameters: map[string]string{"id": "global-main"}},
-		{Name: "aux", ConfigHash: ptr.To("global-aux"), Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "aux", ConfigMapName: "aux"}, Reconfigure: action, Parameters: map[string]string{"id": "global-aux"}},
+		{Name: "main", ConfigHash: ptr.To("global"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "main"}, Reconfigure: action, Parameters: map[string]string{"id": "global-main"}},
+		{Name: "aux", ConfigHash: ptr.To("global-aux"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "aux", ConfigMapName: "aux"}, Reconfigure: action, Parameters: map[string]string{"id": "global-aux"}},
 	}
 	its.Spec.Template.Spec.Volumes = []corev1.Volume{
 		{Name: "config", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "main"}}}},
 		{Name: "aux", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "aux"}}}},
 	}
 	tpl := workloads.InstanceTemplate{Name: "a", Replicas: ptr.To[int32](1), Configs: []workloads.ConfigTemplate{
-		{Name: "main", ConfigHash: ptr.To("main-old"), Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "main-a"}, Reconfigure: action, Parameters: map[string]string{"id": "main"}},
-		{Name: "aux", ConfigHash: ptr.To("aux-old"), Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "aux", ConfigMapName: "aux-a"}, Reconfigure: action, Parameters: map[string]string{"id": "aux"}},
+		{Name: "main", ConfigHash: ptr.To("main-old"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "main-a"}, Reconfigure: action, Parameters: map[string]string{"id": "main"}},
+		{Name: "aux", ConfigHash: ptr.To("aux-old"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "aux", ConfigMapName: "aux-a"}, Reconfigure: action, Parameters: map[string]string{"id": "aux"}},
 	}}
 	member := "demo-a-0"
 	if its.Spec.FlatInstanceOrdinal {

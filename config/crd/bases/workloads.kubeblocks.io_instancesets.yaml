@@ -66,7 +66,10 @@ spec:
               the configuration details for the state machine.
             properties:
               configs:
-                description: Describe the configs to be reconfigured.
+                description: |-
+                  Configs defines the default configurations and update settings for the InstanceSet.
+                  If a config sets volume, volume.volumeName must match the name of a ConfigMap volume
+                  in spec.template.spec.volumes. volume.configMapName must match that volume's configMap.name.
                 items:
                   properties:
                     configHash:
@@ -706,11 +709,12 @@ spec:
                       type: object
                     configs:
                       description: |-
-                        Configs replaces matching entries in the InstanceSet's configs by name.
-                        Each entry replaces the entire matching config. Entries without an override are inherited.
-                        A volume override uses the volume name of the matching InstanceSet config.
-                        An override without volume inherits the matching config's volume.
-                        An omitted or empty list inherits all entries.
+                        Configs overrides the InstanceSet's configurations by name for this InstanceTemplate.
+                        Each override must match exactly one configuration in the InstanceSet.
+                        Configurations without an override are inherited.
+                        An override replaces the matching configuration's settings and inherits its volume if omitted.
+                        To select a different ConfigMap, use the same volume name as the matching configuration.
+                        Configurations that use the same volume must select the same ConfigMap.
                       items:
                         properties:
                           configHash:

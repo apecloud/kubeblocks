@@ -30,7 +30,7 @@ import (
 
 func TestResolveConfigs(t *testing.T) {
 	base := []workloads.ConfigTemplate{
-		{Name: "main", ConfigHash: ptr.To("global"), Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "global"}, Restart: ptr.To(true), Parameters: map[string]string{"global": "value"}},
+		{Name: "main", ConfigHash: ptr.To("global"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "global"}, Restart: ptr.To(true), Parameters: map[string]string{"global": "value"}},
 		{Name: "other", ConfigHash: ptr.To("other")},
 	}
 	source := InstanceTemplateExt{PodTemplateSpec: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
@@ -41,7 +41,7 @@ func TestResolveConfigs(t *testing.T) {
 	}}}
 	t.Run("whole entry replacement and inherited volume options", func(t *testing.T) {
 		got := source
-		override := workloads.ConfigTemplate{Name: "main", ConfigHash: ptr.To("specific"), Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "specific"}}
+		override := workloads.ConfigTemplate{Name: "main", ConfigHash: ptr.To("specific"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "specific"}}
 		if err := ResolveConfigs(&got, base, []workloads.ConfigTemplate{override}); err != nil {
 			t.Fatal(err)
 		}
@@ -86,10 +86,10 @@ func TestResolveConfigs(t *testing.T) {
 		"empty name":                    {{Name: ""}},
 		"duplicate name":                {{Name: "main"}, {Name: "main"}},
 		"unknown config":                {{Name: "missing"}},
-		"unknown volume":                {{Name: "main", Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "missing", ConfigMapName: "new"}}},
-		"non ConfigMap volume":          {{Name: "main", Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "data", ConfigMapName: "new"}}},
-		"empty ConfigMap name":          {{Name: "main", Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config"}}},
-		"override without base binding": {{Name: "other", Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "new"}}},
+		"unknown volume":                {{Name: "main", Volume: &workloads.ConfigVolumeBinding{VolumeName: "missing", ConfigMapName: "new"}}},
+		"non ConfigMap volume":          {{Name: "main", Volume: &workloads.ConfigVolumeBinding{VolumeName: "data", ConfigMapName: "new"}}},
+		"empty ConfigMap name":          {{Name: "main", Volume: &workloads.ConfigVolumeBinding{VolumeName: "config"}}},
+		"override without base binding": {{Name: "other", Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "new"}}},
 	}
 	for name, overrides := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -105,7 +105,7 @@ func TestResolveConfigs(t *testing.T) {
 	t.Run("conflicting destinations for shared association", func(t *testing.T) {
 		got := source
 		shared := []workloads.ConfigTemplate{*base[0].DeepCopy(), {Name: "other", Volume: base[0].Volume.DeepCopy()}}
-		override := workloads.ConfigTemplate{Name: "main", Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "specific"}}
+		override := workloads.ConfigTemplate{Name: "main", Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "specific"}}
 		if err := ResolveConfigs(&got, shared, []workloads.ConfigTemplate{override}); err == nil {
 			t.Fatal("conflicting destinations for a shared volume were accepted")
 		}
@@ -113,7 +113,7 @@ func TestResolveConfigs(t *testing.T) {
 			t.Fatal("failed resolution published partial state")
 		}
 	})
-	for name, binding := range map[string]*workloads.ConfigMapVolumeBinding{
+	for name, binding := range map[string]*workloads.ConfigVolumeBinding{
 		"missing volume":         {VolumeName: "missing", ConfigMapName: "global"},
 		"non ConfigMap volume":   {VolumeName: "data", ConfigMapName: "global"},
 		"missing volume name":    {ConfigMapName: "global"},

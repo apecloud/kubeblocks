@@ -32,19 +32,24 @@ func ResolveConfigs(template *InstanceTemplateExt, configs, overrides []workload
 	counts := make(map[string]int, len(configs))
 	effective := make([]workloads.ConfigTemplate, len(configs))
 	for i := range configs {
-		config := &configs[i]
+		effective[i] = *configs[i].DeepCopy()
+		config := &effective[i]
 		if config.Volume != nil {
 			index, err := configVolumeIndex(template, *config)
 			if err != nil {
 				return err
 			}
-			if template.Spec.Volumes[index].ConfigMap.Name != config.Volume.ConfigMapName {
+			source := template.Spec.Volumes[index].ConfigMap.Name
+			if source == "" {
+				return fmt.Errorf("config %q: volume %q has no ConfigMap name", config.Name, config.Volume.VolumeName)
+			}
+			if config.Volume.ConfigMapName != "" && config.Volume.ConfigMapName != source {
 				return fmt.Errorf("config %q: binding ConfigMap %q does not match volume %q source", config.Name, config.Volume.ConfigMapName, config.Volume.VolumeName)
 			}
+			config.Volume.ConfigMapName = source
 		}
 		counts[config.Name]++
 		indices[config.Name] = i
-		effective[i] = *config.DeepCopy()
 	}
 	seen := make(map[string]bool, len(overrides))
 	for i := range overrides {
@@ -63,13 +68,20 @@ func ResolveConfigs(template *InstanceTemplateExt, configs, overrides []workload
 		if counts[config.Name] > 1 {
 			return fmt.Errorf("config override %q matches multiple InstanceSet configs", config.Name)
 		}
-		baseBinding := configs[index].Volume
-		if config.Volume != nil && (baseBinding == nil || config.Volume.VolumeName != baseBinding.VolumeName) {
-			return fmt.Errorf("config override %q: volume must match an explicit InstanceSet config binding", config.Name)
+		baseBinding := effective[index].Volume
+		if binding := config.Volume; binding != nil {
+			if binding.ConfigMapName == "" {
+				return fmt.Errorf("config override %q: ConfigMap name must not be empty", config.Name)
+			}
+			if baseBinding == nil || (binding.VolumeName != "" && binding.VolumeName != baseBinding.VolumeName) {
+				return fmt.Errorf("config override %q: volume must match an explicit InstanceSet config binding", config.Name)
+			}
 		}
 		effective[index] = *config.DeepCopy()
-		if effective[index].Volume == nil && baseBinding != nil {
-			effective[index].Volume = baseBinding.DeepCopy()
+		if effective[index].Volume == nil {
+			effective[index].Volume = baseBinding
+		} else {
+			effective[index].Volume.VolumeName = baseBinding.VolumeName
 		}
 	}
 
@@ -103,8 +115,8 @@ func ResolveConfigs(template *InstanceTemplateExt, configs, overrides []workload
 
 func configVolumeIndex(template *InstanceTemplateExt, config workloads.ConfigTemplate) (int, error) {
 	binding := config.Volume
-	if binding.VolumeName == "" || binding.ConfigMapName == "" {
-		return 0, fmt.Errorf("config %q: volume and ConfigMap names must not be empty", config.Name)
+	if binding.VolumeName == "" {
+		return 0, fmt.Errorf("config %q: volume name must not be empty", config.Name)
 	}
 	for _, claim := range template.VolumeClaimTemplates {
 		if claim.Name == binding.VolumeName {

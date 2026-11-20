@@ -25,12 +25,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
 
-// ResolveConfigs resolves config overrides and their volume bindings together.
-// Callers opt in to binding expansion after building the instance Pod template.
-func ResolveConfigs(template *InstanceTemplateExt, configs, overrides []workloads.ConfigTemplate) error {
+func resolveConfigs(template *InstanceTemplateExt, configs, overrides []workloads.ConfigTemplate) error {
 	indices := make(map[string]int, len(configs))
 	counts := make(map[string]int, len(configs))
 	effective := make([]workloads.ConfigTemplate, len(configs))
@@ -136,50 +133,6 @@ func configVolumeIndex(template *InstanceTemplateExt, config workloads.ConfigTem
 		return i, nil
 	}
 	return 0, fmt.Errorf("config %q: volume %q does not exist", config.Name, binding.VolumeName)
-}
-
-// BuildInstanceTemplatesWithConfigs maps desired instance names to effective Pod templates and configs.
-func BuildInstanceTemplatesWithConfigs(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) (map[string]*InstanceTemplateExt, error) {
-	itsExt, err := BuildInstanceSetExt(its, tree)
-	if err != nil {
-		return nil, err
-	}
-	if len(itsExt.InstanceTemplates) == 0 {
-		template := &InstanceTemplateExt{
-			PodTemplateSpec:      its.Spec.Template,
-			VolumeClaimTemplates: its.Spec.VolumeClaimTemplates,
-		}
-		if err := ResolveConfigs(template, its.Spec.Configs, nil); err != nil {
-			return nil, err
-		}
-	}
-	opts := &PodNameBuilderOpts{}
-	if tree != nil {
-		opts.EventLogger = tree.EventRecorder
-	}
-	nameBuilder, err := NewPodNameBuilder(itsExt, opts)
-	if err != nil {
-		return nil, err
-	}
-	templates, err := nameBuilder.BuildInstanceName2TemplateMap()
-	if err != nil {
-		return nil, err
-	}
-	resolved := make(map[string]*InstanceTemplateExt, len(itsExt.InstanceTemplates))
-	for _, template := range templates {
-		resolved[template.Name] = template
-	}
-	for name, source := range itsExt.InstanceTemplates {
-		template := resolved[name]
-		if template == nil {
-			// Validate bindings for zero-replica templates as well.
-			template = buildInstanceTemplateExt(source, its)
-		}
-		if err := ResolveConfigs(template, its.Spec.Configs, source.Configs); err != nil {
-			return nil, fmt.Errorf("instance template %q: %w", name, err)
-		}
-	}
-	return templates, nil
 }
 
 // ChangedConfigMapVolumes identifies desired ConfigMap volume sources that differ from the existing Pod.

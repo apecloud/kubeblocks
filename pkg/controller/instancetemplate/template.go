@@ -20,6 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instancetemplate
 
 import (
+	"fmt"
+	"maps"
+	"slices"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
@@ -35,27 +39,29 @@ func BuildInstanceSetExt(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTr
 		return nil, err
 	}
 
+	templates := buildInstanceTemplates(its, instancesCompressed)
 	ext := &InstanceSetExt{
 		InstanceSet:       its,
-		InstanceTemplates: make(map[string]*workloads.InstanceTemplate),
+		InstanceTemplates: make(map[string]*InstanceTemplateExt, len(templates)),
 	}
-	templates := buildInstanceTemplates(its, instancesCompressed)
-	for i, tpl := range templates {
-		ext.InstanceTemplates[tpl.Name] = templates[i]
+	if len(templates) == 0 && len(its.Spec.Configs) > 0 {
+		// Validate the defaults even when there are no InstanceTemplates or replicas.
+		if _, err := buildInstanceTemplateExt(&workloads.InstanceTemplate{}, its); err != nil {
+			return nil, err
+		}
+	}
+	for _, template := range templates {
+		resolved, err := buildInstanceTemplateExt(template, its)
+		if err != nil {
+			return nil, fmt.Errorf("instance template %q: %w", template.Name, err)
+		}
+		ext.InstanceTemplates[template.Name] = resolved
 	}
 	return ext, nil
 }
 
 func BuildInstanceTemplateExt(itsExt *InstanceSetExt) []*InstanceTemplateExt {
-	instanceTemplatesMap := itsExt.InstanceTemplates
-	templates := make([]*InstanceTemplateExt, 0, len(instanceTemplatesMap))
-	for templateName := range instanceTemplatesMap {
-		tpl := instanceTemplatesMap[templateName]
-		tplExt := buildInstanceTemplateExt(tpl, itsExt.InstanceSet)
-		templates = append(templates, tplExt)
-	}
-
-	return templates
+	return slices.Collect(maps.Values(itsExt.InstanceTemplates))
 }
 
 // buildInstanceTemplates builds a complete instance template list,
@@ -87,7 +93,7 @@ func buildInstanceTemplates(its *workloads.InstanceSet, instancesCompressed *cor
 	return instanceTemplateList
 }
 
-func buildInstanceTemplateExt(template *workloads.InstanceTemplate, its *workloads.InstanceSet) *InstanceTemplateExt {
+func buildInstanceTemplateExt(template *workloads.InstanceTemplate, its *workloads.InstanceSet) (*InstanceTemplateExt, error) {
 	var claims []corev1.PersistentVolumeClaim
 	for _, t := range its.Spec.VolumeClaimTemplates {
 		claims = append(claims, *t.DeepCopy())
@@ -96,6 +102,7 @@ func buildInstanceTemplateExt(template *workloads.InstanceTemplate, its *workloa
 		Name:                 template.Name,
 		PodTemplateSpec:      *its.Spec.Template.DeepCopy(),
 		VolumeClaimTemplates: claims,
+		ordinals:             *template.Ordinals.DeepCopy(),
 	}
 
 	replicas := int32(1)
@@ -156,7 +163,10 @@ func buildInstanceTemplateExt(template *workloads.InstanceTemplate, its *workloa
 		}
 	}
 
-	return templateExt
+	if err := resolveConfigs(templateExt, its.Spec.Configs, template.Configs); err != nil {
+		return nil, err
+	}
+	return templateExt, nil
 }
 
 func mergeCPUNMemory(s, d *corev1.ResourceList) {

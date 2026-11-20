@@ -37,12 +37,11 @@ const (
 	templateRefDataKey       = "instances"
 )
 
-// InstanceSetExt has a complete list of instance templates.
-// i.e. it has a pseudo template (which equals to `.spec.template`)
-// to the end of the list, to fill up the replica count.
+// InstanceSetExt holds the effective templates for an InstanceSet, including the
+// default template for replicas without a named InstanceTemplate.
 type InstanceSetExt struct {
 	InstanceSet       *workloads.InstanceSet
-	InstanceTemplates map[string]*workloads.InstanceTemplate // key is template name
+	InstanceTemplates map[string]*InstanceTemplateExt // key is template name
 }
 
 // InstanceTemplateExt merges the default podSpec with overrides in the template
@@ -52,6 +51,7 @@ type InstanceTemplateExt struct {
 	corev1.PodTemplateSpec
 	VolumeClaimTemplates []corev1.PersistentVolumeClaim
 	Configs              []workloads.ConfigTemplate
+	ordinals             workloads.Ordinals
 }
 
 type PodNameBuilder interface {

@@ -406,7 +406,7 @@ var _ = Describe("InstanceSet Controller 2", func() {
 			DeferCleanup(func() { intctrlutil.SupportResizeSubResource = supportResize })
 			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
 				f.SetReplicas(2)
-				f.AddConfigs(workloads.ConfigTemplate{Name: "server", ConfigHash: ptr.To("base"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "shared-config"}})
+				f.AddConfigs(workloads.ConfigTemplate{Name: "server", ConfigHash: ptr.To("base"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config"}})
 				spec := &f.Get().Spec
 				spec.InstanceUpdateStrategy = &kbappsv1.InstanceUpdateStrategy{Type: kbappsv1.RollingUpdateStrategyType}
 				spec.Template.Spec.Volumes = []corev1.Volume{{
@@ -423,7 +423,7 @@ var _ = Describe("InstanceSet Controller 2", func() {
 					Configs: []workloads.ConfigTemplate{{
 						Name:       "server",
 						ConfigHash: ptr.To("hot"),
-						Volume:     &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "hot-config"},
+						Volume:     &workloads.ConfigVolumeBinding{ConfigMapName: "hot-config"},
 					}},
 				}}
 			})

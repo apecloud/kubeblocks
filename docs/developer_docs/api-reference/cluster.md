@@ -19259,8 +19259,9 @@ If set, all the computing resources will be released.</p>
 <td>
 <em>(Optional)</em>
 <p>Configs defines the default configurations and update settings for the InstanceSet.
-If a config sets volume, volume.volumeName must match the name of a ConfigMap volume
-in spec.template.spec.volumes. volume.configMapName must match that volume&rsquo;s configMap.name.</p>
+If a config sets volume, set volume.volumeName to the name of a ConfigMap volume
+in spec.template.spec.volumes. The volume supplies the default ConfigMap.
+If set, volume.configMapName must match that ConfigMap.</p>
 </td>
 </tr>
 <tr>
@@ -19524,6 +19525,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>VolumeName is the name of the ConfigMap volume in the Pod template.</p>
 </td>
 </tr>
@@ -19535,6 +19537,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>ConfigMapName is the name of the ConfigMap in the Pod namespace.</p>
 </td>
 </tr>
@@ -20063,8 +20066,9 @@ If set, all the computing resources will be released.</p>
 <td>
 <em>(Optional)</em>
 <p>Configs defines the default configurations and update settings for the InstanceSet.
-If a config sets volume, volume.volumeName must match the name of a ConfigMap volume
-in spec.template.spec.volumes. volume.configMapName must match that volume&rsquo;s configMap.name.</p>
+If a config sets volume, set volume.volumeName to the name of a ConfigMap volume
+in spec.template.spec.volumes. The volume supplies the default ConfigMap.
+If set, volume.configMapName must match that ConfigMap.</p>
 </td>
 </tr>
 <tr>
@@ -21222,7 +21226,9 @@ map[string]string
 Each override must match exactly one configuration in the InstanceSet.
 Configurations without an override are inherited.
 An override replaces the matching configuration&rsquo;s settings and inherits its volume if omitted.
-To select a different ConfigMap, use the same volume name as the matching configuration.
+To select a different ConfigMap, set volume.configMapName. The override uses
+the volume of the matching InstanceSet configuration. If set, volume.volumeName
+must match that volume name.
 Configurations that use the same volume must select the same ConfigMap.</p>
 </td>
 </tr>

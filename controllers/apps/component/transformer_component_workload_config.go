@@ -60,14 +60,8 @@ func instanceConfigMapNames(its *workloads.InstanceSet) sets.Set[string] {
 	base := sets.New[string]()
 	retainPodConfigMaps(base, &its.Spec.Template.Spec)
 	names := sets.New[string]()
-	for _, instance := range its.Spec.Instances {
-		for _, config := range instance.Configs {
-			if config.Volume != nil && !base.Has(config.Volume.ConfigMapName) {
-				names.Insert(config.Volume.ConfigMapName)
-			}
-		}
-	}
-	return names
+	retainInstanceTemplateConfigMaps(names, its.Spec.Instances)
+	return names.Difference(base)
 }
 
 func configMapPlacements(value string) sets.Set[string] {
@@ -196,13 +190,7 @@ func boundConfigMapNames(its *workloads.InstanceSet) sets.Set[string] {
 			names.Insert(volume.ConfigMap.Name)
 		}
 	}
-	for _, instance := range its.Spec.Instances {
-		for _, config := range instance.Configs {
-			if config.Volume != nil {
-				names.Insert(config.Volume.ConfigMapName)
-			}
-		}
-	}
+	retainInstanceTemplateConfigMaps(names, its.Spec.Instances)
 	return names
 }
 
@@ -351,7 +339,11 @@ func retainInstanceSetConfigMaps(retained sets.Set[string], its *workloads.Insta
 		return
 	}
 	retainPodConfigMaps(retained, &its.Spec.Template.Spec)
-	for _, instance := range its.Spec.Instances {
+	retainInstanceTemplateConfigMaps(retained, its.Spec.Instances)
+}
+
+func retainInstanceTemplateConfigMaps(retained sets.Set[string], instances []workloads.InstanceTemplate) {
+	for _, instance := range instances {
 		for _, config := range instance.Configs {
 			if config.Volume != nil {
 				retained.Insert(config.Volume.ConfigMapName)

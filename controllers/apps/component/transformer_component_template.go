@@ -203,10 +203,10 @@ func (t *componentFileTemplateTransformer) prepareInstanceFileTemplateObjects(tr
 				}
 				config.Volume = &workloads.ConfigVolumeBinding{ConfigMapName: configObj.Name}
 			}
-			baseConfig, found := slices.BinarySearchFunc(synth.Configs, config.Name, func(config workloads.ConfigTemplate, name string) int {
-				return strings.Compare(config.Name, name)
-			})
 			if sameData {
+				baseConfig, found := slices.BinarySearchFunc(synth.Configs, config.Name, func(config workloads.ConfigTemplate, name string) int {
+					return strings.Compare(config.Name, name)
+				})
 				if found && reflect.DeepEqual(config, synth.Configs[baseConfig]) {
 					continue
 				}

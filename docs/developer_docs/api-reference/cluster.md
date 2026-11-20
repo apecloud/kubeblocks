@@ -21225,11 +21225,12 @@ map[string]string
 <p>Configs overrides the InstanceSet&rsquo;s configurations by name for this InstanceTemplate.
 Each override must match exactly one configuration in the InstanceSet.
 Configurations without an override are inherited.
-An override replaces the matching configuration&rsquo;s settings and inherits its volume if omitted.
+An override replaces the matching configuration&rsquo;s settings. If the override omits volume,
+it inherits the matching configuration&rsquo;s volume and ConfigMap.
 To select a different ConfigMap, set volume.configMapName. The override uses
 the volume of the matching InstanceSet configuration. If set, volume.volumeName
 must match that volume name.
-Configurations that use the same volume must select the same ConfigMap.</p>
+Configurations that use the same volume in a Pod must select the same ConfigMap.</p>
 </td>
 </tr>
 </tbody>

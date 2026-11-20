@@ -468,11 +468,12 @@ type InstanceTemplate struct {
 	// Configs overrides the InstanceSet's configurations by name for this InstanceTemplate.
 	// Each override must match exactly one configuration in the InstanceSet.
 	// Configurations without an override are inherited.
-	// An override replaces the matching configuration's settings and inherits its volume if omitted.
+	// An override replaces the matching configuration's settings. If the override omits volume,
+	// it inherits the matching configuration's volume and ConfigMap.
 	// To select a different ConfigMap, set volume.configMapName. The override uses
 	// the volume of the matching InstanceSet configuration. If set, volume.volumeName
 	// must match that volume name.
-	// Configurations that use the same volume must select the same ConfigMap.
+	// Configurations that use the same volume in a Pod must select the same ConfigMap.
 	//
 	// +optional
 	// +listType=map

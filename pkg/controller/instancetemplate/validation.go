@@ -83,5 +83,6 @@ func ValidateInstanceTemplates(its *workloads.InstanceSet, tree *kubebuilderx.Ob
 	if len(dupNames) > 0 {
 		return fmt.Errorf("duplicate pod names: %s", dupNames[:len(dupNames)-1])
 	}
-	return nil
+	_, err = buildInstanceTemplateExtMap(itsExt, nameBuilder)
+	return err
 }

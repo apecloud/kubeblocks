@@ -868,7 +868,7 @@ func newLegacyInstanceStatusFixture(t *testing.T, configs []workloads.ConfigTemp
 	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)
 	}
-	templates, err := instancetemplate.BuildInstanceTemplatesWithConfigs(its, tree)
+	templates, err := instancetemplate.BuildInstanceName2TemplateMap(its, tree)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -907,7 +907,7 @@ func newLegacyInstanceStatusFixtureFromSet(t *testing.T, its *workloads.Instance
 	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)
 	}
-	templates, err := instancetemplate.BuildInstanceTemplatesWithConfigs(its, tree)
+	templates, err := instancetemplate.BuildInstanceName2TemplateMap(its, tree)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -950,7 +950,7 @@ func legacyInstanceStatusSet(replicas int32) *workloads.InstanceSet {
 
 func addLegacyPVCs(t *testing.T, tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, capacity resource.Quantity) {
 	t.Helper()
-	templates, err := instancetemplate.BuildInstanceTemplatesWithConfigs(its, tree)
+	templates, err := instancetemplate.BuildInstanceName2TemplateMap(its, tree)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -997,7 +997,7 @@ func TestDirectConfigOverridesCreationAndConvergence(t *testing.T) {
 			if pods["demo-0"].Spec.Volumes[0].ConfigMap.Name != "main" {
 				t.Fatal("default member binding changed")
 			}
-			desired, err := instancetemplate.BuildInstanceTemplatesWithConfigs(its, tree)
+			desired, err := instancetemplate.BuildInstanceName2TemplateMap(its, tree)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1034,7 +1034,7 @@ func TestDirectConfigOverridesCreationAndConvergence(t *testing.T) {
 			if revisions[member] != oldRevision {
 				t.Fatal("same-mount dynamic hash changed the Pod revision")
 			}
-			desired, err = instancetemplate.BuildInstanceTemplatesWithConfigs(its, tree)
+			desired, err = instancetemplate.BuildInstanceName2TemplateMap(its, tree)
 			if err != nil {
 				t.Fatal(err)
 			}

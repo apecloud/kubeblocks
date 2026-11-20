@@ -177,6 +177,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			return kubebuilderx.Continue, err
 		}
 		configs := configsForMountedVolumes(nameToTemplateMap[pod.Name].Configs, pod, desiredPod)
+		// Always call reconfigure to execute reconfigure actions
 		allUpdated, err := r.reconfigure(tree, its, pod, configs)
 		if err != nil {
 			return kubebuilderx.Continue, err

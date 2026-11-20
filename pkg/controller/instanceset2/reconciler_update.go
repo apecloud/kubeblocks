@@ -56,7 +56,7 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 	// 1. build desired name to template map
-	nameToTemplateMap, err := instancetemplate.BuildInstanceName2TemplateMap(its, tree)
+	nameToTemplateMap, err := instancetemplate.BuildInstanceTemplatesWithConfigs(its, tree)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}

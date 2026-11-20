@@ -201,7 +201,7 @@ func TestInstanceConfigCollectionWaitsForReferences(t *testing.T) {
 			objects := []client.Object{cm, running}
 			spec := corev1.PodSpec{Volumes: []corev1.Volume{{Name: "old", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: cm.Name}}}}}}
 			if reference == "published workload" {
-				running.Spec.Instances = []workloads.InstanceTemplate{{Name: "removed", Replicas: ptr.To(int32(0)), Configs: []workloads.ConfigTemplate{{Name: "main", Volume: &workloads.ConfigVolumeBinding{ConfigMapName: cm.Name}}}}}
+				running.Spec.Instances = []workloads.InstanceTemplate{{Name: "removed", Replicas: ptr.To(int32(0)), Configs: []workloads.ConfigTemplate{{Name: "main", Volume: &workloads.ConfigVolumeBinding{VolumeName: "old", ConfigMapName: cm.Name}}}}}
 			}
 			if reference == "instance" {
 				inst := &workloads.Instance{ObjectMeta: metav1.ObjectMeta{Name: comp.Name + "-0", Namespace: comp.Namespace, Labels: constant.GetCompLabels("db", "mysql")}}
@@ -373,7 +373,7 @@ func TestInstanceConfigStartPublishesCoherentRuntime(t *testing.T) {
 			if ptr.Deref(starting.Spec.Stop, false) || !reflect.DeepEqual(starting.Spec.Instances[0].Configs, synth.InstanceConfigs["canary"]) {
 				t.Fatalf("Start did not publish both latest config bindings: %#v", starting.Spec.Instances[0].Configs)
 			}
-			templates, err := instancetemplate.BuildInstanceName2TemplateMap(starting, nil)
+			templates, err := instancetemplate.BuildInstanceTemplatesWithConfigs(starting, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -516,7 +516,7 @@ func TestInstanceConfigStartKeepsRenderInputsAndTopology(t *testing.T) {
 			if ptr.Deref(starting.Spec.Stop, false) || starting.Annotations[constant.KubeBlocksGenerationKey] != "1" || !reflect.DeepEqual(starting.Spec.Replicas, running.Spec.Replicas) || starting.Spec.FlatInstanceOrdinal != running.Spec.FlatInstanceOrdinal || !reflect.DeepEqual(starting.Spec.OfflineInstances, running.Spec.OfflineInstances) || !reflect.DeepEqual(starting.Spec.Instances[0].Replicas, running.Spec.Instances[0].Replicas) || !reflect.DeepEqual(starting.Spec.Instances[0].Ordinals, running.Spec.Instances[0].Ordinals) {
 				t.Fatal("Start applied scaling topology or acknowledged it before the normal lifecycle")
 			}
-			templates, err := instancetemplate.BuildInstanceName2TemplateMap(starting, nil)
+			templates, err := instancetemplate.BuildInstanceTemplatesWithConfigs(starting, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -561,7 +561,7 @@ func TestInstanceConfigStartKeepsRetiringTemplateOnBaseRuntime(t *testing.T) {
 	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(running), starting); err != nil {
 		t.Fatal(err)
 	}
-	templates, err := instancetemplate.BuildInstanceName2TemplateMap(starting, nil)
+	templates, err := instancetemplate.BuildInstanceTemplatesWithConfigs(starting, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

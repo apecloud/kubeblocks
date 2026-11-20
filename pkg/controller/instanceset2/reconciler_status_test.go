@@ -32,6 +32,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	instctrl "github.com/apecloud/kubeblocks/pkg/controller/instance"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
 )
@@ -263,7 +264,7 @@ func TestSetInstanceStatusReadsCurrentStateFromInstance(t *testing.T) {
 	instanceSpecRevision := stampInstanceRevision(inst)
 	its.Status.UpdateRevisions = map[string]string{inst.Name: instanceSpecRevision}
 
-	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
+	if err := setInstanceStatusForTest(tree, its, []*workloads.Instance{inst}); err != nil {
 		t.Fatal(err)
 	}
 	if len(its.Status.InstanceStatus) != 1 {
@@ -286,7 +287,7 @@ func TestSetInstanceStatusReadsCurrentStateFromInstance(t *testing.T) {
 		{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue},
 		{Type: string(workloads.InstanceFailure), Status: metav1.ConditionTrue},
 	}
-	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
+	if err := setInstanceStatusForTest(tree, its, []*workloads.Instance{inst}); err != nil {
 		t.Fatal(err)
 	}
 	status = its.Status.InstanceStatus[0]
@@ -295,7 +296,7 @@ func TestSetInstanceStatusReadsCurrentStateFromInstance(t *testing.T) {
 	}
 
 	inst.Status.UpToDate = false
-	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
+	if err := setInstanceStatusForTest(tree, its, []*workloads.Instance{inst}); err != nil {
 		t.Fatal(err)
 	}
 	status = its.Status.InstanceStatus[0]
@@ -304,7 +305,7 @@ func TestSetInstanceStatusReadsCurrentStateFromInstance(t *testing.T) {
 	}
 
 	inst.Status.CurrentState = workloads.InstanceCurrentStateTerminating
-	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
+	if err := setInstanceStatusForTest(tree, its, []*workloads.Instance{inst}); err != nil {
 		t.Fatal(err)
 	}
 	status = its.Status.InstanceStatus[0]
@@ -332,7 +333,7 @@ func TestSetInstanceStatusRetainsOfflineWithoutInstance(t *testing.T) {
 	}
 	tree := kubebuilderx.NewObjectTree()
 	tree.SetRoot(its)
-	if err := setInstanceStatus(tree, its, nil); err != nil {
+	if err := setInstanceStatusForTest(tree, its, nil); err != nil {
 		t.Fatal(err)
 	}
 	status := its.Status.InstanceStatus[0]
@@ -361,7 +362,7 @@ func TestSetInstanceStatusTreatsUnreportedInstanceAsAbsent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := setInstanceStatus(tree, its, nil); err != nil {
+	if err := setInstanceStatusForTest(tree, its, nil); err != nil {
 		t.Fatal(err)
 	}
 	status := its.FindInstanceStatus(instanceName)
@@ -410,7 +411,7 @@ func TestSetInstanceStatusKeepsRuntimeStateIndependentFromConvergence(t *testing
 		t.Fatal(err)
 	}
 
-	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
+	if err := setInstanceStatusForTest(tree, its, []*workloads.Instance{inst}); err != nil {
 		t.Fatal(err)
 	}
 	status := its.FindInstanceStatus(inst.Name)
@@ -440,7 +441,7 @@ func TestSetInstanceStatusUsesActiveFlatTemplateOverStaleInstanceTemplate(t *tes
 		Spec:       workloads.InstanceSpec{InstanceTemplateName: ""},
 	}
 
-	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
+	if err := setInstanceStatusForTest(tree, its, []*workloads.Instance{inst}); err != nil {
 		t.Fatal(err)
 	}
 	status := its.FindInstanceStatus(inst.Name)
@@ -1191,4 +1192,12 @@ func assertITS2UpToDate(t *testing.T, its *workloads.InstanceSet, name string, w
 	if status == nil || status.UpToDate != want {
 		t.Fatalf("instance %s UpToDate = %#v, want %v", name, status, want)
 	}
+}
+
+func setInstanceStatusForTest(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, instances []*workloads.Instance) error {
+	assignments, templateNames, err := instancetemplate.BuildAssignments(tree, its)
+	if err != nil {
+		return err
+	}
+	return setInstanceStatus(tree, its, instances, assignments, templateNames)
 }

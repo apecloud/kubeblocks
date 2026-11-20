@@ -1334,7 +1334,7 @@ func resolveComponentVarRefLow(ctx context.Context, cli client.Reader, synthesiz
 		objs, err := resolveReferentObjects(synthesizedComp, objRef, getter)
 		if err == nil && len(objs) == 1 && instance != nil {
 			if comp, ok := objs[synthesizedComp.Name].(*appsv1.Component); ok && comp != nil {
-				objs[synthesizedComp.Name] = fileTemplateComponent(comp, instance)
+				objs[synthesizedComp.Name] = componentWithInstanceTemplateOverrides(comp, instance)
 			}
 		}
 		return objs, err

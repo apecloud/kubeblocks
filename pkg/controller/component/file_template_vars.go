@@ -37,7 +37,7 @@ func ResolveFileTemplateVars(ctx context.Context, cli client.Reader, synthesized
 	return vars, err
 }
 
-func fileTemplateComponent(component *appsv1.Component, instance *appsv1.InstanceTemplate) *appsv1.Component {
+func componentWithInstanceTemplateOverrides(component *appsv1.Component, instance *appsv1.InstanceTemplate) *appsv1.Component {
 	comp := component.DeepCopy()
 	if instance.Resources != nil {
 		merge := func(src corev1.ResourceList, dst *corev1.ResourceList) {

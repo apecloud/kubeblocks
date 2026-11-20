@@ -324,8 +324,9 @@ var _ = Describe("file templates transformer test", func() {
 			obj := instanceConfigMaps()[0]
 			Expect(obj.Data["server.conf"]).To(Equal("8589934592/2.0/sidecar"))
 			Expect(obj.Labels[instanceConfigMapLabelKey]).To(Equal("true"))
-			Expect(transCtx.SynthesizeComponent.InstanceConfigs["large"][0].Volume).To(Equal(&workloads.ConfigVolumeBinding{VolumeName: "logConf", ConfigMapName: obj.Name}))
-			Expect(transCtx.SynthesizeComponent.Configs[0].Volume).To(Equal(&workloads.ConfigVolumeBinding{VolumeName: "logConf", ConfigMapName: fileTemplateObjectName(transCtx.SynthesizeComponent, "logConf")}))
+			Expect(transCtx.SynthesizeComponent.InstanceConfigs["large"][0].Volume).To(Equal(&workloads.ConfigVolumeBinding{ConfigMapName: obj.Name}))
+			Expect(transCtx.SynthesizeComponent.Configs[0].Volume).To(Equal(&workloads.ConfigVolumeBinding{VolumeName: "logConf"}))
+			Expect(transCtx.SynthesizeComponent.PodSpec.Volumes).To(ContainElement(newVolume("logConf")))
 			Expect(transCtx.SynthesizeComponent.TemplateVars["MEMORY"]).To(Equal("2147483648"))
 		})
 
@@ -339,7 +340,8 @@ var _ = Describe("file templates transformer test", func() {
 			checkTemplateObject("logConf", func(obj *corev1.ConfigMap) {
 				Expect(obj.Labels[constant.KBAppConfigMapOwnerLabelKey]).To(Equal(string(transCtx.Component.UID)))
 				Expect(obj.Annotations[instanceConfigMapPlacementsAnnotationKey]).To(Equal("a"))
-				Expect(transCtx.SynthesizeComponent.Configs[0].Volume.ConfigMapName).To(Equal(obj.Name))
+				Expect(transCtx.SynthesizeComponent.Configs[0].Volume).To(Equal(&workloads.ConfigVolumeBinding{VolumeName: "logConf"}))
+				Expect(transCtx.SynthesizeComponent.PodSpec.Volumes).To(ContainElement(newVolume("logConf")))
 				Expect(transCtx.SynthesizeComponent.InstanceAssistantObjects).NotTo(ContainElement(corev1.ObjectReference{
 					Kind: "ConfigMap", Namespace: obj.Namespace, Name: obj.Name,
 				}))
@@ -371,7 +373,7 @@ var _ = Describe("file templates transformer test", func() {
 			Expect(instanceConfigMaps()).To(BeEmpty())
 			config := transCtx.SynthesizeComponent.InstanceConfigs["large"][0]
 			Expect(config.Parameters).To(HaveKeyWithValue("MEMORY", "2147483648"))
-			Expect(config.Volume.ConfigMapName).To(Equal(fileTemplateObjectName(transCtx.SynthesizeComponent, "logConf")))
+			Expect(config.Volume).To(BeNil())
 		})
 
 		It("inherits variables and accepts a named template source override", func() {
@@ -404,7 +406,7 @@ var _ = Describe("file templates transformer test", func() {
 			Expect(transCtx.SynthesizeComponent.InstanceConfigs["disabled"]).To(BeEmpty())
 			config := transCtx.SynthesizeComponent.InstanceConfigs["different"][0]
 			Expect(config.Parameters).To(HaveKeyWithValue("PORT", "2000"))
-			Expect(config.Volume.ConfigMapName).To(Equal(fileTemplateObjectName(transCtx.SynthesizeComponent, "logConf")))
+			Expect(config.Volume).To(BeNil())
 		})
 
 		It("validates every rendered template before scheduling ConfigMap changes", func() {

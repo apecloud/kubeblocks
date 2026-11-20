@@ -197,17 +197,20 @@ func (t *componentFileTemplateTransformer) prepareInstanceFileTemplateObjects(tr
 				configObj = obj
 			}
 			config := t.buildConfigTemplate(transCtx, tpl, configObj)
-			if config.Volume == nil && !sameData {
-				return nil, nil, fmt.Errorf("instance template %s config %s has no ConfigMap volume %s", instance.Name, tpl.Name, tpl.VolumeName)
-			}
-			if config.Volume != nil {
-				config.Volume.ConfigMapName = configObj.Name
+			if !sameData {
+				if config.Volume == nil {
+					return nil, nil, fmt.Errorf("instance template %s config %s has no ConfigMap volume %s", instance.Name, tpl.Name, tpl.VolumeName)
+				}
+				config.Volume = &workloads.ConfigVolumeBinding{ConfigMapName: configObj.Name}
 			}
 			baseConfig, found := slices.BinarySearchFunc(synth.Configs, config.Name, func(config workloads.ConfigTemplate, name string) int {
 				return strings.Compare(config.Name, name)
 			})
-			if sameData && found && reflect.DeepEqual(config, synth.Configs[baseConfig]) {
-				continue
+			if sameData {
+				if found && reflect.DeepEqual(config, synth.Configs[baseConfig]) {
+					continue
+				}
+				config.Volume = nil
 			}
 			synth.InstanceConfigs[instance.Name] = append(synth.InstanceConfigs[instance.Name], config)
 		}
@@ -576,7 +579,7 @@ func (t *componentFileTemplateTransformer) configVolumeBinding(transCtx *compone
 	}
 	for _, volume := range transCtx.SynthesizeComponent.PodSpec.Volumes {
 		if volume.Name == tpl.VolumeName && volume.ConfigMap != nil {
-			return &workloads.ConfigVolumeBinding{VolumeName: volume.Name, ConfigMapName: volume.ConfigMap.Name}
+			return &workloads.ConfigVolumeBinding{VolumeName: volume.Name}
 		}
 	}
 	return nil

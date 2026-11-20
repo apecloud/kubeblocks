@@ -2243,8 +2243,8 @@ func TestLegacyInstanceSetStartUsesLatestNamedTemplateConfigs(t *testing.T) {
 	cli := legacyStopRecoveryFixture(t, 1, 0, func(its *workloads.InstanceSet) {
 		its.Spec.Template.Spec.Volumes = []corev1.Volume{volume("main", "default-old")}
 		its.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: "main", MountPath: "/etc/main"}}
-		its.Spec.Configs = []workloads.ConfigTemplate{config("main", "main", "default-old", "default-old-hash")}
-		its.Spec.Instances = []workloads.InstanceTemplate{{Name: "canary", Replicas: ptr.To(int32(1)), Configs: []workloads.ConfigTemplate{config("main", "main", "special-old", "special-old-hash")}}}
+		its.Spec.Configs = []workloads.ConfigTemplate{config("main", "main", "", "default-old-hash")}
+		its.Spec.Instances = []workloads.InstanceTemplate{{Name: "canary", Replicas: ptr.To(int32(1)), Configs: []workloads.ConfigTemplate{config("main", "", "special-old", "special-old-hash")}}}
 	})
 	legacyStopRecoveryReady(t, cli)
 	initial := legacyStopRecoveryPods(t, cli)[0]
@@ -2273,8 +2273,8 @@ func TestLegacyInstanceSetStartUsesLatestNamedTemplateConfigs(t *testing.T) {
 	legacyStopRecoveryChange(t, cli, func(its *workloads.InstanceSet) {
 		its.Spec.Template.Spec.Volumes = []corev1.Volume{volume("main", "default-latest"), volume("extra", "default-extra")}
 		its.Spec.Template.Spec.Containers[0].VolumeMounts = append(its.Spec.Template.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{Name: "extra", MountPath: "/etc/extra"})
-		its.Spec.Configs = []workloads.ConfigTemplate{config("main", "main", "default-latest", "default-latest-hash"), config("extra", "extra", "default-extra", "default-extra-hash")}
-		its.Spec.Instances[0].Configs = []workloads.ConfigTemplate{config("main", "main", "special-latest", "special-latest-hash"), config("extra", "extra", "special-extra", "special-extra-hash")}
+		its.Spec.Configs = []workloads.ConfigTemplate{config("main", "main", "", "default-latest-hash"), config("extra", "extra", "", "default-extra-hash")}
+		its.Spec.Instances[0].Configs = []workloads.ConfigTemplate{config("main", "", "special-latest", "special-latest-hash"), config("extra", "", "special-extra", "special-extra-hash")}
 	})
 	legacyStopRecoveryReconcile(t, cli, 3)
 	if len(legacyStopRecoveryPods(t, cli)) != 0 || !ptr.Deref(legacyStopRecoverySet(t, cli).Spec.Stop, false) {

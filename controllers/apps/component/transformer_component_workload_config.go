@@ -185,9 +185,15 @@ func startingConfigMounts(pod *corev1.PodSpec, names sets.Set[string]) configMou
 
 func boundConfigMapNames(its *workloads.InstanceSet) sets.Set[string] {
 	names := sets.New[string]()
+	volumes := sets.New[string]()
 	for _, config := range its.Spec.Configs {
 		if config.Volume != nil {
-			names.Insert(config.Volume.ConfigMapName)
+			volumes.Insert(config.Volume.VolumeName)
+		}
+	}
+	for _, volume := range its.Spec.Template.Spec.Volumes {
+		if volume.ConfigMap != nil && volume.ConfigMap.Name != "" && volumes.Has(volume.Name) {
+			names.Insert(volume.ConfigMap.Name)
 		}
 	}
 	for _, instance := range its.Spec.Instances {

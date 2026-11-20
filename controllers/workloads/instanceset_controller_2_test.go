@@ -1301,9 +1301,9 @@ func TestInstanceSetStopResumesLatestTemplateConfigs(t *testing.T) {
 	}}}
 	its.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: "config", MountPath: "/etc/db"}}
 	its.Spec.Configs = []workloads.ConfigTemplate{{Name: "server", ConfigHash: ptr.To("base"),
-		Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "shared-config"}}}
+		Volume: &workloads.ConfigVolumeBinding{VolumeName: "config"}}}
 	its.Spec.Instances = []workloads.InstanceTemplate{{Name: "hot", Replicas: ptr.To(int32(1)), Configs: []workloads.ConfigTemplate{{
-		Name: "server", ConfigHash: ptr.To("old"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "hot-config"},
+		Name: "server", ConfigHash: ptr.To("old"), Volume: &workloads.ConfigVolumeBinding{ConfigMapName: "hot-config"},
 	}}}}
 	cli := newSetStopClient(t, its)
 	wrapped := cli.(*setStopClient)
@@ -1346,8 +1346,11 @@ func TestInstanceSetStopResumesLatestTemplateConfigs(t *testing.T) {
 		}})
 		its.Spec.Template.Spec.Containers[0].VolumeMounts = append(its.Spec.Template.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{Name: "extra-config", MountPath: "/etc/extra"})
 		its.Spec.Configs = append(its.Spec.Configs, workloads.ConfigTemplate{Name: "extra", ConfigHash: ptr.To("base-extra"),
-			Volume: &workloads.ConfigVolumeBinding{VolumeName: "extra-config", ConfigMapName: "shared-extra"}})
-		its.Spec.Instances[0].Configs = wantConfigs
+			Volume: &workloads.ConfigVolumeBinding{VolumeName: "extra-config"}})
+		its.Spec.Instances[0].Configs = []workloads.ConfigTemplate{
+			{Name: "server", ConfigHash: ptr.To("server-new"), Volume: &workloads.ConfigVolumeBinding{ConfigMapName: "hot-config-new"}},
+			{Name: "extra", ConfigHash: ptr.To("extra-new"), Volume: &workloads.ConfigVolumeBinding{ConfigMapName: "hot-extra"}},
+		}
 	})
 	reconcileSetStop(t, cli, 5)
 	children = listSetStopChildren(t, cli)

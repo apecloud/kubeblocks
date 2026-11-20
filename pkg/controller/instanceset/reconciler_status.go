@@ -209,7 +209,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	// 4. set instance status
-	if err = setInstanceStatus(tree, its, podList); err != nil {
+	if err = setInstanceStatus(tree, its, podList, nameToTemplateMap); err != nil {
 		return kubebuilderx.Continue, err
 	}
 
@@ -453,12 +453,9 @@ func instancePodFailed(pod *corev1.Pod) bool {
 	return isFailed && isTimedOut
 }
 
-func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []*corev1.Pod) error {
+func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []*corev1.Pod,
+	nameToTemplateMap map[string]*instancetemplate.InstanceTemplateExt) error {
 	desiredAssignments, templateNames, err := instancetemplate.BuildAssignments(tree, its)
-	if err != nil {
-		return err
-	}
-	desiredTemplates, err := instancetemplate.BuildInstanceTemplateExtMap(its, tree)
 	if err != nil {
 		return err
 	}
@@ -505,7 +502,7 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 			return err
 		}
 		if observation.State == workloads.InstanceCurrentStatePresent && isCreated(pod) {
-			template := desiredTemplates[pod.Name]
+			template := nameToTemplateMap[pod.Name]
 			if _, active := desiredNames[pod.Name]; !stopped && active && template != nil {
 				podApplied, err := isDesiredPodApplied(its, pod, template)
 				if err != nil {

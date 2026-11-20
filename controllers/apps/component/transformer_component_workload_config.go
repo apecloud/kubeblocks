@@ -214,6 +214,15 @@ func isComponentInstanceConfigMapMirror(comp *appsv1.Component, cm *corev1.Confi
 		cm.Labels[constant.KBAppConfigMapOwnerLabelKey] == string(comp.UID)
 }
 
+func isLegacySharedConfigMapCopy(authority, candidate *corev1.ConfigMap) bool {
+	return authority.Labels[instanceConfigMapLabelKey] != "true" &&
+		instancecontroller.IsSharedAssistantConfigMap(candidate, authority.Labels[constant.AppInstanceLabelKey], authority.Labels[constant.KBAppComponentLabelKey])
+}
+
+func isManagedConfigMapCopy(comp *appsv1.Component, authority, candidate *corev1.ConfigMap) bool {
+	return candidate != nil && (isComponentInstanceConfigMapMirror(comp, candidate) || isLegacySharedConfigMapCopy(authority, candidate))
+}
+
 func (t *componentWorkloadTransformer) prepareInstanceConfigMaps(transCtx *componentTransformContext,
 	graphCli model.GraphClient, dag *graph.DAG, its *workloads.InstanceSet) error {
 	if !ptr.Deref(its.Spec.EnableInstanceAPI, false) || ptr.Deref(its.Spec.Stop, false) || !multicluster.Enabled4Object(its) {
@@ -229,15 +238,17 @@ func (t *componentWorkloadTransformer) prepareInstanceConfigMaps(transCtx *compo
 	for _, name := range sets.List(boundConfigMapNames(its)) {
 		key := client.ObjectKey{Namespace: its.Namespace, Name: name}
 		cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: key.Namespace, Name: key.Name}}
-		if graphCli.IsAction(dag, cm, model.ActionCreatePtr()) || graphCli.IsAction(dag, cm, model.ActionUpdatePtr()) {
-			return intctrlutil.NewRequeueError(time.Second, "waiting for rendered instance configuration")
-		}
-		cm = &corev1.ConfigMap{}
-		if err := graphCli.Get(transCtx.Context, key, cm, multicluster.InControlContext()); err != nil {
-			if apierrors.IsNotFound(err) && !managed.Has(name) {
-				continue
+		pending, _ := graphCli.FindMatchedVertex(dag, cm).(*model.ObjectVertex)
+		if pending != nil && pending.Action != nil && (*pending.Action == model.CREATE || *pending.Action == model.UPDATE) {
+			cm = pending.Obj.(*corev1.ConfigMap)
+		} else {
+			pending = nil
+			if err := graphCli.Get(transCtx.Context, key, cm, multicluster.InControlContext()); err != nil {
+				if apierrors.IsNotFound(err) && !managed.Has(name) {
+					continue
+				}
+				return err
 			}
-			return err
 		}
 		if !isCurrentComponentConfigMap(transCtx.Component, cm) {
 			if managed.Has(name) {
@@ -249,16 +260,37 @@ func (t *componentWorkloadTransformer) prepareInstanceConfigMaps(transCtx *compo
 			return fmt.Errorf("instance configuration providers are not configured: %v", sets.List(missing))
 		}
 		recorded := configMapPlacements(cm.Annotations[instanceConfigMapPlacementsAnnotationKey])
-		for _, placement := range sets.List(placements) {
-			if !recorded.Has(placement) {
-				return intctrlutil.NewRequeueError(time.Second, "waiting for rendered instance configuration placement")
+		if !recorded.IsSuperset(placements) {
+			return intctrlutil.NewRequeueError(time.Second, "waiting for rendered instance configuration placement")
+		}
+		if pending != nil {
+			var err error
+			cm, err = t.publishConfigMapAuthority(transCtx.Context, dag, pending)
+			if err != nil {
+				return err
 			}
+		}
+		for _, placement := range sets.List(placements) {
 			if err := syncInstanceConfigMap(transCtx.Context, t.Client, transCtx.Component, cm, placement); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
+}
+
+func (t *componentWorkloadTransformer) publishConfigMapAuthority(ctx context.Context, dag *graph.DAG, pending *model.ObjectVertex) (*corev1.ConfigMap, error) {
+	// Publish the current render before mirroring it. Rebuilding the plan first
+	// can produce a new render on every reconcile.
+	// Remove the planned write so it is not executed again if mirroring fails.
+	dag.RemoveVertex(pending)
+	cm := pending.Obj.(*corev1.ConfigMap).DeepCopy()
+	if *pending.Action == model.CREATE {
+		return cm, t.Client.Create(ctx, cm, multicluster.InControlContext())
+	}
+	old := pending.OriObj.(*corev1.ConfigMap)
+	cm.UID, cm.ResourceVersion = old.UID, old.ResourceVersion
+	return cm, t.Client.Update(ctx, cm, multicluster.InControlContext())
 }
 
 func syncInstanceConfigMap(ctx context.Context, cli client.Client, comp *appsv1.Component, config *corev1.ConfigMap, placement string) error {
@@ -274,13 +306,11 @@ func syncInstanceConfigMap(ctx context.Context, cli client.Client, comp *appsv1.
 		if current.Name != key.Name || current.Namespace != key.Namespace {
 			return fmt.Errorf("cannot read instance configuration ConfigMap %s in placement %s", key, placement)
 		}
-		if current.UID == config.UID && isCurrentComponentConfigMap(comp, current) {
+		// A just-created authority may lack its assigned UID in the routed client's response.
+		if (config.UID == "" || current.UID == config.UID) && isCurrentComponentConfigMap(comp, current) {
 			return nil
 		}
-		// Only shared rendered configurations can have a mirror left by a legacy Instance.
-		legacy := config.Labels[instanceConfigMapLabelKey] != "true" &&
-			instancecontroller.IsSharedAssistantConfigMap(current, config.Labels[constant.AppInstanceLabelKey], config.Labels[constant.KBAppComponentLabelKey])
-		if !isComponentInstanceConfigMapMirror(comp, current) && !legacy {
+		if !isManagedConfigMapCopy(comp, config, current) {
 			return fmt.Errorf("instance configuration ConfigMap %s in placement %s is not owned by Component %s", key, placement, comp.Name)
 		}
 		if !current.DeletionTimestamp.IsZero() {

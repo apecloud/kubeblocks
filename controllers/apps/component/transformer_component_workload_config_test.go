@@ -821,9 +821,10 @@ func TestInstanceConfigMirrorPublicationPrecedesWorkload(t *testing.T) {
 			providerA := fake.NewClientBuilder().WithScheme(scheme).WithObjects(legacy).Build()
 			providerBBase := fake.NewClientBuilder().WithScheme(scheme).Build()
 			failMirror := true
+			mirrorUnavailable := errors.New("mirror unavailable")
 			providerB := interceptor.NewClient(providerBBase, interceptor.Funcs{Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
 				if failMirror {
-					return errors.New("mirror unavailable")
+					return mirrorUnavailable
 				}
 				return c.Create(ctx, obj, opts...)
 			}})
@@ -864,22 +865,14 @@ func TestInstanceConfigMirrorPublicationPrecedesWorkload(t *testing.T) {
 			cli := multicluster.NewClient(control, map[string]client.Client{"a": providerA, "b": providerB})
 			providers := []string{"a", "b"}
 			plan, err := workloadConfigPlanWithProviders(t, cli, comp, synth, running, providers, shared, cm)
-			if !intctrlutil.IsRequeueError(err) {
-				t.Fatalf("expected an authority write before publication: %v", err)
-			}
-			if err := plan.Execute(); err != nil || writes != 0 {
-				t.Fatalf("authority write published workload: writes=%d, error=%v", writes, err)
-			}
-			if err := control.Get(context.Background(), client.ObjectKeyFromObject(cm), &corev1.ConfigMap{}); err != nil {
-				t.Fatalf("authority was not persisted: %v", err)
-			}
-
-			plan, err = workloadConfigPlanWithProviders(t, cli, comp, synth, running, providers, shared, cm)
-			if err == nil {
-				t.Fatal("mirror failure allowed workload publication")
+			if !errors.Is(err, mirrorUnavailable) {
+				t.Fatalf("expected provider failure after publishing the authority: %v", err)
 			}
 			if err := plan.Execute(); err != nil || writes != 0 {
 				t.Fatalf("mirror failure allowed workload publication: writes=%d, error=%v", writes, err)
+			}
+			if err := control.Get(context.Background(), client.ObjectKeyFromObject(shared), &corev1.ConfigMap{}); err != nil {
+				t.Fatalf("shared authority was not persisted before mirroring: %v", err)
 			}
 
 			failMirror = false
@@ -903,13 +896,6 @@ func TestInstanceConfigMirrorPublicationPrecedesWorkload(t *testing.T) {
 				t.Fatal(err)
 			}
 			cm.Data["config"] = "updated"
-			plan, err = workloadConfigPlanWithProviders(t, cli, comp, synth, running, providers, shared, cm)
-			if !intctrlutil.IsRequeueError(err) {
-				t.Fatalf("expected to persist updated content: %v", err)
-			}
-			if err := plan.Execute(); err != nil {
-				t.Fatal(err)
-			}
 			plan, err = workloadConfigPlanWithProviders(t, cli, comp, synth, running, providers, shared, cm)
 			if err != nil {
 				t.Fatal(err)
@@ -970,5 +956,106 @@ func TestInstanceConfigPublicationRequiresConfiguredProvider(t *testing.T) {
 	current := &corev1.ConfigMap{}
 	if err := control.Get(ctx, client.ObjectKeyFromObject(shared), current); err != nil || current.ResourceVersion != original.ResourceVersion {
 		t.Fatalf("control alias rewrote the authority: %#v, %v", current.ObjectMeta, err)
+	}
+}
+
+func TestInstanceConfigPublishesWhenEachRenderChanges(t *testing.T) {
+	comp, synth, scheme := instanceConfigFixture(t)
+	comp.Annotations = map[string]string{constant.KBAppMultiClusterPlacementKey: "worker"}
+	synth.EnableInstanceAPI = ptr.To(true)
+	source := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Namespace: comp.Namespace, Name: "source"},
+		Data:       map[string]string{"db.conf": "{{ randAlphaNum 64 }}"},
+	}
+	synth.FileTemplates = []component.SynthesizedFileTemplate{{
+		Config: true,
+		ComponentFileTemplate: appsv1.ComponentFileTemplate{
+			Name: "main", Template: source.Name, Namespace: source.Namespace, VolumeName: "config",
+		},
+	}}
+	synth.PodSpec.Volumes, synth.Configs = nil, nil
+	ctx := context.Background()
+	controlBase := fake.NewClientBuilder().WithScheme(scheme).WithObjects(source).Build()
+	rejected := errors.New("control CM write failed")
+	failAuthority := true
+	control := interceptor.NewClient(controlBase, interceptor.Funcs{Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+		if _, ok := obj.(*corev1.ConfigMap); ok && failAuthority {
+			return rejected
+		}
+		return c.Create(ctx, obj, opts...)
+	}})
+	worker := fake.NewClientBuilder().WithScheme(scheme).Build()
+	unavailable := errors.New("provider rejected the mirror")
+	failMirror := true
+	mirrorAttempts := 0
+	provider := interceptor.NewClient(worker, interceptor.Funcs{Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+		mirrorAttempts++
+		if failMirror {
+			return unavailable
+		}
+		return c.Create(ctx, obj, opts...)
+	}})
+	cli := multicluster.NewClient(control, map[string]client.Client{"worker": provider})
+	key := client.ObjectKey{Namespace: comp.Namespace, Name: fileTemplateObjectName(synth, "main")}
+	reconcile := func() error {
+		desired := *synth
+		desired.PodSpec = synth.PodSpec.DeepCopy()
+		transCtx := &componentTransformContext{
+			Context: ctx, Client: model.NewGraphClient(cli), Component: comp, ComponentOrig: comp.DeepCopy(),
+			SynthesizeComponent: &desired, CompDef: &appsv1.ComponentDefinition{},
+		}
+		dag := graph.NewDAG()
+		transCtx.Client.(model.GraphClient).Root(dag, comp, comp, model.ActionStatusPtr())
+		providers := []string{"worker"}
+		if err := (&componentFileTemplateTransformer{configProviders: providers}).Transform(transCtx, dag); err != nil {
+			t.Fatal(err)
+		}
+		err := (&componentWorkloadTransformer{Client: cli, configProviders: providers}).Transform(transCtx, dag)
+		builder := &componentPlanBuilder{cli: cli, transCtx: transCtx}
+		walkErr := dag.WalkReverseTopoOrder(func(v graph.Vertex) error {
+			if _, ok := v.(*model.ObjectVertex).Obj.(*appsv1.Component); ok {
+				return nil
+			}
+			return builder.defaultWalkFunc(v)
+		}, nil)
+		if walkErr != nil {
+			t.Fatal(walkErr)
+		}
+		return err
+	}
+	if err := reconcile(); !errors.Is(err, rejected) || mirrorAttempts != 0 {
+		t.Fatalf("provider publication started before the control write succeeded: attempts=%d, error=%v", mirrorAttempts, err)
+	}
+	failAuthority = false
+	if err := reconcile(); !errors.Is(err, unavailable) {
+		t.Fatalf("publish did not reach the provider after persisting the control CM: %v", err)
+	}
+	before := &corev1.ConfigMap{}
+	if err := control.Get(ctx, key, before); err != nil {
+		t.Fatal(err)
+	}
+	its := &workloads.InstanceSet{}
+	if err := control.Get(ctx, client.ObjectKeyFromObject(comp), its); !apierrors.IsNotFound(err) {
+		t.Fatalf("published the workload during provider failure: %v", err)
+	}
+	failMirror = false
+	if err := reconcile(); err != nil {
+		t.Fatalf("publish did not converge after the provider recovered: %v", err)
+	}
+	authority, mirror := &corev1.ConfigMap{}, &corev1.ConfigMap{}
+	for _, read := range []struct {
+		cli client.Client
+		cm  *corev1.ConfigMap
+	}{{control, authority}, {worker, mirror}} {
+		if err := read.cli.Get(ctx, key, read.cm); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := control.Get(ctx, client.ObjectKeyFromObject(comp), its); err != nil {
+		t.Fatal(err)
+	}
+	if authority.Data["db.conf"] == before.Data["db.conf"] || authority.Data["db.conf"] != mirror.Data["db.conf"] ||
+		ptr.Deref(its.Spec.Configs[0].ConfigHash, "") != authority.Annotations[constant.CMInsConfigurationHashLabelKey] {
+		t.Fatal("the new render did not reach the control CM, provider copy and workload together")
 	}
 }

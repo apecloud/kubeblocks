@@ -94,6 +94,74 @@ func TestConfigCleanupRemovesMirrorBeforeAuthority(t *testing.T) {
 	}
 }
 
+func TestConfigCleanupRemovesLegacyCopyAfterPartialHandoff(t *testing.T) {
+	for _, deleting := range []bool{false, true} {
+		t.Run(map[bool]string{false: "retired config", true: "component deletion"}[deleting], func(t *testing.T) {
+			comp, synth, scheme := instanceConfigFixture(t)
+			authority := managedInstanceConfig(comp, "retired")
+			delete(authority.Labels, instanceConfigMapLabelKey)
+			authority.Annotations = map[string]string{instanceConfigMapPlacementsAnnotationKey: "a,b"}
+			mirror := authority.DeepCopy()
+			mirror.OwnerReferences = nil
+			mirror.UID = "claimed"
+			legacy := mirror.DeepCopy()
+			legacy.UID = "legacy"
+			delete(legacy.Labels, constant.KBAppConfigMapOwnerLabelKey)
+			legacy.Annotations = map[string]string{"workloads.kubeblocks.io/assistant-object": "true"}
+			control := fake.NewClientBuilder().WithScheme(scheme).WithObjects(authority).Build()
+			a := fake.NewClientBuilder().WithScheme(scheme).WithObjects(mirror).Build()
+			b := fake.NewClientBuilder().WithScheme(scheme).WithObjects(legacy).Build()
+			cli := multicluster.NewClient(control, map[string]client.Client{"a": a, "b": b})
+			ctx := context.Background()
+			tc := &componentTransformContext{Context: ctx, Component: comp, SynthesizeComponent: synth}
+			providers := []string{"a", "b"}
+			collect := func() error {
+				if deleting {
+					return collectDeletingInstanceConfigMaps(tc, cli, constant.GetCompLabels("db", "mysql"), providers)
+				}
+				return collectInstanceConfigMaps(tc, cli, nil, providers)
+			}
+			key := client.ObjectKeyFromObject(authority)
+			if !deleting {
+				// An Instance can still carry the old write payload even when it
+				// mounts a different configuration.
+				writer := &workloads.Instance{
+					ObjectMeta: metav1.ObjectMeta{Namespace: authority.Namespace, Name: "db-mysql-0", Labels: comp.Labels},
+					Spec:       workloads.InstanceSpec{InstanceAssistantObjects: []workloads.InstanceAssistantObject{{ConfigMap: legacy}}},
+				}
+				if err := b.Create(ctx, writer); err != nil {
+					t.Fatal(err)
+				}
+				if err := collect(); !intctrlutil.IsDelayedRequeueError(err) {
+					t.Fatalf("expected to wait for the remaining assistant: %v", err)
+				}
+				if err := b.Get(ctx, key, &corev1.ConfigMap{}); err != nil {
+					t.Fatalf("removed the copy while a legacy writer was still present: %v", err)
+				}
+				writer.Spec.InstanceAssistantObjects = nil
+				if err := b.Update(ctx, writer); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			if err := collect(); !intctrlutil.IsRequeueError(err) {
+				t.Fatalf("expected to recheck the removed copies: %v", err)
+			}
+			for _, provider := range []client.Client{a, b} {
+				if err := provider.Get(ctx, key, &corev1.ConfigMap{}); !apierrors.IsNotFound(err) {
+					t.Fatalf("retired provider copy remains: %v", err)
+				}
+			}
+			if err := control.Get(ctx, key, &corev1.ConfigMap{}); err != nil {
+				t.Fatalf("lost the authority before confirming both provider deletions: %v", err)
+			}
+			if err := collect(); deleting && err != nil || !deleting && !intctrlutil.IsDelayedRequeueError(err) {
+				t.Fatalf("cleanup did not finish after both provider deletions: %v", err)
+			}
+		})
+	}
+}
+
 func TestConfigCleanupDefersUnknownOrUnavailableProvider(t *testing.T) {
 	for _, scope := range []string{"unknown", "unavailable"} {
 		t.Run(scope, func(t *testing.T) {

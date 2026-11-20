@@ -83,13 +83,16 @@ func collectInstanceConfigMaps(transCtx *componentTransformContext, cli client.C
 				providerObservations[mirror.placement] = observation
 			}
 			retained.Insert(observation.references.UnsortedList()...)
+			if isLegacySharedConfigMapCopy(cm, mirror.configMap) && observation.assistantConfigMaps.Has(cm.Name) {
+				retained.Insert(cm.Name)
+			}
 		}
 		if retained.Has(cm.Name) {
 			continue
 		}
 		mirrorPresent := false
 		for _, mirror := range mirrors {
-			if mirror.configMap == nil || !isComponentInstanceConfigMapMirror(transCtx.Component, mirror.configMap) {
+			if !isManagedConfigMapCopy(transCtx.Component, cm, mirror.configMap) {
 				continue
 			}
 			mirrorPresent = true
@@ -145,7 +148,7 @@ func collectDeletingInstanceConfigMaps(transCtx *componentTransformContext, cli 
 			if observation.workloadPresent {
 				return intctrlutil.NewRequeueError(time.Second, "waiting for provider instances and Pods to disappear")
 			}
-			if mirror.configMap != nil && isComponentInstanceConfigMapMirror(transCtx.Component, mirror.configMap) {
+			if isManagedConfigMapCopy(transCtx.Component, authority, mirror.configMap) {
 				copies = append(copies, mirror)
 			}
 		}
@@ -210,8 +213,9 @@ func instanceConfigMapMirrors(transCtx *componentTransformContext, cli client.Cl
 }
 
 type instanceConfigMapObservations struct {
-	references      sets.Set[string]
-	workloadPresent bool
+	references          sets.Set[string]
+	assistantConfigMaps sets.Set[string]
+	workloadPresent     bool
 }
 
 func observeInstanceConfigMapReferences(ctx context.Context, cli client.Client, namespace string, labels map[string]string, placement string) (*instanceConfigMapObservations, error) {
@@ -229,9 +233,17 @@ func observeInstanceConfigMapReferences(ctx context.Context, cli client.Client, 
 	if err := cli.List(ctx, pods, opts...); err != nil {
 		return nil, err
 	}
-	observation := &instanceConfigMapObservations{references: sets.New[string](), workloadPresent: len(instances.Items) > 0 || len(pods.Items) > 0}
+	observation := &instanceConfigMapObservations{
+		references: sets.New[string](), assistantConfigMaps: sets.New[string](),
+		workloadPresent: len(instances.Items) > 0 || len(pods.Items) > 0,
+	}
 	for _, instance := range instances.Items {
 		retainPodConfigMaps(observation.references, &instance.Spec.Template.Spec)
+		for _, assistant := range instance.Spec.InstanceAssistantObjects {
+			if cm := assistant.ConfigMap; cm != nil && cm.Namespace == namespace {
+				observation.assistantConfigMaps.Insert(cm.Name)
+			}
+		}
 	}
 	for _, pod := range pods.Items {
 		retainPodConfigMaps(observation.references, &pod.Spec)

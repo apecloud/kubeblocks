@@ -48,7 +48,7 @@ func TestAlignmentBuildsInstancesWithEffectiveConfigs(t *testing.T) {
 			}
 
 			// Replicas share a resolved template, but each child owns its config association.
-			templates, err := instancetemplate.BuildInstanceName2TemplateMap(its, tree)
+			templates, err := instancetemplate.BuildInstanceTemplatesWithConfigs(its, tree)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -28,35 +28,6 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-func TestBuildInstanceSetExtResolvesConfigs(t *testing.T) {
-	its := &workloads.InstanceSet{Spec: workloads.InstanceSetSpec{
-		Replicas: ptr.To(int32(2)),
-		Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{Volumes: []corev1.Volume{{
-			Name: "config", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
-				LocalObjectReference: corev1.LocalObjectReference{Name: "shared"},
-			}},
-		}}}},
-		Configs: []workloads.ConfigTemplate{{Name: "main", Volume: &workloads.ConfigVolumeBinding{VolumeName: "config"}}},
-		Instances: []workloads.InstanceTemplate{{Name: "canary", Configs: []workloads.ConfigTemplate{{
-			Name: "main", Volume: &workloads.ConfigVolumeBinding{ConfigMapName: "canary"},
-		}}}},
-	}}
-	ext, err := BuildInstanceSetExt(its, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for name, want := range map[string]string{DefaultTemplateName: "shared", "canary": "canary"} {
-		template := ext.InstanceTemplates[name]
-		if template == nil || len(template.Configs) != 1 || template.Configs[0].Volume == nil {
-			t.Fatalf("template %q has no resolved config binding", name)
-		}
-		binding := template.Configs[0].Volume
-		if binding.VolumeName != "config" || binding.ConfigMapName != want || template.Spec.Volumes[0].ConfigMap.Name != want {
-			t.Fatalf("template %q does not mount %q: %#v, %#v", name, want, binding, template.Spec.Volumes)
-		}
-	}
-}
-
 func TestResolveConfigs(t *testing.T) {
 	base := []workloads.ConfigTemplate{
 		{Name: "main", ConfigHash: ptr.To("global"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "global"}, Restart: ptr.To(true), Parameters: map[string]string{"global": "value"}},

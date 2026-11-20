@@ -190,7 +190,9 @@ var _ = Describe("status reconciler test", func() {
 			Name: "demo-0", Labels: map[string]string{constant.KBAppInstanceTemplateLabelKey: ""},
 		}}
 
-		Expect(setInstanceStatus(tree, its, []*corev1.Pod{pod})).Should(Succeed())
+		nameToTemplateMap, err := instancetemplate.BuildInstanceTemplateExtMap(its, tree)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(setInstanceStatus(tree, its, []*corev1.Pod{pod}, nameToTemplateMap)).Should(Succeed())
 		status := its.FindInstanceStatus("demo-0")
 		Expect(status).ShouldNot(BeNil())
 		Expect(status.TemplateName).ShouldNot(BeNil())
@@ -558,7 +560,9 @@ var _ = Describe("status reconciler test", func() {
 			its.Status.UpdateRevisions = map[string]string{
 				"bar-0": "target", "bar-1": "target", "bar-2": "target",
 			}
-			Expect(setInstanceStatus(nil, its, pods)).Should(Succeed())
+			nameToTemplateMap, err := instancetemplate.BuildInstanceTemplateExtMap(its, nil)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(setInstanceStatus(nil, its, pods, nameToTemplateMap)).Should(Succeed())
 
 			Expect(its.Status.InstanceStatus).Should(HaveLen(3))
 			Expect(its.Status.InstanceStatus[0].PodName).Should(Equal("bar-0"))
@@ -596,7 +600,9 @@ var _ = Describe("status reconciler test", func() {
 			}}
 			pod := builder.NewPodBuilder(namespace, "bar-0").GetObject()
 
-			Expect(setInstanceStatus(nil, its, []*corev1.Pod{pod})).Should(Succeed())
+			nameToTemplateMap, err := instancetemplate.BuildInstanceTemplateExtMap(its, nil)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(setInstanceStatus(nil, its, []*corev1.Pod{pod}, nameToTemplateMap)).Should(Succeed())
 			status := its.FindInstanceStatus("bar-0")
 			Expect(status).ShouldNot(BeNil())
 			Expect(status.DesiredState).Should(Equal(workloads.InstanceDesiredStateOffline))
@@ -607,10 +613,10 @@ var _ = Describe("status reconciler test", func() {
 			Expect(*status.TemplateName).Should(BeEmpty())
 
 			pod.DeletionTimestamp = &metav1.Time{Time: metav1.Now().Time}
-			Expect(setInstanceStatus(nil, its, []*corev1.Pod{pod})).Should(Succeed())
+			Expect(setInstanceStatus(nil, its, []*corev1.Pod{pod}, nameToTemplateMap)).Should(Succeed())
 			Expect(its.FindInstanceStatus("bar-0").CurrentState).Should(Equal(workloads.InstanceCurrentStateTerminating))
 
-			Expect(setInstanceStatus(nil, its, nil)).Should(Succeed())
+			Expect(setInstanceStatus(nil, its, nil, nameToTemplateMap)).Should(Succeed())
 			status = its.FindInstanceStatus("bar-0")
 			Expect(status).ShouldNot(BeNil())
 			Expect(status.CurrentState).Should(Equal(workloads.InstanceCurrentStateAbsent))

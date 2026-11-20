@@ -176,8 +176,8 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
-		configs := instancetemplate.ConfigsForMountedVolumes(nameToTemplateMap[pod.Name].Configs, pod, desiredPod)
-		allUpdated, err := r.reconfigure(tree, its, pod, configs)
+		// Always call reconfigure to execute reconfigure actions
+		allUpdated, err := r.reconfigure(tree, its, pod, desiredPod, nameToTemplateMap[pod.Name].Configs)
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
@@ -309,8 +309,10 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, its *worklo
 	return nil
 }
 
-func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod, configs []workloads.ConfigTemplate) (bool, error) {
-	toUpdate, err := configsToUpdate(configs, pod)
+func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet,
+	pod, desiredPod *corev1.Pod, configs []workloads.ConfigTemplate) (bool, error) {
+	mountedConfigs := instancetemplate.ConfigsForMountedVolumes(configs, pod, desiredPod)
+	toUpdate, err := configsToUpdate(mountedConfigs, pod)
 	if err != nil {
 		return false, err
 	}

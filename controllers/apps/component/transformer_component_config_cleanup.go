@@ -163,7 +163,7 @@ func collectDeletingInstanceConfigMaps(transCtx *componentTransformContext, cli 
 
 func instanceConfigMapAuthorities(transCtx *componentTransformContext, cli client.Client, labels map[string]string) ([]*corev1.ConfigMap, error) {
 	selector := maps.Clone(labels)
-	selector[instanceConfigMapLabelKey] = "true"
+	selector[constant.KBAppConfigMapOwnerLabelKey] = string(transCtx.Component.UID)
 	list := &corev1.ConfigMapList{}
 	if err := cli.List(transCtx.Context, list, client.InNamespace(transCtx.Component.Namespace), client.MatchingLabels(selector), multicluster.InControlContext()); err != nil {
 		return nil, err

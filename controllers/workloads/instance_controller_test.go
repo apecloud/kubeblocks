@@ -45,6 +45,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -928,6 +929,95 @@ func assertStopPodAbsent(t *testing.T, cli client.Client) {
 	err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "demo-0"}, &corev1.Pod{})
 	if !apierrors.IsNotFound(err) {
 		t.Fatalf("Pod should be absent, got %v", err)
+	}
+}
+
+func instanceConfigMapHandoffFixture(t *testing.T) (client.Client, *corev1.ConfigMap) {
+	t.Helper()
+	inst := stopTestInstance()
+	inst.Labels = constant.GetCompLabels("demo", "db")
+	inst.Spec.Stop = ptr.To(true)
+	inst.Spec.VolumeClaimTemplates = nil
+	inst.Spec.InstanceAssistantObjects = []workloads.InstanceAssistantObject{{ConfigMap: &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "managed-config", Namespace: inst.Namespace}, Data: map[string]string{"config": "old"},
+	}}}
+	cli := stopTestClient(t, inst)
+	reconcileStopEntry(t, cli, 3)
+	cm := &corev1.ConfigMap{}
+	if err := cli.Get(context.Background(), client.ObjectKey{Namespace: inst.Namespace, Name: "managed-config"}, cm); err != nil {
+		t.Fatal(err)
+	}
+	// The fake API does not assign UIDs to created objects.
+	cm.UID = "assistant-uid"
+	if err := cli.Update(context.Background(), cm); err != nil {
+		t.Fatal(err)
+	}
+	return cli, cm
+}
+
+func TestInstanceDoesNotRewriteConfigMapAfterComponentHandoff(t *testing.T) {
+	cli, cm := instanceConfigMapHandoffFixture(t)
+	cm.Labels[constant.KBAppConfigMapOwnerLabelKey] = "component-uid"
+	cm.Data["config"] = "latest"
+	if err := cli.Update(context.Background(), cm); err != nil {
+		t.Fatal(err)
+	}
+	before := cm.DeepCopy()
+	reconcileStopEntry(t, cli, 3)
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(cm), cm); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(cm, before) {
+		t.Fatalf("stale Instance assistant changed the Component ConfigMap: %#v", cm)
+	}
+	if err := cli.Delete(context.Background(), readStopInstance(t, cli)); err != nil {
+		t.Fatal(err)
+	}
+	reconcileStopEntry(t, cli, 3)
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(cm), cm); err != nil || !reflect.DeepEqual(cm, before) {
+		t.Fatalf("retiring the stale Instance changed the Component ConfigMap: %#v, %v", cm, err)
+	}
+	if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "demo-0"}, &workloads.Instance{}); !apierrors.IsNotFound(err) {
+		t.Fatalf("protected ConfigMap blocked Instance retirement: %v", err)
+	}
+}
+
+func TestInstanceConfigMapRetirementConflictsWithComponentHandoff(t *testing.T) {
+	cli, cm := instanceConfigMapHandoffFixture(t)
+	if err := cli.Delete(context.Background(), readStopInstance(t, cli)); err != nil {
+		t.Fatal(err)
+	}
+	deletes := 0
+	guarded := interceptor.NewClient(cli.(client.WithWatch), interceptor.Funcs{Delete: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.DeleteOption) error {
+		if _, ok := obj.(*corev1.ConfigMap); ok {
+			deletes++
+			options := (&client.DeleteOptions{}).ApplyOptions(opts)
+			if options.Preconditions == nil || options.Preconditions.UID == nil || *options.Preconditions.UID != cm.UID || options.Preconditions.ResourceVersion == nil || *options.Preconditions.ResourceVersion != cm.ResourceVersion {
+				t.Fatal("shared ConfigMap retirement omitted its observed UID/resourceVersion")
+			}
+			current := &corev1.ConfigMap{}
+			if err := c.Get(ctx, client.ObjectKeyFromObject(cm), current); err != nil {
+				t.Fatal(err)
+			}
+			current.Labels[constant.KBAppConfigMapOwnerLabelKey] = "component-uid"
+			current.Data["config"] = "latest"
+			if err := c.Update(ctx, current); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return c.Delete(ctx, obj, opts...)
+	}})
+	reconciler := &InstanceReconciler{Client: guarded, Scheme: guarded.Scheme(), Recorder: record.NewFakeRecorder(100)}
+	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKey{Namespace: "default", Name: "demo-0"}})
+	if !apierrors.IsConflict(err) || deletes != 1 {
+		t.Fatalf("retirement did not conflict with the handoff: deletes=%d, err=%v", deletes, err)
+	}
+	reconcileStopEntry(t, guarded, 3)
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(cm), cm); err != nil || cm.Data["config"] != "latest" || cm.Labels[constant.KBAppConfigMapOwnerLabelKey] != "component-uid" || deletes != 1 {
+		t.Fatalf("retirement retry deleted or changed the claimed ConfigMap: %#v, deletes=%d, err=%v", cm, deletes, err)
+	}
+	if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "demo-0"}, &workloads.Instance{}); !apierrors.IsNotFound(err) {
+		t.Fatalf("Instance retirement did not resume after the handoff: %v", err)
 	}
 }
 

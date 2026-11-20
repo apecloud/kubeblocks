@@ -167,7 +167,7 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			// provision component system accounts, depend on vars
 			&componentAccountProvisionTransformer{},
 			// render config/script templates
-			&componentFileTemplateTransformer{},
+			&componentFileTemplateTransformer{configProviders: configProviders},
 			// handle RBAC for component workloads
 			// it should be put before workload transformer, because we modify podSpec's serviceaccount in it
 			&componentRBACTransformer{},

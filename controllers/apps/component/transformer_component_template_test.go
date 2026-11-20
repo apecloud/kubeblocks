@@ -28,6 +28,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -255,6 +256,48 @@ var _ = Describe("file templates transformer test", func() {
 	}
 
 	Context("provision", func() {
+		It("uses the same resolved variable for the Component file and environment", func() {
+			transCtx.CompDef.Spec.Vars = []appsv1.EnvVar{{Name: "TOKEN", Expression: ptr.To("{{ randAlphaNum 64 }}")}}
+			transCtx.SynthesizeComponent.FileTemplates[0].Config = true
+			logConfCM.Data["server.conf"] = "{{ .TOKEN }}"
+
+			Expect((&componentVarsTransformer{}).Transform(transCtx, dag)).To(Succeed())
+			Expect((&componentFileTemplateTransformer{}).Transform(transCtx, dag)).To(Succeed())
+
+			graphCli := transCtx.Client.(model.GraphClient)
+			envMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+				Namespace: transCtx.Component.Namespace,
+				Name:      constant.GenerateClusterComponentEnvPattern(clusterName, compName),
+			}}
+			vertex := graphCli.FindMatchedVertex(dag, envMap)
+			Expect(vertex).NotTo(BeNil())
+			envValue := vertex.(*model.ObjectVertex).Obj.(*corev1.ConfigMap).Data["TOKEN"]
+			Expect(envValue).To(HaveLen(64))
+			checkTemplateObject("logConf", func(obj *corev1.ConfigMap) {
+				Expect(obj.Data["server.conf"]).To(Equal(envValue))
+			})
+		})
+
+		It("reuses the Component render for an InstanceTemplate with no overrides", func() {
+			transCtx.CompDef.Spec.Vars = []appsv1.EnvVar{{Name: "TOKEN", Expression: ptr.To("{{ randAlphaNum 64 }}")}}
+			transCtx.SynthesizeComponent.FileTemplates[0].Config = true
+			logConfCM.Data["server.conf"] = "{{ .TOKEN }}/{{ randAlphaNum 64 }}"
+			transCtx.SynthesizeComponent.Instances = []appsv1.InstanceTemplate{
+				{Name: "same"},
+				{Name: "empty-resources", Resources: &corev1.ResourceRequirements{}},
+			}
+
+			Expect((&componentVarsTransformer{}).Transform(transCtx, dag)).To(Succeed())
+			Expect((&componentFileTemplateTransformer{}).Transform(transCtx, dag)).To(Succeed())
+
+			checkTemplateObject("logConf", func(obj *corev1.ConfigMap) {
+				Expect(obj.Data["server.conf"]).To(HaveLen(129))
+			})
+			Expect(instanceConfigMaps()).To(BeEmpty())
+			Expect(transCtx.SynthesizeComponent.InstanceConfigs["same"]).To(BeEmpty())
+			Expect(transCtx.SynthesizeComponent.InstanceConfigs["empty-resources"]).To(BeEmpty())
+		})
+
 		It("renders named templates with effective resource and service version variables", func() {
 			required := ptr.To(appsv1.VarRequired)
 			transCtx.CompDef.Spec.Vars = []appsv1.EnvVar{
@@ -265,7 +308,6 @@ var _ = Describe("file templates transformer test", func() {
 			transCtx.Component.Spec.Resources.Requests = corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("2Gi")}
 			transCtx.Component.Spec.ServiceVersion = "1.0"
 			reader.Objects = append(reader.Objects, transCtx.Component)
-			transCtx.SynthesizeComponent.TemplateVars = map[string]string{"MEMORY": "original-environment-value"}
 			transCtx.SynthesizeComponent.FileTemplates[0].Config = true
 			logConfCM.Data["server.conf"] = "{{.MEMORY}}/{{.VERSION}}/{{.SIDECAR}}"
 			transCtx.SynthesizeComponent.Instances = []appsv1.InstanceTemplate{{
@@ -273,6 +315,7 @@ var _ = Describe("file templates transformer test", func() {
 				Resources: &corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("8Gi")}},
 			}}
 
+			Expect((&componentVarsTransformer{}).Transform(transCtx, dag)).To(Succeed())
 			Expect((&componentFileTemplateTransformer{}).Transform(transCtx, dag)).To(Succeed())
 			checkTemplateObject("logConf", func(obj *corev1.ConfigMap) {
 				Expect(obj.Data["server.conf"]).To(Equal("2147483648/1.0/sidecar"))
@@ -283,7 +326,52 @@ var _ = Describe("file templates transformer test", func() {
 			Expect(obj.Labels[instanceConfigMapLabelKey]).To(Equal("true"))
 			Expect(transCtx.SynthesizeComponent.InstanceConfigs["large"][0].Volume).To(Equal(&workloads.ConfigMapVolumeBinding{VolumeName: "logConf", ConfigMapName: obj.Name}))
 			Expect(transCtx.SynthesizeComponent.Configs[0].Volume).To(Equal(&workloads.ConfigMapVolumeBinding{VolumeName: "logConf", ConfigMapName: fileTemplateObjectName(transCtx.SynthesizeComponent, "logConf")}))
-			Expect(transCtx.SynthesizeComponent.TemplateVars["MEMORY"]).To(Equal("original-environment-value"))
+			Expect(transCtx.SynthesizeComponent.TemplateVars["MEMORY"]).To(Equal("2147483648"))
+		})
+
+		It("publishes rendered configs independently of Instance assistants in a provider", func() {
+			transCtx.Component.UID = "component-uid"
+			transCtx.Component.Annotations = map[string]string{constant.KBAppMultiClusterPlacementKey: "a,missing"}
+			transCtx.SynthesizeComponent.EnableInstanceAPI = ptr.To(true)
+			transCtx.SynthesizeComponent.FileTemplates[0].Config = true
+
+			Expect((&componentFileTemplateTransformer{configProviders: []string{"a"}}).Transform(transCtx, dag)).To(Succeed())
+			checkTemplateObject("logConf", func(obj *corev1.ConfigMap) {
+				Expect(obj.Labels[constant.KBAppConfigMapOwnerLabelKey]).To(Equal(string(transCtx.Component.UID)))
+				Expect(obj.Annotations[instanceConfigMapPlacementsAnnotationKey]).To(Equal("a"))
+				Expect(transCtx.SynthesizeComponent.Configs[0].Volume.ConfigMapName).To(Equal(obj.Name))
+				Expect(transCtx.SynthesizeComponent.InstanceAssistantObjects).NotTo(ContainElement(corev1.ObjectReference{
+					Kind: "ConfigMap", Namespace: obj.Namespace, Name: obj.Name,
+				}))
+			})
+			checkAssistantObject("ConfigMap", transCtx.Component.Namespace, fileTemplateObjectName(transCtx.SynthesizeComponent, "serverConf"))
+		})
+
+		It("reuses the Component render when merged file variables match", func() {
+			transCtx.CompDef.Spec.Vars = []appsv1.EnvVar{{
+				Name: "MEMORY", ValueFrom: &appsv1.VarSource{ResourceVarRef: &appsv1.ResourceVarSelector{
+					ResourceVars: appsv1.ResourceVars{Memory: ptr.To(appsv1.VarRequired)},
+				}},
+			}}
+			transCtx.Component.Spec.Resources.Requests = corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("2Gi")}
+			reader.Objects = append(reader.Objects, transCtx.Component)
+			transCtx.SynthesizeComponent.FileTemplates[0].Config = true
+			logConfCM.Data["server.conf"] = "{{ .MEMORY }}/{{ randAlphaNum 64 }}"
+			transCtx.SynthesizeComponent.Instances = []appsv1.InstanceTemplate{{
+				Name:      "large",
+				Resources: &corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("8Gi")}},
+				Configs: []appsv1.ClusterComponentConfig{{
+					Name: ptr.To("logConf"), Variables: map[string]string{"MEMORY": "2147483648"},
+				}},
+			}}
+
+			Expect((&componentVarsTransformer{}).Transform(transCtx, dag)).To(Succeed())
+			Expect((&componentFileTemplateTransformer{}).Transform(transCtx, dag)).To(Succeed())
+
+			Expect(instanceConfigMaps()).To(BeEmpty())
+			config := transCtx.SynthesizeComponent.InstanceConfigs["large"][0]
+			Expect(config.Parameters).To(HaveKeyWithValue("MEMORY", "2147483648"))
+			Expect(config.Volume.ConfigMapName).To(Equal(fileTemplateObjectName(transCtx.SynthesizeComponent, "logConf")))
 		})
 
 		It("inherits variables and accepts a named template source override", func() {
@@ -335,6 +423,7 @@ var _ = Describe("file templates transformer test", func() {
 
 		It("replays file changes after the ConfigMap update has persisted", func() {
 			transCtx.SynthesizeComponent.FileTemplates[0].Config = true
+			transCtx.SynthesizeComponent.FileTemplates[0].Reconfigure = &appsv1.Action{Exec: &appsv1.ExecAction{Command: []string{"reload"}}}
 			transCtx.SynthesizeComponent.FileTemplates[0].Variables = map[string]string{"PORT": "1000"}
 			transCtx.SynthesizeComponent.PodSpec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: "logConf", MountPath: "/etc/server"}}
 			logConfCM.Data["server.conf"] = "port={{.PORT}}"
@@ -367,6 +456,32 @@ var _ = Describe("file templates transformer test", func() {
 			persist()
 			Expect(transformer.Transform(transCtx, dag)).To(Succeed())
 			Expect(transCtx.SynthesizeComponent.InstanceConfigs["large"][0]).To(Equal(*before))
+		})
+
+		It("keeps large restart-only ConfigMaps writable without durable reload changes", func() {
+			tpl := &transCtx.SynthesizeComponent.FileTemplates[0]
+			tpl.Config = true
+			tpl.RestartOnFileChange = ptr.To(true)
+			transCtx.SynthesizeComponent.PodSpec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: tpl.VolumeName, MountPath: "/etc/" + strings.Repeat("directory/", 20)}}
+			for i := 0; i < 2000; i++ {
+				logConfCM.Data[fmt.Sprintf("file-%04d.conf", i)] = "old"
+			}
+			transformer := &componentFileTemplateTransformer{}
+			running, err := transformer.buildFileTemplateObject(transCtx, *tpl)
+			Expect(err).NotTo(HaveOccurred())
+			reader.Objects = append(reader.Objects, running)
+			for file := range logConfCM.Data {
+				logConfCM.Data[file] = "new"
+			}
+
+			Expect(transformer.Transform(transCtx, dag)).To(Succeed())
+			vertex := transCtx.Client.(model.GraphClient).FindMatchedVertex(dag, running).(*model.ObjectVertex)
+			updated := vertex.Obj.(*corev1.ConfigMap)
+			Expect(updated.Data).To(Equal(logConfCM.Data))
+			Expect(updated.Annotations).NotTo(HaveKey(fileTemplateChangesAnnotationKey))
+			Expect(apivalidation.ValidateAnnotationsSize(updated.Annotations)).To(Succeed())
+			Expect(transCtx.SynthesizeComponent.Configs[0].Restart).To(Equal(ptr.To(true)))
+			Expect(transCtx.SynthesizeComponent.Configs[0].ConfigHash).NotTo(BeNil())
 		})
 
 		It("keeps stable tuple names within the ConfigMap name limit", func() {

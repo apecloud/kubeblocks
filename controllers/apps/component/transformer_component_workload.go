@@ -201,13 +201,13 @@ func (t *componentWorkloadTransformer) handleWorkloadStartNStop(transCtx *compon
 	if start || stop {
 		runningITSCopy := runningITS.DeepCopy()
 		// While stopped, normal updates stay deferred, so acknowledge the generation here.
-		// Start publishes configuration with Stop. Defer its generation until the normal
-		// update publishes the rest of the requested workload.
+		// Changed configuration starts with its desired runtime. Defer the generation
+		// until the normal update has also applied membership and scaling changes.
 		if stop {
 			runningITSCopy.Annotations[constant.KubeBlocksGenerationKey] = (*protoITS).Annotations[constant.KubeBlocksGenerationKey]
 		}
 		if start {
-			publishStartingInstanceConfigs(runningITSCopy, *protoITS)
+			publishStartingInstanceConfigs(runningITSCopy, *protoITS, legacyConfigManagerRequired(transCtx.Component))
 		}
 		*protoITS = runningITSCopy
 	}
@@ -355,6 +355,11 @@ func preserveLegacyConfigManagerPodSpec(oldITS, desiredITS, mergedITS *workloads
 	}
 
 	volumeNames := collectVolumeNamesFromContainers(oldCfg, oldInit)
+	for _, config := range desiredITS.Spec.Configs {
+		if config.Volume != nil {
+			delete(volumeNames, config.Volume.VolumeName)
+		}
+	}
 	newSpec.Volumes = preserveLegacyVolumeOrder(oldSpec.Volumes, newSpec.Volumes, volumeNames)
 	if _, ok := volumeNames[legacyConfigManagerToolsVolumeName]; ok {
 		mergeVolumeMountsByVolumeName(oldSpec.Containers, &newSpec.Containers, legacyConfigManagerToolsVolumeName)

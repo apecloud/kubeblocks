@@ -60,7 +60,7 @@ func TestComponentDeletionCollectsInstanceConfigMirrorsAfterWorkload(t *testing.
 	mirror.OwnerReferences = nil
 	foreign := mirror.DeepCopy()
 	foreign.Name = "foreign"
-	foreign.Labels[instanceConfigMapOwnerLabelKey] = "previous-component"
+	foreign.Labels[constant.KBAppConfigMapOwnerLabelKey] = "previous-component"
 	control := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&appsv1.Component{}).WithObjects(comp, its, authoritative).Build()
 	provider := fake.NewClientBuilder().WithScheme(scheme).WithObjects(mirror, foreign).Build()
 	cli := multicluster.NewClient(control, map[string]client.Client{"removed-provider": provider})

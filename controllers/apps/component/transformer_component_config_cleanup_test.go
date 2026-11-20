@@ -67,6 +67,8 @@ func TestConfigCleanupReadsConsumersWhenScopedMirrorIsAbsent(t *testing.T) {
 func TestConfigCleanupRemovesMirrorBeforeAuthority(t *testing.T) {
 	comp, synth, scheme := instanceConfigFixture(t)
 	authority := managedInstanceConfig(comp, "retired")
+	// A removed shared configuration follows the same provider cleanup as a specialization.
+	delete(authority.Labels, instanceConfigMapLabelKey)
 	authority.Annotations = map[string]string{instanceConfigMapPlacementsAnnotationKey: "old-provider"}
 	mirror := authority.DeepCopy()
 	mirror.OwnerReferences = nil

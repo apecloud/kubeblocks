@@ -55,7 +55,9 @@ const (
 	fileTemplateChangesAnnotationKey = "apps.kubeblocks.io/file-template-changes"
 )
 
-type componentFileTemplateTransformer struct{}
+type componentFileTemplateTransformer struct {
+	configProviders []string
+}
 
 var _ graph.Transformer = &componentFileTemplateTransformer{}
 
@@ -69,11 +71,7 @@ func (t *componentFileTemplateTransformer) Transform(ctx graph.TransformContext,
 		return err
 	}
 
-	renderCtx, err := t.fileTemplateRenderContext(transCtx, dag, nil)
-	if err != nil {
-		return err
-	}
-	runningObjs, protoObjs, err := t.prepareFileTemplateObjects(renderCtx)
+	runningObjs, protoObjs, err := t.prepareFileTemplateObjects(transCtx)
 	if err != nil {
 		return err
 	}
@@ -91,7 +89,8 @@ func (t *componentFileTemplateTransformer) Transform(ctx graph.TransformContext,
 		name := fileTemplateObjectName(synth, tpl.Name)
 		obj := protoObjs[name]
 		if obj != nil {
-			t.preserveFileTemplateChanges(transCtx, tpl.Name, runningObjs[name], obj)
+			t.recordConfigMapPlacements(transCtx, runningObjs[name], obj)
+			t.preserveFileTemplateChanges(transCtx, tpl, runningObjs[name], obj)
 		}
 		synth.Configs = append(synth.Configs, t.buildConfigTemplate(transCtx, tpl, obj))
 	}
@@ -103,6 +102,12 @@ func (t *componentFileTemplateTransformer) Transform(ctx graph.TransformContext,
 		return err
 	}
 
+	for name := range toDelete {
+		if isCurrentComponentConfigMap(transCtx.Component, runningObjs[name]) {
+			// The workload may still mount this ConfigMap in a provider.
+			toDelete.Delete(name)
+		}
+	}
 	t.handleTemplateObjectChanges(transCtx, dag, runningObjs, protoObjs, toCreate, toDelete, toUpdate)
 	instanceCreate, _, instanceUpdate := mapDiff(instanceRunning, instanceDesired)
 	t.handleTemplateObjectChanges(transCtx, dag, instanceRunning, instanceDesired, instanceCreate, nil, instanceUpdate)
@@ -118,6 +123,13 @@ func (t *componentFileTemplateTransformer) Transform(ctx graph.TransformContext,
 
 func (t *componentFileTemplateTransformer) fileTemplateRenderContext(transCtx *componentTransformContext,
 	dag *graph.DAG, instance *kbappsv1.InstanceTemplate) (*componentTransformContext, error) {
+	resources := instance.Resources
+	hasResourceOverrides := resources != nil && (len(resources.Requests) > 0 || len(resources.Limits) > 0)
+	inheritsVersion := instance.ServiceVersion == "" || instance.ServiceVersion == transCtx.SynthesizeComponent.ServiceVersion
+	if !hasResourceOverrides && len(instance.VolumeClaimTemplates) == 0 && inheritsVersion {
+		return transCtx, nil
+	}
+
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	reader := &varsReader{transCtx.Client, graphCli, dag}
 	vars := slices.Clone(transCtx.CompDef.Spec.Vars)
@@ -139,6 +151,12 @@ func (t *componentFileTemplateTransformer) prepareInstanceFileTemplateObjects(tr
 	dag *graph.DAG, baseDesired map[string]*corev1.ConfigMap) (map[string]*corev1.ConfigMap, map[string]*corev1.ConfigMap, error) {
 	running, desired := make(map[string]*corev1.ConfigMap), make(map[string]*corev1.ConfigMap)
 	synth := transCtx.SynthesizeComponent
+	baseTemplates := make(map[string]component.SynthesizedFileTemplate)
+	for _, tpl := range synth.FileTemplates {
+		if tpl.Config {
+			baseTemplates[tpl.Name] = tpl
+		}
+	}
 	synth.InstanceConfigs = make(map[string][]workloads.ConfigTemplate)
 	for i := range synth.Instances {
 		instance := &synth.Instances[i]
@@ -154,13 +172,18 @@ func (t *componentFileTemplateTransformer) prepareInstanceFileTemplateObjects(tr
 			return nil, nil, err
 		}
 		for _, tpl := range templates {
-			obj, err := t.buildFileTemplateObject(renderCtx, tpl)
-			if err != nil {
-				return nil, nil, fmt.Errorf("render instance template %s config %s: %w", instance.Name, tpl.Name, err)
-			}
 			baseName := fileTemplateObjectName(synth, tpl.Name)
 			base := baseDesired[baseName]
-			sameData := base != nil && reflect.DeepEqual(base.Data, obj.Data)
+			baseTpl := baseTemplates[tpl.Name]
+			obj := base
+			if base == nil || fileTemplateSource(tpl) != fileTemplateSource(baseTpl) ||
+				!maps.Equal(fileTemplateVariables(renderCtx, tpl), fileTemplateVariables(transCtx, baseTpl)) {
+				obj, err = t.buildFileTemplateObject(renderCtx, tpl)
+				if err != nil {
+					return nil, nil, fmt.Errorf("render instance template %s config %s: %w", instance.Name, tpl.Name, err)
+				}
+			}
+			sameData := base != nil && (obj == base || reflect.DeepEqual(base.Data, obj.Data))
 			configObj := base
 			if !sameData {
 				current, err := t.prepareSpecializedConfigMap(transCtx, instance.Name, tpl, obj)
@@ -199,7 +222,6 @@ func (t *componentFileTemplateTransformer) prepareSpecializedConfigMap(transCtx 
 	instanceName string, tpl component.SynthesizedFileTemplate, desired *corev1.ConfigMap) (*corev1.ConfigMap, error) {
 	desired.Name = instanceFileTemplateObjectName(transCtx.SynthesizeComponent, instanceName, tpl.Name)
 	desired.Labels[instanceConfigMapLabelKey] = "true"
-	desired.Labels[instanceConfigMapOwnerLabelKey] = string(transCtx.Component.UID)
 	current := &corev1.ConfigMap{}
 	if err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(desired), current); err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -209,18 +231,11 @@ func (t *componentFileTemplateTransformer) prepareSpecializedConfigMap(transCtx 
 	} else if !isCurrentComponentConfigMap(transCtx.Component, current) {
 		return nil, fmt.Errorf("the ConfigMap name for instance template %s config %s conflicts", instanceName, tpl.Name)
 	}
-	placements := sets.New[string]()
 	if current != nil {
 		desired.ResourceVersion = current.ResourceVersion
-		placements = configMapPlacements(current.Annotations[instanceConfigMapPlacementsAnnotationKey])
 	}
-	if ptr.Deref(transCtx.SynthesizeComponent.EnableInstanceAPI, false) {
-		placements.Insert(sets.List(configMapPlacements(transCtx.Component.Annotations[constant.KBAppMultiClusterPlacementKey]))...)
-	}
-	if len(placements) > 0 {
-		desired.Annotations[instanceConfigMapPlacementsAnnotationKey] = strings.Join(sets.List(placements), ",")
-	}
-	t.preserveFileTemplateChanges(transCtx, tpl.Name, current, desired)
+	t.recordConfigMapPlacements(transCtx, current, desired)
+	t.preserveFileTemplateChanges(transCtx, tpl, current, desired)
 	if tpl.ConfigHash != nil {
 		hash, err := intctrlutil.ComputeHash(struct {
 			Version string
@@ -232,6 +247,29 @@ func (t *componentFileTemplateTransformer) prepareSpecializedConfigMap(transCtx 
 		desired.Annotations[constant.CMInsConfigurationHashLabelKey] = hash
 	}
 	return current, nil
+}
+
+func (t *componentFileTemplateTransformer) recordConfigMapPlacements(transCtx *componentTransformContext, current, desired *corev1.ConfigMap) {
+	requested := sets.New[string]()
+	if ptr.Deref(transCtx.SynthesizeComponent.EnableInstanceAPI, false) {
+		requested = configMapPlacements(transCtx.Component.Annotations[constant.KBAppMultiClusterPlacementKey])
+	}
+	if running := transCtx.RunningWorkload; running != nil && ptr.Deref(running.Spec.EnableInstanceAPI, false) {
+		requested = requested.Union(configMapPlacements(running.Annotations[constant.KBAppMultiClusterPlacementKey]))
+	}
+	managed := isCurrentComponentConfigMap(transCtx.Component, current)
+	// Unknown requests cannot have published a mirror. Keep recorded providers
+	// even if they have since been removed from the manager.
+	placements := requested.Intersection(sets.New(t.configProviders...))
+	if managed {
+		placements = placements.Union(configMapPlacements(current.Annotations[instanceConfigMapPlacementsAnnotationKey]))
+	}
+	if len(placements) > 0 {
+		desired.Annotations[instanceConfigMapPlacementsAnnotationKey] = strings.Join(sets.List(placements), ",")
+	}
+	if managed || len(requested) > 0 || desired.Labels[instanceConfigMapLabelKey] == "true" {
+		desired.Labels[constant.KBAppConfigMapOwnerLabelKey] = string(transCtx.Component.UID)
+	}
 }
 
 func instanceFileTemplateObjectName(synth *component.SynthesizedComponent, instance, config string) string {
@@ -260,7 +298,10 @@ func (t *componentFileTemplateTransformer) instanceAssistantObject(transCtx *com
 		}
 	}
 	objName := fileTemplateObjectName(transCtx.SynthesizeComponent, tpl.Name)
-	return protoObjs[objName]
+	if obj := protoObjs[objName]; obj != nil && !isCurrentComponentConfigMap(transCtx.Component, obj) {
+		return obj
+	}
+	return nil
 }
 
 func (t *componentFileTemplateTransformer) precheck(transCtx *componentTransformContext) error {
@@ -431,43 +472,36 @@ func (t *componentFileTemplateTransformer) buildFileTemplateObject(transCtx *com
 }
 
 func (t *componentFileTemplateTransformer) buildFileTemplateData(transCtx *componentTransformContext, tpl component.SynthesizedFileTemplate) (map[string]string, error) {
-	cmObj, err := func() (*corev1.ConfigMap, error) {
-		cm := &corev1.ConfigMap{}
-		cmKey := types.NamespacedName{
-			Namespace: func() string {
-				if len(tpl.Namespace) > 0 {
-					return tpl.Namespace
-				}
-				return "default"
-			}(),
-			Name: tpl.Template,
-		}
-		if err := transCtx.Client.Get(transCtx.Context, cmKey, cm); err != nil {
-			return nil, err
-		}
-		return cm, nil
-	}()
-	if err != nil {
+	cm := &corev1.ConfigMap{}
+	if err := transCtx.Client.Get(transCtx.Context, fileTemplateSource(tpl), cm); err != nil {
 		return nil, err
 	}
-	return t.renderFileTemplateData(transCtx, tpl, cmObj.Data)
+	return t.renderFileTemplateData(transCtx, tpl, cm.Data)
 }
 
-func (t *componentFileTemplateTransformer) renderFileTemplateData(transCtx *componentTransformContext,
-	fileTemplate component.SynthesizedFileTemplate, data map[string]string) (map[string]string, error) {
-	var (
-		synthesizedComp = transCtx.SynthesizeComponent
-		rendered        = make(map[string]string)
-	)
+func fileTemplateSource(tpl component.SynthesizedFileTemplate) types.NamespacedName {
+	namespace := tpl.Namespace
+	if namespace == "" {
+		namespace = "default"
+	}
+	return types.NamespacedName{Namespace: namespace, Name: tpl.Template}
+}
 
+func fileTemplateVariables(transCtx *componentTransformContext, fileTemplate component.SynthesizedFileTemplate) map[string]any {
 	variables := make(map[string]any)
-	for k, v := range synthesizedComp.TemplateVars {
+	for k, v := range transCtx.SynthesizeComponent.TemplateVars {
 		variables[k] = v
 	}
 	for k, v := range fileTemplate.Variables {
 		variables[k] = v // override
 	}
+	return variables
+}
 
+func (t *componentFileTemplateTransformer) renderFileTemplateData(transCtx *componentTransformContext,
+	fileTemplate component.SynthesizedFileTemplate, data map[string]string) (map[string]string, error) {
+	variables := fileTemplateVariables(transCtx, fileTemplate)
+	rendered := make(map[string]string)
 	tpl := template.New(fileTemplate.Name).Option("missingkey=error").Funcs(sprig.TxtFuncMap())
 	for key, val := range data {
 		ptpl, err := tpl.Clone()
@@ -549,8 +583,9 @@ func (t *componentFileTemplateTransformer) configVolumeBinding(transCtx *compone
 }
 
 func (t *componentFileTemplateTransformer) preserveFileTemplateChanges(transCtx *componentTransformContext,
-	tplName string, running, desired *corev1.ConfigMap) {
-	if running == nil {
+	tpl component.SynthesizedFileTemplate, running, desired *corev1.ConfigMap) {
+	delete(desired.Annotations, fileTemplateChangesAnnotationKey)
+	if running == nil || t.buildConfigTemplate(transCtx, tpl, nil).Reconfigure == nil {
 		return
 	}
 	if reflect.DeepEqual(running.Data, desired.Data) {
@@ -559,7 +594,7 @@ func (t *componentFileTemplateTransformer) preserveFileTemplateChanges(transCtx 
 		}
 		return
 	}
-	changes := t.fileTemplateChanges(transCtx, tplName, running.Data, desired.Data)
+	changes := t.fileTemplateChanges(transCtx, tpl.Name, running.Data, desired.Data)
 	encoded, _ := json.Marshal(changes)
 	desired.Annotations[fileTemplateChangesAnnotationKey] = string(encoded)
 }

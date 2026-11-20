@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"maps"
 	"reflect"
-	"slices"
 	"strings"
 	"time"
 
@@ -39,6 +38,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	instancecontroller "github.com/apecloud/kubeblocks/pkg/controller/instance"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -46,7 +46,6 @@ import (
 
 const (
 	instanceConfigMapLabelKey                = "apps.kubeblocks.io/instance-config"
-	instanceConfigMapOwnerLabelKey           = "apps.kubeblocks.io/instance-config-owner"
 	instanceConfigMapPlacementsAnnotationKey = "apps.kubeblocks.io/instance-config-placements"
 )
 
@@ -75,53 +74,113 @@ func configMapPlacements(value string) sets.Set[string] {
 	return sets.New(strings.FieldsFunc(value, func(r rune) bool { return r == ',' })...)
 }
 
-// Start retains deferred workload changes, but must publish the files and hashes
-// that the first replacement Pod will use before releasing the Stop barrier.
-func publishStartingInstanceConfigs(target, desired *workloads.InstanceSet) {
-	configVolumes := sets.New[string]()
-	for _, its := range []*workloads.InstanceSet{target, desired} {
-		for _, config := range its.Spec.Configs {
-			if config.Volume != nil {
-				configVolumes.Insert(config.Volume.VolumeName)
+// Changed configuration must start with the runtime that produced it. Membership
+// changes remain deferred to the normal scaling lifecycle after Start.
+func publishStartingInstanceConfigs(target, desired *workloads.InstanceSet, legacyPolicy legacyConfigManagerPolicy) {
+	templates := make(map[string]*workloads.InstanceTemplate, len(desired.Spec.Instances))
+	for _, instance := range desired.Spec.Instances {
+		if instance.GetReplicas() > 0 {
+			templates[instance.Name] = instance.DeepCopy()
+		}
+	}
+	changed := !sameStartingConfigs(target, desired, legacyPolicy)
+	for _, instance := range target.Spec.Instances {
+		var configs []workloads.ConfigTemplate
+		if next := templates[instance.Name]; next != nil {
+			configs = next.Configs
+		}
+		changed = changed || !reflect.DeepEqual(instance.Configs, configs)
+	}
+	if !changed {
+		// Older workloads can adopt the binding for an existing mount without
+		// applying unrelated deferred runtime changes.
+		target.Spec.Configs = desired.Spec.Configs
+		return
+	}
+	snapshot := desired.DeepCopy()
+	target.Spec.Template = snapshot.Spec.Template
+	target.Spec.Configs = snapshot.Spec.Configs
+	target.Spec.VolumeClaimTemplates = snapshot.Spec.VolumeClaimTemplates
+	target.Spec.LifecycleActions = snapshot.Spec.LifecycleActions
+	target.Spec.InstanceAssistantObjects = snapshot.Spec.InstanceAssistantObjects
+	for i, current := range target.Spec.Instances {
+		next := templates[current.Name]
+		if next == nil {
+			// Removed or disabled templates temporarily use the desired base runtime.
+			next = &workloads.InstanceTemplate{}
+		}
+		next.Name, next.Replicas, next.Ordinals = current.Name, current.Replicas, current.Ordinals
+		target.Spec.Instances[i] = *next
+	}
+	if target.Annotations == nil {
+		target.Annotations = make(map[string]string)
+	}
+	for _, key := range []string{constant.AppComponentLabelKey, constant.KBAppServiceVersionKey} {
+		target.Annotations[key] = desired.Annotations[key]
+	}
+}
+
+func sameStartingConfigs(current, desired *workloads.InstanceSet, legacyPolicy legacyConfigManagerPolicy) bool {
+	if len(current.Spec.Configs) != len(desired.Spec.Configs) {
+		return false
+	}
+	previous := make(map[string]workloads.ConfigTemplate, len(current.Spec.Configs))
+	for _, config := range current.Spec.Configs {
+		previous[config.Name] = config
+	}
+	volumes := sets.New[string]()
+	for _, next := range desired.Spec.Configs {
+		old, exists := previous[next.Name]
+		if !exists {
+			return false
+		}
+		if next.Volume != nil {
+			volumes.Insert(next.Volume.VolumeName)
+			if old.Volume == nil {
+				// The Pod volume comparison below verifies this association.
+				old.Volume = next.Volume
 			}
 		}
-	}
-	previousConfigMaps := boundConfigMapNames(target)
-	target.Spec.Configs = desired.Spec.Configs
-	configs := make(map[string][]workloads.ConfigTemplate, len(desired.Spec.Instances))
-	for _, instance := range desired.Spec.Instances {
-		configs[instance.Name] = instance.Configs
-	}
-	for i := range target.Spec.Instances {
-		target.Spec.Instances[i].Configs = configs[target.Spec.Instances[i].Name]
-	}
-
-	targetPod := &target.Spec.Template.Spec
-	desiredPod := &desired.Spec.Template.Spec
-	targetPod.Volumes = projectConfigVolumes(targetPod.Volumes, desiredPod.Volumes, configVolumes, func(v corev1.Volume) string { return v.Name })
-	availableVolumes := sets.New[string]()
-	for _, volume := range targetPod.Volumes {
-		availableVolumes.Insert(volume.Name)
-	}
-	projectConfigMounts(targetPod.Containers, desiredPod.Containers, configVolumes, availableVolumes)
-	projectConfigMounts(targetPod.InitContainers, desiredPod.InitContainers, configVolumes, availableVolumes)
-
-	currentConfigMaps := boundConfigMapNames(target)
-	isManagedConfigMap := func(ref corev1.ObjectReference, names sets.Set[string]) bool {
-		return ref.Kind == "ConfigMap" && (ref.Namespace == "" || ref.Namespace == target.Namespace) && names.Has(ref.Name)
-	}
-	assistants := target.Spec.InstanceAssistantObjects[:0]
-	for _, ref := range target.Spec.InstanceAssistantObjects {
-		if !isManagedConfigMap(ref, previousConfigMaps) {
-			assistants = append(assistants, ref)
+		if !reflect.DeepEqual(old, next) {
+			return false
 		}
 	}
-	for _, ref := range desired.Spec.InstanceAssistantObjects {
-		if isManagedConfigMap(ref, currentConfigMaps) && !slices.Contains(assistants, ref) {
-			assistants = append(assistants, ref)
+	if len(volumes) == 0 {
+		return true
+	}
+	effective := desired
+	if _, old := intctrlutil.GetContainerByName(current.Spec.Template.Spec.Containers, legacyConfigManagerContainerName); old != nil {
+		effective = desired.DeepCopy()
+		preserveLegacyConfigManagerPodSpec(current, desired, effective, legacyPolicy)
+	}
+	return reflect.DeepEqual(startingConfigMounts(&current.Spec.Template.Spec, volumes), startingConfigMounts(&effective.Spec.Template.Spec, volumes))
+}
+
+type configMounts struct {
+	volumes    map[string]corev1.Volume
+	containers map[string][]corev1.VolumeMount
+	init       map[string][]corev1.VolumeMount
+}
+
+func startingConfigMounts(pod *corev1.PodSpec, names sets.Set[string]) configMounts {
+	mounts := func(containers []corev1.Container) map[string][]corev1.VolumeMount {
+		result := make(map[string][]corev1.VolumeMount)
+		for _, container := range containers {
+			for _, mount := range container.VolumeMounts {
+				if names.Has(mount.Name) {
+					result[container.Name] = append(result[container.Name], mount)
+				}
+			}
+		}
+		return result
+	}
+	result := configMounts{volumes: make(map[string]corev1.Volume), containers: mounts(pod.Containers), init: mounts(pod.InitContainers)}
+	for _, volume := range pod.Volumes {
+		if names.Has(volume.Name) {
+			result.volumes[volume.Name] = volume
 		}
 	}
-	target.Spec.InstanceAssistantObjects = assistants
+	return result
 }
 
 func boundConfigMapNames(its *workloads.InstanceSet) sets.Set[string] {
@@ -141,47 +200,8 @@ func boundConfigMapNames(its *workloads.InstanceSet) sets.Set[string] {
 	return names
 }
 
-func projectConfigMounts(current, desired []corev1.Container, configVolumes, availableVolumes sets.Set[string]) {
-	for i := range current {
-		_, next := intctrlutil.GetContainerByName(desired, current[i].Name)
-		if next == nil {
-			current[i].VolumeMounts = slices.DeleteFunc(current[i].VolumeMounts, func(m corev1.VolumeMount) bool {
-				return configVolumes.Has(m.Name) && !availableVolumes.Has(m.Name)
-			})
-			continue
-		}
-		current[i].VolumeMounts = projectConfigVolumes(current[i].VolumeMounts, next.VolumeMounts, configVolumes, func(m corev1.VolumeMount) string { return m.Name })
-	}
-}
-
-func projectConfigVolumes[T any](current, desired []T, configVolumes sets.Set[string], name func(T) string) []T {
-	var result []T
-	replacements := make(map[string][]T)
-	for _, item := range desired {
-		volume := name(item)
-		if configVolumes.Has(volume) {
-			replacements[volume] = append(replacements[volume], item)
-		}
-	}
-	for _, item := range current {
-		volume := name(item)
-		if !configVolumes.Has(volume) {
-			result = append(result, item)
-			continue
-		}
-		result = append(result, replacements[volume]...)
-		delete(replacements, volume)
-	}
-	for _, item := range desired {
-		if _, ok := replacements[name(item)]; ok {
-			result = append(result, item)
-		}
-	}
-	return result
-}
-
 func isCurrentComponentConfigMap(comp *appsv1.Component, cm *corev1.ConfigMap) bool {
-	if comp.UID == "" || cm.Labels[instanceConfigMapLabelKey] != "true" {
+	if cm == nil || comp.UID == "" || cm.Labels[constant.KBAppConfigMapOwnerLabelKey] != string(comp.UID) {
 		return false
 	}
 	owner := metav1.GetControllerOf(cm)
@@ -191,7 +211,7 @@ func isCurrentComponentConfigMap(comp *appsv1.Component, cm *corev1.ConfigMap) b
 
 func isComponentInstanceConfigMapMirror(comp *appsv1.Component, cm *corev1.ConfigMap) bool {
 	return comp.UID != "" && len(cm.OwnerReferences) == 0 &&
-		cm.Labels[instanceConfigMapLabelKey] == "true" && cm.Labels[instanceConfigMapOwnerLabelKey] == string(comp.UID)
+		cm.Labels[constant.KBAppConfigMapOwnerLabelKey] == string(comp.UID)
 }
 
 func (t *componentWorkloadTransformer) prepareInstanceConfigMaps(transCtx *componentTransformContext,
@@ -199,22 +219,37 @@ func (t *componentWorkloadTransformer) prepareInstanceConfigMaps(transCtx *compo
 	if !ptr.Deref(its.Spec.EnableInstanceAPI, false) || ptr.Deref(its.Spec.Stop, false) || !multicluster.Enabled4Object(its) {
 		return nil
 	}
-	placements := sets.List(configMapPlacements(its.Annotations[constant.KBAppMultiClusterPlacementKey]))
-	for _, name := range sets.List(instanceConfigMapNames(its)) {
+	placements := configMapPlacements(its.Annotations[constant.KBAppMultiClusterPlacementKey])
+	managed := instanceConfigMapNames(its)
+	for _, tpl := range transCtx.SynthesizeComponent.FileTemplates {
+		if tpl.Config && !isExternalManaged(tpl) {
+			managed.Insert(fileTemplateObjectName(transCtx.SynthesizeComponent, tpl.Name))
+		}
+	}
+	for _, name := range sets.List(boundConfigMapNames(its)) {
 		key := client.ObjectKey{Namespace: its.Namespace, Name: name}
 		cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: key.Namespace, Name: key.Name}}
 		if graphCli.IsAction(dag, cm, model.ActionCreatePtr()) || graphCli.IsAction(dag, cm, model.ActionUpdatePtr()) {
 			return intctrlutil.NewRequeueError(time.Second, "waiting for rendered instance configuration")
 		}
 		cm = &corev1.ConfigMap{}
-		if err := graphCli.Get(transCtx.Context, key, cm); err != nil {
+		if err := graphCli.Get(transCtx.Context, key, cm, multicluster.InControlContext()); err != nil {
+			if apierrors.IsNotFound(err) && !managed.Has(name) {
+				continue
+			}
 			return err
 		}
 		if !isCurrentComponentConfigMap(transCtx.Component, cm) {
-			return fmt.Errorf("instance configuration ConfigMap %s is not owned by Component %s", key, transCtx.Component.Name)
+			if managed.Has(name) {
+				return fmt.Errorf("instance configuration ConfigMap %s is not owned by Component %s", key, transCtx.Component.Name)
+			}
+			continue
+		}
+		if missing := placements.Difference(sets.New(t.configProviders...)); len(missing) > 0 {
+			return fmt.Errorf("instance configuration providers are not configured: %v", sets.List(missing))
 		}
 		recorded := configMapPlacements(cm.Annotations[instanceConfigMapPlacementsAnnotationKey])
-		for _, placement := range placements {
+		for _, placement := range sets.List(placements) {
 			if !recorded.Has(placement) {
 				return intctrlutil.NewRequeueError(time.Second, "waiting for rendered instance configuration placement")
 			}
@@ -242,7 +277,10 @@ func syncInstanceConfigMap(ctx context.Context, cli client.Client, comp *appsv1.
 		if current.UID == config.UID && isCurrentComponentConfigMap(comp, current) {
 			return nil
 		}
-		if !isComponentInstanceConfigMapMirror(comp, current) {
+		// Only shared rendered configurations can have a mirror left by a legacy Instance.
+		legacy := config.Labels[instanceConfigMapLabelKey] != "true" &&
+			instancecontroller.IsSharedAssistantConfigMap(current, config.Labels[constant.AppInstanceLabelKey], config.Labels[constant.KBAppComponentLabelKey])
+		if !isComponentInstanceConfigMapMirror(comp, current) && !legacy {
 			return fmt.Errorf("instance configuration ConfigMap %s in placement %s is not owned by Component %s", key, placement, comp.Name)
 		}
 		if !current.DeletionTimestamp.IsZero() {

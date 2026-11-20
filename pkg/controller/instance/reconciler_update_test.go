@@ -174,7 +174,7 @@ func TestInstanceMixedConfigUpdateRouting(t *testing.T) {
 			pod.Spec.Containers[0].VolumeMounts = append(pod.Spec.Containers[0].VolumeMounts, mount)
 			inst.Spec.Configs = append(inst.Spec.Configs, workloads.ConfigTemplate{
 				Name: "aux", ConfigHash: ptr.To("old-aux"), Reconfigure: &kbappsv1.Action{}, Parameters: map[string]string{"id": "aux"},
-				Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "aux", ConfigMapName: "aux-config"},
+				Volume: &workloads.ConfigVolumeBinding{VolumeName: "aux", ConfigMapName: "aux-config"},
 			})
 			if err := configsToPod(inst.Spec.Configs, pod); err != nil {
 				t.Fatal(err)
@@ -242,7 +242,7 @@ func newInstanceConfigUpdateFixture(t *testing.T) (*workloads.Instance, *corev1.
 			Containers: []corev1.Container{{Name: "mysql", Image: "mysql:8.4", VolumeMounts: []corev1.VolumeMount{{Name: "config", MountPath: "/etc/mysql"}}}},
 			Volumes:    []corev1.Volume{{Name: "config", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "old-config"}}}}},
 		}}).
-		SetConfigs([]workloads.ConfigTemplate{{Name: "main", ConfigHash: ptr.To("old-hash"), Reconfigure: &kbappsv1.Action{}, Parameters: map[string]string{"id": "main"}, Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "old-config"}}}).
+		SetConfigs([]workloads.ConfigTemplate{{Name: "main", ConfigHash: ptr.To("old-hash"), Reconfigure: &kbappsv1.Action{}, Parameters: map[string]string{"id": "main"}, Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "old-config"}}}).
 		SetPodUpdatePolicy(kbappsv1.PreferInPlacePodUpdatePolicyType).
 		SetPodUpgradePolicy(kbappsv1.PreferInPlacePodUpdatePolicyType).
 		GetObject()

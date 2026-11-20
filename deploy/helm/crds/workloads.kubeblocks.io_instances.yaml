@@ -552,9 +552,6 @@ spec:
                             in the Pod template.
                           minLength: 1
                           type: string
-                      required:
-                      - configMapName
-                      - volumeName
                       type: object
                   required:
                   - name

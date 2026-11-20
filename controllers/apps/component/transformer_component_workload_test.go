@@ -86,7 +86,7 @@ func TestStartingManagedConfigurationWithLegacyConfigManager(t *testing.T) {
 			if ptr.Deref(current.Spec.Stop, false) {
 				t.Fatal("workload is still stopped")
 			}
-			if _, err = instancetemplate.BuildInstanceTemplatesWithConfigs(current, nil); err != nil {
+			if _, err = instancetemplate.BuildInstanceName2TemplateMap(current, nil); err != nil {
 				t.Fatalf("Start published invalid managed config bindings: %v", err)
 			}
 			_, sidecar := intctrlutil.GetContainerByName(current.Spec.Template.Spec.Containers, "config-manager")

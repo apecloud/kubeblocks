@@ -329,7 +329,7 @@ func getHeadlessSvcName(itsName string) string {
 }
 
 func buildDesiredInstancesByName(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) (map[string]*workloads.Instance, []string, error) {
-	nameMap, err := instancetemplate.BuildInstanceTemplatesWithConfigs(its, tree)
+	nameMap, err := instancetemplate.BuildInstanceName2TemplateMap(its, tree)
 	if err != nil {
 		return nil, nil, err
 	}

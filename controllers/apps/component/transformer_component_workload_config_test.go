@@ -373,7 +373,7 @@ func TestInstanceConfigStartPublishesCoherentRuntime(t *testing.T) {
 			if ptr.Deref(starting.Spec.Stop, false) || !reflect.DeepEqual(starting.Spec.Instances[0].Configs, synth.InstanceConfigs["canary"]) {
 				t.Fatalf("Start did not publish both latest config bindings: %#v", starting.Spec.Instances[0].Configs)
 			}
-			templates, err := instancetemplate.BuildInstanceTemplatesWithConfigs(starting, nil)
+			templates, err := instancetemplate.BuildInstanceName2TemplateMap(starting, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -516,7 +516,7 @@ func TestInstanceConfigStartKeepsRenderInputsAndTopology(t *testing.T) {
 			if ptr.Deref(starting.Spec.Stop, false) || starting.Annotations[constant.KubeBlocksGenerationKey] != "1" || !reflect.DeepEqual(starting.Spec.Replicas, running.Spec.Replicas) || starting.Spec.FlatInstanceOrdinal != running.Spec.FlatInstanceOrdinal || !reflect.DeepEqual(starting.Spec.OfflineInstances, running.Spec.OfflineInstances) || !reflect.DeepEqual(starting.Spec.Instances[0].Replicas, running.Spec.Instances[0].Replicas) || !reflect.DeepEqual(starting.Spec.Instances[0].Ordinals, running.Spec.Instances[0].Ordinals) {
 				t.Fatal("Start applied scaling topology or acknowledged it before the normal lifecycle")
 			}
-			templates, err := instancetemplate.BuildInstanceTemplatesWithConfigs(starting, nil)
+			templates, err := instancetemplate.BuildInstanceName2TemplateMap(starting, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -561,7 +561,7 @@ func TestInstanceConfigStartKeepsRetiringTemplateOnBaseRuntime(t *testing.T) {
 	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(running), starting); err != nil {
 		t.Fatal(err)
 	}
-	templates, err := instancetemplate.BuildInstanceTemplatesWithConfigs(starting, nil)
+	templates, err := instancetemplate.BuildInstanceName2TemplateMap(starting, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

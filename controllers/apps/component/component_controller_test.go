@@ -2716,7 +2716,7 @@ var _ = Describe("Component Controller", func() {
 			var firstHash string
 			baseKey := client.ObjectKey{Namespace: compKey.Namespace, Name: compKey.Name + "-" + fileTemplate}
 			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, its *workloads.InstanceSet) {
-				templates, err := instancetemplate.BuildInstanceTemplatesWithConfigs(its, nil)
+				templates, err := instancetemplate.BuildInstanceName2TemplateMap(its, nil)
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(templates).To(HaveLen(2))
 				for _, tmpl := range templates {
@@ -2771,7 +2771,7 @@ var _ = Describe("Component Controller", func() {
 			})()).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Spec.Instances[0].Configs).To(BeEmpty())
-				templates, err := instancetemplate.BuildInstanceTemplatesWithConfigs(its, nil)
+				templates, err := instancetemplate.BuildInstanceName2TemplateMap(its, nil)
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(templates).To(HaveLen(2))
 				for _, tmpl := range templates {

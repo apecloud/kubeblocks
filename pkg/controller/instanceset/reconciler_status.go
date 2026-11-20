@@ -73,10 +73,11 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 		return kubebuilderx.Continue, err
 	}
-	desiredTemplates, err := instancetemplate.BuildInstanceTemplateExtMap(its, tree)
+	nameToTemplateMap, err := instancetemplate.BuildInstanceTemplateExtMap(its, tree)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
+
 	// 2. calculate status summary
 	updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
 	if err != nil {
@@ -133,7 +134,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			updated := false
 			if !stopping {
 				var err1 error
-				updated, err1 = isPodUpdated(its, pod, desiredTemplates[pod.Name])
+				updated, err1 = isPodUpdated(its, pod, nameToTemplateMap[pod.Name])
 				if err1 != nil {
 					return kubebuilderx.Continue, err1
 				}

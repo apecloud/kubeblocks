@@ -2235,7 +2235,7 @@ func TestLegacyInstanceSetStopRecoveryFlatTemplateChange(t *testing.T) {
 
 func TestLegacyInstanceSetStartUsesLatestNamedTemplateConfigs(t *testing.T) {
 	config := func(name, volume, configMap, hash string) workloads.ConfigTemplate {
-		return workloads.ConfigTemplate{Name: name, ConfigHash: ptr.To(hash), Volume: &workloads.ConfigMapVolumeBinding{VolumeName: volume, ConfigMapName: configMap}}
+		return workloads.ConfigTemplate{Name: name, ConfigHash: ptr.To(hash), Volume: &workloads.ConfigVolumeBinding{VolumeName: volume, ConfigMapName: configMap}}
 	}
 	volume := func(name, configMap string) corev1.Volume {
 		return corev1.Volume{Name: name, VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: configMap}}}}

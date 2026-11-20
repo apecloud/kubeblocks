@@ -570,13 +570,13 @@ func (t *componentFileTemplateTransformer) buildConfigTemplate(transCtx *compone
 }
 
 func (t *componentFileTemplateTransformer) configVolumeBinding(transCtx *componentTransformContext,
-	tpl component.SynthesizedFileTemplate) *workloads.ConfigMapVolumeBinding {
+	tpl component.SynthesizedFileTemplate) *workloads.ConfigVolumeBinding {
 	if isExternalManaged(tpl) {
 		return nil
 	}
 	for _, volume := range transCtx.SynthesizeComponent.PodSpec.Volumes {
 		if volume.Name == tpl.VolumeName && volume.ConfigMap != nil {
-			return &workloads.ConfigMapVolumeBinding{VolumeName: volume.Name, ConfigMapName: volume.ConfigMap.Name}
+			return &workloads.ConfigVolumeBinding{VolumeName: volume.Name, ConfigMapName: volume.ConfigMap.Name}
 		}
 	}
 	return nil

@@ -59,7 +59,7 @@ func instanceConfigFixture(t *testing.T) (*appsv1.Component, *component.Synthesi
 	synth := &component.SynthesizedComponent{
 		Namespace: comp.Namespace, ClusterName: "db", Name: "mysql", FullCompName: comp.Name, Generation: "2", Replicas: 1,
 		PodSpec:          &corev1.PodSpec{Containers: []corev1.Container{{Name: "db", Image: "db:old"}}, Volumes: []corev1.Volume{{Name: "config", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "default-config"}}}}}},
-		Configs:          []workloads.ConfigTemplate{{Name: "main", ConfigHash: ptr.To("default-hash"), Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "default-config"}}},
+		Configs:          []workloads.ConfigTemplate{{Name: "main", ConfigHash: ptr.To("default-hash"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "default-config"}}},
 		LifecycleActions: component.SynthesizedLifecycleActions{ComponentLifecycleActions: &appsv1.ComponentLifecycleActions{}},
 	}
 	return comp, synth, scheme
@@ -113,7 +113,7 @@ func TestInstanceConfigPublicationPrecedesWorkload(t *testing.T) {
 		t.Run(map[bool]string{false: "create", true: "start update"}[update], func(t *testing.T) {
 			comp, synth, scheme := instanceConfigFixture(t)
 			synth.Instances = []appsv1.InstanceTemplate{{Name: "canary", Replicas: ptr.To(int32(1))}}
-			synth.InstanceConfigs = map[string][]workloads.ConfigTemplate{"canary": {{Name: "main", ConfigHash: ptr.To("special-hash"), Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "special"}}}}
+			synth.InstanceConfigs = map[string][]workloads.ConfigTemplate{"canary": {{Name: "main", ConfigHash: ptr.To("special-hash"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "special"}}}}
 			cm := managedInstanceConfig(comp, "special")
 			var running *workloads.InstanceSet
 			var objects []client.Object
@@ -201,7 +201,7 @@ func TestInstanceConfigCollectionWaitsForReferences(t *testing.T) {
 			objects := []client.Object{cm, running}
 			spec := corev1.PodSpec{Volumes: []corev1.Volume{{Name: "old", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: cm.Name}}}}}}
 			if reference == "published workload" {
-				running.Spec.Instances = []workloads.InstanceTemplate{{Name: "removed", Replicas: ptr.To(int32(0)), Configs: []workloads.ConfigTemplate{{Name: "main", Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "old", ConfigMapName: cm.Name}}}}}
+				running.Spec.Instances = []workloads.InstanceTemplate{{Name: "removed", Replicas: ptr.To(int32(0)), Configs: []workloads.ConfigTemplate{{Name: "main", Volume: &workloads.ConfigVolumeBinding{VolumeName: "old", ConfigMapName: cm.Name}}}}}
 			}
 			if reference == "instance" {
 				inst := &workloads.Instance{ObjectMeta: metav1.ObjectMeta{Name: comp.Name + "-0", Namespace: comp.Namespace, Labels: constant.GetCompLabels("db", "mysql")}}
@@ -324,7 +324,7 @@ func TestInstanceConfigStartPublishesCoherentRuntime(t *testing.T) {
 				return corev1.Volume{Name: volume, VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: source}}}}
 			}
 			config := func(name, volume, source, hash string) workloads.ConfigTemplate {
-				return workloads.ConfigTemplate{Name: name, Volume: &workloads.ConfigMapVolumeBinding{VolumeName: volume, ConfigMapName: source}, ConfigHash: ptr.To(hash)}
+				return workloads.ConfigTemplate{Name: name, Volume: &workloads.ConfigVolumeBinding{VolumeName: volume, ConfigMapName: source}, ConfigHash: ptr.To(hash)}
 			}
 			configRef := func(name string) corev1.ObjectReference {
 				return corev1.ObjectReference{Kind: "ConfigMap", Namespace: comp.Namespace, Name: name}
@@ -403,7 +403,7 @@ func TestInstanceConfigStartClearsRemovedOverride(t *testing.T) {
 		t.Fatal(err)
 	}
 	running.Spec.Stop = ptr.To(true)
-	running.Spec.Instances[0].Configs = []workloads.ConfigTemplate{{Name: "main", ConfigHash: ptr.To("old-special-hash"), Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "removed-special"}}}
+	running.Spec.Instances[0].Configs = []workloads.ConfigTemplate{{Name: "main", ConfigHash: ptr.To("old-special-hash"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "removed-special"}}}
 	running.Spec.Template.Spec.Volumes[0].ConfigMap.Name = "old-default"
 	running.Spec.InstanceAssistantObjects = []corev1.ObjectReference{{Kind: "Secret", Name: "kept"}, {Kind: "ConfigMap", Name: "removed-special"}}
 	synth.InstanceAssistantObjects = []corev1.ObjectReference{{Kind: "Secret", Name: "deferred"}, {Kind: "ConfigMap", Name: "default-config"}}
@@ -539,7 +539,7 @@ func TestInstanceConfigStartKeepsRetiringTemplateOnBaseRuntime(t *testing.T) {
 	comp, synth, scheme := instanceConfigFixture(t)
 	synth.Instances = []appsv1.InstanceTemplate{{Name: "canary", Replicas: ptr.To(int32(1)), Resources: &corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("8Gi")}}}}
 	synth.InstanceImages = map[string]map[string]string{"canary": {"db": "db:old-canary"}}
-	synth.InstanceConfigs = map[string][]workloads.ConfigTemplate{"canary": {{Name: "main", ConfigHash: ptr.To("old"), Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "old-special"}}}}
+	synth.InstanceConfigs = map[string][]workloads.ConfigTemplate{"canary": {{Name: "main", ConfigHash: ptr.To("old"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "old-special"}}}}
 	running, err := component.BuildInstanceSet(synth, &appsv1.ComponentDefinition{})
 	if err != nil {
 		t.Fatal(err)
@@ -798,7 +798,7 @@ func TestInstanceConfigMirrorPublicationPrecedesWorkload(t *testing.T) {
 			shared := managedInstanceConfig(comp, "default-config")
 			delete(shared.Labels, instanceConfigMapLabelKey)
 			shared.Annotations = map[string]string{instanceConfigMapPlacementsAnnotationKey: "a,b"}
-			synth.InstanceConfigs = map[string][]workloads.ConfigTemplate{"canary": {{Name: "main", ConfigHash: ptr.To("special-hash"), Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: cm.Name}}}}
+			synth.InstanceConfigs = map[string][]workloads.ConfigTemplate{"canary": {{Name: "main", ConfigHash: ptr.To("special-hash"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: cm.Name}}}}
 			var running *workloads.InstanceSet
 			var objects []client.Object
 			if update {

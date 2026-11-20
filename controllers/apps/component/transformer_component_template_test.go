@@ -324,8 +324,8 @@ var _ = Describe("file templates transformer test", func() {
 			obj := instanceConfigMaps()[0]
 			Expect(obj.Data["server.conf"]).To(Equal("8589934592/2.0/sidecar"))
 			Expect(obj.Labels[instanceConfigMapLabelKey]).To(Equal("true"))
-			Expect(transCtx.SynthesizeComponent.InstanceConfigs["large"][0].Volume).To(Equal(&workloads.ConfigMapVolumeBinding{VolumeName: "logConf", ConfigMapName: obj.Name}))
-			Expect(transCtx.SynthesizeComponent.Configs[0].Volume).To(Equal(&workloads.ConfigMapVolumeBinding{VolumeName: "logConf", ConfigMapName: fileTemplateObjectName(transCtx.SynthesizeComponent, "logConf")}))
+			Expect(transCtx.SynthesizeComponent.InstanceConfigs["large"][0].Volume).To(Equal(&workloads.ConfigVolumeBinding{VolumeName: "logConf", ConfigMapName: obj.Name}))
+			Expect(transCtx.SynthesizeComponent.Configs[0].Volume).To(Equal(&workloads.ConfigVolumeBinding{VolumeName: "logConf", ConfigMapName: fileTemplateObjectName(transCtx.SynthesizeComponent, "logConf")}))
 			Expect(transCtx.SynthesizeComponent.TemplateVars["MEMORY"]).To(Equal("2147483648"))
 		})
 

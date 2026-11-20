@@ -406,7 +406,7 @@ var _ = Describe("InstanceSet Controller 2", func() {
 			DeferCleanup(func() { intctrlutil.SupportResizeSubResource = supportResize })
 			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
 				f.SetReplicas(2)
-				f.AddConfigs(workloads.ConfigTemplate{Name: "server", ConfigHash: ptr.To("base"), Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "shared-config"}})
+				f.AddConfigs(workloads.ConfigTemplate{Name: "server", ConfigHash: ptr.To("base"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "shared-config"}})
 				spec := &f.Get().Spec
 				spec.InstanceUpdateStrategy = &kbappsv1.InstanceUpdateStrategy{Type: kbappsv1.RollingUpdateStrategyType}
 				spec.Template.Spec.Volumes = []corev1.Volume{{
@@ -423,7 +423,7 @@ var _ = Describe("InstanceSet Controller 2", func() {
 					Configs: []workloads.ConfigTemplate{{
 						Name:       "server",
 						ConfigHash: ptr.To("hot"),
-						Volume:     &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "hot-config"},
+						Volume:     &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "hot-config"},
 					}},
 				}}
 			})
@@ -433,7 +433,7 @@ var _ = Describe("InstanceSet Controller 2", func() {
 				volume := And(HaveField("Name", "config"), HaveField("ConfigMap", HaveField("Name", source)))
 				Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, inst *workloads.Instance) {
 					g.Expect(inst.Spec.Template.Spec.Volumes).Should(ContainElement(volume))
-					g.Expect(inst.Spec.Configs).Should(Equal([]workloads.ConfigTemplate{{Name: "server", ConfigHash: ptr.To(hash), Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: source}}}))
+					g.Expect(inst.Spec.Configs).Should(Equal([]workloads.ConfigTemplate{{Name: "server", ConfigHash: ptr.To(hash), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: source}}}))
 				})).Should(Succeed())
 				var uid types.UID
 				Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pod *corev1.Pod) {
@@ -1301,9 +1301,9 @@ func TestInstanceSetStopResumesLatestTemplateConfigs(t *testing.T) {
 	}}}
 	its.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: "config", MountPath: "/etc/db"}}
 	its.Spec.Configs = []workloads.ConfigTemplate{{Name: "server", ConfigHash: ptr.To("base"),
-		Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "shared-config"}}}
+		Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "shared-config"}}}
 	its.Spec.Instances = []workloads.InstanceTemplate{{Name: "hot", Replicas: ptr.To(int32(1)), Configs: []workloads.ConfigTemplate{{
-		Name: "server", ConfigHash: ptr.To("old"), Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "hot-config"},
+		Name: "server", ConfigHash: ptr.To("old"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "hot-config"},
 	}}}}
 	cli := newSetStopClient(t, its)
 	wrapped := cli.(*setStopClient)
@@ -1337,8 +1337,8 @@ func TestInstanceSetStopResumesLatestTemplateConfigs(t *testing.T) {
 		t.Fatal("Stop retained a Pod")
 	}
 	wantConfigs := []workloads.ConfigTemplate{
-		{Name: "server", ConfigHash: ptr.To("server-new"), Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "hot-config-new"}},
-		{Name: "extra", ConfigHash: ptr.To("extra-new"), Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "extra-config", ConfigMapName: "hot-extra"}},
+		{Name: "server", ConfigHash: ptr.To("server-new"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "hot-config-new"}},
+		{Name: "extra", ConfigHash: ptr.To("extra-new"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "extra-config", ConfigMapName: "hot-extra"}},
 	}
 	mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
 		its.Spec.Template.Spec.Volumes = append(its.Spec.Template.Spec.Volumes, corev1.Volume{Name: "extra-config", VolumeSource: corev1.VolumeSource{
@@ -1346,7 +1346,7 @@ func TestInstanceSetStopResumesLatestTemplateConfigs(t *testing.T) {
 		}})
 		its.Spec.Template.Spec.Containers[0].VolumeMounts = append(its.Spec.Template.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{Name: "extra-config", MountPath: "/etc/extra"})
 		its.Spec.Configs = append(its.Spec.Configs, workloads.ConfigTemplate{Name: "extra", ConfigHash: ptr.To("base-extra"),
-			Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "extra-config", ConfigMapName: "shared-extra"}})
+			Volume: &workloads.ConfigVolumeBinding{VolumeName: "extra-config", ConfigMapName: "shared-extra"}})
 		its.Spec.Instances[0].Configs = wantConfigs
 	})
 	reconcileSetStop(t, cli, 5)

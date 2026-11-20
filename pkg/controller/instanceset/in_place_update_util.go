@@ -430,14 +430,14 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod, template *i
 		return noOpsPolicy, "", "", err
 	}
 	specUpdatePolicy := getPodUpdatePolicyInSpec(its, pod, newPod)
-	configRestart, configs, err := hasConfigRestart(configsForMountedVolumes(template.Configs, pod, newPod), pod)
+	configRestart, configs, err := hasConfigRestart(instancetemplate.ConfigsForMountedVolumes(template.Configs, pod, newPod), pod)
 	if err != nil {
 		return noOpsPolicy, "", "", err
 	}
 	if configRestart {
 		return recreatePolicy, its.Spec.PodUpdatePolicy, fmt.Sprintf("config restart: %s", strings.Join(configs, ",")), nil
 	}
-	if configMapSourceChanged(pod, newPod) {
+	if len(instancetemplate.ChangedConfigMapVolumes(pod, newPod)) > 0 {
 		return recreatePolicy, specUpdatePolicy, "config volume source update", nil
 	}
 
@@ -489,44 +489,4 @@ func isPodUpdated(its *workloads.InstanceSet, pod *corev1.Pod, template *instanc
 		return false, err
 	}
 	return policy == noOpsPolicy, err
-}
-
-// A replacement ConfigMap cannot be reloaded through the old Pod's mounted volume.
-func configMapSourceChanged(old, desired *corev1.Pod) bool {
-	return len(changedConfigMapVolumes(old, desired)) > 0
-}
-
-func changedConfigMapVolumes(old, desired *corev1.Pod) map[string]bool {
-	previous := make(map[string]string)
-	for _, volume := range old.Spec.Volumes {
-		if volume.ConfigMap != nil {
-			previous[volume.Name] = volume.ConfigMap.Name
-		}
-	}
-	changed := make(map[string]bool)
-	for _, volume := range desired.Spec.Volumes {
-		if volume.ConfigMap != nil {
-			if source, exists := previous[volume.Name]; !exists || source != volume.ConfigMap.Name {
-				changed[volume.Name] = true
-			}
-		}
-	}
-	return changed
-}
-
-// configsForMountedVolumes excludes actions whose explicitly associated volume needs replacement.
-// Unbound legacy configs retain their existing reload behavior.
-func configsForMountedVolumes(configs []workloads.ConfigTemplate, old, desired *corev1.Pod) []workloads.ConfigTemplate {
-	changed := changedConfigMapVolumes(old, desired)
-	if len(changed) == 0 {
-		return configs
-	}
-	mounted := make([]workloads.ConfigTemplate, 0, len(configs))
-	for _, config := range configs {
-		if config.Volume != nil && changed[config.Volume.VolumeName] {
-			continue
-		}
-		mounted = append(mounted, config)
-	}
-	return mounted
 }

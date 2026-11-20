@@ -127,7 +127,7 @@ func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree,
 		SetPodUpgradePolicy(its.Spec.PodUpgradePolicy).
 		SetRoles(its.Spec.Roles).
 		SetLifecycleActions(its.Spec.LifecycleActions).
-		SetConfigs(its.Spec.Configs)
+		SetConfigs(copyConfigTemplates(template.Configs))
 
 	// set these immutable fields only on initial Pod creation, not updates.
 	b.SetHostname(instName).
@@ -328,28 +328,20 @@ func getHeadlessSvcName(itsName string) string {
 }
 
 func buildDesiredInstancesByName(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) (map[string]*workloads.Instance, []string, error) {
-	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
-	if err != nil {
-		return nil, nil, err
-	}
-	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
-	if err != nil {
-		return nil, nil, err
-	}
-	nameMap, err := nameBuilder.BuildInstanceName2TemplateMap()
+	nameToTemplateMap, err := instancetemplate.BuildInstanceTemplateExtMap(its, tree)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	names := make([]string, 0, len(nameMap))
-	for name := range nameMap {
+	names := make([]string, 0, len(nameToTemplateMap))
+	for name := range nameToTemplateMap {
 		names = append(names, name)
 	}
 	sort.Strings(names)
 
 	desired := make(map[string]*workloads.Instance, len(names))
 	for _, name := range names {
-		inst, err := buildInstanceByTemplate(tree, name, nameMap[name], its)
+		inst, err := buildInstanceByTemplate(tree, name, nameToTemplateMap[name], its)
 		if err != nil {
 			return nil, nil, err
 		}

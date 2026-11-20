@@ -315,25 +315,28 @@ func configsFromPod(pod *corev1.Pod) ([]workloads.ConfigTemplate, error) {
 	return configs, nil
 }
 
-func configsToUpdate(inst *workloads.Instance, pod *corev1.Pod) ([]workloads.ConfigTemplate, error) {
+func configsToUpdate(desired []workloads.ConfigTemplate, pod *corev1.Pod) ([]workloads.ConfigTemplate, error) {
+	if len(desired) == 0 {
+		return nil, nil
+	}
 	configs, err := configsFromPod(pod)
 	if err != nil {
 		return nil, err
 	}
 	toUpdate := make([]workloads.ConfigTemplate, 0)
-	for i, config := range inst.Spec.Configs {
+	for i, config := range desired {
 		idx := slices.IndexFunc(configs, func(cfg workloads.ConfigTemplate) bool {
 			return cfg.Name == config.Name
 		})
 		if idx < 0 || ptr.Deref(config.ConfigHash, "") != ptr.Deref(configs[idx].ConfigHash, "") {
-			toUpdate = append(toUpdate, inst.Spec.Configs[i])
+			toUpdate = append(toUpdate, desired[i])
 		}
 	}
 	return toUpdate, nil
 }
 
-func hasConfigRestart(inst *workloads.Instance, pod *corev1.Pod) (bool, []string, error) {
-	toUpdate, err := configsToUpdate(inst, pod)
+func hasConfigRestart(configs []workloads.ConfigTemplate, pod *corev1.Pod) (bool, []string, error) {
+	toUpdate, err := configsToUpdate(configs, pod)
 	if err != nil {
 		return false, nil, err
 	}

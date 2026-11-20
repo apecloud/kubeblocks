@@ -513,3 +513,20 @@ func changedConfigMapVolumes(old, desired *corev1.Pod) map[string]bool {
 	}
 	return changed
 }
+
+// configsForMountedVolumes excludes actions whose explicitly associated volume needs replacement.
+// Unbound legacy configs retain their existing reload behavior.
+func configsForMountedVolumes(configs []workloads.ConfigTemplate, old, desired *corev1.Pod) []workloads.ConfigTemplate {
+	changed := changedConfigMapVolumes(old, desired)
+	if len(changed) == 0 {
+		return configs
+	}
+	mounted := make([]workloads.ConfigTemplate, 0, len(configs))
+	for _, config := range configs {
+		if config.Volume != nil && changed[config.Volume.VolumeName] {
+			continue
+		}
+		mounted = append(mounted, config)
+	}
+	return mounted
+}

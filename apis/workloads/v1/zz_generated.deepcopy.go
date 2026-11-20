@@ -533,6 +533,11 @@ func (in *InstanceStatus) DeepCopyInto(out *InstanceStatus) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.MemberLeft != nil {
+		in, out := &in.MemberLeft, &out.MemberLeft
+		*out = new(bool)
+		**out = **in
+	}
 	if in.Configs != nil {
 		in, out := &in.Configs, &out.Configs
 		*out = make([]InstanceConfigStatus, len(*in))

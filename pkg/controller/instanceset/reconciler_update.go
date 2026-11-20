@@ -90,15 +90,20 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		oldNameSet.Insert(object.GetName())
 		pod, _ := object.(*corev1.Pod)
 		oldInstanceMap[object.GetName()] = pod
+		if !newNameSet.Has(pod.Name) {
+			continue
+		}
 		oldPodList = append(oldPodList, pod)
-		if newNameSet.Has(pod.Name) && isTerminating(pod) {
+		if isTerminating(pod) {
 			result = kubebuilderx.RetryAfter(time.Second)
 		}
 	}
-	updateNameSet := oldNameSet.Intersection(newNameSet)
-	if len(updateNameSet) != len(oldNameSet) || len(updateNameSet) != len(newNameSet) {
+	aligned := oldNameSet.Equal(newNameSet)
+	if !aligned {
 		tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s instances are not aligned", its.Namespace, its.Name))
-		return result, nil
+		if !memberActionsEnabled(its) {
+			return result, nil
+		}
 	}
 
 	// 3. do update
@@ -139,6 +144,17 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			err = tree.Delete(pod)
 			// wait another reconciliation, so that the following update process won't be confused
 			return result, err
+		}
+	}
+
+	// Repair Pending desired Pods while alignment waits, but defer normal rollouts until exits finish.
+	if !aligned {
+		return result, nil
+	}
+	for i := range its.Status.InstanceStatus {
+		status := &its.Status.InstanceStatus[i]
+		if status.EffectiveDesiredState() != workloads.InstanceDesiredStateActive && needsMemberRetirement(its, status) {
+			return result, nil
 		}
 	}
 

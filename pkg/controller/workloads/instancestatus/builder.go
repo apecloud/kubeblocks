@@ -79,8 +79,8 @@ func ConfigsApplied(desired []workloads.ConfigTemplate, observed []workloads.Ins
 	return true
 }
 
-// Build merges InstanceStatus by PodName. It carries only retained template identity from Previous;
-// all observed revision, health, and runtime fields are rebuilt from Observations.
+// Build merges InstanceStatus by PodName, carrying retained identity and recorded progress from Previous.
+// Observed revision, health, and runtime fields are rebuilt from Observations.
 func Build(input Input) ([]workloads.InstanceStatus, error) {
 	previousByName, err := indexPrevious(input.Previous)
 	if err != nil {
@@ -135,13 +135,27 @@ func Build(input Input) ([]workloads.InstanceStatus, error) {
 		names[name] = struct{}{}
 	}
 
-	// Previous is intentionally excluded from the output identity set. It may retain template identity for a
-	// desired or observed instance, but must not keep a fully released and disappeared instance alive forever.
+	for name, old := range previousByName {
+		pendingLeave := old.MemberLeft != nil && !*old.MemberLeft
+		if ptr.Deref(old.MemberJoined, false) || pendingLeave {
+			names[name] = struct{}{}
+		}
+	}
 	statuses := make([]workloads.InstanceStatus, 0, len(names))
 	for name := range names {
 		status := workloads.InstanceStatus{PodName: name, CurrentState: workloads.InstanceCurrentStateAbsent}
+		if old := previousByName[name]; old != nil {
+			status.Provisioned = old.Provisioned
+			if old.MemberJoined != nil {
+				status.MemberJoined = ptr.To(*old.MemberJoined)
+			}
+			if old.MemberLeft != nil {
+				status.MemberLeft = ptr.To(*old.MemberLeft)
+			}
+		}
 		observation := observationsByName[name]
 		if observation != nil {
+			status.Provisioned = true
 			status.CurrentState = observation.State
 			status.CurrentRevision = observation.Revision
 		}

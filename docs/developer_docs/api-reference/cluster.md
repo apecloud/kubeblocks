@@ -20669,7 +20669,8 @@ InstanceDesiredState
 <td>
 <em>(Optional)</em>
 <p>DesiredState describes whether the instance should be running (Active), is retained without running (Offline),
-or is no longer allocated and is kept only while its runtime is still observed (Released).
+or is no longer allocated (Released).
+Released entries may remain while the runtime or associated resources are observed or membership cleanup is unfinished.
 An empty value from an older object is treated as Active.</p>
 </td>
 </tr>
@@ -20728,6 +20729,20 @@ bool
 <p>MemberJoined records the tracked membership result. nil means no result is tracked and does not prove absence,
 false records not joined, and true records joined. A successful leave can record false.
 Runtime health and role do not determine this value.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberLeft</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>MemberLeft records membership exit progress. nil means no exit is tracked,
+false means an exit has started but completion is unconfirmed, and true means the exit completed.
+A successful join clears this field. Runtime health and presence do not determine this value.</p>
 </td>
 </tr>
 <tr>

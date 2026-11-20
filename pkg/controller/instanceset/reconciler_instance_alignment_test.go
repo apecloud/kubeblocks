@@ -20,20 +20,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"context"
 	"fmt"
 	"slices"
+	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	apps "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
+	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
 var _ = Describe("replicas alignment reconciler test", func() {
@@ -52,7 +62,7 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			its.Generation = 1
 			tree := kubebuilderx.NewObjectTree()
 			tree.SetRoot(its)
-			reconciler = NewReplicasAlignmentReconciler()
+			reconciler = NewReplicasAlignmentReconciler(nil)
 			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ConditionSatisfied))
 
 			By("prepare current tree")
@@ -183,3 +193,141 @@ var _ = Describe("replicas alignment reconciler test", func() {
 		})
 	})
 })
+
+func memberWorkload() *workloads.InstanceSet {
+	return &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", Generation: 1}, Spec: workloads.InstanceSetSpec{LifecycleActions: &workloads.LifecycleActions{MemberJoin: testAction("join"), MemberLeave: testAction("leave")}}}
+}
+func memberPod() *corev1.Pod {
+	return &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Namespace: "default"}, Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "db"}, {Name: kbagent.ContainerName}}}}
+}
+func testAction(command string) *apps.Action {
+	return &apps.Action{Exec: &apps.ExecAction{Command: []string{"/bin/sh", "-c", command}}}
+}
+
+type memberAgent struct{ calls int }
+
+func (a *memberAgent) Close() error { return nil }
+
+func (a *memberAgent) Action(_ context.Context, _ proto.ActionRequest) (proto.ActionResponse, error) {
+	a.calls++
+	return proto.ActionResponse{}, nil
+}
+
+func TestValidatedExecutionPreservesActionSelection(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		action   *apps.Action
+		podCount int
+		calls    int
+	}{
+		{name: "default", action: testAction("join"), podCount: 2, calls: 1},
+		{name: "any", action: &apps.Action{TargetPodSelector: apps.AnyReplica, Exec: testAction("join").Exec}, podCount: 2, calls: 1},
+		{name: "legacy any", action: &apps.Action{Exec: &apps.ExecAction{Command: []string{"join"}, TargetPodSelector: apps.AnyReplica}}, podCount: 2, calls: 1},
+		{name: "all", action: &apps.Action{TargetPodSelector: apps.AllReplicas, Exec: testAction("join").Exec}, podCount: 2, calls: 2},
+		{name: "single all", action: &apps.Action{TargetPodSelector: apps.AllReplicas, Exec: testAction("join").Exec}, podCount: 1, calls: 1},
+		{name: "role", action: &apps.Action{TargetPodSelector: apps.RoleSelector, MatchingKey: "replica", Exec: testAction("join").Exec}, podCount: 2, calls: 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			its := memberWorkload()
+			its.Spec.LifecycleActions.MemberJoin = tc.action
+			pods := []*corev1.Pod{memberPod(), memberPod()}
+			pods[1].Name = "demo-2"
+			pods = pods[:tc.podCount]
+			for _, pod := range pods {
+				pod.Labels = map[string]string{constant.RoleLabelKey: "replica"}
+				pod.Status.PodIP = "10.0.0.1"
+				pod.Spec.InitContainers = nil
+				pod.Spec.Containers[1] = corev1.Container{Name: kbagent.ContainerName, Ports: []corev1.ContainerPort{{Name: kbagent.DefaultHTTPPortName, ContainerPort: 3501}}}
+			}
+			opts, err := validateMemberExecution(tc.action, pods[0], pods)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if (tc.name == "any" || tc.name == "legacy any") && (opts == nil || opts.TargetPodName == "") {
+				t.Fatal("random executor was not retained for execution")
+			}
+			if tc.name == "single all" && opts != nil {
+				t.Fatal("AllReplicas lost its aggregate-error semantics")
+			}
+			lfa, err := lifecycle.New(its.Namespace, "", "", &apps.ComponentLifecycleActions{MemberJoin: tc.action}, its.Spec.LifecycleActions.TemplateVars, pods[0], pods)
+			if err != nil {
+				t.Fatal(err)
+			}
+			agent := &memberAgent{}
+			kbacli.SetMockClient(agent, nil)
+			defer kbacli.UnsetMockClient()
+			if err := lfa.MemberJoin(context.Background(), nil, opts); err != nil {
+				t.Fatal(err)
+			}
+			if agent.calls != tc.calls {
+				t.Fatalf("action executed %d times, want %d", agent.calls, tc.calls)
+			}
+		})
+	}
+}
+
+func TestValidatedExecutionWaitsWithoutExecutors(t *testing.T) {
+	pod := memberPod()
+	if _, err := validateMemberExecution(testAction("join"), pod, []*corev1.Pod{pod}); err == nil {
+		t.Fatal("missing agent endpoint would record success")
+	}
+	for _, legacy := range []bool{false, true} {
+		t.Run(fmt.Sprintf("legacy=%t", legacy), func(t *testing.T) {
+			defer func() {
+				if got := recover(); got != nil {
+					t.Fatalf("missing executor must return an error instead of panic: %v", got)
+				}
+			}()
+			action := testAction("leave")
+			if legacy {
+				action.Exec.TargetPodSelector = apps.AnyReplica
+			} else {
+				action.TargetPodSelector = apps.AnyReplica
+			}
+			if _, err := validateMemberExecution(action, memberPod(), nil); err == nil {
+				t.Fatal("missing executor was accepted")
+			}
+		})
+	}
+}
+
+func TestValidationRejectsUnownedPreconditionsAndNonblockingActions(t *testing.T) {
+	for _, condition := range []*apps.PreConditionType{nil, ptr.To(apps.ImmediatelyPreConditionType), ptr.To(apps.RuntimeReadyPreConditionType)} {
+		its := memberWorkload()
+		its.Spec.LifecycleActions.Switchover = testAction("switch")
+		for _, action := range []*apps.Action{its.Spec.LifecycleActions.MemberJoin, its.Spec.LifecycleActions.MemberLeave, its.Spec.LifecycleActions.Switchover} {
+			action.PreCondition = condition
+		}
+		if err := validateMemberActions(its); err != nil {
+			t.Fatalf("blocking workload-owned actions were rejected: %v", err)
+		}
+	}
+	for _, condition := range []apps.PreConditionType{apps.ComponentReadyPreConditionType, apps.ClusterReadyPreConditionType} {
+		its := memberWorkload()
+		its.Spec.LifecycleActions.MemberJoin.PreCondition = ptr.To(condition)
+		if err := validateMemberActions(its); err == nil {
+			t.Fatalf("accepted unowned precondition %s", condition)
+		}
+	}
+	for _, name := range []string{"join", "leave", "switch"} {
+		its := memberWorkload()
+		switch name {
+		case "join":
+			its.Spec.LifecycleActions.MemberJoin.NonBlocking = true
+		case "leave":
+			its.Spec.LifecycleActions.MemberLeave.NonBlocking = true
+		case "switch":
+			its.Spec.LifecycleActions.Switchover = testAction("true")
+			its.Spec.LifecycleActions.Switchover.NonBlocking = true
+		}
+		if err := validateMemberActions(its); err == nil {
+			t.Fatalf("accepted nonblocking %s without a completion contract", name)
+		}
+	}
+	its := memberWorkload()
+	its.Spec.LifecycleActions.Switchover = testAction("switch")
+	its.Spec.LifecycleActions.Switchover.PreCondition = ptr.To(apps.ComponentReadyPreConditionType)
+	if err := validateMemberActions(its); err == nil {
+		t.Fatal("new switchover accepts a Component dependency")
+	}
+}

@@ -645,7 +645,8 @@ type InstanceStatus struct {
 	TemplateName *string `json:"templateName,omitempty"`
 
 	// DesiredState describes whether the instance should be running (Active), is retained without running (Offline),
-	// or is no longer allocated and is kept only while its runtime is still observed (Released).
+	// or is no longer allocated (Released).
+	// Released entries may remain while the runtime or associated resources are observed or membership cleanup is unfinished.
 	// An empty value from an older object is treated as Active.
 	//
 	// +optional
@@ -679,6 +680,13 @@ type InstanceStatus struct {
 	//
 	// +optional
 	MemberJoined *bool `json:"memberJoined,omitempty"`
+
+	// MemberLeft records membership exit progress. nil means no exit is tracked,
+	// false means an exit has started but completion is unconfirmed, and true means the exit completed.
+	// A successful join clears this field. Runtime health and presence do not determine this value.
+	//
+	// +optional
+	MemberLeft *bool `json:"memberLeft,omitempty"`
 
 	// CurrentRevision identifies the revision currently applied to this instance.
 	// It is empty when CurrentState is Absent.

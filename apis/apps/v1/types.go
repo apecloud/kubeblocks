@@ -894,11 +894,7 @@ type InstanceTemplate struct {
 	// Configs overrides managed file configurations for all instances of this template.
 	// Each entry must name a distinct configuration declared in the ComponentDefinition
 	// and managed by the Component. Each override accepts only name, variables, and configMap.name.
-	// Variables replace inherited values by key. Set configMap.name to select a template
-	// source ConfigMap in the Component namespace.
-	// Omitted variable keys and the omitted template source are inherited from the Component.
-	// Restart and reconfigure settings are always inherited.
-	// Configurations without an override are inherited, including when the list is empty.
+	// Unspecified settings and configurations are inherited from the Component.
 	//
 	// +optional
 	// +listType=atomic

@@ -241,7 +241,8 @@ type InstanceSetSpec struct {
 	Stop *bool `json:"stop,omitempty"`
 
 	// Configs defines the default configurations and update settings for the InstanceSet.
-	// Each volume association must match a ConfigMap volume and its source in the Pod template.
+	// If a config sets volume, volume.volumeName must match the name of a ConfigMap volume
+	// in spec.template.spec.volumes. volume.configMapName must match that volume's configMap.name.
 	//
 	// +optional
 	Configs []ConfigTemplate `json:"configs,omitempty"`

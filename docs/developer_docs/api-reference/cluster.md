@@ -9327,11 +9327,7 @@ Add new or override existing envs.</p>
 <p>Configs overrides managed file configurations for all instances of this template.
 Each entry must name a distinct configuration declared in the ComponentDefinition
 and managed by the Component. Each override accepts only name, variables, and configMap.name.
-Variables replace inherited values by key. Set configMap.name to select a template
-source ConfigMap in the Component namespace.
-Omitted variable keys and the omitted template source are inherited from the Component.
-Restart and reconfigure settings are always inherited.
-Configurations without an override are inherited, including when the list is empty.</p>
+Unspecified settings and configurations are inherited from the Component.</p>
 </td>
 </tr>
 </tbody>
@@ -19263,7 +19259,8 @@ If set, all the computing resources will be released.</p>
 <td>
 <em>(Optional)</em>
 <p>Configs defines the default configurations and update settings for the InstanceSet.
-Each volume association must match a ConfigMap volume and its source in the Pod template.</p>
+If a config sets volume, volume.volumeName must match the name of a ConfigMap volume
+in spec.template.spec.volumes. volume.configMapName must match that volume&rsquo;s configMap.name.</p>
 </td>
 </tr>
 <tr>
@@ -20066,7 +20063,8 @@ If set, all the computing resources will be released.</p>
 <td>
 <em>(Optional)</em>
 <p>Configs defines the default configurations and update settings for the InstanceSet.
-Each volume association must match a ConfigMap volume and its source in the Pod template.</p>
+If a config sets volume, volume.volumeName must match the name of a ConfigMap volume
+in spec.template.spec.volumes. volume.configMapName must match that volume&rsquo;s configMap.name.</p>
 </td>
 </tr>
 <tr>

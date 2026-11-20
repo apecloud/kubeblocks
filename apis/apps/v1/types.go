@@ -890,6 +890,15 @@ type InstanceTemplate struct {
 	//
 	// +optional
 	VolumeClaimTemplates []PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
+
+	// Configs overrides managed file configurations for all instances of this template.
+	// Each entry must name a distinct configuration declared in the ComponentDefinition
+	// and managed by the Component. Each override accepts only name, variables, and configMap.name.
+	// Unspecified settings and configurations are inherited from the Component.
+	//
+	// +optional
+	// +listType=atomic
+	Configs []ClusterComponentConfig `json:"configs,omitempty"`
 }
 
 // Range represents a range with a start and an end value. Both start and end are included.

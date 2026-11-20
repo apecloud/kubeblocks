@@ -25,9 +25,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
-// ResolveConfigs resolves config overrides and their volume bindings together.
-// Callers opt in to binding expansion after building the instance Pod template.
-func ResolveConfigs(template *InstanceTemplateExt, configs, overrides []workloads.ConfigTemplate) error {
+func resolveConfigs(template *InstanceTemplateExt, configs, overrides []workloads.ConfigTemplate) error {
 	indices := make(map[string]int, len(configs))
 	counts := make(map[string]int, len(configs))
 	effective := make([]workloads.ConfigTemplate, len(configs))

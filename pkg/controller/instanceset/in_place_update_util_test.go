@@ -38,6 +38,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -410,7 +411,7 @@ var _ = Describe("instance util test", func() {
 
 func TestDirectConfigOverrideRetainedAndInjectedPods(t *testing.T) {
 	its, tree, pods, member := newDirectConfigFixture(t, "named")
-	desired, err := desiredInstanceTemplates(its, tree)
+	desired, err := instancetemplate.BuildInstanceName2TemplateMap(its, tree)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -454,7 +455,7 @@ func TestDirectConfigRestartPolicyWithSourceChange(t *testing.T) {
 				tpl.Configs[tc.restartConfig].Restart = ptr.To(true)
 				tpl.Images = map[string]string{"db": "mysql:new"}
 			})
-			desired, err := desiredInstanceTemplates(its, tree)
+			desired, err := instancetemplate.BuildInstanceName2TemplateMap(its, tree)
 			if err != nil {
 				t.Fatal(err)
 			}

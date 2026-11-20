@@ -73,7 +73,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 		return kubebuilderx.Continue, err
 	}
-	desiredTemplates, err := desiredInstanceTemplates(its, tree)
+	desiredTemplates, err := instancetemplate.BuildInstanceName2TemplateMap(its, tree)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
@@ -457,7 +457,7 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	if err != nil {
 		return err
 	}
-	desiredTemplates, err := desiredInstanceTemplates(its, tree)
+	desiredTemplates, err := instancetemplate.BuildInstanceName2TemplateMap(its, tree)
 	if err != nil {
 		return err
 	}

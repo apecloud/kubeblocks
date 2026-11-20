@@ -57,7 +57,7 @@ func (r *revisionUpdateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *
 
 func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
-	nameMap, err := desiredInstanceTemplates(its, tree)
+	nameMap, err := instancetemplate.BuildInstanceName2TemplateMap(its, tree)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}

@@ -28,6 +28,35 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+func TestBuildInstanceSetExtResolvesConfigs(t *testing.T) {
+	its := &workloads.InstanceSet{Spec: workloads.InstanceSetSpec{
+		Replicas: ptr.To(int32(2)),
+		Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{Volumes: []corev1.Volume{{
+			Name: "config", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{Name: "shared"},
+			}},
+		}}}},
+		Configs: []workloads.ConfigTemplate{{Name: "main", Volume: &workloads.ConfigVolumeBinding{VolumeName: "config"}}},
+		Instances: []workloads.InstanceTemplate{{Name: "canary", Configs: []workloads.ConfigTemplate{{
+			Name: "main", Volume: &workloads.ConfigVolumeBinding{ConfigMapName: "canary"},
+		}}}},
+	}}
+	ext, err := BuildInstanceSetExt(its, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range map[string]string{DefaultTemplateName: "shared", "canary": "canary"} {
+		template := ext.InstanceTemplates[name]
+		if template == nil || len(template.Configs) != 1 || template.Configs[0].Volume == nil {
+			t.Fatalf("template %q has no resolved config binding", name)
+		}
+		binding := template.Configs[0].Volume
+		if binding.VolumeName != "config" || binding.ConfigMapName != want || template.Spec.Volumes[0].ConfigMap.Name != want {
+			t.Fatalf("template %q does not mount %q: %#v, %#v", name, want, binding, template.Spec.Volumes)
+		}
+	}
+}
+
 func TestResolveConfigs(t *testing.T) {
 	base := []workloads.ConfigTemplate{
 		{Name: "main", ConfigHash: ptr.To("global"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "global"}, Restart: ptr.To(true), Parameters: map[string]string{"global": "value"}},
@@ -42,7 +71,7 @@ func TestResolveConfigs(t *testing.T) {
 	t.Run("whole entry replacement and inherited volume options", func(t *testing.T) {
 		got := source
 		override := workloads.ConfigTemplate{Name: "main", ConfigHash: ptr.To("specific"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "specific"}}
-		if err := ResolveConfigs(&got, base, []workloads.ConfigTemplate{override}); err != nil {
+		if err := resolveConfigs(&got, base, []workloads.ConfigTemplate{override}); err != nil {
 			t.Fatal(err)
 		}
 		if !reflect.DeepEqual(got.Configs, []workloads.ConfigTemplate{override, base[1]}) {
@@ -60,7 +89,7 @@ func TestResolveConfigs(t *testing.T) {
 	t.Run("omitted binding inherits only base association", func(t *testing.T) {
 		got := source
 		override := workloads.ConfigTemplate{Name: "main", ConfigHash: ptr.To("specific")}
-		if err := ResolveConfigs(&got, base, []workloads.ConfigTemplate{override}); err != nil {
+		if err := resolveConfigs(&got, base, []workloads.ConfigTemplate{override}); err != nil {
 			t.Fatal(err)
 		}
 		expected := override.DeepCopy()
@@ -78,7 +107,7 @@ func TestResolveConfigs(t *testing.T) {
 		instanceConfig := workloads.ConfigTemplate{Name: "main", Volume: &workloads.ConfigVolumeBinding{ConfigMapName: "specific"}}
 
 		got := source
-		if err := ResolveConfigs(&got, []workloads.ConfigTemplate{defaultConfig}, []workloads.ConfigTemplate{instanceConfig}); err != nil {
+		if err := resolveConfigs(&got, []workloads.ConfigTemplate{defaultConfig}, []workloads.ConfigTemplate{instanceConfig}); err != nil {
 			t.Fatal(err)
 		}
 		if got.Spec.Volumes[0].ConfigMap.Name != "specific" ||
@@ -90,7 +119,7 @@ func TestResolveConfigs(t *testing.T) {
 		}
 
 		got = source
-		if err := ResolveConfigs(&got, []workloads.ConfigTemplate{defaultConfig}, nil); err != nil {
+		if err := resolveConfigs(&got, []workloads.ConfigTemplate{defaultConfig}, nil); err != nil {
 			t.Fatal(err)
 		}
 		if got.Spec.Volumes[0].ConfigMap.Name != "global" || got.Configs[0].Volume.ConfigMapName != "global" {
@@ -99,7 +128,7 @@ func TestResolveConfigs(t *testing.T) {
 	})
 	for _, overrides := range [][]workloads.ConfigTemplate{nil, {}} {
 		got := source
-		if err := ResolveConfigs(&got, base, overrides); err != nil {
+		if err := resolveConfigs(&got, base, overrides); err != nil {
 			t.Fatal(err)
 		}
 		if !reflect.DeepEqual(got.Configs, base) || !reflect.DeepEqual(got.PodTemplateSpec, source.PodTemplateSpec) {
@@ -119,7 +148,7 @@ func TestResolveConfigs(t *testing.T) {
 	for name, overrides := range cases {
 		t.Run(name, func(t *testing.T) {
 			got := source
-			if err := ResolveConfigs(&got, base, overrides); err == nil {
+			if err := resolveConfigs(&got, base, overrides); err == nil {
 				t.Fatal("expected invalid override to fail")
 			}
 			if !reflect.DeepEqual(got, source) {
@@ -131,7 +160,7 @@ func TestResolveConfigs(t *testing.T) {
 		got := source
 		shared := []workloads.ConfigTemplate{*base[0].DeepCopy(), {Name: "other", Volume: &workloads.ConfigVolumeBinding{VolumeName: "config"}}}
 		override := workloads.ConfigTemplate{Name: "main", Volume: &workloads.ConfigVolumeBinding{ConfigMapName: "specific"}}
-		if err := ResolveConfigs(&got, shared, []workloads.ConfigTemplate{override}); err == nil {
+		if err := resolveConfigs(&got, shared, []workloads.ConfigTemplate{override}); err == nil {
 			t.Fatal("conflicting destinations for a shared volume were accepted")
 		}
 		if !reflect.DeepEqual(got, source) {
@@ -149,7 +178,7 @@ func TestResolveConfigs(t *testing.T) {
 			got := source
 			config := *base[0].DeepCopy()
 			config.Volume = binding
-			if err := ResolveConfigs(&got, []workloads.ConfigTemplate{config}, nil); err == nil {
+			if err := resolveConfigs(&got, []workloads.ConfigTemplate{config}, nil); err == nil {
 				t.Fatal("invalid base binding was accepted")
 			}
 			if !reflect.DeepEqual(got, source) {
@@ -162,17 +191,17 @@ func TestResolveConfigs(t *testing.T) {
 		got.PodTemplateSpec = *source.PodTemplateSpec.DeepCopy()
 		got.Spec.Volumes[0].ConfigMap.Name = ""
 		config := workloads.ConfigTemplate{Name: "main", Volume: &workloads.ConfigVolumeBinding{VolumeName: "config"}}
-		if err := ResolveConfigs(&got, []workloads.ConfigTemplate{config}, nil); err == nil {
+		if err := resolveConfigs(&got, []workloads.ConfigTemplate{config}, nil); err == nil {
 			t.Fatal("accepted a volume without a default ConfigMap")
 		}
 	})
 	t.Run("legacy global names remain accepted without overrides", func(t *testing.T) {
 		got := source
 		legacy := []workloads.ConfigTemplate{{Name: ""}, {Name: "main"}, {Name: "main"}}
-		if err := ResolveConfigs(&got, legacy, nil); err != nil {
+		if err := resolveConfigs(&got, legacy, nil); err != nil {
 			t.Fatal(err)
 		}
-		if err := ResolveConfigs(&got, legacy, []workloads.ConfigTemplate{{Name: "main"}}); err == nil {
+		if err := resolveConfigs(&got, legacy, []workloads.ConfigTemplate{{Name: "main"}}); err == nil {
 			t.Fatal("ambiguous override target was accepted")
 		}
 	})

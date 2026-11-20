@@ -38,9 +38,6 @@ func (r *validationReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebui
 	if err := instancetemplate.ValidateInstanceTemplates(tree.GetRoot().(*workloads.InstanceSet), tree); err != nil {
 		return kubebuilderx.Commit, err
 	}
-	if _, err := desiredInstanceTemplates(tree.GetRoot().(*workloads.InstanceSet), tree); err != nil {
-		return kubebuilderx.Commit, err
-	}
 	return kubebuilderx.Continue, nil
 }
 

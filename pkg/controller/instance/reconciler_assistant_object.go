@@ -75,6 +75,9 @@ func (r *assistantObjectReconciler) createOrUpdate(tree *kubebuilderx.ObjectTree
 	if !ok {
 		return nil
 	}
+	if cm, ok := obj.(*corev1.ConfigMap); ok && cm.Labels[constant.KBAppConfigMapOwnerLabelKey] != "" {
+		return nil
+	}
 	if isOrdinalAssistantObject(obj) {
 		obj = r.checkObjectProvisionPolicy(inst, obj)
 		if obj == nil {
@@ -126,6 +129,9 @@ func (r *assistantObjectReconciler) createOrUpdateShared(tree *kubebuilderx.Obje
 	if robj == nil {
 		markSharedAssistantObject(inst, obj)
 		return tree.Add(obj)
+	}
+	if cm, ok := robj.(*corev1.ConfigMap); ok && cm.Labels[constant.KBAppConfigMapOwnerLabelKey] != "" {
+		return nil
 	}
 
 	desired := obj.DeepCopyObject().(client.Object)
@@ -198,6 +204,9 @@ func markSharedAssistantObject(inst *workloads.Instance, obj client.Object) {
 }
 
 func isSharedAssistantObject(obj client.Object, inst *workloads.Instance) bool {
+	if cm, ok := obj.(*corev1.ConfigMap); ok {
+		return IsSharedAssistantConfigMap(cm, inst.Labels[constant.AppInstanceLabelKey], inst.Labels[constant.KBAppComponentLabelKey])
+	}
 	labels := obj.GetLabels()
 	annotations := obj.GetAnnotations()
 	return labels[constant.AppManagedByLabelKey] == constant.AppName &&
@@ -206,6 +215,16 @@ func isSharedAssistantObject(obj client.Object, inst *workloads.Instance) bool {
 		labels[constant.KBAppComponentLabelKey] != "" &&
 		labels[constant.KBAppComponentLabelKey] == inst.Labels[constant.KBAppComponentLabelKey] &&
 		annotations[assistantObjectAnnotationKey] == "true"
+}
+
+// IsSharedAssistantConfigMap identifies an ownerless ConfigMap still managed by Instances.
+func IsSharedAssistantConfigMap(cm *corev1.ConfigMap, clusterName, componentName string) bool {
+	return cm != nil && len(cm.OwnerReferences) == 0 && cm.Labels[constant.KBAppConfigMapOwnerLabelKey] == "" &&
+		clusterName != "" && componentName != "" &&
+		cm.Labels[constant.AppManagedByLabelKey] == constant.AppName &&
+		cm.Labels[constant.AppInstanceLabelKey] == clusterName &&
+		cm.Labels[constant.KBAppComponentLabelKey] == componentName &&
+		cm.Annotations[assistantObjectAnnotationKey] == "true"
 }
 
 func (r *assistantObjectReconciler) copyAndMerge(obj workloads.InstanceAssistantObject, oldObj, newObj client.Object) client.Object {

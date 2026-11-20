@@ -486,9 +486,10 @@ func main() {
 		}
 
 		if err = (&component.ComponentReconciler{
-			Client:   client,
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("component-controller"),
+			Client:          client,
+			Scheme:          mgr.GetScheme(),
+			Recorder:        mgr.GetEventRecorderFor("component-controller"),
+			MultiClusterMgr: multiClusterMgr,
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "Component")
 			os.Exit(1)

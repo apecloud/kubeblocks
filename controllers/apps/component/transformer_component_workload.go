@@ -45,6 +45,7 @@ import (
 // componentWorkloadTransformer handles component workload generation
 type componentWorkloadTransformer struct {
 	client.Client
+	configProviders []string
 }
 
 var _ graph.Transformer = &componentWorkloadTransformer{}
@@ -76,8 +77,11 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 			if err := setCompOwnershipNFinalizer(comp, protoITS); err != nil {
 				return err
 			}
+			if err = t.prepareInstanceConfigMaps(transCtx, graphCli, dag, protoITS); err != nil {
+				return err
+			}
 			graphCli.Create(dag, protoITS)
-			return nil
+			dependOnInstanceConfigMaps(graphCli, dag, protoITS)
 		}
 	} else {
 		if protoITS == nil {
@@ -86,7 +90,10 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 			err = t.handleUpdate(transCtx, graphCli, dag, synthesizeComp, comp, runningITS, protoITS)
 		}
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	return collectInstanceConfigMaps(transCtx, t.Client, protoITS, t.configProviders)
 }
 
 func (t *componentWorkloadTransformer) reconcileWorkload(ctx context.Context, cli client.Reader,
@@ -167,16 +174,21 @@ func (t *componentWorkloadTransformer) handleUpdate(transCtx *componentTransform
 	if err != nil {
 		return err
 	}
-	if objCopy != nil {
-		cli.Update(dag, nil, objCopy, &model.ReplaceIfExistingOption{})
-		// make sure the workload is updated after the env CM
-		cli.DependOn(dag, &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: synthesizedComp.Namespace,
-				Name:      constant.GenerateClusterComponentEnvPattern(synthesizedComp.ClusterName, synthesizedComp.Name),
-			},
-		})
+	if objCopy == nil {
+		return t.prepareInstanceConfigMaps(transCtx, cli, dag, runningITS)
 	}
+	if err = t.prepareInstanceConfigMaps(transCtx, cli, dag, objCopy); err != nil {
+		return err
+	}
+	cli.Update(dag, nil, objCopy, &model.ReplaceIfExistingOption{})
+	dependOnInstanceConfigMaps(cli, dag, objCopy)
+	// make sure the workload is updated after the env CM
+	cli.DependOn(dag, &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: synthesizedComp.Namespace,
+			Name:      constant.GenerateClusterComponentEnvPattern(synthesizedComp.ClusterName, synthesizedComp.Name),
+		},
+	})
 	return nil
 }
 
@@ -189,10 +201,13 @@ func (t *componentWorkloadTransformer) handleWorkloadStartNStop(transCtx *compon
 	if start || stop {
 		runningITSCopy := runningITS.DeepCopy()
 		// While stopped, normal updates stay deferred, so acknowledge the generation here.
-		// Start only clears Stop here; defer its generation until the normal update publishes
-		// the requested workload, so old readiness cannot complete pending operations.
+		// Changed configuration starts with its desired runtime. Defer the generation
+		// until the normal update has also applied membership and scaling changes.
 		if stop {
 			runningITSCopy.Annotations[constant.KubeBlocksGenerationKey] = (*protoITS).Annotations[constant.KubeBlocksGenerationKey]
+		}
+		if start {
+			publishStartingInstanceConfigs(runningITSCopy, *protoITS, legacyConfigManagerRequired(transCtx.Component))
 		}
 		*protoITS = runningITSCopy
 	}
@@ -340,6 +355,11 @@ func preserveLegacyConfigManagerPodSpec(oldITS, desiredITS, mergedITS *workloads
 	}
 
 	volumeNames := collectVolumeNamesFromContainers(oldCfg, oldInit)
+	for _, config := range desiredITS.Spec.Configs {
+		if config.Volume != nil {
+			delete(volumeNames, config.Volume.VolumeName)
+		}
+	}
 	newSpec.Volumes = preserveLegacyVolumeOrder(oldSpec.Volumes, newSpec.Volumes, volumeNames)
 	if _, ok := volumeNames[legacyConfigManagerToolsVolumeName]; ok {
 		mergeVolumeMountsByVolumeName(oldSpec.Containers, &newSpec.Containers, legacyConfigManagerToolsVolumeName)

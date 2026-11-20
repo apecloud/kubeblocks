@@ -18,6 +18,7 @@ package component
 import (
 	"context"
 	"errors"
+	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -36,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
@@ -43,6 +45,61 @@ import (
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
+
+func TestStartingManagedConfigurationWithLegacyConfigManager(t *testing.T) {
+	for _, enableInstanceAPI := range []bool{false, true} {
+		t.Run(map[bool]string{false: "direct Pod", true: "Instance"}[enableInstanceAPI], func(t *testing.T) {
+			comp, synth, scheme := instanceConfigFixture(t)
+			synth.EnableInstanceAPI = ptr.To(enableInstanceAPI)
+			mount := corev1.VolumeMount{Name: "config", MountPath: "/opt/db"}
+			synth.PodSpec.Containers[0].VolumeMounts = []corev1.VolumeMount{mount}
+			running, err := component.BuildInstanceSet(synth, &appsv1.ComponentDefinition{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			running.Spec.Stop = ptr.To(true)
+			running.Spec.Configs = []workloads.ConfigTemplate{{Name: "old-config"}}
+			running.Spec.Template.Spec.Volumes[0].ConfigMap.Name = "old-config"
+			running.Spec.Template.Spec.Volumes = append(running.Spec.Template.Spec.Volumes, corev1.Volume{
+				Name: "legacy-scripts", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "legacy-scripts"},
+				}},
+			})
+			running.Spec.Template.Spec.Containers = append(running.Spec.Template.Spec.Containers, corev1.Container{
+				Name: "config-manager", Image: "kb:old", VolumeMounts: []corev1.VolumeMount{
+					mount, {Name: "legacy-scripts", MountPath: "/opt/scripts"},
+				},
+			})
+
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(running).Build()
+			plan, err := workloadConfigPlan(t, cli, comp, synth, running)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = plan.Execute(); err != nil {
+				t.Fatal(err)
+			}
+			current := &workloads.InstanceSet{}
+			if err = cli.Get(context.Background(), client.ObjectKeyFromObject(running), current); err != nil {
+				t.Fatal(err)
+			}
+			if ptr.Deref(current.Spec.Stop, false) {
+				t.Fatal("workload is still stopped")
+			}
+			if _, err = instancetemplate.BuildInstanceTemplateExtMap(current, nil); err != nil {
+				t.Fatalf("Start published invalid managed config bindings: %v", err)
+			}
+			_, sidecar := intctrlutil.GetContainerByName(current.Spec.Template.Spec.Containers, "config-manager")
+			if sidecar == nil {
+				t.Fatal("Start removed the legacy sidecar")
+			}
+			volumes := current.Spec.Template.Spec.Volumes
+			if len(volumes) != 2 || volumes[1].Name != "legacy-scripts" || volumes[1].ConfigMap == nil || volumes[1].ConfigMap.Name != "legacy-scripts" {
+				t.Fatalf("Start changed the legacy-only volume: %#v", volumes)
+			}
+		})
+	}
+}
 
 var _ = Describe("Component Workload Operations Test", func() {
 	const (

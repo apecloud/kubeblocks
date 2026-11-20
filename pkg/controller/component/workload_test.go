@@ -21,6 +21,7 @@ package component
 
 import (
 	"context"
+	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -38,6 +39,18 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
+
+func TestGetInstanceTemplatesConfigs(t *testing.T) {
+	g := NewWithT(t)
+	configs := []workloads.ConfigTemplate{{Name: "server"}}
+	templates := getInstanceTemplates(&SynthesizedComponent{
+		Instances:       []appsv1.InstanceTemplate{{Name: "large"}, {Name: "default"}},
+		InstanceConfigs: map[string][]workloads.ConfigTemplate{"large": configs},
+	})
+	g.Expect(templates).Should(HaveLen(2))
+	g.Expect(templates[0].Configs).Should(Equal(configs))
+	g.Expect(templates[1].Configs).Should(BeNil())
+}
 
 var _ = Describe("workload PVC templates", func() {
 	It("preserves PVC dataSourceRef and template annotations", func() {

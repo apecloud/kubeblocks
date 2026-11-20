@@ -215,9 +215,32 @@ func mergeInPlaceFields(src, dst *corev1.Pod) {
 					requests, limits := copyRequestsNLimitsFields(&container)
 					mergeResources(&requests, &dst.Spec.Containers[i].Resources.Requests)
 					mergeResources(&limits, &dst.Spec.Containers[i].Resources.Limits)
+					capOmittedRequestsToLimits(&container, &dst.Spec.Containers[i])
 				}
 				break
 			}
+		}
+	}
+}
+
+// capOmittedRequestsToLimits keeps a limit-only template mergeable: when the
+// desired template omits a CPU/memory request, the live request is preserved
+// by the merge — but a limit-only scale-down can leave that preserved request
+// above the new limit, producing an invalid pod that the resize subresource
+// rejects, so the update never converges. Cap the preserved request at the
+// merged limit. Explicit desired requests are applied as-is and stay owned by
+// the template.
+func capOmittedRequestsToLimits(src, dst *corev1.Container) {
+	for _, resourceName := range []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory} {
+		if _, owned := src.Resources.Requests[resourceName]; owned {
+			continue
+		}
+		limit, hasLimit := dst.Resources.Limits[resourceName]
+		if !hasLimit {
+			continue
+		}
+		if request, ok := dst.Resources.Requests[resourceName]; ok && request.Cmp(limit) > 0 {
+			dst.Resources.Requests[resourceName] = limit
 		}
 	}
 }
@@ -388,13 +411,21 @@ func equalResourcesInPlaceFields(old, new *corev1.Pod) bool {
 			return false
 		}
 		oc := old.Spec.Containers[index]
-		realRequests := nc.Resources.Requests
-		// 'requests' defaults to Limits if that is explicitly specified, see: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#resources
-		if realRequests == nil {
-			realRequests = nc.Resources.Limits
-		}
-		if !equalField(oc.Resources.Requests, realRequests) {
-			return false
+		// Compare a request only when the desired template explicitly sets it.
+		// An omitted request is not owned by the template: the live value was
+		// defaulted from the limit at pod admission and is intentionally left
+		// untouched by the in-place merge, so demanding it to match anything
+		// would keep the resize path from converging.
+		for _, resourceName := range []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory} {
+			if request, ok := nc.Resources.Requests[resourceName]; ok {
+				oldRequest := corev1.ResourceList{}
+				if existing, ok := oc.Resources.Requests[resourceName]; ok {
+					oldRequest[resourceName] = existing
+				}
+				if !equalField(oldRequest, corev1.ResourceList{resourceName: request}) {
+					return false
+				}
+			}
 		}
 		if !equalField(oc.Resources.Limits, nc.Resources.Limits) {
 			return false

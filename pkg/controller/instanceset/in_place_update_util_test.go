@@ -119,6 +119,76 @@ var _ = Describe("instance util test", func() {
 			mergeInPlaceFields(newPod, oldPod)
 			Expect(equalBasicInPlaceFields(oldPod, newPod)).Should(BeTrue())
 		})
+
+		It("caps a preserved omitted request at the new limit and converges", func() {
+			ignorePodVerticalScaling := viper.GetBool(FeatureGateIgnorePodVerticalScaling)
+			defer viper.Set(FeatureGateIgnorePodVerticalScaling, ignorePodVerticalScaling)
+			viper.Set(FeatureGateIgnorePodVerticalScaling, false)
+
+			livePod := builder.NewPodBuilder(namespace, "foo-0").
+				SetContainers([]corev1.Container{{
+					Name: "foo",
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+						// the live request was defaulted from the old limit at admission
+						Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+					},
+				}}).
+				GetObject()
+
+			desired := livePod.DeepCopy()
+			desired.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("500m")},
+			}
+
+			merged := livePod.DeepCopy()
+			mergeInPlaceFields(desired, merged)
+
+			limit := merged.Spec.Containers[0].Resources.Limits[corev1.ResourceCPU]
+			request := merged.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU]
+			Expect(request.Cmp(limit)).Should(BeNumerically("<=", 0),
+				"merged pod must not carry request > limit")
+			// second reconcile: the merged (now live) pod must compare equal
+			// to the desired template so the resize path terminates
+			Expect(equalResourcesInPlaceFields(merged, desired)).Should(BeTrue())
+		})
+
+		It("skips omitted CPU and memory requests in resource comparison", func() {
+			oldPod := builder.NewPodBuilder(namespace, "foo-0").
+				SetContainers([]corev1.Container{{
+					Name: "foo",
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("1"),
+							corev1.ResourceMemory: resource.MustParse("2Gi"),
+						},
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("500m"),
+							corev1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+					},
+				}}).
+				GetObject()
+
+			omittedRequests := oldPod.DeepCopy()
+			omittedRequests.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("2Gi"),
+				},
+			}
+			Expect(equalResourcesInPlaceFields(oldPod, omittedRequests)).Should(BeTrue())
+
+			explicitRequestChanged := omittedRequests.DeepCopy()
+			explicitRequestChanged.Spec.Containers[0].Resources.Requests = corev1.ResourceList{
+				corev1.ResourceCPU: resource.MustParse("1"),
+			}
+			Expect(equalResourcesInPlaceFields(oldPod, explicitRequestChanged)).Should(BeFalse())
+
+			limitChanged := omittedRequests.DeepCopy()
+			limitChanged.Spec.Containers[0].Resources.Limits[corev1.ResourceMemory] = resource.MustParse("3Gi")
+			Expect(equalResourcesInPlaceFields(oldPod, limitChanged)).Should(BeFalse())
+		})
 	})
 
 	Context("container image comparison", func() {

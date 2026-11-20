@@ -272,7 +272,7 @@ func newITS2ConfigFixture(t *testing.T, compressed bool) (*workloads.InstanceSet
 	its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 	its.Spec.FlatInstanceOrdinal = compressed
 	its.Spec.Configs = []workloads.ConfigTemplate{
-		{Name: "main", ConfigHash: ptr.To("global"), Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "main"}},
+		{Name: "main", ConfigHash: ptr.To("global"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "main"}},
 		{Name: "aux", ConfigHash: ptr.To("inherited")},
 	}
 	its.Spec.Template = corev1.PodTemplateSpec{Spec: corev1.PodSpec{
@@ -283,7 +283,7 @@ func newITS2ConfigFixture(t *testing.T, compressed bool) (*workloads.InstanceSet
 	}}
 	template := workloads.InstanceTemplate{Name: "a", Replicas: ptr.To[int32](1), Configs: []workloads.ConfigTemplate{{
 		Name: "main", ConfigHash: ptr.To("specific"),
-		Volume: &workloads.ConfigMapVolumeBinding{VolumeName: "config", ConfigMapName: "main-a"},
+		Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "main-a"},
 	}}}
 	tree := kubebuilderx.NewObjectTree()
 	tree.SetRoot(its)

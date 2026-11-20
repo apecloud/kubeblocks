@@ -9324,12 +9324,10 @@ Add new or override existing envs.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Configs overrides managed file configurations for this InstanceTemplate.
-Each entry must name a distinct configuration declared in the ComponentDefinition.
-Each override accepts only name, variables, and configMap.name.
-Variables override inherited values by key. Set configMap.name to select a template
-source in the Component namespace. The settings for applying updates are inherited.
-An omitted or empty list inherits all configurations from the Component.</p>
+<p>Configs overrides managed file configurations for all instances of this template.
+Each entry must name a distinct configuration declared in the ComponentDefinition
+and managed by the Component. Each override accepts only name, variables, and configMap.name.
+Unspecified settings and configurations are inherited from the Component.</p>
 </td>
 </tr>
 </tbody>
@@ -19260,7 +19258,9 @@ If set, all the computing resources will be released.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Describe the configs to be reconfigured.</p>
+<p>Configs defines the default configurations and update settings for the InstanceSet.
+If a config sets volume, volume.volumeName must match the name of a ConfigMap volume
+in spec.template.spec.volumes. volume.configMapName must match that volume&rsquo;s configMap.name.</p>
 </td>
 </tr>
 <tr>
@@ -19383,46 +19383,6 @@ PodUpdatePolicy is set to StrictInPlace but the pods cannot be updated in-place)
 </td>
 </tr></tbody>
 </table>
-<h3 id="workloads.kubeblocks.io/v1.ConfigMapVolumeBinding">ConfigMapVolumeBinding
-</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate</a>)
-</p>
-<div>
-<p>ConfigMapVolumeBinding identifies a Pod volume and the ConfigMap to mount in it.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>volumeName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>VolumeName is the name of the ConfigMap volume in the Pod template.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>configMapName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>ConfigMapName is the name of the ConfigMap in the Pod namespace.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate
 </h3>
 <p>
@@ -19453,8 +19413,8 @@ string
 <td>
 <code>volume</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1.ConfigMapVolumeBinding">
-ConfigMapVolumeBinding
+<a href="#workloads.kubeblocks.io/v1.ConfigVolumeBinding">
+ConfigVolumeBinding
 </a>
 </em>
 </td>
@@ -19536,6 +19496,46 @@ map[string]string
 <td>
 <em>(Optional)</em>
 <p>ReconfigureArgs is the runtime argv payload for the reconfigure action.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.ConfigVolumeBinding">ConfigVolumeBinding
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate</a>)
+</p>
+<div>
+<p>ConfigVolumeBinding associates a configuration with a Pod volume and its ConfigMap.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>volumeName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>VolumeName is the name of the ConfigMap volume in the Pod template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configMapName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>ConfigMapName is the name of the ConfigMap in the Pod namespace.</p>
 </td>
 </tr>
 </tbody>
@@ -20062,7 +20062,9 @@ If set, all the computing resources will be released.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Describe the configs to be reconfigured.</p>
+<p>Configs defines the default configurations and update settings for the InstanceSet.
+If a config sets volume, volume.volumeName must match the name of a ConfigMap volume
+in spec.template.spec.volumes. volume.configMapName must match that volume&rsquo;s configMap.name.</p>
 </td>
 </tr>
 <tr>
@@ -21216,11 +21218,12 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Configs replaces matching entries in the InstanceSet&rsquo;s configs by name.
-Each entry replaces the entire matching config. Entries without an override are inherited.
-A volume override uses the volume name of the matching InstanceSet config.
-An override without volume inherits the matching config&rsquo;s volume.
-An omitted or empty list inherits all entries.</p>
+<p>Configs overrides the InstanceSet&rsquo;s configurations by name for this InstanceTemplate.
+Each override must match exactly one configuration in the InstanceSet.
+Configurations without an override are inherited.
+An override replaces the matching configuration&rsquo;s settings and inherits its volume if omitted.
+To select a different ConfigMap, use the same volume name as the matching configuration.
+Configurations that use the same volume must select the same ConfigMap.</p>
 </td>
 </tr>
 </tbody>

@@ -818,12 +818,10 @@ spec:
                                 type: string
                               configs:
                                 description: |-
-                                  Configs overrides managed file configurations for this InstanceTemplate.
-                                  Each entry must name a distinct configuration declared in the ComponentDefinition.
-                                  Each override accepts only name, variables, and configMap.name.
-                                  Variables override inherited values by key. Set configMap.name to select a template
-                                  source in the Component namespace. The settings for applying updates are inherited.
-                                  An omitted or empty list inherits all configurations from the Component.
+                                  Configs overrides managed file configurations for all instances of this template.
+                                  Each entry must name a distinct configuration declared in the ComponentDefinition
+                                  and managed by the Component. Each override accepts only name, variables, and configMap.name.
+                                  Unspecified settings and configurations are inherited from the Component.
                                 items:
                                   description: ClusterComponentConfig represents a
                                     configuration for a component.
@@ -4278,12 +4276,10 @@ spec:
                                 type: string
                               configs:
                                 description: |-
-                                  Configs overrides managed file configurations for this InstanceTemplate.
-                                  Each entry must name a distinct configuration declared in the ComponentDefinition.
-                                  Each override accepts only name, variables, and configMap.name.
-                                  Variables override inherited values by key. Set configMap.name to select a template
-                                  source in the Component namespace. The settings for applying updates are inherited.
-                                  An omitted or empty list inherits all configurations from the Component.
+                                  Configs overrides managed file configurations for all instances of this template.
+                                  Each entry must name a distinct configuration declared in the ComponentDefinition
+                                  and managed by the Component. Each override accepts only name, variables, and configMap.name.
+                                  Unspecified settings and configurations are inherited from the Component.
                                 items:
                                   description: ClusterComponentConfig represents a
                                     configuration for a component.

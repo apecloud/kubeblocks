@@ -161,17 +161,30 @@ func setConfigReloadScope(templates map[string]*InstanceTemplateExt, names sets.
 	}
 }
 
-// ConfigReloadTarget returns the triggering Pod for an override or a return to
-// the default. Other actions keep their configured selector.
-func ConfigReloadTarget(pod, desiredPod *corev1.Pod, configName string) string {
+// ConfigReloadTarget pins a scoped reload to the triggering Pod and skips it
+// if the configured volume is unmounted. Other reloads keep their selector.
+func ConfigReloadTarget(pod, desiredPod *corev1.Pod, config workloads.ConfigTemplate) (targetPod string, eligible bool) {
 	for _, candidate := range []*corev1.Pod{pod, desiredPod} {
 		var names []string
 		if value := candidate.Annotations[configReloadScopeAnnotation]; value != "" &&
-			json.Unmarshal([]byte(value), &names) == nil && slices.Contains(names, configName) {
-			return pod.Name
+			json.Unmarshal([]byte(value), &names) == nil && slices.Contains(names, config.Name) {
+			return pod.Name, config.Volume == nil || hasConfigVolumeMount(pod, config.Volume.VolumeName)
 		}
 	}
-	return ""
+	return "", true
+}
+
+func hasConfigVolumeMount(pod *corev1.Pod, name string) bool {
+	for _, containers := range [][]corev1.Container{pod.Spec.Containers, pod.Spec.InitContainers} {
+		for _, container := range containers {
+			if slices.ContainsFunc(container.VolumeMounts, func(mount corev1.VolumeMount) bool {
+				return mount.Name == name
+			}) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // AnnotationsWithoutConfigReloadScope excludes the bookkeeping annotation

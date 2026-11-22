@@ -324,7 +324,10 @@ func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, its *workl
 		return false, err
 	}
 	for _, config := range toUpdate {
-		targetPod := instancetemplate.ConfigReloadTarget(pod, desiredPod, config.Name)
+		targetPod, eligible := instancetemplate.ConfigReloadTarget(pod, desiredPod, config)
+		if !eligible {
+			continue
+		}
 		if err = r.reconfigureInst(tree, its, pod, config, targetPod); err != nil {
 			return false, err
 		}

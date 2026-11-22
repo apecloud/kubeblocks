@@ -54,6 +54,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -404,9 +405,20 @@ var _ = Describe("InstanceSet Controller 2", func() {
 			supportResize := intctrlutil.SupportResizeSubResource
 			intctrlutil.SupportResizeSubResource = func() (bool, error) { return false, nil }
 			DeferCleanup(func() { intctrlutil.SupportResizeSubResource = supportResize })
+			reload := testapps.NewLifecycleAction("reconfigure")
+			reload.TargetPodSelector = kbappsv1.OrdinalSelector
+			reload.MatchingKey = "1"
+			testapps.MockKBAgentClientDefault()
+			DeferCleanup(kbacli.UnsetMockClient)
+
 			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
 				f.SetReplicas(2)
-				f.AddConfigs(workloads.ConfigTemplate{Name: "server", ConfigHash: ptr.To("base"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config"}})
+				f.AddConfigs(workloads.ConfigTemplate{
+					Name:        "server",
+					ConfigHash:  ptr.To("base"),
+					Reconfigure: reload,
+					Volume:      &workloads.ConfigVolumeBinding{VolumeName: "config"},
+				})
 				spec := &f.Get().Spec
 				spec.InstanceUpdateStrategy = &kbappsv1.InstanceUpdateStrategy{Type: kbappsv1.RollingUpdateStrategyType}
 				spec.Template.Spec.Volumes = []corev1.Volume{{
@@ -421,9 +433,10 @@ var _ = Describe("InstanceSet Controller 2", func() {
 				spec.Instances = []workloads.InstanceTemplate{{
 					Name: "hot",
 					Configs: []workloads.ConfigTemplate{{
-						Name:       "server",
-						ConfigHash: ptr.To("hot"),
-						Volume:     &workloads.ConfigVolumeBinding{ConfigMapName: "hot-config"},
+						Name:        "server",
+						ConfigHash:  ptr.To("hot"),
+						Reconfigure: reload,
+						Volume:      &workloads.ConfigVolumeBinding{ConfigMapName: "hot-config"},
 					}},
 				}}
 			})
@@ -433,7 +446,13 @@ var _ = Describe("InstanceSet Controller 2", func() {
 				volume := And(HaveField("Name", "config"), HaveField("ConfigMap", HaveField("Name", source)))
 				Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, inst *workloads.Instance) {
 					g.Expect(inst.Spec.Template.Spec.Volumes).Should(ContainElement(volume))
-					g.Expect(inst.Spec.Configs).Should(Equal([]workloads.ConfigTemplate{{Name: "server", ConfigHash: ptr.To(hash), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: source}}}))
+					config := workloads.ConfigTemplate{
+						Name:        "server",
+						ConfigHash:  ptr.To(hash),
+						Reconfigure: reload,
+						Volume:      &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: source},
+					}
+					g.Expect(inst.Spec.Configs).Should(Equal([]workloads.ConfigTemplate{config}))
 				})).Should(Succeed())
 				var uid types.UID
 				Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pod *corev1.Pod) {
@@ -470,7 +489,18 @@ var _ = Describe("InstanceSet Controller 2", func() {
 			})).Should(Succeed())
 
 			changeConfig("replacement-config", "replaced")
-			Expect(checkConfig(hot, "replacement-config", "replaced")).ShouldNot(Equal(hotUID))
+			replacedUID := checkConfig(hot, "replacement-config", "replaced")
+			Expect(replacedUID).ShouldNot(Equal(hotUID))
+			mockPodReady(hot.Namespace, hot.Name)
+
+			changeConfig("shared-config", "shared-override")
+			sharedUID := checkConfig(hot, "shared-config", "shared-override")
+			Expect(sharedUID).ShouldNot(Equal(replacedUID))
+			mockPodReady(hot.Namespace, hot.Name)
+			Eventually(testapps.GetAndChangeObj(&testCtx, itsKey, func(set *workloads.InstanceSet) {
+				set.Spec.Instances[0].Configs = nil
+			})).Should(Succeed())
+			Expect(checkConfig(hot, "shared-config", "base")).Should(Equal(sharedUID))
 			Expect(checkConfig(ordinary, "shared-config", "base")).Should(Equal(ordinaryUID))
 		})
 

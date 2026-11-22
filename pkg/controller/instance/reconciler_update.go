@@ -155,8 +155,15 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 
 		switch updatePolicy {
+		case noOpsPolicy:
+			if patch := instancetemplate.ConfigReloadScopePatch(pod, desiredPod); patch != nil {
+				if err := tree.Update(patch, kubebuilderx.WithPatch(true)); err != nil {
+					return kubebuilderx.Continue, err
+				}
+			}
 		case inPlaceUpdatePolicy:
 			newMergedPod := copyAndMerge(pod, desiredPod)
+			instancetemplate.SyncConfigReloadScope(newMergedPod.(*corev1.Pod), desiredPod)
 			supportResizeSubResource, err := intctrlutil.SupportResizeSubResource()
 			if err != nil {
 				tree.Logger.Error(err, "check support resize sub resource error")
@@ -224,14 +231,18 @@ func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, inst *work
 		return false, err
 	}
 	for _, config := range toUpdate {
-		if err = r.reconfigureInst(tree, inst, pod, config); err != nil {
+		targetPod, eligible := instancetemplate.ConfigReloadTarget(pod, desiredPod, config)
+		if !eligible {
+			continue
+		}
+		if err = r.reconfigureInst(tree, inst, pod, config, targetPod); err != nil {
 			return false, err
 		}
 	}
 	return len(toUpdate) == 0, nil
 }
 
-func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod, config workloads.ConfigTemplate) error {
+func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod, config workloads.ConfigTemplate, targetPod string) error {
 	if config.Reconfigure == nil {
 		return nil
 	}
@@ -247,7 +258,7 @@ func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, inst *
 		return err
 	}
 
-	opts := reconfigureOptions(config)
+	opts := reconfigureOptions(config, targetPod)
 	if len(config.ReconfigureActionName) == 0 {
 		err = lfa.Reconfigure(tree.Context, nil, opts, config.Parameters)
 	} else {
@@ -267,11 +278,11 @@ func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, inst *
 	return nil
 }
 
-func reconfigureOptions(config workloads.ConfigTemplate) *lifecycle.Options {
-	if len(config.ReconfigureArgs) == 0 {
+func reconfigureOptions(config workloads.ConfigTemplate, targetPod string) *lifecycle.Options {
+	if len(config.ReconfigureArgs) == 0 && targetPod == "" {
 		return nil
 	}
-	return &lifecycle.Options{Arguments: config.ReconfigureArgs}
+	return &lifecycle.Options{Arguments: config.ReconfigureArgs, TargetPodName: targetPod}
 }
 
 func buildBlockedCondition(inst *workloads.Instance, message string) *metav1.Condition {

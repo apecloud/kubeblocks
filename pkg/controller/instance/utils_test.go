@@ -40,12 +40,12 @@ import (
 )
 
 func TestReconfigureOptions(t *testing.T) {
-	if opts := reconfigureOptions(workloads.ConfigTemplate{}); opts != nil {
+	if opts := reconfigureOptions(workloads.ConfigTemplate{}, ""); opts != nil {
 		t.Fatalf("expected nil options for empty reconfigure args, got %v", opts)
 	}
 
 	args := [][]string{{"maxmemory", "1gb"}, {"timeout", "30"}}
-	opts := reconfigureOptions(workloads.ConfigTemplate{ReconfigureArgs: args})
+	opts := reconfigureOptions(workloads.ConfigTemplate{ReconfigureArgs: args}, "")
 	if opts == nil {
 		t.Fatalf("expected options for non-empty reconfigure args")
 		return

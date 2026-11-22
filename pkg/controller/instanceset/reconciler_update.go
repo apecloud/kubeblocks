@@ -181,14 +181,21 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
-		if !allUpdated && updatePolicy == noOpsPolicy {
-			updatingPods++
-		}
-
 		switch updatePolicy {
+		case noOpsPolicy:
+			if !allUpdated {
+				updatingPods++
+				break
+			}
+			if patch := instancetemplate.ConfigReloadScopePatch(pod, desiredPod); patch != nil {
+				if err := tree.Update(patch, kubebuilderx.WithPatch(true)); err != nil {
+					return kubebuilderx.Continue, err
+				}
+			}
 		case inPlaceUpdatePolicy:
 			newPod := desiredPod
 			newMergedPod := copyAndMerge(pod, newPod)
+			instancetemplate.SyncConfigReloadScope(newMergedPod.(*corev1.Pod), newPod)
 			supportResizeSubResource, err := intctrlutil.SupportResizeSubResource()
 			if err != nil {
 				tree.Logger.Error(err, "check support resize sub resource error")
@@ -317,14 +324,15 @@ func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, its *workl
 		return false, err
 	}
 	for _, config := range toUpdate {
-		if err = r.reconfigureInst(tree, its, pod, config); err != nil {
+		targetPod := instancetemplate.ConfigReloadTarget(pod, desiredPod, config.Name)
+		if err = r.reconfigureInst(tree, its, pod, config, targetPod); err != nil {
 			return false, err
 		}
 	}
 	return len(toUpdate) == 0, nil
 }
 
-func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod, config workloads.ConfigTemplate) error {
+func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod, config workloads.ConfigTemplate, targetPod string) error {
 	if config.Reconfigure == nil {
 		return nil // skip
 	}
@@ -339,7 +347,7 @@ func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, its *w
 		return err
 	}
 
-	opts := reconfigureOptions(config)
+	opts := reconfigureOptions(config, targetPod)
 	if len(config.ReconfigureActionName) == 0 {
 		err = lfa.Reconfigure(tree.Context, nil, opts, config.Parameters)
 	} else {
@@ -359,11 +367,11 @@ func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, its *w
 	return nil
 }
 
-func reconfigureOptions(config workloads.ConfigTemplate) *lifecycle.Options {
-	if len(config.ReconfigureArgs) == 0 {
+func reconfigureOptions(config workloads.ConfigTemplate, targetPod string) *lifecycle.Options {
+	if len(config.ReconfigureArgs) == 0 && targetPod == "" {
 		return nil
 	}
-	return &lifecycle.Options{Arguments: config.ReconfigureArgs}
+	return &lifecycle.Options{Arguments: config.ReconfigureArgs, TargetPodName: targetPod}
 }
 
 func (r *updateReconciler) isInstUpdated(its *workloads.InstanceSet, pod *corev1.Pod, template *instancetemplate.InstanceTemplateExt) (bool, error) {

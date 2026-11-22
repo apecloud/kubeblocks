@@ -20,7 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instancetemplate
 
 import (
+	"encoding/json"
 	"fmt"
+	"maps"
+	"slices"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
@@ -131,4 +137,74 @@ func configVolumeIndex(template *InstanceTemplateExt, config workloads.ConfigTem
 		return i, nil
 	}
 	return 0, fmt.Errorf("config %q: volume %q does not exist", config.Name, binding.VolumeName)
+}
+
+// The Pod template carries the desired scope. The same annotation on the Pod
+// records its applied scope so restoring a default still reloads locally.
+const configReloadScopeAnnotation = "workloads.kubeblocks.io/config-reload-scope"
+
+func setConfigReloadScope(templates map[string]*InstanceTemplateExt, names sets.Set[string]) {
+	var scope string
+	if len(names) > 0 {
+		data, _ := json.Marshal(sets.List(names))
+		scope = string(data)
+	}
+	for _, template := range templates {
+		if scope == "" {
+			delete(template.Annotations, configReloadScopeAnnotation)
+		} else {
+			if template.Annotations == nil {
+				template.Annotations = make(map[string]string)
+			}
+			template.Annotations[configReloadScopeAnnotation] = scope
+		}
+	}
+}
+
+// ConfigReloadTarget returns the triggering Pod for an override or a return to
+// the default. Other actions keep their configured selector.
+func ConfigReloadTarget(pod, desiredPod *corev1.Pod, configName string) string {
+	for _, candidate := range []*corev1.Pod{pod, desiredPod} {
+		var names []string
+		if value := candidate.Annotations[configReloadScopeAnnotation]; value != "" &&
+			json.Unmarshal([]byte(value), &names) == nil && slices.Contains(names, configName) {
+			return pod.Name
+		}
+	}
+	return ""
+}
+
+// AnnotationsWithoutConfigReloadScope excludes the bookkeeping annotation
+// from the Pod update policy.
+func AnnotationsWithoutConfigReloadScope(pod *corev1.Pod) map[string]string {
+	if _, ok := pod.Annotations[configReloadScopeAnnotation]; !ok {
+		return pod.Annotations
+	}
+	annotations := maps.Clone(pod.Annotations)
+	delete(annotations, configReloadScopeAnnotation)
+	return annotations
+}
+
+// SyncConfigReloadScope copies the desired annotation to a Pod.
+func SyncConfigReloadScope(pod, desiredPod *corev1.Pod) {
+	scope := desiredPod.Annotations[configReloadScopeAnnotation]
+	if scope == "" {
+		delete(pod.Annotations, configReloadScopeAnnotation)
+		return
+	}
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
+	}
+	pod.Annotations[configReloadScopeAnnotation] = scope
+}
+
+// ConfigReloadScopePatch records a scope-only change without applying the Pod
+// replacement policy to otherwise unchanged configuration.
+func ConfigReloadScopePatch(pod, desiredPod *corev1.Pod) *corev1.Pod {
+	if pod.Annotations[configReloadScopeAnnotation] == desiredPod.Annotations[configReloadScopeAnnotation] {
+		return nil
+	}
+	patch := pod.DeepCopy()
+	SyncConfigReloadScope(patch, desiredPod)
+	return patch
 }

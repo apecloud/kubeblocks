@@ -292,6 +292,10 @@ func newDirectConfigFixture(t *testing.T, layout string, configure ...func(*work
 		{Name: "config", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "main"}}}},
 		{Name: "aux", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "aux"}}}},
 	}
+	its.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{
+		{Name: "config", MountPath: "/etc/config"},
+		{Name: "aux", MountPath: "/etc/aux"},
+	}
 	tpl := workloads.InstanceTemplate{Name: "a", Replicas: ptr.To[int32](1), Configs: []workloads.ConfigTemplate{
 		{Name: "main", ConfigHash: ptr.To("main-old"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "main-a"}, Reconfigure: action, Parameters: map[string]string{"id": "main"}},
 		{Name: "aux", ConfigHash: ptr.To("aux-old"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "aux", ConfigMapName: "aux-a"}, Reconfigure: action, Parameters: map[string]string{"id": "aux"}},

@@ -1197,6 +1197,7 @@ func TestDirectConfigReloadSelectorScope(t *testing.T) {
 		inherited   bool
 		rollback    bool
 		scopeOnly   bool
+		unmounted   bool
 		wantCalls   int
 	}{
 		{name: "overridden configuration", selector: kbappsv1.AllReplicas, wantCalls: 1},
@@ -1205,10 +1206,13 @@ func TestDirectConfigReloadSelectorScope(t *testing.T) {
 		{name: "remove last override without changing mounts", selector: kbappsv1.AllReplicas, rollback: true, wantCalls: 1},
 		{name: "homogeneous configuration retains selector", selector: kbappsv1.AllReplicas, homogeneous: true, wantCalls: 2},
 		{name: "scope alone does not recreate a Pod", selector: kbappsv1.AllReplicas, homogeneous: true, scopeOnly: true},
+		{name: "declared ConfigMap volume is not mounted", selector: kbappsv1.AllReplicas, unmounted: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			its, tree, pods, _ := newDirectConfigFixture(t, "named", func(its *workloads.InstanceSet, tpl *workloads.InstanceTemplate) {
-				its.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: "config", MountPath: "/etc/config"}}
+				if tc.unmounted {
+					its.Spec.Template.Spec.Containers[0].VolumeMounts = nil
+				}
 				its.Spec.Configs[0].Reconfigure = &kbappsv1.Action{
 					Exec:              &kbappsv1.ExecAction{Command: []string{"reload"}},
 					TargetPodSelector: tc.selector,
@@ -1228,6 +1232,7 @@ func TestDirectConfigReloadSelectorScope(t *testing.T) {
 				its.Spec.PodUpdatePolicy = kbappsv1.ReCreatePodUpdatePolicyType
 				override := *its.Spec.Configs[0].DeepCopy()
 				override.Volume = nil
+				override.Parameters = map[string]string{"id": "override"}
 				its.Spec.Instances[0].Configs = []workloads.ConfigTemplate{override}
 			case tc.rollback:
 				its.Spec.Instances[0].Configs = nil

@@ -47,6 +47,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
+	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -76,13 +78,13 @@ var _ = Describe("update reconciler test", func() {
 	Context("reconfigure options", func() {
 		It("passes workload reconfigure args as lifecycle arguments", func() {
 			args := [][]string{{"maxmemory", "1gb"}, {"timeout", "30"}}
-			opts := reconfigureOptions(workloads.ConfigTemplate{ReconfigureArgs: args})
+			opts := reconfigureOptions(workloads.ConfigTemplate{ReconfigureArgs: args}, "")
 			Expect(opts).ShouldNot(BeNil())
 			Expect(opts.Arguments).Should(Equal(args))
 		})
 
 		It("uses nil options when reconfigure args are empty", func() {
-			Expect(reconfigureOptions(workloads.ConfigTemplate{})).Should(BeNil())
+			Expect(reconfigureOptions(workloads.ConfigTemplate{}, "")).Should(BeNil())
 		})
 	})
 
@@ -1185,4 +1187,95 @@ func TestDirectConfigRollbackPreservesInheritedSameMountReload(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDirectConfigReloadSelectorScope(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		selector    kbappsv1.TargetPodSelector
+		homogeneous bool
+		inherited   bool
+		rollback    bool
+		scopeOnly   bool
+		wantCalls   int
+	}{
+		{name: "overridden configuration", selector: kbappsv1.AllReplicas, wantCalls: 1},
+		{name: "ordinal shared by another template", selector: kbappsv1.OrdinalSelector, wantCalls: 1},
+		{name: "inherited configuration with an overridden variant", selector: kbappsv1.AllReplicas, inherited: true, wantCalls: 1},
+		{name: "remove last override without changing mounts", selector: kbappsv1.AllReplicas, rollback: true, wantCalls: 1},
+		{name: "homogeneous configuration retains selector", selector: kbappsv1.AllReplicas, homogeneous: true, wantCalls: 2},
+		{name: "scope alone does not recreate a Pod", selector: kbappsv1.AllReplicas, homogeneous: true, scopeOnly: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			its, tree, pods, _ := newDirectConfigFixture(t, "named", func(its *workloads.InstanceSet, tpl *workloads.InstanceTemplate) {
+				its.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: "config", MountPath: "/etc/config"}}
+				its.Spec.Configs[0].Reconfigure = &kbappsv1.Action{
+					Exec:              &kbappsv1.ExecAction{Command: []string{"reload"}},
+					TargetPodSelector: tc.selector,
+					MatchingKey:       "0",
+				}
+				tpl.Configs = tpl.Configs[:1]
+				tpl.Configs[0].Reconfigure = its.Spec.Configs[0].Reconfigure
+				if tc.rollback {
+					tpl.Configs[0].Volume = nil
+				}
+				if tc.homogeneous {
+					tpl.Configs = nil
+				}
+			})
+			switch {
+			case tc.scopeOnly:
+				its.Spec.PodUpdatePolicy = kbappsv1.ReCreatePodUpdatePolicyType
+				override := *its.Spec.Configs[0].DeepCopy()
+				override.Volume = nil
+				its.Spec.Instances[0].Configs = []workloads.ConfigTemplate{override}
+			case tc.rollback:
+				its.Spec.Instances[0].Configs = nil
+			case tc.homogeneous || tc.inherited:
+				its.Spec.Configs[0].ConfigHash = ptr.To("base-new")
+			default:
+				its.Spec.Instances[0].Configs[0].ConfigHash = ptr.To("override-new")
+			}
+			agent := &configReloadAgent{}
+			kbacli.SetMockClient(agent, nil)
+			t.Cleanup(kbacli.UnsetMockClient)
+
+			its.Generation++
+			runDirectReconciler(t, NewRevisionUpdateReconciler(), tree)
+			runDirectReconciler(t, NewUpdateReconciler(), tree)
+			if agent.calls != tc.wantCalls {
+				t.Fatalf("reload agent calls = %d, want %d", agent.calls, tc.wantCalls)
+			}
+			for name, pod := range pods {
+				if obj, err := tree.Get(pod); err != nil || obj == nil {
+					t.Fatalf("Pod %s was replaced during a same-mount update: %v", name, err)
+				}
+			}
+
+			if tc.rollback {
+				// Finish persisting the restored configuration and then update it
+				// as a homogeneous configuration with the original selector.
+				runDirectReconciler(t, NewUpdateReconciler(), tree)
+				agent.calls = 0
+				its.Spec.Configs[0].ConfigHash = ptr.To("base-next")
+				its.Generation++
+				runDirectReconciler(t, NewRevisionUpdateReconciler(), tree)
+				runDirectReconciler(t, NewUpdateReconciler(), tree)
+				if agent.calls != 2 {
+					t.Fatalf("reload after rollback called %d agents, want both agents from the All selector", agent.calls)
+				}
+			}
+		})
+	}
+}
+
+type configReloadAgent struct {
+	calls int
+}
+
+func (a *configReloadAgent) Close() error { return nil }
+
+func (a *configReloadAgent) Action(context.Context, proto.ActionRequest) (proto.ActionResponse, error) {
+	a.calls++
+	return proto.ActionResponse{}, nil
 }

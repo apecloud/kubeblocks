@@ -286,3 +286,56 @@ func TestRevisionUpdateInvalidatesUnobservedITS2InstanceHandoff(t *testing.T) {
 	assertITS2UpToDate(t, its, "demo-0", false)
 	assertITS2UpToDate(t, its, "demo-1", true)
 }
+
+func TestTemplateConfigRevisionsPreserveUnaffectedITS2Status(t *testing.T) {
+	for _, changeMount := range []bool{false, true} {
+		t.Run(map[bool]string{false: "reload hash", true: "ConfigMap mount"}[changeMount], func(t *testing.T) {
+			its, tree, member := newITS2ConfigFixture(t, false)
+			if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := NewAlignmentReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			for _, inst := range its2ConfigInstances(tree) {
+				inst.Generation = 1
+				inst.Status = workloads.InstanceStatus2{ObservedGeneration: 1, CurrentState: workloads.InstanceCurrentStatePresent, UpToDate: true}
+				for _, config := range inst.Spec.Configs {
+					inst.Status.Configs = append(inst.Status.Configs, workloads.InstanceConfigStatus{Name: config.Name, ConfigHash: config.ConfigHash})
+				}
+			}
+			if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			assertITS2UpToDate(t, its, member, true)
+			assertITS2UpToDate(t, its, "demo-0", true)
+			before, err := revisionmap.Decode(its.Status.UpdateRevisions)
+			if err != nil {
+				t.Fatal(err)
+			}
+			its.Generation++
+			if changeMount {
+				its.Spec.Instances[0].Configs[0].Volume.ConfigMapName = "main-new"
+			} else {
+				its.Spec.Instances[0].Configs[0].ConfigHash = ptr.To("specific-new")
+			}
+			if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			after, err := revisionmap.Decode(its.Status.UpdateRevisions)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if before[member] == after[member] || before["demo-0"] != after["demo-0"] {
+				t.Fatalf("config revision change affected wrong members: before=%v after=%v", before, after)
+			}
+			assertITS2UpToDate(t, its, member, false)
+			assertITS2UpToDate(t, its, "demo-0", true)
+			if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			assertITS2UpToDate(t, its, member, false)
+			assertITS2UpToDate(t, its, "demo-0", true)
+		})
+	}
+}

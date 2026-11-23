@@ -240,7 +240,10 @@ type InstanceSetSpec struct {
 	// +optional
 	Stop *bool `json:"stop,omitempty"`
 
-	// Describe the configs to be reconfigured.
+	// Configs defines the default configurations and update settings for the InstanceSet.
+	// If a config sets volume, set volume.volumeName to the name of a ConfigMap volume
+	// in spec.template.spec.volumes. The volume supplies the default ConfigMap.
+	// If set, volume.configMapName must match that ConfigMap.
 	//
 	// +optional
 	Configs []ConfigTemplate `json:"configs,omitempty"`
@@ -461,6 +464,21 @@ type InstanceTemplate struct {
 	//
 	// +optional
 	Images map[string]string `json:"images,omitempty"`
+
+	// Configs overrides the InstanceSet's configurations by name for this InstanceTemplate.
+	// Each override must match exactly one configuration in the InstanceSet.
+	// Configurations without an override are inherited.
+	// An override replaces the matching configuration's settings. If the override omits volume,
+	// it inherits the matching configuration's volume and ConfigMap.
+	// To select a different ConfigMap, set volume.configMapName. The override uses
+	// the volume of the matching InstanceSet configuration. If set, volume.volumeName
+	// must match that volume name.
+	// Configurations that use the same volume in a Pod must select the same ConfigMap.
+	//
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	Configs []ConfigTemplate `json:"configs,omitempty"`
 }
 
 func (t *InstanceTemplate) GetName() string {
@@ -559,6 +577,11 @@ type ConfigTemplate struct {
 	// The name of the config.
 	Name string `json:"name"`
 
+	// Volume identifies the ConfigMap volume for this configuration.
+	//
+	// +optional
+	Volume *ConfigVolumeBinding `json:"volume,omitempty"`
+
 	// Represents a checksum or hash of the config content.
 	//
 	// +optional
@@ -590,6 +613,21 @@ type ConfigTemplate struct {
 	//
 	// +optional
 	ReconfigureArgs [][]string `json:"reconfigureArgs,omitempty"`
+}
+
+// ConfigVolumeBinding associates a configuration with a Pod volume and its ConfigMap.
+type ConfigVolumeBinding struct {
+	// VolumeName is the name of the ConfigMap volume in the Pod template.
+	//
+	// +optional
+	// +kubebuilder:validation:MinLength=1
+	VolumeName string `json:"volumeName,omitempty"`
+
+	// ConfigMapName is the name of the ConfigMap in the Pod namespace.
+	//
+	// +optional
+	// +kubebuilder:validation:MinLength=1
+	ConfigMapName string `json:"configMapName,omitempty"`
 }
 
 // InstanceStatus describes the desired allocation and observed runtime state of an instance identity.

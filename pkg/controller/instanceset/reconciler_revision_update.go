@@ -57,27 +57,19 @@ func (r *revisionUpdateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *
 
 func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
-	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
-	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
-	nameMap, err := nameBuilder.BuildInstanceName2TemplateMap()
+	nameToTemplateMap, err := instancetemplate.BuildInstanceTemplateExtMap(its, tree)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
 
 	if its.Spec.FlatInstanceOrdinal {
-		r.updateAssignedOrdinals(its, nameMap, tree.List(&corev1.Pod{}))
+		r.updateAssignedOrdinals(its, nameToTemplateMap, tree.List(&corev1.Pod{}))
 	}
 
 	// build instance revision list from instance templates
 	var instanceRevisionList []instanceRevision
 	proposedRevisions := make(map[string]string)
-	for instanceName, templateExt := range nameMap {
+	for instanceName, templateExt := range nameToTemplateMap {
 		updatedRevision, err := buildInstanceTemplateRevision(&templateExt.PodTemplateSpec, its, nil)
 		if err != nil {
 			return kubebuilderx.Continue, err
@@ -118,12 +110,12 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 		updateRevision = instanceRevisionList[len(instanceRevisionList)-1].revision
 	}
 	its.Status.UpdateRevision = updateRevision
-	updatedReplicas, err := r.calculateUpdatedReplicas(its, tree.List(&corev1.Pod{}))
+	updatedReplicas, err := r.calculateUpdatedReplicas(its, tree.List(&corev1.Pod{}), nameToTemplateMap)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
 	its.Status.UpdatedReplicas = updatedReplicas
-	if err := r.publishInstanceUpdateTargets(its, updatedRevisions, nameMap, tree); err != nil {
+	if err := r.publishInstanceUpdateTargets(its, updatedRevisions, nameToTemplateMap, tree); err != nil {
 		return kubebuilderx.Continue, err
 	}
 	its.Status.ObservedGeneration = its.Generation
@@ -165,7 +157,7 @@ func (r *revisionUpdateReconciler) publishInstanceUpdateTargets(its *workloads.I
 		if err != nil {
 			return err
 		}
-		configsApplied := instancestatus.ConfigsApplied(its.Spec.Configs, status.Configs)
+		configsApplied := instancestatus.ConfigsApplied(template.Configs, status.Configs)
 		pending, observed := hasPendingPVCExpansion(its.Name, status.PodName, template.VolumeClaimTemplates, pvcsByName)
 		pvcApplied := observed && !pending
 		if previousRevision != newRevision || !podApplied || !configsApplied || !pvcApplied {
@@ -218,7 +210,7 @@ func (r *revisionUpdateReconciler) updateAssignedOrdinals(its *workloads.Instanc
 	its.Status.AssignedOrdinals = assignedOrdinals
 }
 
-func (r *revisionUpdateReconciler) calculateUpdatedReplicas(its *workloads.InstanceSet, pods []client.Object) (int32, error) {
+func (r *revisionUpdateReconciler) calculateUpdatedReplicas(its *workloads.InstanceSet, pods []client.Object, templates map[string]*instancetemplate.InstanceTemplateExt) (int32, error) {
 	if isStopRequested(its) {
 		return 0, nil
 	}
@@ -228,7 +220,7 @@ func (r *revisionUpdateReconciler) calculateUpdatedReplicas(its *workloads.Insta
 		if isTerminating(pod) {
 			continue
 		}
-		updated, err := isPodUpdated(its, pod)
+		updated, err := isPodUpdated(its, pod, templates[pod.Name])
 		if err != nil {
 			return 0, nil
 		}

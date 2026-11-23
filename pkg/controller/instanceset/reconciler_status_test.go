@@ -39,6 +39,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -189,7 +190,11 @@ var _ = Describe("status reconciler test", func() {
 			Name: "demo-0", Labels: map[string]string{constant.KBAppInstanceTemplateLabelKey: ""},
 		}}
 
-		Expect(setInstanceStatus(tree, its, []*corev1.Pod{pod})).Should(Succeed())
+		assignments, templateNames, err := instancetemplate.BuildAssignments(tree, its)
+		Expect(err).ShouldNot(HaveOccurred())
+		nameToTemplateMap, err := instancetemplate.BuildInstanceTemplateExtMap(its, tree)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(setInstanceStatus(tree, its, []*corev1.Pod{pod}, assignments, templateNames, nameToTemplateMap)).Should(Succeed())
 		status := its.FindInstanceStatus("demo-0")
 		Expect(status).ShouldNot(BeNil())
 		Expect(status.TemplateName).ShouldNot(BeNil())
@@ -557,7 +562,11 @@ var _ = Describe("status reconciler test", func() {
 			its.Status.UpdateRevisions = map[string]string{
 				"bar-0": "target", "bar-1": "target", "bar-2": "target",
 			}
-			Expect(setInstanceStatus(nil, its, pods)).Should(Succeed())
+			assignments, templateNames, err := instancetemplate.BuildAssignments(nil, its)
+			Expect(err).ShouldNot(HaveOccurred())
+			nameToTemplateMap, err := instancetemplate.BuildInstanceTemplateExtMap(its, nil)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(setInstanceStatus(nil, its, pods, assignments, templateNames, nameToTemplateMap)).Should(Succeed())
 
 			Expect(its.Status.InstanceStatus).Should(HaveLen(3))
 			Expect(its.Status.InstanceStatus[0].PodName).Should(Equal("bar-0"))
@@ -595,7 +604,11 @@ var _ = Describe("status reconciler test", func() {
 			}}
 			pod := builder.NewPodBuilder(namespace, "bar-0").GetObject()
 
-			Expect(setInstanceStatus(nil, its, []*corev1.Pod{pod})).Should(Succeed())
+			assignments, templateNames, err := instancetemplate.BuildAssignments(nil, its)
+			Expect(err).ShouldNot(HaveOccurred())
+			nameToTemplateMap, err := instancetemplate.BuildInstanceTemplateExtMap(its, nil)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(setInstanceStatus(nil, its, []*corev1.Pod{pod}, assignments, templateNames, nameToTemplateMap)).Should(Succeed())
 			status := its.FindInstanceStatus("bar-0")
 			Expect(status).ShouldNot(BeNil())
 			Expect(status.DesiredState).Should(Equal(workloads.InstanceDesiredStateOffline))
@@ -606,10 +619,10 @@ var _ = Describe("status reconciler test", func() {
 			Expect(*status.TemplateName).Should(BeEmpty())
 
 			pod.DeletionTimestamp = &metav1.Time{Time: metav1.Now().Time}
-			Expect(setInstanceStatus(nil, its, []*corev1.Pod{pod})).Should(Succeed())
+			Expect(setInstanceStatus(nil, its, []*corev1.Pod{pod}, assignments, templateNames, nameToTemplateMap)).Should(Succeed())
 			Expect(its.FindInstanceStatus("bar-0").CurrentState).Should(Equal(workloads.InstanceCurrentStateTerminating))
 
-			Expect(setInstanceStatus(nil, its, nil)).Should(Succeed())
+			Expect(setInstanceStatus(nil, its, nil, assignments, templateNames, nameToTemplateMap)).Should(Succeed())
 			status = its.FindInstanceStatus("bar-0")
 			Expect(status).ShouldNot(BeNil())
 			Expect(status.CurrentState).Should(Equal(workloads.InstanceCurrentStateAbsent))
@@ -867,7 +880,7 @@ func newLegacyInstanceStatusFixture(t *testing.T, configs []workloads.ConfigTemp
 	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)
 	}
-	templates, err := desiredInstanceTemplates(its, tree)
+	templates, err := instancetemplate.BuildInstanceTemplateExtMap(its, tree)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -906,7 +919,7 @@ func newLegacyInstanceStatusFixtureFromSet(t *testing.T, its *workloads.Instance
 	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)
 	}
-	templates, err := desiredInstanceTemplates(its, tree)
+	templates, err := instancetemplate.BuildInstanceTemplateExtMap(its, tree)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -949,7 +962,7 @@ func legacyInstanceStatusSet(replicas int32) *workloads.InstanceSet {
 
 func addLegacyPVCs(t *testing.T, tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, capacity resource.Quantity) {
 	t.Helper()
-	templates, err := desiredInstanceTemplates(its, tree)
+	templates, err := instancetemplate.BuildInstanceTemplateExtMap(its, tree)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -982,5 +995,68 @@ func assertLegacyUpToDate(t *testing.T, its *workloads.InstanceSet, name string,
 	status := its.FindInstanceStatus(name)
 	if status == nil || status.UpToDate != want {
 		t.Fatalf("instance %s UpToDate = %#v, want %v", name, status, want)
+	}
+}
+
+func TestDirectConfigOverridesCreationAndConvergence(t *testing.T) {
+	for _, layout := range []string{"named", "compressed flat"} {
+		t.Run(layout, func(t *testing.T) {
+			its, tree, pods, member := newDirectConfigFixture(t, layout)
+			specific := pods[member]
+			if specific.Spec.Volumes[0].ConfigMap.Name != "main-a" || specific.Spec.Volumes[1].ConfigMap.Name != "aux-a" {
+				t.Fatal("member bindings were not expanded on creation")
+			}
+			if pods["demo-0"].Spec.Volumes[0].ConfigMap.Name != "main" {
+				t.Fatal("default member binding changed")
+			}
+			desired, err := instancetemplate.BuildInstanceTemplateExtMap(its, tree)
+			if err != nil {
+				t.Fatal(err)
+			}
+			hashes, err := configsFromPod(specific)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(hashes) != 2 || *hashes[0].ConfigHash != "aux-old" || *hashes[1].ConfigHash != "main-old" {
+				t.Fatalf("wrong initial hashes: %#v", hashes)
+			}
+			if getPodRevision(specific) == getPodRevision(pods["demo-0"]) {
+				t.Fatal("different mounted source was omitted from initial revision")
+			}
+			for name, pod := range pods {
+				policy, _, _, err := getPodUpdatePolicy(its, pod, desired[name])
+				if err != nil || policy != noOpsPolicy {
+					t.Fatalf("fresh member %s needs update: %v %v", name, policy, err)
+				}
+			}
+			mutateDirectTemplate(t, its, tree, func(tpl *workloads.InstanceTemplate) { tpl.Configs[0].ConfigHash = ptr.To("main-new") })
+			oldRevision := getPodRevision(specific)
+			its.Generation++
+			runDirectReconciler(t, NewRevisionUpdateReconciler(), tree)
+			if its.FindInstanceStatus(member).UpToDate {
+				t.Fatal("member hash change did not invalidate convergence")
+			}
+			if !its.FindInstanceStatus("demo-0").UpToDate {
+				t.Fatal("override invalidated the default member")
+			}
+			revisions, err := GetRevisions(its.Status.UpdateRevisions)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if revisions[member] != oldRevision {
+				t.Fatal("same-mount dynamic hash changed the Pod revision")
+			}
+			desired, err = instancetemplate.BuildInstanceTemplateExtMap(its, tree)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := configsToPod(desired[member].Configs, specific); err != nil {
+				t.Fatal(err)
+			}
+			runDirectReconciler(t, NewStatusReconciler(), tree)
+			if !its.FindInstanceStatus(member).UpToDate || !its.FindInstanceStatus("demo-0").UpToDate {
+				t.Fatal("effective hashes did not converge per member")
+			}
+		})
 	}
 }

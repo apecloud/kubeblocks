@@ -415,7 +415,7 @@ func buildInstancePodByTemplate(name string, template *instancetemplate.Instance
 	})
 
 	// 4. build configs annotation
-	if err = configsToPod(parent.Spec.Configs, pod); err != nil {
+	if err = configsToPod(template.Configs, pod); err != nil {
 		return nil, err
 	}
 
@@ -643,25 +643,25 @@ func configsFromPod(pod *corev1.Pod) ([]workloads.ConfigTemplate, error) {
 	return configs, nil
 }
 
-func configsToUpdate(its *workloads.InstanceSet, pod *corev1.Pod) ([]workloads.ConfigTemplate, error) {
+func configsToUpdate(desired []workloads.ConfigTemplate, pod *corev1.Pod) ([]workloads.ConfigTemplate, error) {
 	configs, err := configsFromPod(pod)
 	if err != nil {
 		return nil, err
 	}
 	toUpdate := make([]workloads.ConfigTemplate, 0)
-	for i, config := range its.Spec.Configs {
+	for i, config := range desired {
 		idx := slices.IndexFunc(configs, func(cfg workloads.ConfigTemplate) bool {
 			return cfg.Name == config.Name
 		})
 		if idx < 0 || ptr.Deref(config.ConfigHash, "") != ptr.Deref(configs[idx].ConfigHash, "") {
-			toUpdate = append(toUpdate, its.Spec.Configs[i])
+			toUpdate = append(toUpdate, desired[i])
 		}
 	}
 	return toUpdate, nil
 }
 
-func hasConfigRestart(its *workloads.InstanceSet, pod *corev1.Pod) (bool, []string, error) {
-	toUpdate, err := configsToUpdate(its, pod)
+func hasConfigRestart(desired []workloads.ConfigTemplate, pod *corev1.Pod) (bool, []string, error) {
+	toUpdate, err := configsToUpdate(desired, pod)
 	if err != nil {
 		return false, nil, err
 	}

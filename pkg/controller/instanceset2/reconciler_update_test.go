@@ -24,6 +24,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
@@ -194,4 +195,38 @@ func TestUpdateReconcilerKeepsConvergingInstanceInRollingWindow(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUpdateReconcilerResolvesTemplateConfigChanges(t *testing.T) {
+	its, tree, member := newITS2ConfigFixture(t, false)
+	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewAlignmentReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	for _, inst := range its2ConfigInstances(tree) {
+		inst.Generation = 1
+		inst.Status = workloads.InstanceStatus2{
+			ObservedGeneration: 1,
+			CurrentState:       workloads.InstanceCurrentStatePresent,
+			UpToDate:           true,
+			Conditions: []metav1.Condition{
+				{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue},
+				{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue},
+			},
+		}
+	}
+	its.Generation++
+	its.Spec.Instances[0].Configs[0].Volume.ConfigMapName = "main-new"
+	its.Spec.Instances[0].Configs[0].ConfigHash = ptr.To("specific-new")
+	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewUpdateReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	instances := its2ConfigInstances(tree)
+	assertITS2ConfigIntent(t, instances[member], "main-new", "specific-new")
+	assertITS2ConfigIntent(t, instances["demo-0"], "main", "global")
 }

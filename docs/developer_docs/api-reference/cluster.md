@@ -2835,7 +2835,7 @@ string
 <h3 id="apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
 </p>
 <div>
 <p>ClusterComponentConfig represents a configuration for a component.</p>
@@ -9311,6 +9311,23 @@ Add new or override existing envs.</p>
 <td>
 <em>(Optional)</em>
 <p>Specifies an override for the storage requirements of the instances.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">
+[]ClusterComponentConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Configs overrides managed file configurations for all instances of this template.
+Each entry must name a distinct configuration declared in the ComponentDefinition
+and managed by the Component. Each override accepts only name, variables, and configMap.name.
+Unspecified settings and configurations are inherited from the Component.</p>
 </td>
 </tr>
 </tbody>
@@ -19241,7 +19258,10 @@ If set, all the computing resources will be released.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Describe the configs to be reconfigured.</p>
+<p>Configs defines the default configurations and update settings for the InstanceSet.
+If a config sets volume, set volume.volumeName to the name of a ConfigMap volume
+in spec.template.spec.volumes. The volume supplies the default ConfigMap.
+If set, volume.configMapName must match that ConfigMap.</p>
 </td>
 </tr>
 <tr>
@@ -19367,7 +19387,7 @@ PodUpdatePolicy is set to StrictInPlace but the pods cannot be updated in-place)
 <h3 id="workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSpec">InstanceSpec</a>)
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSpec">InstanceSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
 </p>
 <div>
 </div>
@@ -19388,6 +19408,20 @@ string
 </td>
 <td>
 <p>The name of the config.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volume</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.ConfigVolumeBinding">
+ConfigVolumeBinding
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Volume identifies the ConfigMap volume for this configuration.</p>
 </td>
 </tr>
 <tr>
@@ -19463,6 +19497,48 @@ map[string]string
 <td>
 <em>(Optional)</em>
 <p>ReconfigureArgs is the runtime argv payload for the reconfigure action.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.ConfigVolumeBinding">ConfigVolumeBinding
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate</a>)
+</p>
+<div>
+<p>ConfigVolumeBinding associates a configuration with a Pod volume and its ConfigMap.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>volumeName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>VolumeName is the name of the ConfigMap volume in the Pod template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configMapName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ConfigMapName is the name of the ConfigMap in the Pod namespace.</p>
 </td>
 </tr>
 </tbody>
@@ -19989,7 +20065,10 @@ If set, all the computing resources will be released.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Describe the configs to be reconfigured.</p>
+<p>Configs defines the default configurations and update settings for the InstanceSet.
+If a config sets volume, set volume.volumeName to the name of a ConfigMap volume
+in spec.template.spec.volumes. The volume supplies the default ConfigMap.
+If set, volume.configMapName must match that ConfigMap.</p>
 </td>
 </tr>
 <tr>
@@ -21130,6 +21209,28 @@ map[string]string
 <td>
 <em>(Optional)</em>
 <p>Images for the containers of the instance template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configs</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.ConfigTemplate">
+[]ConfigTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Configs overrides the InstanceSet&rsquo;s configurations by name for this InstanceTemplate.
+Each override must match exactly one configuration in the InstanceSet.
+Configurations without an override are inherited.
+An override replaces the matching configuration&rsquo;s settings. If the override omits volume,
+it inherits the matching configuration&rsquo;s volume and ConfigMap.
+To select a different ConfigMap, set volume.configMapName. The override uses
+the volume of the matching InstanceSet configuration. If set, volume.volumeName
+must match that volume name.
+Configurations that use the same volume in a Pod must select the same ConfigMap.</p>
 </td>
 </tr>
 </tbody>

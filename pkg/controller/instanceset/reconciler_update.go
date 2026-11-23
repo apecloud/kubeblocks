@@ -62,17 +62,7 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
-	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
-
-	// 1. build desired name to template map
-	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
-	nameToTemplateMap, err := nameBuilder.BuildInstanceName2TemplateMap()
+	nameToTemplateMap, err := instancetemplate.BuildInstanceTemplateExtMap(its, tree)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
@@ -114,7 +104,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	// handle 'MemberUpdate'
-	memberUpdateQuota, err := r.memberUpdateQuota(its, oldPodList)
+	memberUpdateQuota, err := r.memberUpdateQuota(its, oldPodList, nameToTemplateMap)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
@@ -131,7 +121,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		if isTerminating(pod) {
 			continue
 		}
-		updatePolicy, _, _, err := getPodUpdatePolicy(its, pod)
+		updatePolicy, _, _, err := getPodUpdatePolicy(its, pod, nameToTemplateMap[pod.Name])
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
@@ -163,7 +153,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			break
 		}
 
-		updatePolicy, specUpdatePolicy, recreateReason, err := getPodUpdatePolicy(its, pod)
+		updatePolicy, specUpdatePolicy, recreateReason, err := getPodUpdatePolicy(its, pod, nameToTemplateMap[pod.Name])
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
@@ -182,10 +172,14 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			recreateReason = "the API required"
 		}
 
+		desiredPod, err := buildInstancePodByTemplateForUpdate(pod, nameToTemplateMap[pod.Name], its)
+		if err != nil {
+			return kubebuilderx.Continue, err
+		}
 		// Always call reconfigure to execute reconfigure actions
-		allUpdated, err1 := r.reconfigure(tree, its, pod)
-		if err1 != nil {
-			return kubebuilderx.Continue, err1
+		allUpdated, err := r.reconfigure(tree, its, pod, desiredPod, nameToTemplateMap[pod.Name].Configs)
+		if err != nil {
+			return kubebuilderx.Continue, err
 		}
 		if !allUpdated && updatePolicy == noOpsPolicy {
 			updatingPods++
@@ -193,10 +187,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 
 		switch updatePolicy {
 		case inPlaceUpdatePolicy:
-			newPod, err := buildInstancePodByTemplateForUpdate(pod, nameToTemplateMap[pod.Name], its)
-			if err != nil {
-				return kubebuilderx.Continue, err
-			}
+			newPod := desiredPod
 			newMergedPod := copyAndMerge(pod, newPod)
 			supportResizeSubResource, err := intctrlutil.SupportResizeSubResource()
 			if err != nil {
@@ -262,11 +253,13 @@ func (r *updateReconciler) rollingUpdateQuota(its *workloads.InstanceSet, podLis
 	return replicas, unavailable, nil
 }
 
-func (r *updateReconciler) memberUpdateQuota(its *workloads.InstanceSet, podList []*corev1.Pod) (int, error) {
+func (r *updateReconciler) memberUpdateQuota(its *workloads.InstanceSet, podList []*corev1.Pod, templates map[string]*instancetemplate.InstanceTemplateExt) (int, error) {
 	// if it's a roleful InstanceSet, we use updateCount to represent Pods can be updated according to the spec.memberUpdateStrategy.
 	updateCount := len(podList)
 	if len(its.Spec.Roles) > 0 {
-		plan := NewUpdatePlan(*its, podList, r.isInstUpdated)
+		plan := NewUpdatePlan(*its, podList, func(its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
+			return r.isInstUpdated(its, pod, templates[pod.Name])
+		})
 		podsToBeUpdated, err := plan.Execute()
 		if err != nil {
 			return -1, err
@@ -316,8 +309,10 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, its *worklo
 	return nil
 }
 
-func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
-	toUpdate, err := configsToUpdate(its, pod)
+func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet,
+	pod, desiredPod *corev1.Pod, configs []workloads.ConfigTemplate) (bool, error) {
+	mountedConfigs := instancetemplate.ConfigsForMountedVolumes(configs, pod, desiredPod)
+	toUpdate, err := configsToUpdate(mountedConfigs, pod)
 	if err != nil {
 		return false, err
 	}
@@ -371,12 +366,12 @@ func reconfigureOptions(config workloads.ConfigTemplate) *lifecycle.Options {
 	return &lifecycle.Options{Arguments: config.ReconfigureArgs}
 }
 
-func (r *updateReconciler) isInstUpdated(its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
-	updated, err1 := isPodUpdated(its, pod)
+func (r *updateReconciler) isInstUpdated(its *workloads.InstanceSet, pod *corev1.Pod, template *instancetemplate.InstanceTemplateExt) (bool, error) {
+	updated, err1 := isPodUpdated(its, pod, template)
 	if err1 != nil || !updated {
 		return updated, err1
 	}
-	toUpdate, err2 := configsToUpdate(its, pod)
+	toUpdate, err2 := configsToUpdate(template.Configs, pod)
 	return len(toUpdate) == 0, err2
 }
 

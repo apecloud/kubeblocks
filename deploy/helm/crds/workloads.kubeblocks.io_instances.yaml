@@ -538,6 +538,21 @@ spec:
                     restart:
                       description: Specifies whether to restart instances.
                       type: boolean
+                    volume:
+                      description: Volume identifies the ConfigMap volume for this
+                        configuration.
+                      properties:
+                        configMapName:
+                          description: ConfigMapName is the name of the ConfigMap
+                            in the Pod namespace.
+                          minLength: 1
+                          type: string
+                        volumeName:
+                          description: VolumeName is the name of the ConfigMap volume
+                            in the Pod template.
+                          minLength: 1
+                          type: string
+                      type: object
                   required:
                   - name
                   type: object

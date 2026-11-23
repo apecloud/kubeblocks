@@ -27,6 +27,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
@@ -55,6 +56,7 @@ func resolveConfigs(template *InstanceTemplateExt, configs, overrides []workload
 		counts[config.Name]++
 		indices[config.Name] = i
 	}
+	var overriddenConfigs []string
 	seen := make(map[string]bool, len(overrides))
 	for i := range overrides {
 		config := &overrides[i]
@@ -72,7 +74,8 @@ func resolveConfigs(template *InstanceTemplateExt, configs, overrides []workload
 		if counts[config.Name] > 1 {
 			return fmt.Errorf("config override %q matches multiple InstanceSet configs", config.Name)
 		}
-		baseBinding := effective[index].Volume
+		baseConfig := &effective[index]
+		baseBinding := baseConfig.Volume
 		if binding := config.Volume; binding != nil {
 			if binding.ConfigMapName == "" {
 				return fmt.Errorf("config override %q: ConfigMap name must not be empty", config.Name)
@@ -80,6 +83,10 @@ func resolveConfigs(template *InstanceTemplateExt, configs, overrides []workload
 			if baseBinding == nil || (binding.VolumeName != "" && binding.VolumeName != baseBinding.VolumeName) {
 				return fmt.Errorf("config override %q: volume must match an explicit InstanceSet config binding", config.Name)
 			}
+		}
+		if ptr.Deref(config.ConfigHash, "") != ptr.Deref(baseConfig.ConfigHash, "") ||
+			(config.Volume != nil && config.Volume.ConfigMapName != baseBinding.ConfigMapName) {
+			overriddenConfigs = append(overriddenConfigs, config.Name)
 		}
 		effective[index] = *config.DeepCopy()
 		if effective[index].Volume == nil {
@@ -114,6 +121,8 @@ func resolveConfigs(template *InstanceTemplateExt, configs, overrides []workload
 	}
 	template.PodTemplateSpec = *podTemplate
 	template.Configs = effective
+	slices.Sort(overriddenConfigs)
+	template.overriddenConfigs = overriddenConfigs
 	return nil
 }
 
@@ -139,39 +148,62 @@ func configVolumeIndex(template *InstanceTemplateExt, config workloads.ConfigTem
 	return 0, fmt.Errorf("config %q: volume %q does not exist", config.Name, binding.VolumeName)
 }
 
-// The Pod template carries the desired scope. The same annotation on the Pod
-// records its applied scope so restoring a default still reloads locally.
 const configReloadScopeAnnotation = "workloads.kubeblocks.io/config-reload-scope"
 
-func setConfigReloadScope(templates map[string]*InstanceTemplateExt, names sets.Set[string]) {
-	var scope string
-	if len(names) > 0 {
-		data, _ := json.Marshal(sets.List(names))
-		scope = string(data)
-	}
+// Scoped configurations can differ anywhere in the InstanceSet. Overrides
+// track only the differences applied by this Pod, which can outlive the
+// InstanceTemplate override until the Pod has reverted or been retired.
+type configReloadScope struct {
+	Scoped      []string `json:"scoped,omitempty"`
+	Overrides   []string `json:"overrides,omitempty"`
+	InstanceSet string   `json:"instanceSet,omitempty"`
+}
+
+func setConfigReloadScope(templates map[string]*InstanceTemplateExt, names sets.Set[string], instanceSet string) {
+	scoped := sets.List(names)
 	for _, template := range templates {
-		if scope == "" {
+		if len(scoped) == 0 {
 			delete(template.Annotations, configReloadScopeAnnotation)
-		} else {
-			if template.Annotations == nil {
-				template.Annotations = make(map[string]string)
-			}
-			template.Annotations[configReloadScopeAnnotation] = scope
+			continue
 		}
+		scope := configReloadScope{Scoped: scoped, Overrides: template.overriddenConfigs}
+		if len(scope.Overrides) != 0 {
+			scope.InstanceSet = instanceSet
+		}
+		data, _ := json.Marshal(scope)
+		if template.Annotations == nil {
+			template.Annotations = make(map[string]string)
+		}
+		template.Annotations[configReloadScopeAnnotation] = string(data)
 	}
 }
 
-// ConfigReloadScope returns the configuration names marked for Pod-local reload.
-func ConfigReloadScope(pods ...*corev1.Pod) sets.Set[string] {
-	scope := sets.New[string]()
-	for _, pod := range pods {
-		var names []string
-		if value := pod.Annotations[configReloadScopeAnnotation]; value != "" &&
-			json.Unmarshal([]byte(value), &names) == nil {
-			scope.Insert(names...)
+func podConfigReloadScope(pod *corev1.Pod) configReloadScope {
+	var scope configReloadScope
+	if value := pod.Annotations[configReloadScopeAnnotation]; value != "" {
+		if err := json.Unmarshal([]byte(value), &scope); err != nil {
+			return configReloadScope{}
 		}
 	}
 	return scope
+}
+
+// ConfigReloadScope returns the configuration names marked for Pod-local reload.
+func ConfigReloadScope(pod *corev1.Pod) sets.Set[string] {
+	return sets.New(podConfigReloadScope(pod).Scoped...)
+}
+
+// AppliedConfigReloadOverrides returns the names of overrides recorded on Pods
+// of the InstanceSet in the current observation.
+func AppliedConfigReloadOverrides(instanceSet string, pods ...*corev1.Pod) sets.Set[string] {
+	overrides := sets.New[string]()
+	for _, pod := range pods {
+		scope := podConfigReloadScope(pod)
+		if scope.InstanceSet == instanceSet {
+			overrides.Insert(scope.Overrides...)
+		}
+	}
+	return overrides
 }
 
 // ConfigReloadTarget pins a scoped reload to the triggering Pod and skips it

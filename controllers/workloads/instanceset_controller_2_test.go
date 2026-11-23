@@ -504,6 +504,104 @@ var _ = Describe("InstanceSet Controller 2", func() {
 			Expect(checkConfig(ordinary, "shared-config", "base")).Should(Equal(ordinaryUID))
 		})
 
+		It("restores the shared reload selector after the last override goes offline", func() {
+			supportResize := intctrlutil.SupportResizeSubResource
+			intctrlutil.SupportResizeSubResource = func() (bool, error) { return false, nil }
+			DeferCleanup(func() { intctrlutil.SupportResizeSubResource = supportResize })
+			reload := testapps.NewLifecycleAction("reconfigure")
+			reload.TargetPodSelector = kbappsv1.OrdinalSelector
+			reload.MatchingKey = "1"
+			testapps.MockKBAgentClientDefault()
+			DeferCleanup(kbacli.UnsetMockClient)
+
+			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
+				f.SetReplicas(4)
+				f.AddConfigs(workloads.ConfigTemplate{
+					Name: "server", ConfigHash: ptr.To("base"), Reconfigure: reload,
+					Volume: &workloads.ConfigVolumeBinding{VolumeName: "config"},
+				})
+				spec := &f.Get().Spec
+				spec.PodUpdatePolicy = kbappsv1.StrictInPlacePodUpdatePolicyType
+				spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
+					Type:          kbappsv1.RollingUpdateStrategyType,
+					RollingUpdate: &workloads.RollingUpdate{MaxUnavailable: ptr.To(intstr.FromInt(4))},
+				}
+				spec.Template.Spec.Volumes = []corev1.Volume{{
+					Name: "config",
+					VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{Name: "shared-config"},
+					}},
+				}}
+				spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: "config", MountPath: "/config"}}
+				spec.Instances = []workloads.InstanceTemplate{
+					{Name: "z", Configs: []workloads.ConfigTemplate{{
+						Name: "server", ConfigHash: ptr.To("z-initial"), Reconfigure: reload,
+					}}},
+					{Name: "b", Configs: []workloads.ConfigTemplate{{
+						Name: "server", ConfigHash: ptr.To("b-initial"), Reconfigure: reload,
+						Volume: &workloads.ConfigVolumeBinding{ConfigMapName: "b-config"},
+					}}},
+				}
+			})
+
+			z := client.ObjectKey{Namespace: itsKey.Namespace, Name: itsKey.Name + "-z-0"}
+			b := client.ObjectKey{Namespace: itsKey.Namespace, Name: itsKey.Name + "-b-0"}
+			checkHash := func(key client.ObjectKey, hash string) {
+				Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pod *corev1.Pod) {
+					g.Expect(pod.Annotations).Should(HaveKeyWithValue(constant.CMInsConfigurationHashLabelKey, fmt.Sprintf("{\"server\":%q}", hash)))
+				})).Should(Succeed())
+			}
+			changeITS := func(change func(*workloads.InstanceSet)) {
+				Eventually(testapps.GetAndChangeObj(&testCtx, itsKey, change)).Should(Succeed())
+			}
+			mockPodReady(z.Namespace, z.Name)
+			mockPodReady(b.Namespace, b.Name)
+			mockPodReady(itsKey.Namespace, podName(0))
+			mockPodReady(itsKey.Namespace, podName(1))
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.IsInstanceSetReady()).Should(BeTrue())
+			})).Should(Succeed())
+
+			changeITS(func(its *workloads.InstanceSet) { its.Spec.Instances[0].Configs = nil })
+			checkHash(z, "base")
+
+			changeITS(func(its *workloads.InstanceSet) { its.Spec.Instances[1].Configs = nil })
+			Eventually(testapps.CheckObj(&testCtx, b, func(g Gomega, inst *workloads.Instance) {
+				g.Expect(meta.IsStatusConditionTrue(inst.Status.Conditions, string(workloads.InstanceUpdateRestricted))).Should(BeTrue())
+			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, b, func(g Gomega, pod *corev1.Pod) {
+				g.Expect(pod.Spec.Volumes).Should(ContainElement(And(HaveField("Name", "config"), HaveField("ConfigMap", HaveField("Name", "b-config")))))
+			})).Should(Succeed())
+
+			changeITS(func(its *workloads.InstanceSet) { its.Spec.Configs[0].ConfigHash = ptr.To("base-next") })
+			Eventually(testapps.CheckObj(&testCtx, z, func(g Gomega, inst *workloads.Instance) {
+				g.Expect(inst.Spec.Configs[0].ConfigHash).Should(Equal(ptr.To("base-next")))
+			})).Should(Succeed())
+			checkHash(z, "base-next")
+
+			changeITS(func(its *workloads.InstanceSet) {
+				its.Spec.Replicas = ptr.To[int32](3)
+				its.Spec.Instances[1].Replicas = ptr.To[int32](0)
+				its.Spec.OfflineInstances = []string{b.Name}
+			})
+			Eventually(func(g Gomega) {
+				g.Expect(testCtx.Cli.Get(testCtx.Ctx, b, &corev1.Pod{})).Should(Satisfy(apierrors.IsNotFound))
+			}).Should(Succeed())
+			changeITS(func(its *workloads.InstanceSet) { its.Spec.Configs[0].ConfigHash = ptr.To("after-offline") })
+			Eventually(testapps.CheckObj(&testCtx, z, func(g Gomega, inst *workloads.Instance) {
+				g.Expect(inst.Spec.Configs[0].ConfigHash).Should(Equal(ptr.To("after-offline")))
+			})).Should(Succeed())
+			Eventually(func(g Gomega) {
+				var events corev1.EventList
+				g.Expect(testCtx.Cli.List(testCtx.Ctx, &events, client.InNamespace(z.Namespace))).Should(Succeed())
+				g.Expect(events.Items).Should(ContainElement(And(
+					HaveField("InvolvedObject.Name", z.Name),
+					HaveField("Reason", "FailedReconcile"),
+					HaveField("Message", ContainSubstring("no available pod to execute action reconfigure")),
+				)))
+			}).Should(Succeed())
+		})
+
 		It("pod management - ordered ready", func() {
 			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
 				f.SetPodManagementPolicy(appsv1.OrderedReadyPodManagement)

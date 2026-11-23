@@ -207,7 +207,7 @@ func TestUpdateReconcilerPatchesKBManagedToolsImagesOnAdmittedPod(t *testing.T) 
 		t.Fatalf("ObjectTree.Add() error = %v", err)
 	}
 
-	if _, err = NewUpdateReconciler().Reconcile(tree); err != nil {
+	if _, err = NewUpdateReconciler(nil).Reconcile(tree); err != nil {
 		t.Fatalf("Reconcile() error = %v", err)
 	}
 	postPods := tree.List(&corev1.Pod{})

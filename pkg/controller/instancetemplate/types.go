@@ -52,6 +52,7 @@ type InstanceTemplateExt struct {
 	corev1.PodTemplateSpec
 	VolumeClaimTemplates []corev1.PersistentVolumeClaim
 	Configs              []workloads.ConfigTemplate
+	overriddenConfigs    []string
 }
 
 type PodNameBuilder interface {

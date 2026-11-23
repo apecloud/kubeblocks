@@ -112,7 +112,7 @@ func buildInstanceTemplateExtMap(itsExt *InstanceSetExt, nameBuilder PodNameBuil
 			return nil, fmt.Errorf("instance template %q: %w", name, err)
 		}
 	}
-	setConfigReloadScope(resolved, configOverrides)
+	setConfigReloadScope(resolved, configOverrides, its.Name)
 	return templates, nil
 }
 

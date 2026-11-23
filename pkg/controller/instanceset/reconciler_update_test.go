@@ -1389,3 +1389,101 @@ func (a *configReloadAgent) Action(context.Context, proto.ActionRequest) (proto.
 	a.calls++
 	return proto.ActionResponse{}, a.err
 }
+
+func TestDirectReloadSelectorAfterSequentialRollbackAndOffline(t *testing.T) {
+	for _, limited := range []bool{false, true} {
+		name := "all surviving members in the update window"
+		if limited {
+			name = "some surviving members outside the update window"
+		}
+		t.Run(name, func(t *testing.T) {
+			its, tree, pods, aName := newDirectConfigFixture(t, "named", func(its *workloads.InstanceSet, tpl *workloads.InstanceTemplate) {
+				tpl.Configs = tpl.Configs[:1]
+				its.Spec.LifecycleActions.Switchover = nil
+				its.Spec.Configs[0].Reconfigure = its.Spec.Configs[0].Reconfigure.DeepCopy()
+				its.Spec.Configs[0].Reconfigure.TargetPodSelector = kbappsv1.AllReplicas
+			})
+			getPod := func(name string) *corev1.Pod {
+				t.Helper()
+				obj, err := tree.Get(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: its.Namespace, Name: name}})
+				if err != nil {
+					t.Fatal(err)
+				}
+				pod, _ := obj.(*corev1.Pod)
+				return pod
+			}
+			publish := func() {
+				its.Generation++
+				runDirectReconciler(t, NewRevisionUpdateReconciler(), tree)
+			}
+			markReady := func(names ...string) {
+				t.Helper()
+				for _, name := range names {
+					pod := getPod(name)
+					if pod == nil {
+						t.Fatalf("missing %s", name)
+					}
+					pod.Status = *pods[aName].Status.DeepCopy()
+				}
+			}
+			agent := &configReloadAgent{}
+			kbacli.SetMockClient(agent, nil)
+			t.Cleanup(kbacli.UnsetMockClient)
+
+			b := its.Spec.Instances[0].DeepCopy()
+			b.Name = "b"
+			b.Configs[0].Volume.ConfigMapName = "main-b"
+			its.Spec.Instances = append(its.Spec.Instances, *b, workloads.InstanceTemplate{Name: "y"}, workloads.InstanceTemplate{Name: "z"})
+			its.Spec.Replicas = ptr.To[int32](4)
+			if err := tree.Delete(pods["demo-0"]); err != nil {
+				t.Fatal(err)
+			}
+			publish()
+			runDirectReconciler(t, NewReplicasAlignmentReconciler(), tree)
+			markReady("demo-b-0", "demo-y-0", "demo-z-0")
+
+			its.Spec.Instances[0].Configs = nil
+			publish()
+			runDirectReconciler(t, NewUpdateReconciler(), tree)
+			runDirectReconciler(t, NewReplicasAlignmentReconciler(), tree)
+			markReady(aName)
+			if getPod(aName).Spec.Volumes[0].ConfigMap.Name != "main" || getPod("demo-b-0").Spec.Volumes[0].ConfigMap.Name != "main-b" {
+				t.Fatal("staged rollback changed the wrong set of mounts")
+			}
+			its.Spec.Configs[0].ConfigHash = ptr.To("with-b")
+			publish()
+			for range 3 {
+				calls := agent.calls
+				runDirectReconciler(t, NewUpdateReconciler(), tree)
+				if agent.calls != calls+1 {
+					t.Fatalf("shared update with an active override used %d agents, want one", agent.calls-calls)
+				}
+			}
+
+			its.Spec.OfflineInstances = []string{"demo-b-0"}
+			its.Spec.Instances[1].Replicas = ptr.To[int32](0)
+			its.Spec.Replicas = ptr.To[int32](3)
+			if limited {
+				its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
+					Type:          kbappsv1.RollingUpdateStrategyType,
+					RollingUpdate: &workloads.RollingUpdate{Replicas: ptr.To(intstr.FromInt(1))},
+				}
+			}
+			publish()
+			runDirectReconciler(t, NewReplicasAlignmentReconciler(), tree)
+			runDirectReconciler(t, NewUpdateReconciler(), tree)
+			if getPod("demo-b-0") != nil {
+				t.Fatal("expected last overridden Pod to retire")
+			}
+			for _, hash := range []string{"after-b", "again-after-b"} {
+				its.Spec.Configs[0].ConfigHash = ptr.To(hash)
+				publish()
+				calls := agent.calls
+				runDirectReconciler(t, NewUpdateReconciler(), tree)
+				if agent.calls != calls+3 {
+					t.Fatalf("All should reach all surviving Pods, got %d calls", agent.calls-calls)
+				}
+			}
+		})
+	}
+}

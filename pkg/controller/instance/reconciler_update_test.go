@@ -72,7 +72,7 @@ func TestInstanceConfigUpdateRouting(t *testing.T) {
 			origSupportResize := intctrlutil.SupportResizeSubResource
 			intctrlutil.SupportResizeSubResource = func() (bool, error) { return false, nil }
 			t.Cleanup(func() { intctrlutil.SupportResizeSubResource = origSupportResize })
-			_, err := NewUpdateReconciler().Reconcile(tree)
+			_, err := NewUpdateReconciler(nil).Reconcile(tree)
 			if !errors.Is(err, tc.reloadErr) {
 				t.Fatalf("Reconcile() error = %v, want %v", err, tc.reloadErr)
 			}
@@ -141,7 +141,7 @@ func TestInstanceConfigMountUpdateRestrictions(t *testing.T) {
 			inst.Spec.Configs[0].Volume.ConfigMapName = "desired-config"
 			inst.Spec.Configs[0].ConfigHash = ptr.To("desired-hash")
 			tc.mutate(inst, pod)
-			if _, err := NewUpdateReconciler().Reconcile(tree); err != nil {
+			if _, err := NewUpdateReconciler(nil).Reconcile(tree); err != nil {
 				t.Fatalf("Reconcile() error = %v", err)
 			}
 			if len(tree.List(&corev1.Pod{})) != 1 || spy.switchoverCalls != 0 || len(spy.configs) != 0 {
@@ -188,7 +188,7 @@ func TestInstanceMixedConfigUpdateRouting(t *testing.T) {
 			inst.Spec.Template.Spec.Containers[0].Image = "mysql:new"
 			inst.Spec.PodUpdatePolicy = tc.updatePolicy
 			inst.Spec.PodUpgradePolicy = tc.upgradePolicy
-			if _, err := NewUpdateReconciler().Reconcile(tree); err != nil {
+			if _, err := NewUpdateReconciler(nil).Reconcile(tree); err != nil {
 				t.Fatal(err)
 			}
 			if !reflect.DeepEqual(spy.configs, []string{"aux"}) {

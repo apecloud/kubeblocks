@@ -21,6 +21,8 @@ package instanceset
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"reflect"
 	"slices"
 	"testing"
@@ -31,12 +33,19 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -45,6 +54,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -1184,5 +1194,269 @@ func TestDirectConfigRollbackPreservesInheritedSameMountReload(t *testing.T) {
 				t.Fatalf("reloads=%v; want inherited B reload for overridden member before restart", spy.configs)
 			}
 		})
+	}
+}
+
+type perPodLifecycleSpy struct {
+	lifecycleCallSpy
+	podName  string
+	onReconf func(podName string) error
+	onSwitch func(podName string) error
+}
+
+func (s *perPodLifecycleSpy) Reconfigure(_ context.Context, _ client.Reader, _ *lifecycle.Options, _ map[string]string) error {
+	if s.onReconf != nil {
+		return s.onReconf(s.podName)
+	}
+	return nil
+}
+
+func (s *perPodLifecycleSpy) Switchover(_ context.Context, _ client.Reader, _ *lifecycle.Options, _ string) error {
+	if s.onSwitch != nil {
+		return s.onSwitch(s.podName)
+	}
+	return nil
+}
+
+func newDirectUpdateFixture(t *testing.T, restart bool, updatePolicy kbappsv1.PodUpdatePolicyType) (client.Client, ctrl.Request) {
+	t.Helper()
+	origSupportResize := intctrlutil.SupportResizeSubResource
+	intctrlutil.SupportResizeSubResource = func() (bool, error) { return false, nil }
+	t.Cleanup(func() { intctrlutil.SupportResizeSubResource = origSupportResize })
+
+	scheme := runtime.NewScheme()
+	if err := clientgoscheme.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := workloads.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	model.AddScheme(workloads.AddToScheme)
+
+	action := &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"action"}}}
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", UID: "demo-uid", Generation: 1},
+		Spec: workloads.InstanceSetSpec{
+			Replicas:            ptr.To[int32](2),
+			PodManagementPolicy: appsv1.ParallelPodManagement,
+			PodUpdatePolicy:     updatePolicy,
+			PodUpgradePolicy:    updatePolicy,
+			InstanceUpdateStrategy: &workloads.InstanceUpdateStrategy{
+				Type:          kbappsv1.RollingUpdateStrategyType,
+				RollingUpdate: &workloads.RollingUpdate{MaxUnavailable: ptr.To(intstr.FromInt32(2))},
+			},
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "demo"}},
+			Configs: []workloads.ConfigTemplate{{
+				Name:        "main",
+				ConfigHash:  ptr.To("old"),
+				Restart:     ptr.To(restart),
+				Reconfigure: action,
+			}},
+			LifecycleActions: &workloads.LifecycleActions{Switchover: action},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "demo"}},
+				Spec: corev1.PodSpec{
+					Volumes: []corev1.Volume{{
+						Name: "main",
+						VolumeSource: corev1.VolumeSource{
+							ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "main-cm"}},
+						},
+					}},
+					Containers: []corev1.Container{{
+						Name:         "db",
+						Image:        "db:v1",
+						VolumeMounts: []corev1.VolumeMount{{Name: "main", MountPath: "/etc/main"}},
+					}},
+				},
+			},
+		},
+	}
+
+	cli := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithStatusSubresource(&workloads.InstanceSet{}, &corev1.Pod{}).
+		WithObjects(its).
+		Build()
+	req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(its)}
+
+	for range 2 {
+		if _, err := runDirectControllerOnce(cli, req); err != nil {
+			t.Fatal(err)
+		}
+	}
+	podList := &corev1.PodList{}
+	if err := cli.List(context.Background(), podList, client.InNamespace("default")); err != nil {
+		t.Fatal(err)
+	}
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		pod.Status.Phase = corev1.PodRunning
+		pod.Status.Conditions = []corev1.PodCondition{{
+			Type:               corev1.PodReady,
+			Status:             corev1.ConditionTrue,
+			LastTransitionTime: metav1.NewTime(time.Now().Add(-time.Minute)),
+		}}
+		if err := cli.Status().Update(context.Background(), pod); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := runDirectControllerOnce(cli, req); err != nil {
+		t.Fatal(err)
+	}
+	return cli, req
+}
+
+func runDirectControllerOnce(cli client.Client, req ctrl.Request) (ctrl.Result, error) {
+	ctx := context.Background()
+	return kubebuilderx.NewController(ctx, cli, req, record.NewFakeRecorder(100), logf.FromContext(ctx)).
+		Prepare(NewTreeLoader()).
+		Do(NewAPIVersionReconciler()).
+		Do(NewFixMetaReconciler()).
+		Do(NewDeletionReconciler()).
+		Do(NewValidationReconciler()).
+		Do(NewStatusReconciler()).
+		Do(NewRevisionUpdateReconciler()).
+		Do(NewAssistantObjectReconciler()).
+		Do(NewReplicasAlignmentReconciler()).
+		Do(NewUpdateReconciler()).
+		Commit()
+}
+
+func podConfigHash(t *testing.T, cli client.Client, name string) string {
+	t.Helper()
+	pod := &corev1.Pod{}
+	if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: name}, pod); err != nil {
+		t.Fatal(err)
+	}
+	hashes := map[string]string{}
+	if raw := pod.Annotations[constant.CMInsConfigurationHashLabelKey]; raw != "" {
+		if err := json.Unmarshal([]byte(raw), &hashes); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return hashes["main"]
+}
+
+func bumpConfigHash(t *testing.T, cli client.Client, req ctrl.Request, hash string) int64 {
+	t.Helper()
+	its := &workloads.InstanceSet{}
+	if err := cli.Get(context.Background(), req.NamespacedName, its); err != nil {
+		t.Fatal(err)
+	}
+	initialObservedGen := its.Status.ObservedGeneration
+	its.Spec.Configs[0].ConfigHash = ptr.To(hash)
+	its.Generation++
+	if err := cli.Update(context.Background(), its); err != nil {
+		t.Fatal(err)
+	}
+	return initialObservedGen
+}
+
+func installPerPodLifecycleSpy(t *testing.T, onReconf, onSwitch func(podName string) error) {
+	t.Helper()
+	orig := newLifecycleAction
+	newLifecycleAction = func(_ *workloads.InstanceSet, _ *kubebuilderx.ObjectTree, pod *corev1.Pod) (lifecycle.Lifecycle, error) {
+		return &perPodLifecycleSpy{podName: pod.Name, onReconf: onReconf, onSwitch: onSwitch}, nil
+	}
+	t.Cleanup(func() { newLifecycleAction = orig })
+}
+
+func TestDirectUpdatePersistsEarlierPodReloadOnLaterPodFailure(t *testing.T) {
+	cli, req := newDirectUpdateFixture(t, false, kbappsv1.PreferInPlacePodUpdatePolicyType)
+	injectedErr := errors.New("injected second pod reload failure")
+	failSecond := true
+	reloads := map[string]int{}
+	installPerPodLifecycleSpy(t, func(podName string) error {
+		reloads[podName]++
+		if podName == "demo-0" && failSecond {
+			return injectedErr
+		}
+		return nil
+	}, nil)
+
+	bumpConfigHash(t, cli, req, "new")
+
+	// Pass 1: demo-1 succeeds and persists its hash; demo-0 fails and returns the error.
+	if _, err := runDirectControllerOnce(cli, req); !errors.Is(err, injectedErr) {
+		t.Fatalf("pass 1 error = %v, want %v", err, injectedErr)
+	}
+	if reloads["demo-1"] != 1 || reloads["demo-0"] != 1 {
+		t.Fatalf("pass 1 reloads = %v, want demo-1=1 demo-0=1", reloads)
+	}
+	if got := podConfigHash(t, cli, "demo-1"); got != "new" {
+		t.Fatalf("pass 1 demo-1 hash = %q, want %q", got, "new")
+	}
+	if got := podConfigHash(t, cli, "demo-0"); got != "old" {
+		t.Fatalf("pass 1 demo-0 hash = %q, want %q", got, "old")
+	}
+
+	// Pass 2: demo-0 still fails; demo-1 must not be replayed.
+	if _, err := runDirectControllerOnce(cli, req); !errors.Is(err, injectedErr) {
+		t.Fatalf("pass 2 error = %v, want %v", err, injectedErr)
+	}
+	if reloads["demo-1"] != 1 || reloads["demo-0"] != 2 {
+		t.Fatalf("pass 2 reloads = %v, want demo-1=1 demo-0=2", reloads)
+	}
+
+	// Pass 3: demo-0 recovers; both pods converge without replaying demo-1.
+	failSecond = false
+	if _, err := runDirectControllerOnce(cli, req); err != nil {
+		t.Fatalf("pass 3 error = %v", err)
+	}
+	if reloads["demo-1"] != 1 || reloads["demo-0"] != 3 {
+		t.Fatalf("pass 3 reloads = %v, want demo-1=1 demo-0=3", reloads)
+	}
+	if podConfigHash(t, cli, "demo-1") != "new" || podConfigHash(t, cli, "demo-0") != "new" {
+		t.Fatalf("pass 3 hashes did not converge")
+	}
+}
+
+func TestDirectUpdatePersistsEarlierPodDeleteOnLaterPodFailure(t *testing.T) {
+	cli, req := newDirectUpdateFixture(t, true, kbappsv1.ReCreatePodUpdatePolicyType)
+	injectedErr := errors.New("injected second pod failure")
+	reloads, switchovers := map[string]int{}, map[string]int{}
+	installPerPodLifecycleSpy(t, func(podName string) error {
+		reloads[podName]++
+		if podName == "demo-0" {
+			return injectedErr
+		}
+		return nil
+	}, func(podName string) error {
+		switchovers[podName]++
+		return nil
+	})
+
+	bumpConfigHash(t, cli, req, "new")
+
+	if _, err := runDirectControllerOnce(cli, req); !errors.Is(err, injectedErr) {
+		t.Fatalf("error = %v, want %v", err, injectedErr)
+	}
+	if reloads["demo-1"] != 1 || switchovers["demo-1"] != 1 || reloads["demo-0"] != 1 {
+		t.Fatalf("unexpected action counts: reloads=%v switchovers=%v", reloads, switchovers)
+	}
+	if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "demo-1"}, &corev1.Pod{}); !apierrors.IsNotFound(err) {
+		t.Fatalf("demo-1 should have been deleted on commit, got err=%v", err)
+	}
+	if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "demo-0"}, &corev1.Pod{}); err != nil {
+		t.Fatalf("demo-0 should remain present after failure, got err=%v", err)
+	}
+}
+
+func TestDirectUpdateFirstPodFailureDoesNotCommit(t *testing.T) {
+	cli, req := newDirectUpdateFixture(t, false, kbappsv1.PreferInPlacePodUpdatePolicyType)
+	injectedErr := errors.New("injected first pod failure")
+	installPerPodLifecycleSpy(t, func(_ string) error { return injectedErr }, nil)
+
+	initialObservedGen := bumpConfigHash(t, cli, req, "new")
+
+	if _, err := runDirectControllerOnce(cli, req); !errors.Is(err, injectedErr) {
+		t.Fatalf("error = %v, want %v", err, injectedErr)
+	}
+	updated := &workloads.InstanceSet{}
+	if err := cli.Get(context.Background(), req.NamespacedName, updated); err != nil {
+		t.Fatal(err)
+	}
+	if updated.Status.ObservedGeneration != initialObservedGen {
+		t.Fatalf("first-pod failure unexpectedly committed status: observedGeneration=%d, want %d", updated.Status.ObservedGeneration, initialObservedGen)
 	}
 }

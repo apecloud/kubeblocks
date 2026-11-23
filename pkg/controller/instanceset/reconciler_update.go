@@ -136,8 +136,15 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	// window, while updatingPods tracks actual updates admitted in this round.
 	updatedPods := 0
 	updatingPods := 0
+	hasPersistedProgress := false
 	isBlocked := false
 	needRetry := false
+	failWithProgress := func(err error) (kubebuilderx.Result, error) {
+		if hasPersistedProgress {
+			return kubebuilderx.CommitOnError, err
+		}
+		return kubebuilderx.Continue, err
+	}
 	for _, pod := range oldPodList {
 		if updatedPods >= rollingUpdateQuota {
 			break
@@ -155,7 +162,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 
 		updatePolicy, specUpdatePolicy, recreateReason, err := getPodUpdatePolicy(its, pod, nameToTemplateMap[pod.Name])
 		if err != nil {
-			return kubebuilderx.Continue, err
+			return failWithProgress(err)
 		}
 		if updatePolicy == recreatePolicy && specUpdatePolicy == kbappsv1.StrictInPlacePodUpdatePolicyType {
 			message := fmt.Sprintf("InstanceSet %s/%s blocks on update as the PodUpdatePolicy is %s and the pod %s can not inplace update",
@@ -174,12 +181,12 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 
 		desiredPod, err := buildInstancePodByTemplateForUpdate(pod, nameToTemplateMap[pod.Name], its)
 		if err != nil {
-			return kubebuilderx.Continue, err
+			return failWithProgress(err)
 		}
 		// Always call reconfigure to execute reconfigure actions
 		allUpdated, err := r.reconfigure(tree, its, pod, desiredPod, nameToTemplateMap[pod.Name].Configs)
 		if err != nil {
-			return kubebuilderx.Continue, err
+			return failWithProgress(err)
 		}
 		if !allUpdated && updatePolicy == noOpsPolicy {
 			updatingPods++
@@ -192,7 +199,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			supportResizeSubResource, err := intctrlutil.SupportResizeSubResource()
 			if err != nil {
 				tree.Logger.Error(err, "check support resize sub resource error")
-				return kubebuilderx.Continue, err
+				return failWithProgress(err)
 			}
 
 			switch {
@@ -202,23 +209,25 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 				err = tree.Update(newMergedPod, kubebuilderx.WithPatch(true))
 			default:
 				if err = r.switchover(tree, its, newMergedPod.(*corev1.Pod)); err != nil {
-					return kubebuilderx.Continue, err
+					return failWithProgress(err)
 				}
 				err = tree.Update(newMergedPod)
 			}
 			if err != nil {
-				return kubebuilderx.Continue, err
+				return failWithProgress(err)
 			}
+			hasPersistedProgress = true
 			updatingPods++
 		case recreatePolicy:
 			if !isTerminating(pod) {
 				tree.Logger.Info("recreate pod", "name", pod.Name, "reason", recreateReason)
 				if err = r.switchover(tree, its, pod); err != nil {
-					return kubebuilderx.Continue, err
+					return failWithProgress(err)
 				}
 				if err = tree.Delete(pod); err != nil {
-					return kubebuilderx.Continue, err
+					return failWithProgress(err)
 				}
+				hasPersistedProgress = true
 			}
 			updatingPods++
 		}

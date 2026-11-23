@@ -23,7 +23,6 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -97,22 +96,16 @@ func buildInstanceTemplateExtMap(itsExt *InstanceSetExt, nameBuilder PodNameBuil
 	for _, template := range templates {
 		resolved[template.Name] = template
 	}
-	configOverrides := sets.New[string]()
 	for name, source := range itsExt.InstanceTemplates {
 		template := resolved[name]
 		if template == nil {
 			// Validate bindings for zero-replica templates as well.
 			template = buildInstanceTemplateExt(source, its)
-		} else {
-			for _, config := range source.Configs {
-				configOverrides.Insert(config.Name)
-			}
 		}
 		if err := resolveConfigs(template, its.Spec.Configs, source.Configs); err != nil {
 			return nil, fmt.Errorf("instance template %q: %w", name, err)
 		}
 	}
-	setConfigReloadScope(resolved, configOverrides, its.Name)
 	return templates, nil
 }
 

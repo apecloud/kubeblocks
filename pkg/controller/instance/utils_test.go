@@ -40,12 +40,12 @@ import (
 )
 
 func TestReconfigureOptions(t *testing.T) {
-	if opts := reconfigureOptions(workloads.ConfigTemplate{}, ""); opts != nil {
+	if opts := reconfigureOptions(workloads.ConfigTemplate{}); opts != nil {
 		t.Fatalf("expected nil options for empty reconfigure args, got %v", opts)
 	}
 
 	args := [][]string{{"maxmemory", "1gb"}, {"timeout", "30"}}
-	opts := reconfigureOptions(workloads.ConfigTemplate{ReconfigureArgs: args}, "")
+	opts := reconfigureOptions(workloads.ConfigTemplate{ReconfigureArgs: args})
 	if opts == nil {
 		t.Fatalf("expected options for non-empty reconfigure args")
 		return
@@ -207,7 +207,7 @@ func TestUpdateReconcilerPatchesKBManagedToolsImagesOnAdmittedPod(t *testing.T) 
 		t.Fatalf("ObjectTree.Add() error = %v", err)
 	}
 
-	if _, err = NewUpdateReconciler(nil).Reconcile(tree); err != nil {
+	if _, err = NewUpdateReconciler().Reconcile(tree); err != nil {
 		t.Fatalf("Reconcile() error = %v", err)
 	}
 	postPods := tree.List(&corev1.Pod{})

@@ -20,10 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instance
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -31,27 +29,22 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-type updateReconciler struct {
-	reader client.Reader
-}
+type updateReconciler struct{}
 
 var _ kubebuilderx.Reconciler = &updateReconciler{}
 
-func NewUpdateReconciler(reader client.Reader) kubebuilderx.Reconciler {
-	return &updateReconciler{reader: reader}
+func NewUpdateReconciler() kubebuilderx.Reconciler {
+	return &updateReconciler{}
 }
 
 func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
@@ -162,15 +155,8 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 
 		switch updatePolicy {
-		case noOpsPolicy:
-			if patch := instancetemplate.ConfigReloadScopePatch(pod, desiredPod); patch != nil {
-				if err := tree.Update(patch, kubebuilderx.WithPatch(true)); err != nil {
-					return kubebuilderx.Continue, err
-				}
-			}
 		case inPlaceUpdatePolicy:
 			newMergedPod := copyAndMerge(pod, desiredPod)
-			instancetemplate.SyncConfigReloadScope(newMergedPod.(*corev1.Pod), desiredPod)
 			supportResizeSubResource, err := intctrlutil.SupportResizeSubResource()
 			if err != nil {
 				tree.Logger.Error(err, "check support resize sub resource error")
@@ -237,51 +223,15 @@ func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, inst *work
 	if err != nil {
 		return false, err
 	}
-	reloadScope := instancetemplate.ConfigReloadScope(desiredPod).Union(
-		instancetemplate.AppliedConfigReloadOverrides(inst.Spec.InstanceSetName, pod),
-	)
-	if inst.Spec.InstanceSetName != "" && slices.ContainsFunc(toUpdate, func(config workloads.ConfigTemplate) bool {
-		return config.Reconfigure != nil && !reloadScope.Has(config.Name)
-	}) {
-		peerScope, err := r.appliedConfigOverrides(tree.Context, inst)
-		if err != nil {
-			return false, err
-		}
-		reloadScope = reloadScope.Union(peerScope)
-	}
 	for _, config := range toUpdate {
-		targetPod, eligible := instancetemplate.ConfigReloadTarget(pod, config, reloadScope.Has(config.Name))
-		if !eligible {
-			continue
-		}
-		if err = r.reconfigureInst(tree, inst, pod, config, targetPod); err != nil {
+		if err = r.reconfigureInst(tree, inst, pod, config); err != nil {
 			return false, err
 		}
 	}
 	return len(toUpdate) == 0, nil
 }
 
-func (r *updateReconciler) appliedConfigOverrides(ctx context.Context, inst *workloads.Instance) (sets.Set[string], error) {
-	pods := &corev1.PodList{}
-	placement := multicluster.InControlContext()
-	if inst.Annotations[constant.KBAppMultiClusterPlacementKey] != "" {
-		placement = multicluster.InDataContextUnspecified()
-	}
-	if err := r.reader.List(ctx, pods, client.InNamespace(inst.Namespace), placement,
-		client.MatchingLabels{constant.AppManagedByLabelKey: constant.AppName}); err != nil {
-		return nil, err
-	}
-
-	// Sibling Pods supply observations only. Reload actions still use this
-	// Instance's own Pod as their only candidate.
-	observed := make([]*corev1.Pod, len(pods.Items))
-	for i := range pods.Items {
-		observed[i] = &pods.Items[i]
-	}
-	return instancetemplate.AppliedConfigReloadOverrides(inst.Spec.InstanceSetName, observed...), nil
-}
-
-func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod, config workloads.ConfigTemplate, targetPod string) error {
+func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod, config workloads.ConfigTemplate) error {
 	if config.Reconfigure == nil {
 		return nil
 	}
@@ -297,7 +247,7 @@ func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, inst *
 		return err
 	}
 
-	opts := reconfigureOptions(config, targetPod)
+	opts := reconfigureOptions(config)
 	if len(config.ReconfigureActionName) == 0 {
 		err = lfa.Reconfigure(tree.Context, nil, opts, config.Parameters)
 	} else {
@@ -317,11 +267,11 @@ func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, inst *
 	return nil
 }
 
-func reconfigureOptions(config workloads.ConfigTemplate, targetPod string) *lifecycle.Options {
-	if len(config.ReconfigureArgs) == 0 && targetPod == "" {
+func reconfigureOptions(config workloads.ConfigTemplate) *lifecycle.Options {
+	if len(config.ReconfigureArgs) == 0 {
 		return nil
 	}
-	return &lifecycle.Options{Arguments: config.ReconfigureArgs, TargetPodName: targetPod}
+	return &lifecycle.Options{Arguments: config.ReconfigureArgs}
 }
 
 func buildBlockedCondition(inst *workloads.Instance, message string) *metav1.Condition {

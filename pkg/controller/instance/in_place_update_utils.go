@@ -228,7 +228,7 @@ func equalBasicInPlaceFields(old, new *corev1.Pod) bool {
 	// The recreation approach (recreating pod(s) when any field is updated in the pod template) used by StatefulSet/Deployment/DaemonSet
 	// is a replacement policy.
 	// Here, we use the override policy, which means keeping the annotations or labels that the new instance template doesn't care about during an in-place update.
-	if !equalField(old.Annotations, instancetemplate.AnnotationsWithoutConfigReloadScope(new)) {
+	if !equalField(old.Annotations, new.Annotations) {
 		return false
 	}
 	if !equalField(old.Labels, new.Labels) {

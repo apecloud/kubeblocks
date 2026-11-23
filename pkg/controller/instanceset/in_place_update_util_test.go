@@ -21,6 +21,7 @@ package instanceset
 
 import (
 	"fmt"
+	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -31,10 +32,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/utils/ptr"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -300,7 +304,7 @@ var _ = Describe("instance util test", func() {
 			Expect(objects).Should(HaveLen(3))
 			pod1, ok := objects[0].(*corev1.Pod)
 			Expect(ok).Should(BeTrue())
-			policy, specPolicy, _, err := getPodUpdatePolicy(its, pod1)
+			policy, specPolicy, _, err := getPodUpdatePolicyForTest(its, pod1)
 			Expect(err).Should(BeNil())
 			Expect(policy).Should(Equal(noOpsPolicy))
 			Expect(specPolicy).Should(Equal(kbappsv1.PodUpdatePolicyType("")))
@@ -308,7 +312,7 @@ var _ = Describe("instance util test", func() {
 			By("build a pod with registry rewritten by admission")
 			podWithRewrittenRegistry := pod1.DeepCopy()
 			podWithRewrittenRegistry.Spec.Containers[0].Image = "172.31.255.3:5000/apecloud/redis:8.4.0"
-			policy, specPolicy, _, err = getPodUpdatePolicy(its, podWithRewrittenRegistry)
+			policy, specPolicy, _, err = getPodUpdatePolicyForTest(its, podWithRewrittenRegistry)
 			Expect(err).Should(BeNil())
 			Expect(policy).Should(Equal(noOpsPolicy))
 			Expect(specPolicy).Should(Equal(kbappsv1.PodUpdatePolicyType("")))
@@ -329,7 +333,7 @@ var _ = Describe("instance util test", func() {
 			pod2.Labels[appsv1.ControllerRevisionHashLabelKey] = "new-revision"
 			its.Status.UpdateRevisions[pod2.Name] = getPodRevision(pod2)
 			var reason string
-			policy, specPolicy, reason, err = getPodUpdatePolicy(its, pod2)
+			policy, specPolicy, reason, err = getPodUpdatePolicyForTest(its, pod2)
 			Expect(err).Should(BeNil())
 			Expect(policy).Should(Equal(recreatePolicy))
 			Expect(specPolicy).Should(Equal(kbappsv1.PreferInPlacePodUpdatePolicyType))
@@ -339,7 +343,7 @@ var _ = Describe("instance util test", func() {
 			pod3 := pod1.DeepCopy()
 			randStr = rand.String(16)
 			mergeMap(&map[string]string{key: randStr}, &pod3.Annotations)
-			policy, specPolicy, _, err = getPodUpdatePolicy(its, pod3)
+			policy, specPolicy, _, err = getPodUpdatePolicyForTest(its, pod3)
 			Expect(err).Should(BeNil())
 			Expect(policy).Should(Equal(inPlaceUpdatePolicy))
 			Expect(specPolicy).Should(Equal(kbappsv1.ReCreatePodUpdatePolicyType))
@@ -351,7 +355,7 @@ var _ = Describe("instance util test", func() {
 				corev1.ResourceCPU: resource.MustParse(fmt.Sprintf("%dm", randInt)),
 			}
 			pod4.Spec.Containers[0].Resources.Requests = requests
-			policy, specPolicy, reason, err = getPodUpdatePolicy(its, pod4)
+			policy, specPolicy, reason, err = getPodUpdatePolicyForTest(its, pod4)
 			Expect(err).Should(BeNil())
 			Expect(policy).Should(Equal(recreatePolicy))
 			Expect(specPolicy).Should(Equal(kbappsv1.ReCreatePodUpdatePolicyType))
@@ -364,7 +368,7 @@ var _ = Describe("instance util test", func() {
 				corev1.ResourceCPU: resource.MustParse(fmt.Sprintf("%dm", randInt)),
 			}
 			pod5.Spec.Containers[0].Resources.Requests = requests
-			policy, specPolicy, reason, err = getPodUpdatePolicy(its, pod5)
+			policy, specPolicy, reason, err = getPodUpdatePolicyForTest(its, pod5)
 			Expect(err).Should(BeNil())
 			Expect(policy).Should(Equal(recreatePolicy))
 			Expect(specPolicy).Should(Equal(kbappsv1.ReCreatePodUpdatePolicyType))
@@ -374,7 +378,7 @@ var _ = Describe("instance util test", func() {
 			ignorePodVerticalScaling := viper.GetBool(FeatureGateIgnorePodVerticalScaling)
 			defer viper.Set(FeatureGateIgnorePodVerticalScaling, ignorePodVerticalScaling)
 			viper.Set(FeatureGateIgnorePodVerticalScaling, true)
-			policy, specPolicy, _, err = getPodUpdatePolicy(its, pod5)
+			policy, specPolicy, _, err = getPodUpdatePolicyForTest(its, pod5)
 			Expect(err).Should(BeNil())
 			Expect(policy).Should(Equal(noOpsPolicy))
 			Expect(specPolicy).Should(Equal(kbappsv1.PodUpdatePolicyType("")))
@@ -397,10 +401,68 @@ var _ = Describe("instance util test", func() {
 			ignorePodVerticalScaling = viper.GetBool(FeatureGateIgnorePodVerticalScaling)
 			defer viper.Set(FeatureGateIgnorePodVerticalScaling, ignorePodVerticalScaling)
 			viper.Set(FeatureGateIgnorePodVerticalScaling, false)
-			policy, specPolicy, _, err = getPodUpdatePolicy(its, pod6)
+			policy, specPolicy, _, err = getPodUpdatePolicyForTest(its, pod6)
 			Expect(err).Should(BeNil())
 			Expect(policy).Should(Equal(inPlaceUpdatePolicy))
 			Expect(specPolicy).Should(Equal(kbappsv1.PreferInPlacePodUpdatePolicyType))
 		})
 	})
 })
+
+func TestDirectConfigOverrideRetainedAndInjectedPods(t *testing.T) {
+	its, tree, pods, member := newDirectConfigFixture(t, "named")
+	desired, err := instancetemplate.BuildInstanceTemplateExtMap(its, tree)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pods[member].Spec.Volumes = append(pods[member].Spec.Volumes, corev1.Volume{Name: "admission-config", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "injected"}}}})
+	policy, _, _, err := getPodUpdatePolicy(its, pods[member], desired[member])
+	if err != nil || policy != noOpsPolicy {
+		t.Fatalf("admission ConfigMap volume triggered update: %v, %v", policy, err)
+	}
+	updated, err := isPodUpdated(its, pods[member], nil)
+	if err != nil || !updated {
+		t.Fatalf("retained member without desired template lost previous handling: %v, %v", updated, err)
+	}
+	its.Spec.Replicas = ptr.To[int32](0)
+	its.Status.UpdateRevisions = nil
+	policy, _, reason, err := getPodUpdatePolicy(its, pods[member], nil)
+	if err != nil || policy != recreatePolicy || reason != "0 replica" {
+		t.Fatalf("zero-replica handling changed: %v, %s, %v", policy, reason, err)
+	}
+}
+
+func TestDirectConfigRestartPolicyWithSourceChange(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		restartConfig int
+		updatePolicy  workloads.PodUpdatePolicyType
+		upgradePolicy workloads.PodUpdatePolicyType
+		wantPolicy    workloads.PodUpdatePolicyType
+		wantReason    string
+	}{
+		{"same mount restart keeps update policy", 1, kbappsv1.StrictInPlacePodUpdatePolicyType, kbappsv1.PreferInPlacePodUpdatePolicyType, kbappsv1.StrictInPlacePodUpdatePolicyType, "config restart: aux"},
+		{"same mount restart takes precedence over upgrade policy", 1, kbappsv1.PreferInPlacePodUpdatePolicyType, kbappsv1.StrictInPlacePodUpdatePolicyType, kbappsv1.PreferInPlacePodUpdatePolicyType, "config restart: aux"},
+		{"replacement mount uses upgrade policy", 0, kbappsv1.PreferInPlacePodUpdatePolicyType, kbappsv1.StrictInPlacePodUpdatePolicyType, kbappsv1.StrictInPlacePodUpdatePolicyType, "config volume source update"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			its, tree, pods, member := newDirectConfigFixture(t, "named")
+			its.Spec.PodUpdatePolicy = tc.updatePolicy
+			its.Spec.PodUpgradePolicy = tc.upgradePolicy
+			mutateDirectTemplate(t, its, tree, func(tpl *workloads.InstanceTemplate) {
+				tpl.Configs[0].Volume.ConfigMapName = "main-new"
+				tpl.Configs[tc.restartConfig].ConfigHash = ptr.To("new")
+				tpl.Configs[tc.restartConfig].Restart = ptr.To(true)
+				tpl.Images = map[string]string{"db": "mysql:new"}
+			})
+			desired, err := instancetemplate.BuildInstanceTemplateExtMap(its, tree)
+			if err != nil {
+				t.Fatal(err)
+			}
+			policy, specPolicy, reason, err := getPodUpdatePolicy(its, pods[member], desired[member])
+			if err != nil || policy != recreatePolicy || specPolicy != tc.wantPolicy || reason != tc.wantReason {
+				t.Fatalf("policy=%v specPolicy=%v reason=%q err=%v", policy, specPolicy, reason, err)
+			}
+		})
+	}
+}

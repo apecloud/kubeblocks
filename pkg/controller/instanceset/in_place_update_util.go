@@ -403,7 +403,7 @@ func equalResourcesInPlaceFields(old, new *corev1.Pod) bool {
 	return true
 }
 
-func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (podUpdatePolicy, workloads.PodUpdatePolicyType, string, error) {
+func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod, template *instancetemplate.InstanceTemplateExt) (podUpdatePolicy, workloads.PodUpdatePolicyType, string, error) {
 	updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
 	if err != nil {
 		return noOpsPolicy, "", "", err
@@ -422,35 +422,25 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (podUpdateP
 		}
 	}
 
-	configRestart, configs, err := hasConfigRestart(its, pod)
+	if template == nil {
+		return noOpsPolicy, "", "", errors.Wrapf(errTemplateNotFound, "pod: %s/%s", pod.Namespace, pod.Name)
+	}
+	newPod, err := buildInstancePodByTemplateForUpdate(pod, template, its)
+	if err != nil {
+		return noOpsPolicy, "", "", err
+	}
+	specUpdatePolicy := getPodUpdatePolicyInSpec(its, pod, newPod)
+	configRestart, configs, err := hasConfigRestart(configsForMountedVolumes(template.Configs, pod, newPod), pod)
 	if err != nil {
 		return noOpsPolicy, "", "", err
 	}
 	if configRestart {
 		return recreatePolicy, its.Spec.PodUpdatePolicy, fmt.Sprintf("config restart: %s", strings.Join(configs, ",")), nil
 	}
-
-	itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
-	if err != nil {
-		return noOpsPolicy, "", "", err
-	}
-	templateList := instancetemplate.BuildInstanceTemplateExt(itsExt)
-	templateName, err := getTemplateNameByPod(itsExt, pod)
-	if err != nil {
-		return noOpsPolicy, "", "", err
-	}
-	index := slices.IndexFunc(templateList, func(templateExt *instancetemplate.InstanceTemplateExt) bool {
-		return templateName == templateExt.Name
-	})
-	if index < 0 {
-		return noOpsPolicy, "", "", errors.Wrapf(errTemplateNotFound, "pod: %s/%s", pod.Namespace, pod.Name)
-	}
-	newPod, err := buildInstancePodByTemplateForUpdate(pod, templateList[index], its)
-	if err != nil {
-		return noOpsPolicy, "", "", err
+	if configMapSourceChanged(pod, newPod) {
+		return recreatePolicy, specUpdatePolicy, "config volume source update", nil
 	}
 
-	specUpdatePolicy := getPodUpdatePolicyInSpec(its, pod, newPod)
 	if getPodRevision(pod) != updateRevisions[pod.Name] && getPodRevision(pod) != proposedRevisions[pod.Name] {
 		return recreatePolicy, specUpdatePolicy, "revision update", nil
 	}
@@ -487,27 +477,11 @@ func getPodUpdatePolicyInSpec(its *workloads.InstanceSet, old, new *corev1.Pod) 
 	return its.Spec.PodUpdatePolicy
 }
 
-func getTemplateNameByPod(itsExt *instancetemplate.InstanceSetExt, pod *corev1.Pod) (string, error) {
-	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
-	if err != nil {
-		return "", err
-	}
-	nameToTemplateMap, err := nameBuilder.BuildInstanceName2TemplateMap()
-	if err != nil {
-		return "", err
-	}
-	tplExt, ok := nameToTemplateMap[pod.Name]
-	if ok {
-		return tplExt.Name, nil
-	}
-	return "", errors.Wrapf(errTemplateNotFound, "pod: %s/%s", pod.Namespace, pod.Name)
-}
-
 // isPodUpdated tells whether the pod's spec is as expected in the InstanceSet.
 // This function is meant to replace the old fashion `GetPodRevision(pod) == updateRevision`,
 // as the pod template revision has been redefined in instanceset.
-func isPodUpdated(its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
-	policy, _, _, err := getPodUpdatePolicy(its, pod)
+func isPodUpdated(its *workloads.InstanceSet, pod *corev1.Pod, template *instancetemplate.InstanceTemplateExt) (bool, error) {
+	policy, _, _, err := getPodUpdatePolicy(its, pod, template)
 	if err != nil {
 		if errors.Is(err, errTemplateNotFound) {
 			return true, nil
@@ -515,4 +489,44 @@ func isPodUpdated(its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
 		return false, err
 	}
 	return policy == noOpsPolicy, err
+}
+
+// A replacement ConfigMap cannot be reloaded through the old Pod's mounted volume.
+func configMapSourceChanged(old, desired *corev1.Pod) bool {
+	return len(changedConfigMapVolumes(old, desired)) > 0
+}
+
+func changedConfigMapVolumes(old, desired *corev1.Pod) map[string]bool {
+	previous := make(map[string]string)
+	for _, volume := range old.Spec.Volumes {
+		if volume.ConfigMap != nil {
+			previous[volume.Name] = volume.ConfigMap.Name
+		}
+	}
+	changed := make(map[string]bool)
+	for _, volume := range desired.Spec.Volumes {
+		if volume.ConfigMap != nil {
+			if source, exists := previous[volume.Name]; !exists || source != volume.ConfigMap.Name {
+				changed[volume.Name] = true
+			}
+		}
+	}
+	return changed
+}
+
+// configsForMountedVolumes excludes actions whose explicitly associated volume needs replacement.
+// Unbound legacy configs retain their existing reload behavior.
+func configsForMountedVolumes(configs []workloads.ConfigTemplate, old, desired *corev1.Pod) []workloads.ConfigTemplate {
+	changed := changedConfigMapVolumes(old, desired)
+	if len(changed) == 0 {
+		return configs
+	}
+	mounted := make([]workloads.ConfigTemplate, 0, len(configs))
+	for _, config := range configs {
+		if config.Volume != nil && changed[config.Volume.VolumeName] {
+			continue
+		}
+		mounted = append(mounted, config)
+	}
+	return mounted
 }

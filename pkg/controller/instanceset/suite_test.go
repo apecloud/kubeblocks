@@ -37,13 +37,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/utils/ptr"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 	"github.com/apecloud/kubeblocks/pkg/testutil/k8s/mocks"
 )
@@ -259,3 +263,118 @@ var _ = BeforeSuite(func() {
 var _ = AfterSuite(func() {
 	controller.Finish()
 })
+
+func getPodUpdatePolicyForTest(its *workloads.InstanceSet, pod *corev1.Pod) (podUpdatePolicy, workloads.PodUpdatePolicyType, string, error) {
+	templates, err := instancetemplate.BuildInstanceTemplateExtMap(its, nil)
+	if err != nil {
+		return noOpsPolicy, "", "", err
+	}
+	return getPodUpdatePolicy(its, pod, templates[pod.Name])
+}
+
+func newDirectConfigFixture(t *testing.T, layout string) (*workloads.InstanceSet, *kubebuilderx.ObjectTree, map[string]*corev1.Pod, string) {
+	t.Helper()
+	originalResizeSupport := intctrlutil.SupportResizeSubResource
+	intctrlutil.SupportResizeSubResource = func() (bool, error) { return false, nil }
+	t.Cleanup(func() { intctrlutil.SupportResizeSubResource = originalResizeSupport })
+	its := legacyInstanceStatusSet(2)
+	its.Spec.FlatInstanceOrdinal = layout == "compressed flat"
+	its.Spec.PodManagementPolicy = apps.ParallelPodManagement
+	its.Spec.PodUpdatePolicy = kbappsv1.PreferInPlacePodUpdatePolicyType
+	its.Spec.PodUpgradePolicy = kbappsv1.PreferInPlacePodUpdatePolicyType
+	action := &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"reload"}}}
+	its.Spec.LifecycleActions = &workloads.LifecycleActions{Switchover: action}
+	its.Spec.Configs = []workloads.ConfigTemplate{
+		{Name: "main", ConfigHash: ptr.To("global"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "main"}, Reconfigure: action, Parameters: map[string]string{"id": "global-main"}},
+		{Name: "aux", ConfigHash: ptr.To("global-aux"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "aux", ConfigMapName: "aux"}, Reconfigure: action, Parameters: map[string]string{"id": "global-aux"}},
+	}
+	its.Spec.Template.Spec.Volumes = []corev1.Volume{
+		{Name: "config", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "main"}}}},
+		{Name: "aux", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "aux"}}}},
+	}
+	tpl := workloads.InstanceTemplate{Name: "a", Replicas: ptr.To[int32](1), Configs: []workloads.ConfigTemplate{
+		{Name: "main", ConfigHash: ptr.To("main-old"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "main-a"}, Reconfigure: action, Parameters: map[string]string{"id": "main"}},
+		{Name: "aux", ConfigHash: ptr.To("aux-old"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "aux", ConfigMapName: "aux-a"}, Reconfigure: action, Parameters: map[string]string{"id": "aux"}},
+	}}
+	member := "demo-a-0"
+	if its.Spec.FlatInstanceOrdinal {
+		tpl.Ordinals = workloads.Ordinals{Discrete: []int32{7}}
+		its.Spec.Ordinals = workloads.Ordinals{Discrete: []int32{0}}
+		member = "demo-7"
+	}
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	if layout == "named" {
+		its.Spec.Instances = []workloads.InstanceTemplate{tpl}
+	} else {
+		its.Spec.Instances = nil
+		setDirectCompressedTemplate(t, its, tree, tpl)
+	}
+	runDirectReconciler(t, NewValidationReconciler(), tree)
+	runDirectReconciler(t, NewRevisionUpdateReconciler(), tree)
+	runDirectReconciler(t, NewReplicasAlignmentReconciler(), tree)
+	pods := map[string]*corev1.Pod{}
+	for _, obj := range tree.List(&corev1.Pod{}) {
+		pod := obj.(*corev1.Pod)
+		pod.Status.Phase = corev1.PodRunning
+		pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}
+		pods[pod.Name] = pod
+	}
+	if len(pods) != 2 || pods[member] == nil || pods["demo-0"] == nil {
+		t.Fatalf("unexpected members: %v", pods)
+	}
+	runDirectReconciler(t, NewStatusReconciler(), tree)
+	return its, tree, pods, member
+}
+
+func runDirectReconciler(t *testing.T, r kubebuilderx.Reconciler, tree *kubebuilderx.ObjectTree) {
+	t.Helper()
+	if _, err := r.Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func setDirectCompressedTemplate(t *testing.T, its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree, tpl workloads.InstanceTemplate) {
+	t.Helper()
+	data, err := json.Marshal([]workloads.InstanceTemplate{tpl})
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer, err := zstd.NewWriter(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer writer.Close()
+	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "templates", Namespace: its.Namespace}, BinaryData: map[string][]byte{"instances": writer.EncodeAll(data, nil)}}
+	its.Annotations = map[string]string{templateRefAnnotationKey: `{"demo":"templates"}`}
+	if err := tree.Add(cm); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func mutateDirectTemplate(t *testing.T, its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree, mutate func(*workloads.InstanceTemplate)) {
+	t.Helper()
+	if len(its.Spec.Instances) > 0 {
+		mutate(&its.Spec.Instances[0])
+		return
+	}
+	cmObj, err := tree.Get(&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "templates", Namespace: its.Namespace}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader, err := zstd.NewReader(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reader.Close()
+	data, err := reader.DecodeAll(cmObj.(*corev1.ConfigMap).BinaryData["instances"], nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var templates []workloads.InstanceTemplate
+	if err := json.Unmarshal(data, &templates); err != nil {
+		t.Fatal(err)
+	}
+	mutate(&templates[0])
+	setDirectCompressedTemplate(t, its, tree, templates[0])
+}

@@ -111,7 +111,6 @@ func baseSort(x any, getNameNOrdinalFunc func(i int) (string, int), getRolePrior
 func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree,
 	instName string, template *instancetemplate.InstanceTemplateExt, its *workloads.InstanceSet) (*workloads.Instance, error) {
 	labels := getMatchLabels(its.Name)
-	configs := copyConfigTemplates(template.Configs)
 	b := builder.NewInstanceBuilder(its.Namespace, instName).
 		AddAnnotationsInMap(template.Annotations).
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(its.Generation, 10)).
@@ -128,7 +127,7 @@ func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree,
 		SetPodUpgradePolicy(its.Spec.PodUpgradePolicy).
 		SetRoles(its.Spec.Roles).
 		SetLifecycleActions(its.Spec.LifecycleActions).
-		SetConfigs(configs)
+		SetConfigs(copyConfigTemplates(template.Configs))
 
 	// set these immutable fields only on initial Pod creation, not updates.
 	b.SetHostname(instName).
@@ -329,20 +328,20 @@ func getHeadlessSvcName(itsName string) string {
 }
 
 func buildDesiredInstancesByName(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) (map[string]*workloads.Instance, []string, error) {
-	nameMap, err := instancetemplate.BuildInstanceTemplateExtMap(its, tree)
+	nameToTemplateMap, err := instancetemplate.BuildInstanceTemplateExtMap(its, tree)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	names := make([]string, 0, len(nameMap))
-	for name := range nameMap {
+	names := make([]string, 0, len(nameToTemplateMap))
+	for name := range nameToTemplateMap {
 		names = append(names, name)
 	}
 	sort.Strings(names)
 
 	desired := make(map[string]*workloads.Instance, len(names))
 	for _, name := range names {
-		inst, err := buildInstanceByTemplate(tree, name, nameMap[name], its)
+		inst, err := buildInstanceByTemplate(tree, name, nameToTemplateMap[name], its)
 		if err != nil {
 			return nil, nil, err
 		}

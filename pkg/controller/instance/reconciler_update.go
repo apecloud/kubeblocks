@@ -77,6 +77,9 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if inst.Spec.InstanceUpdateStrategyType != nil && *inst.Spec.InstanceUpdateStrategyType == kbappsv1.OnDeleteStrategyType {
 		return kubebuilderx.Continue, nil
 	}
+
+	// The alignment check above ensures oldPodList contains only the current Pod for this Instance.
+	// Both update passes can share a desired Pod built with that Pod's revision.
 	desiredPod, err := buildInstancePod(inst, getPodRevision(oldPodList[0]))
 	if err != nil {
 		return kubebuilderx.Continue, err

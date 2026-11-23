@@ -230,8 +230,9 @@ func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, inst *work
 	if err != nil {
 		return false, err
 	}
+	reloadScope := instancetemplate.ConfigReloadScope(pod, desiredPod)
 	for _, config := range toUpdate {
-		targetPod, eligible := instancetemplate.ConfigReloadTarget(pod, desiredPod, config)
+		targetPod, eligible := instancetemplate.ConfigReloadTarget(pod, config, reloadScope.Has(config.Name))
 		if !eligible {
 			continue
 		}

@@ -134,7 +134,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 
 	// Keep reloads local until all existing Pods have applied the shared
 	// configuration. Use the same scope throughout this reconciliation.
-	observedReloadScope := instancetemplate.ConfigReloadScope(oldPodList...)
+	observedReloadScope := instancetemplate.AppliedConfigReloadOverrides(its.Name, oldPodList...)
 
 	// updatedPods tracks the positions already covered by the rolling-update
 	// window, while updatingPods tracks actual updates admitted in this round.

@@ -65,7 +65,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		inst, _ := object.(*workloads.Instance)
 		instanceList = append(instanceList, inst)
 	}
-	assignments, _, err := instancetemplate.BuildAssignments(tree, its)
+	assignments, templateNames, err := instancetemplate.BuildAssignments(tree, its)
 	if err != nil {
 		if instancetemplate.IsAssignmentIncomplete(err) {
 			return kubebuilderx.Continue, nil
@@ -183,7 +183,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	// 4. set instance status
-	if err := setInstanceStatus(tree, its, instanceList); err != nil {
+	if err := setInstanceStatus(tree, its, instanceList, assignments, templateNames); err != nil {
 		return kubebuilderx.Continue, err
 	}
 
@@ -376,16 +376,13 @@ func buildFailureCondition(its *workloads.InstanceSet, instances []*workloads.In
 	}, nil
 }
 
-func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, instances []*workloads.Instance) error {
+func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, instances []*workloads.Instance,
+	desiredAssignments []instancetemplate.Assignment, templateNames []string) error {
 	for _, inst := range instances {
 		if (isStopRequested(its) || ptr.Deref(inst.Spec.Stop, false)) &&
 			(inst.Status.CurrentState == "" || (inst.Status.CurrentState == workloads.InstanceCurrentStateAbsent && !hasObservedStoppedRuntime(inst))) {
 			return nil
 		}
-	}
-	desiredAssignments, templateNames, err := instancetemplate.BuildAssignments(tree, its)
-	if err != nil {
-		return err
 	}
 	desiredTemplateAssignments := make([]instancestatus.TemplateAssignment, 0, len(desiredAssignments))
 	desiredNames := make(map[string]struct{}, len(desiredAssignments))

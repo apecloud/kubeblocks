@@ -400,6 +400,80 @@ var _ = Describe("InstanceSet Controller 2", func() {
 			})).Should(Succeed())
 		})
 
+		It("applies InstanceTemplate configs through Instance and Pod", func() {
+			supportResize := intctrlutil.SupportResizeSubResource
+			intctrlutil.SupportResizeSubResource = func() (bool, error) { return false, nil }
+			DeferCleanup(func() { intctrlutil.SupportResizeSubResource = supportResize })
+			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
+				f.SetReplicas(2)
+				f.AddConfigs(workloads.ConfigTemplate{Name: "server", ConfigHash: ptr.To("base"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config"}})
+				spec := &f.Get().Spec
+				spec.InstanceUpdateStrategy = &kbappsv1.InstanceUpdateStrategy{Type: kbappsv1.RollingUpdateStrategyType}
+				spec.Template.Spec.Volumes = []corev1.Volume{{
+					Name: "config",
+					VolumeSource: corev1.VolumeSource{
+						ConfigMap: &corev1.ConfigMapVolumeSource{
+							LocalObjectReference: corev1.LocalObjectReference{Name: "shared-config"},
+						},
+					},
+				}}
+				spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: "config", MountPath: "/config"}}
+				spec.Instances = []workloads.InstanceTemplate{{
+					Name: "hot",
+					Configs: []workloads.ConfigTemplate{{
+						Name:       "server",
+						ConfigHash: ptr.To("hot"),
+						Volume:     &workloads.ConfigVolumeBinding{ConfigMapName: "hot-config"},
+					}},
+				}}
+			})
+			hot := client.ObjectKey{Namespace: itsKey.Namespace, Name: itsKey.Name + "-hot-0"}
+			ordinary := client.ObjectKey{Namespace: itsKey.Namespace, Name: podName(0)}
+			checkConfig := func(key client.ObjectKey, source, hash string) types.UID {
+				volume := And(HaveField("Name", "config"), HaveField("ConfigMap", HaveField("Name", source)))
+				Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, inst *workloads.Instance) {
+					g.Expect(inst.Spec.Template.Spec.Volumes).Should(ContainElement(volume))
+					g.Expect(inst.Spec.Configs).Should(Equal([]workloads.ConfigTemplate{{Name: "server", ConfigHash: ptr.To(hash), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: source}}}))
+				})).Should(Succeed())
+				var uid types.UID
+				Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pod *corev1.Pod) {
+					g.Expect(pod.Spec.Volumes).Should(ContainElement(volume))
+					g.Expect(pod.Annotations).Should(HaveKeyWithValue(constant.CMInsConfigurationHashLabelKey, fmt.Sprintf(`{"server":%q}`, hash)))
+					uid = pod.UID
+				})).Should(Succeed())
+				return uid
+			}
+			changeConfig := func(source, hash string) {
+				Eventually(testapps.GetAndChangeObj(&testCtx, itsKey, func(set *workloads.InstanceSet) {
+					config := &set.Spec.Instances[0].Configs[0]
+					config.ConfigHash = ptr.To(hash)
+					config.Volume.ConfigMapName = source
+				})).Should(Succeed())
+			}
+
+			hotUID := checkConfig(hot, "hot-config", "hot")
+			ordinaryUID := checkConfig(ordinary, "shared-config", "base")
+			mockPodReady(hot.Namespace, hot.Name)
+			mockPodReady(ordinary.Namespace, ordinary.Name)
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, set *workloads.InstanceSet) {
+				g.Expect(set.IsInstanceSetReady()).Should(BeTrue())
+			})).Should(Succeed())
+
+			changeConfig("hot-config", "hot-updated")
+			Expect(checkConfig(hot, "hot-config", "hot-updated")).Should(Equal(hotUID))
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, set *workloads.InstanceSet) {
+				g.Expect(set.Status.InstanceStatus).Should(ContainElement(And(
+					HaveField("PodName", hot.Name),
+					HaveField("Configs", []workloads.InstanceConfigStatus{{Name: "server", ConfigHash: ptr.To("hot-updated")}}),
+					HaveField("UpToDate", true),
+				)))
+			})).Should(Succeed())
+
+			changeConfig("replacement-config", "replaced")
+			Expect(checkConfig(hot, "replacement-config", "replaced")).ShouldNot(Equal(hotUID))
+			Expect(checkConfig(ordinary, "shared-config", "base")).Should(Equal(ordinaryUID))
+		})
+
 		It("pod management - ordered ready", func() {
 			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
 				f.SetPodManagementPolicy(appsv1.OrderedReadyPodManagement)

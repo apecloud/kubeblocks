@@ -311,7 +311,7 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, its *worklo
 
 func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet,
 	pod, desiredPod *corev1.Pod, configs []workloads.ConfigTemplate) (bool, error) {
-	mountedConfigs := configsForMountedVolumes(configs, pod, desiredPod)
+	mountedConfigs := instancetemplate.ConfigsForMountedVolumes(configs, pod, desiredPod)
 	toUpdate, err := configsToUpdate(mountedConfigs, pod)
 	if err != nil {
 		return false, err

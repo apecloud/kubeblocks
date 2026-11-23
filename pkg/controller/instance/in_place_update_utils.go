@@ -29,6 +29,7 @@ import (
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -332,20 +333,27 @@ func equalResourcesInPlaceFields(old, new *corev1.Pod) bool {
 }
 
 func getPodUpdatePolicy(inst *workloads.Instance, pod *corev1.Pod) (podUpdatePolicy, workloads.PodUpdatePolicyType, error) {
-	configRestart, _, err := hasConfigRestart(inst, pod)
+	newPod, err := buildInstancePod(inst, getPodRevision(pod))
+	if err != nil {
+		return noOpsPolicy, "", err
+	}
+	return getPodUpdatePolicyForDesiredPod(inst, pod, newPod)
+}
+
+func getPodUpdatePolicyForDesiredPod(inst *workloads.Instance, pod, newPod *corev1.Pod) (podUpdatePolicy, workloads.PodUpdatePolicyType, error) {
+	specUpdatePolicy := getPodUpdatePolicyInSpec(inst, pod, newPod)
+	configs := instancetemplate.ConfigsForMountedVolumes(inst.Spec.Configs, pod, newPod)
+	configRestart, _, err := hasConfigRestart(configs, pod)
 	if err != nil {
 		return noOpsPolicy, "", err
 	}
 	if configRestart {
 		return recreatePolicy, inst.Spec.PodUpdatePolicy, nil
 	}
-
-	newPod, err := buildInstancePod(inst, getPodRevision(pod))
-	if err != nil {
-		return noOpsPolicy, "", err
+	if len(instancetemplate.ChangedConfigMapVolumes(pod, newPod)) > 0 {
+		return recreatePolicy, specUpdatePolicy, nil
 	}
 
-	specUpdatePolicy := getPodUpdatePolicyInSpec(inst, pod, newPod)
 	if getPodRevision(pod) != inst.Status.UpdateRevision {
 		if len(inst.Status.UpdateRevision) == 0 {
 			return noOpsPolicy, "", nil
@@ -390,7 +398,7 @@ func isPodUpdated(inst *workloads.Instance, pod *corev1.Pod) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	toUpdate, err := configsToUpdate(inst, pod)
+	toUpdate, err := configsToUpdate(inst.Spec.Configs, pod)
 	if err != nil {
 		return false, err
 	}

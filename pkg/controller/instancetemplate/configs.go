@@ -161,15 +161,24 @@ func setConfigReloadScope(templates map[string]*InstanceTemplateExt, names sets.
 	}
 }
 
+// ConfigReloadScope returns the configuration names marked for Pod-local reload.
+func ConfigReloadScope(pods ...*corev1.Pod) sets.Set[string] {
+	scope := sets.New[string]()
+	for _, pod := range pods {
+		var names []string
+		if value := pod.Annotations[configReloadScopeAnnotation]; value != "" &&
+			json.Unmarshal([]byte(value), &names) == nil {
+			scope.Insert(names...)
+		}
+	}
+	return scope
+}
+
 // ConfigReloadTarget pins a scoped reload to the triggering Pod and skips it
 // if the configured volume is unmounted. Other reloads keep their selector.
-func ConfigReloadTarget(pod, desiredPod *corev1.Pod, config workloads.ConfigTemplate) (targetPod string, eligible bool) {
-	for _, candidate := range []*corev1.Pod{pod, desiredPod} {
-		var names []string
-		if value := candidate.Annotations[configReloadScopeAnnotation]; value != "" &&
-			json.Unmarshal([]byte(value), &names) == nil && slices.Contains(names, config.Name) {
-			return pod.Name, config.Volume == nil || hasConfigVolumeMount(pod, config.Volume.VolumeName)
-		}
+func ConfigReloadTarget(pod *corev1.Pod, config workloads.ConfigTemplate, scoped bool) (targetPod string, eligible bool) {
+	if scoped {
+		return pod.Name, config.Volume == nil || hasConfigVolumeMount(pod, config.Volume.VolumeName)
 	}
 	return "", true
 }

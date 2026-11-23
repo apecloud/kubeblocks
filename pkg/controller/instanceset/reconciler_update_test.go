@@ -21,6 +21,7 @@ package instanceset
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"slices"
 	"testing"
@@ -1274,13 +1275,117 @@ func TestDirectConfigReloadSelectorScope(t *testing.T) {
 	}
 }
 
+func TestDirectConfigReloadRetriesDuringLastOverrideRollback(t *testing.T) {
+	its, tree, pods, canaryName := newDirectConfigFixture(t, "named", func(its *workloads.InstanceSet, tpl *workloads.InstanceTemplate) {
+		tpl.Configs = tpl.Configs[:1]
+		its.Spec.PodUpdatePolicy = kbappsv1.StrictInPlacePodUpdatePolicyType
+		its.Spec.LifecycleActions.Switchover = nil
+		action := its.Spec.Configs[0].Reconfigure.DeepCopy()
+		action.TargetPodSelector = kbappsv1.AllReplicas
+		for i := range its.Spec.Configs {
+			its.Spec.Configs[i].Reconfigure = action
+		}
+	})
+	const sharedName = "demo-z-0"
+	getPod := func(name string) *corev1.Pod {
+		t.Helper()
+		key := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: its.Namespace, Name: name}}
+		object, err := tree.Get(key)
+		if err != nil || object == nil {
+			t.Fatalf("get Pod %s: object=%v, error=%v", name, object, err)
+		}
+		return object.(*corev1.Pod)
+	}
+
+	publishUpdateRevisions := func() {
+		t.Helper()
+		its.Generation++
+		runDirectReconciler(t, NewRevisionUpdateReconciler(), tree)
+	}
+
+	// Give the shared member the first position in the update order.
+	its.Spec.Instances = append(its.Spec.Instances, workloads.InstanceTemplate{Name: "z"})
+	if err := tree.Delete(pods["demo-0"]); err != nil {
+		t.Fatal(err)
+	}
+	publishUpdateRevisions()
+	runDirectReconciler(t, NewReplicasAlignmentReconciler(), tree)
+	getPod(sharedName).Status = *getPod(canaryName).Status.DeepCopy()
+
+	agent := &configReloadAgent{}
+	kbacli.SetMockClient(agent, nil)
+	t.Cleanup(kbacli.UnsetMockClient)
+
+	its.Spec.Instances[0].Configs = nil
+	publishUpdateRevisions()
+	runDirectReconciler(t, NewUpdateReconciler(), tree)
+	if !meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceUpdateRestricted)) || agent.calls != 0 {
+		t.Fatalf("expected a blocked mount replacement with no reloads, got %d calls", agent.calls)
+	}
+
+	// The rollback concerns main. The shared aux configuration still uses All.
+	its.Spec.Configs[1].ConfigHash = ptr.To("next-aux")
+	publishUpdateRevisions()
+	runDirectReconciler(t, NewUpdateReconciler(), tree)
+	if agent.calls != 2 {
+		t.Fatalf("unrelated shared configuration made %d reloads, want 2", agent.calls)
+	}
+
+	oldHash := getPod(sharedName).Annotations[constant.CMInsConfigurationHashLabelKey]
+	its.Spec.Configs[0].ConfigHash = ptr.To("next-main")
+	publishUpdateRevisions()
+
+	agent.calls = 0
+	agent.err = errors.New("shared reload failed")
+	if _, err := NewUpdateReconciler().Reconcile(tree); !errors.Is(err, agent.err) {
+		t.Fatalf("expected the reload error, got %v", err)
+	}
+	if agent.calls != 1 {
+		t.Fatalf("failed reload made %d calls, want only the shared Pod", agent.calls)
+	}
+	if getPod(sharedName).Annotations[constant.CMInsConfigurationHashLabelKey] != oldHash {
+		t.Fatal("failed reload advanced the observed config hash")
+	}
+
+	agent.calls, agent.err = 0, nil
+	runDirectReconciler(t, NewUpdateReconciler(), tree)
+	if agent.calls != 1 {
+		t.Fatalf("retried reload made %d calls, want only the shared Pod", agent.calls)
+	}
+	if getPod(sharedName).Annotations[constant.CMInsConfigurationHashLabelKey] == oldHash {
+		t.Fatal("retried reload did not advance the observed config hash")
+	}
+	if mounted := getPod(canaryName).Spec.Volumes[0].ConfigMap.Name; mounted != "main-a" {
+		t.Fatalf("expected canary to retain main-a during retry, got %q", mounted)
+	}
+
+	its.Spec.PodUpdatePolicy = kbappsv1.PreferInPlacePodUpdatePolicyType
+	publishUpdateRevisions()
+	runDirectReconciler(t, NewUpdateReconciler(), tree)
+	runDirectReconciler(t, NewReplicasAlignmentReconciler(), tree)
+	canary := getPod(canaryName)
+	if mounted := canary.Spec.Volumes[0].ConfigMap.Name; mounted != "main" {
+		t.Fatalf("expected canary to restore the shared mount, got %q", mounted)
+	}
+	canary.Status = *getPod(sharedName).Status.DeepCopy()
+
+	agent.calls = 0
+	its.Spec.Configs[0].ConfigHash = ptr.To("main-after-rollback")
+	publishUpdateRevisions()
+	runDirectReconciler(t, NewUpdateReconciler(), tree)
+	if agent.calls != 2 {
+		t.Fatalf("reload after rollback made %d calls, want both Pods from the All selector", agent.calls)
+	}
+}
+
 type configReloadAgent struct {
 	calls int
+	err   error
 }
 
 func (a *configReloadAgent) Close() error { return nil }
 
 func (a *configReloadAgent) Action(context.Context, proto.ActionRequest) (proto.ActionResponse, error) {
 	a.calls++
-	return proto.ActionResponse{}, nil
+	return proto.ActionResponse{}, a.err
 }

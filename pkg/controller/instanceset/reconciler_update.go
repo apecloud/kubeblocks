@@ -132,6 +132,10 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 	}
 
+	// Keep reloads local until all existing Pods have applied the shared
+	// configuration. Use the same scope throughout this reconciliation.
+	observedReloadScope := instancetemplate.ConfigReloadScope(oldPodList...)
+
 	// updatedPods tracks the positions already covered by the rolling-update
 	// window, while updatingPods tracks actual updates admitted in this round.
 	updatedPods := 0
@@ -177,7 +181,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			return kubebuilderx.Continue, err
 		}
 		// Always call reconfigure to execute reconfigure actions
-		allUpdated, err := r.reconfigure(tree, its, pod, desiredPod, nameToTemplateMap[pod.Name].Configs)
+		allUpdated, err := r.reconfigure(tree, its, pod, desiredPod, nameToTemplateMap[pod.Name].Configs, observedReloadScope)
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
@@ -317,14 +321,16 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, its *worklo
 }
 
 func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet,
-	pod, desiredPod *corev1.Pod, configs []workloads.ConfigTemplate) (bool, error) {
+	pod, desiredPod *corev1.Pod, configs []workloads.ConfigTemplate, observedReloadScope sets.Set[string]) (bool, error) {
 	mountedConfigs := configsForMountedVolumes(configs, pod, desiredPod)
 	toUpdate, err := configsToUpdate(mountedConfigs, pod)
 	if err != nil {
 		return false, err
 	}
+	desiredReloadScope := instancetemplate.ConfigReloadScope(desiredPod)
 	for _, config := range toUpdate {
-		targetPod, eligible := instancetemplate.ConfigReloadTarget(pod, desiredPod, config)
+		scoped := observedReloadScope.Has(config.Name) || desiredReloadScope.Has(config.Name)
+		targetPod, eligible := instancetemplate.ConfigReloadTarget(pod, config, scoped)
 		if !eligible {
 			continue
 		}

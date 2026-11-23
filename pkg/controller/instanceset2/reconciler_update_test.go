@@ -230,3 +230,85 @@ func TestUpdateReconcilerResolvesTemplateConfigChanges(t *testing.T) {
 	assertITS2ConfigIntent(t, instances[member], "main-new", "specific-new")
 	assertITS2ConfigIntent(t, instances["demo-0"], "main", "global")
 }
+
+func TestUpdateReconcilerPendingInstance(t *testing.T) {
+	ready := []metav1.Condition{{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue, Reason: workloads.ReasonReady}, {Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue, Reason: workloads.ReasonAvailable}}
+	pending := []metav1.Condition{{Type: string(workloads.InstanceReady), Status: metav1.ConditionFalse, Reason: workloads.ReasonPodPending}, {Type: string(workloads.InstanceAvailable), Status: metav1.ConditionFalse, Reason: workloads.ReasonNotAvailable}}
+	notReady := []metav1.Condition{{Type: string(workloads.InstanceReady), Status: metav1.ConditionFalse, Reason: workloads.ReasonNotReady}, {Type: string(workloads.InstanceAvailable), Status: metav1.ConditionFalse, Reason: workloads.ReasonNotAvailable}}
+	type instSpec struct {
+		name           string
+		updated, stale bool
+		conds          []metav1.Condition
+	}
+	tests := []struct {
+		name                              string
+		replicas, rolling, maxUnavailable int32
+		instances                         []instSpec
+		wantImages                        map[string]string
+	}{
+		{"updates single outdated Pending Instance", 1, 0, 1, []instSpec{{name: "demo-0", conds: pending}}, map[string]string{"demo-0": "mysql:new"}},
+		{"does not update Running not-ready Instance", 1, 0, 1, []instSpec{{name: "demo-0", conds: notReady}}, map[string]string{"demo-0": "mysql:old"}},
+		{"ignores stale unobserved Pending report", 1, 0, 1, []instSpec{{name: "demo-0", stale: true, conds: pending}}, map[string]string{"demo-0": "mysql:old"}},
+		{"updates only the outdated Pending Instance without admitting Ready peer", 2, 0, 2, []instSpec{{name: "demo-1", conds: pending}, {name: "demo-0", conds: ready}}, map[string]string{"demo-1": "mysql:new", "demo-0": "mysql:old"}},
+		{"respects maxUnavailable when an already-updated Instance is Pending", 2, 0, 1, []instSpec{{name: "demo-1", updated: true, conds: pending}, {name: "demo-0", conds: ready}}, map[string]string{"demo-0": "mysql:old"}},
+		{"keeps outdated Pending Instance outside rolling-update window untouched", 3, 1, 2, []instSpec{{name: "demo-2", conds: ready}, {name: "demo-1", conds: ready}, {name: "demo-0", conds: pending}}, map[string]string{"demo-2": "mysql:new", "demo-0": "mysql:old"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			its := its2InstanceStatusSet(tt.replicas)
+			its.Spec.Instances, its.Generation = nil, 2
+			its.Spec.Template.Spec.Containers[0].Image = "mysql:new"
+			rolling := &workloads.RollingUpdate{MaxUnavailable: ptr.To(intstr.FromInt32(tt.maxUnavailable))}
+			if tt.rolling > 0 {
+				rolling.Replicas = ptr.To(intstr.FromInt32(tt.rolling))
+			}
+			its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{RollingUpdate: rolling}
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			desired, names, err := buildDesiredInstancesByName(tree, its)
+			if err != nil {
+				t.Fatal(err)
+			}
+			revs := make(map[string]string, len(names))
+			for _, name := range names {
+				revs[name] = getInstanceRevision(desired[name])
+			}
+			if its.Status.UpdateRevisions, err = revisionmap.Encode(revs); err != nil {
+				t.Fatal(err)
+			}
+			for _, spec := range tt.instances {
+				inst := desired[spec.name].DeepCopy()
+				gen, obs := int64(1), int64(1)
+				if spec.updated {
+					gen, obs = 2, 2
+				} else {
+					inst.Spec.Template.Spec.Containers[0].Image = "mysql:old"
+					stampInstanceRevision(inst)
+					if spec.stale {
+						gen = 2
+					}
+				}
+				inst.Generation = gen
+				inst.Status = workloads.InstanceStatus2{
+					ObservedGeneration: obs, CurrentState: workloads.InstanceCurrentStatePresent,
+					UpToDate: true, Conditions: spec.conds,
+				}
+				if err := tree.Add(inst); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := NewUpdateReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			for name, want := range tt.wantImages {
+				obj, err := tree.Get(&workloads.Instance{ObjectMeta: metav1.ObjectMeta{Namespace: its.Namespace, Name: name}})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got := obj.(*workloads.Instance).Spec.Template.Spec.Containers[0].Image; got != want {
+					t.Fatalf("%s image = %q, want %q", name, got, want)
+				}
+			}
+		})
+	}
+}

@@ -71,6 +71,10 @@ func setPodUnavailableStatus(inst *workloads.Instance, state workloads.InstanceC
 }
 
 func buildReadyCondition(inst *workloads.Instance, ready bool, notReadyName string) *metav1.Condition {
+	return buildReadyConditionWithReason(inst, ready, workloads.ReasonNotReady, notReadyName)
+}
+
+func buildReadyConditionWithReason(inst *workloads.Instance, ready bool, notReadyReason, notReadyName string) *metav1.Condition {
 	condition := &metav1.Condition{
 		Type:               string(workloads.InstanceReady),
 		Status:             metav1.ConditionTrue,
@@ -79,7 +83,7 @@ func buildReadyCondition(inst *workloads.Instance, ready bool, notReadyName stri
 	}
 	if !ready {
 		condition.Status = metav1.ConditionFalse
-		condition.Reason = workloads.ReasonNotReady
+		condition.Reason = notReadyReason
 		condition.Message = notReadyName
 	}
 	return condition

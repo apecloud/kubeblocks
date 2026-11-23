@@ -842,6 +842,9 @@ const (
 	// ReasonNotReady is a reason for condition InstanceReady.
 	ReasonNotReady = "NotReady"
 
+	// ReasonPodPending is a reason for condition InstanceReady when the managed Pod is in Pending phase.
+	ReasonPodPending = "PodPending"
+
 	// ReasonReady is a reason for condition InstanceReady.
 	ReasonReady = "Ready"
 

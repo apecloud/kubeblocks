@@ -423,47 +423,43 @@ var _ = Describe("file templates transformer test", func() {
 			Expect(transCtx.Client.(model.GraphClient).FindAll(dag, &corev1.ConfigMap{})).To(BeEmpty())
 		})
 
-		It("replays file changes after the ConfigMap update has persisted", func() {
+		It("passes file changes when updating a specialized config", func() {
 			transCtx.SynthesizeComponent.FileTemplates[0].Config = true
 			transCtx.SynthesizeComponent.FileTemplates[0].Reconfigure = &appsv1.Action{Exec: &appsv1.ExecAction{Command: []string{"reload"}}}
 			transCtx.SynthesizeComponent.FileTemplates[0].Variables = map[string]string{"PORT": "1000"}
 			transCtx.SynthesizeComponent.PodSpec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: "logConf", MountPath: "/etc/server"}}
 			logConfCM.Data["server.conf"] = "port={{.PORT}}"
-			transCtx.SynthesizeComponent.Instances = []appsv1.InstanceTemplate{{Name: "large", Configs: []appsv1.ClusterComponentConfig{{Name: ptr.To("logConf"), Variables: map[string]string{"PORT": "2000"}}}}}
+			logConfCM.Data["old.conf"] = "old"
+			transCtx.SynthesizeComponent.Instances = []appsv1.InstanceTemplate{{
+				Name: "large",
+				Configs: []appsv1.ClusterComponentConfig{{
+					Name: ptr.To("logConf"), Variables: map[string]string{"PORT": "2000"},
+				}},
+			}}
 			transformer := &componentFileTemplateTransformer{}
-			persist := func() {
-				for _, obj := range transCtx.Client.(model.GraphClient).FindAll(dag, &corev1.ConfigMap{}) {
-					found := false
-					for i, existing := range reader.Objects {
-						if client.ObjectKeyFromObject(obj) == client.ObjectKeyFromObject(existing) {
-							reader.Objects[i] = obj.DeepCopyObject().(client.Object)
-							found = true
-							break
-						}
-					}
-					if !found {
-						reader.Objects = append(reader.Objects, obj.DeepCopyObject().(client.Object))
-					}
-				}
-				dag = newDAG(transCtx.Client.(model.GraphClient), transCtx.Component)
-				transCtx.SynthesizeComponent.Configs = nil
-			}
 			Expect(transformer.Transform(transCtx, dag)).To(Succeed())
-			persist()
+			Expect(instanceConfigMaps()).To(HaveLen(1))
+			running := instanceConfigMaps()[0].DeepCopy()
+			reader.Objects = append(reader.Objects, running)
+			dag = newDAG(transCtx.Client.(model.GraphClient), transCtx.Component)
+			transCtx.SynthesizeComponent.Configs = nil
 			transCtx.SynthesizeComponent.Instances[0].Configs[0].Variables["PORT"] = "3000"
+			delete(logConfCM.Data, "old.conf")
+			logConfCM.Data["new.conf"] = "new"
+
 			Expect(transformer.Transform(transCtx, dag)).To(Succeed())
-			before := transCtx.SynthesizeComponent.InstanceConfigs["large"][0].DeepCopy()
-			Expect(before.Parameters).To(HaveKeyWithValue("KB_CONFIG_FILES_UPDATED", ContainSubstring("/etc/server/server.conf:")))
-			Expect(instanceConfigMaps()[0].Annotations).To(HaveKey(fileTemplateChangesAnnotationKey))
-			persist()
-			Expect(transformer.Transform(transCtx, dag)).To(Succeed())
-			Expect(transCtx.SynthesizeComponent.InstanceConfigs["large"][0]).To(Equal(*before))
+			config := transCtx.SynthesizeComponent.InstanceConfigs["large"][0]
+			Expect(config.Volume.ConfigMapName).To(Equal(running.Name))
+			Expect(config.Parameters).To(HaveKeyWithValue("PORT", "3000"))
+			Expect(config.Parameters).To(HaveKeyWithValue("KB_CONFIG_FILES_CREATED", "new.conf"))
+			Expect(config.Parameters).To(HaveKeyWithValue("KB_CONFIG_FILES_REMOVED", "old.conf"))
+			Expect(config.Parameters).To(HaveKeyWithValue("KB_CONFIG_FILES_UPDATED", HavePrefix("/etc/server/server.conf:")))
 		})
 
-		It("keeps large restart-only ConfigMaps writable without durable reload changes", func() {
+		It("keeps large reloadable ConfigMaps writable", func() {
 			tpl := &transCtx.SynthesizeComponent.FileTemplates[0]
 			tpl.Config = true
-			tpl.RestartOnFileChange = ptr.To(true)
+			tpl.Reconfigure = &appsv1.Action{Exec: &appsv1.ExecAction{Command: []string{"reload"}}}
 			transCtx.SynthesizeComponent.PodSpec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: tpl.VolumeName, MountPath: "/etc/" + strings.Repeat("directory/", 20)}}
 			for i := 0; i < 2000; i++ {
 				logConfCM.Data[fmt.Sprintf("file-%04d.conf", i)] = "old"
@@ -480,10 +476,10 @@ var _ = Describe("file templates transformer test", func() {
 			vertex := transCtx.Client.(model.GraphClient).FindMatchedVertex(dag, running).(*model.ObjectVertex)
 			updated := vertex.Obj.(*corev1.ConfigMap)
 			Expect(updated.Data).To(Equal(logConfCM.Data))
-			Expect(updated.Annotations).NotTo(HaveKey(fileTemplateChangesAnnotationKey))
 			Expect(apivalidation.ValidateAnnotationsSize(updated.Annotations)).To(Succeed())
-			Expect(transCtx.SynthesizeComponent.Configs[0].Restart).To(Equal(ptr.To(true)))
-			Expect(transCtx.SynthesizeComponent.Configs[0].ConfigHash).NotTo(BeNil())
+			config := transCtx.SynthesizeComponent.Configs[0]
+			Expect(config.Reconfigure).NotTo(BeNil())
+			Expect(len(config.Parameters["KB_CONFIG_FILES_UPDATED"])).To(BeNumerically(">", 256*1024))
 		})
 
 		It("keeps stable tuple names within the ConfigMap name limit", func() {

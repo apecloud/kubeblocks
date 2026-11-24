@@ -47,7 +47,7 @@ import (
 
 var (
 	varReferenceRegExp = regexp.MustCompile(`\$\(([^)]+)\)`)
-	varTemplate        = template.New("vars").Option("missingkey=error").Funcs(sprig.TxtFuncMap())
+	varTemplateFuncs   = sprig.TxtFuncMap()
 )
 
 func VarReferenceRegExp() *regexp.Regexp {
@@ -285,7 +285,7 @@ func evaluateObjectVarsExpression(definedVars []appsv1.EnvVar, credentialVars []
 		if !evaluable(v) {
 			return nil
 		}
-		tpl, err := varTemplate.Parse(*v.Expression)
+		tpl, err := template.New("vars").Option("missingkey=error").Funcs(varTemplateFuncs).Parse(*v.Expression)
 		if err != nil {
 			return err
 		}

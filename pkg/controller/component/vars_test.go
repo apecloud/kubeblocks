@@ -21,8 +21,11 @@ package component
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
+	"sync"
+	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -40,6 +43,46 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
+
+func TestResolveTemplateNEnvVarsConcurrently(t *testing.T) {
+	const workers = 12
+	const iterations = 1000
+
+	ctx := t.Context()
+	start := make(chan struct{})
+	var group sync.WaitGroup
+	for worker := range workers {
+		group.Go(func() {
+			value := fmt.Sprintf("value-%d", worker)
+			expression := fmt.Sprintf(`{{ printf "worker-%d/%%s" .VALUE }}`, worker)
+			want := fmt.Sprintf("worker-%d/%s", worker, value)
+			vars := []appsv1.EnvVar{
+				{Name: "VALUE", Value: value},
+				{Name: "EXPR", Expression: &expression},
+			}
+			synthesizedComp := &SynthesizedComponent{}
+
+			<-start
+			for iteration := range iterations {
+				templateVars, envVars, err := ResolveTemplateNEnvVars(ctx, nil, synthesizedComp, vars)
+				if err != nil {
+					t.Errorf("worker %d iteration %d: %v", worker, iteration, err)
+					return
+				}
+				if got := templateVars["EXPR"]; got != want {
+					t.Errorf("worker %d iteration %d: template EXPR = %q, want %q", worker, iteration, got, want)
+					return
+				}
+				if !slices.Contains(envVars, corev1.EnvVar{Name: "EXPR", Value: want}) {
+					t.Errorf("worker %d iteration %d: expected EXPR=%q in env vars %v", worker, iteration, want, envVars)
+					return
+				}
+			}
+		})
+	}
+	close(start)
+	group.Wait()
+}
 
 var _ = Describe("vars", func() {
 	optional := func() *bool {

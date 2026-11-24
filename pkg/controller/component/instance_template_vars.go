@@ -29,8 +29,8 @@ import (
 )
 
 // ResolveInstanceTemplateVars resolves variables for an InstanceTemplate.
-// References to the current Component use the template's effective resource,
-// storage, and service version values. A nil instance uses Component values.
+// References that resolve only to the current Component use the template's
+// effective resources, storage, and service version. A nil instance uses Component values.
 func ResolveInstanceTemplateVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	definedVars []appsv1.EnvVar, instance *appsv1.InstanceTemplate) (map[string]string, error) {
 	vars, _, err := resolveTemplateNEnvVars(ctx, cli, synthesizedComp, definedVars, instance)

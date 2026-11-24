@@ -194,13 +194,12 @@ func (t *componentWorkloadTransformer) handleWorkloadStartNStop(transCtx *compon
 	if start || stop {
 		runningITSCopy := runningITS.DeepCopy()
 		// While stopped, normal updates stay deferred, so acknowledge the generation here.
-		// Changed configuration starts with its desired runtime. Defer the generation
-		// until the normal update has also applied membership and scaling changes.
+		// Start defers the generation until the normal workload update.
 		if stop {
 			runningITSCopy.Annotations[constant.KubeBlocksGenerationKey] = (*protoITS).Annotations[constant.KubeBlocksGenerationKey]
 		}
 		if start {
-			publishStartingInstanceConfigs(runningITSCopy, *protoITS, legacyConfigManagerRequired(transCtx.Component))
+			publishStartingInstanceConfigs(runningITSCopy, *protoITS)
 		}
 		*protoITS = runningITSCopy
 	}

@@ -24,16 +24,21 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/golang/mock/gomock"
+	k8sappsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
+	workloadctrl "github.com/apecloud/kubeblocks/controllers/workloads"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -45,6 +50,151 @@ import (
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
+
+func TestStartScopesConfigChangesToAffectedInstanceTemplate(t *testing.T) {
+	model.AddScheme(workloads.AddToScheme)
+	for _, viaInstance := range []bool{false, true} {
+		t.Run(map[bool]string{false: "direct Pod", true: "Instance"}[viaInstance], func(t *testing.T) {
+			for _, specialized := range []bool{false, true} {
+				t.Run(map[bool]string{false: "shared config update", true: "specialized config update"}[specialized], func(t *testing.T) {
+					ctx := context.Background()
+					comp, synth, scheme := instanceConfigFixture(t)
+					if err := clientgoscheme.AddToScheme(scheme); err != nil {
+						t.Fatal(err)
+					}
+					synth.EnableInstanceAPI = ptr.To(viaInstance)
+					synth.PodManagementPolicy = ptr.To(k8sappsv1.ParallelPodManagement)
+					synth.PodSpec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: "config", MountPath: "/etc/db"}}
+					synth.PodSpec.Containers[0].Resources.Requests = corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")}
+					if specialized {
+						synth.Replicas = 3
+						synth.Instances = []appsv1.InstanceTemplate{
+							{Name: "canary", Resources: &corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("8Gi")}}},
+							{Name: "other", Resources: &corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("3")}}},
+						}
+					}
+					running, err := component.BuildInstanceSet(synth, &appsv1.ComponentDefinition{})
+					if err != nil {
+						t.Fatal(err)
+					}
+					running = running.DeepCopy()
+					running.UID = "running-its"
+					running.Spec.Stop = ptr.To(true)
+					synth.PodSpec.Containers[0].Resources.Requests = corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")}
+					shared := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "default-config", Namespace: comp.Namespace}, Data: map[string]string{"server.conf": "shared"}}
+					previousShared := shared.DeepCopy()
+					maps := []*corev1.ConfigMap{shared}
+					if specialized {
+						synth.Instances[0].Resources.Requests[corev1.ResourceMemory] = resource.MustParse("12Gi")
+						synth.Instances[0].Env = []corev1.EnvVar{{Name: "PENDING_ENV", Value: "deferred"}}
+						synth.Instances[1].Resources.Requests[corev1.ResourceCPU] = resource.MustParse("4")
+						synth.InstanceConfigs = map[string][]workloads.ConfigTemplate{"canary": {{
+							Name: "main", ConfigHash: ptr.To("specialized-hash"), Volume: &workloads.ConfigVolumeBinding{ConfigMapName: "specialized-config"},
+						}}}
+						cm := managedInstanceConfig(comp, "specialized-config")
+						cm.Data["server.conf"] = "cpu=2 memory=12Gi"
+						maps = append(maps, cm)
+					} else {
+						synth.Configs[0].ConfigHash = ptr.To("new-shared-hash")
+						shared.Data["server.conf"] = "updated shared config"
+					}
+					cli := fake.NewClientBuilder().WithScheme(scheme).
+						WithStatusSubresource(&workloads.InstanceSet{}, &workloads.Instance{}, &corev1.Pod{}).
+						WithObjects(running, previousShared).Build()
+					plan, err := workloadConfigPlan(t, cli, comp, synth, running, maps...)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if err := plan.Execute(); err != nil {
+						t.Fatal(err)
+					}
+					starting := &workloads.InstanceSet{}
+					key := client.ObjectKeyFromObject(running)
+					if err := cli.Get(ctx, key, starting); err != nil {
+						t.Fatal(err)
+					}
+					if ptr.Deref(starting.Spec.Stop, false) || !ptr.Equal(starting.Spec.Configs[0].ConfigHash, running.Spec.Configs[0].ConfigHash) {
+						t.Errorf("Start did not preserve shared config state: stop=%v, config hash=%q", starting.Spec.Stop, ptr.Deref(starting.Spec.Configs[0].ConfigHash, ""))
+					}
+					recorder := record.NewFakeRecorder(100)
+					for range 6 {
+						if viaInstance {
+							if _, err := (&workloadctrl.InstanceSetReconciler2{Client: cli, Scheme: scheme, Recorder: recorder}).Reconcile(ctx, ctrl.Request{NamespacedName: key}); err != nil {
+								t.Fatal(err)
+							}
+							children := &workloads.InstanceList{}
+							if err := cli.List(ctx, children); err != nil {
+								t.Fatal(err)
+							}
+							for _, child := range children.Items {
+								if _, err := (&workloadctrl.InstanceReconciler{Client: cli, Scheme: scheme, Recorder: recorder}).Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(&child)}); err != nil {
+									t.Fatal(err)
+								}
+							}
+						} else if _, err := (&workloadctrl.InstanceSetReconciler{Client: cli, Scheme: scheme, Recorder: recorder}).Reconcile(ctx, ctrl.Request{NamespacedName: key}); err != nil {
+							t.Fatal(err)
+						}
+					}
+					checkPod := func(name, cpu, memory, configMap, configContents string) {
+						t.Helper()
+						pod := &corev1.Pod{}
+						if err := cli.Get(ctx, client.ObjectKey{Namespace: comp.Namespace, Name: running.Name + name}, pod); err != nil {
+							t.Fatal(err)
+						}
+						container := pod.Spec.Containers[0]
+						if container.Resources.Requests.Cpu().String() != cpu ||
+							(memory != "" && container.Resources.Requests.Memory().String() != memory) ||
+							len(container.Env) != 0 || container.VolumeMounts[0].MountPath != "/etc/db" {
+							t.Errorf("unexpected config runtime for %s: %+v", pod.Name, container)
+						}
+						for _, volume := range pod.Spec.Volumes {
+							if volume.Name != "config" {
+								continue
+							}
+							if volume.ConfigMap == nil || volume.ConfigMap.Name != configMap {
+								t.Fatalf("%s mounts the wrong configuration: %+v", pod.Name, volume)
+							}
+							cm := &corev1.ConfigMap{}
+							if err := cli.Get(ctx, client.ObjectKey{Namespace: pod.Namespace, Name: configMap}, cm); err != nil || cm.Data["server.conf"] != configContents {
+								t.Fatalf("%s did not mount the expected config contents: %v, %v", pod.Name, cm.Data, err)
+							}
+							return
+						}
+						t.Fatalf("%s has no config volume", pod.Name)
+					}
+					checkPod("-0", "1", "", "default-config", shared.Data["server.conf"])
+					if specialized {
+						checkPod("-canary-0", "2", "12Gi", "specialized-config", "cpu=2 memory=12Gi")
+						checkPod("-other-0", "3", "", "default-config", "shared")
+					}
+
+					if err := cli.Get(ctx, key, starting); err != nil {
+						t.Fatal(err)
+					}
+					plan, err = workloadConfigPlan(t, cli, comp, synth, starting, maps...)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if err := plan.Execute(); err != nil {
+						t.Fatal(err)
+					}
+					updated := &workloads.InstanceSet{}
+					if err := cli.Get(ctx, key, updated); err != nil {
+						t.Fatal(err)
+					}
+					if updated.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().String() != "2" ||
+						!ptr.Equal(updated.Spec.Configs[0].ConfigHash, synth.Configs[0].ConfigHash) {
+						t.Error("normal reconciliation did not apply the deferred shared changes")
+					}
+					if specialized && (len(updated.Spec.Instances[0].Env) != 1 ||
+						updated.Spec.Instances[1].Resources.Requests.Cpu().String() != "4") {
+						t.Error("normal reconciliation did not apply the deferred template changes")
+					}
+				})
+			}
+		})
+	}
+}
 
 func TestStartingManagedConfigurationWithLegacyConfigManager(t *testing.T) {
 	for _, enableInstanceAPI := range []bool{false, true} {

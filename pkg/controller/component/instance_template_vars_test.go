@@ -37,7 +37,7 @@ import (
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
-func TestResolveFileTemplateVars(t *testing.T) {
+func TestResolveInstanceTemplateVars(t *testing.T) {
 	required := ptr.To(appsv1.VarRequired)
 	resourceVar := func(name string, vars appsv1.ResourceVars) appsv1.EnvVar {
 		return appsv1.EnvVar{Name: name, ValueFrom: &appsv1.VarSource{ResourceVarRef: &appsv1.ResourceVarSelector{ResourceVars: vars}}}
@@ -62,14 +62,14 @@ func TestResolveFileTemplateVars(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	componentVars, err := ResolveFileTemplateVars(context.Background(), cli, synth, vars, nil)
+	componentVars, err := ResolveInstanceTemplateVars(context.Background(), cli, synth, vars, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(componentVars, original) {
-		t.Fatalf("default file vars differ: %v != %v", componentVars, original)
+		t.Fatalf("default vars differ: %v != %v", componentVars, original)
 	}
-	scoped, err := ResolveFileTemplateVars(context.Background(), cli, synth, vars, instance)
+	scoped, err := ResolveInstanceTemplateVars(context.Background(), cli, synth, vars, instance)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +95,7 @@ func TestResolveFileTemplateVars(t *testing.T) {
 		Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("6")},
 	}
 	instance.ServiceVersion = ""
-	scoped, err = ResolveFileTemplateVars(context.Background(), cli, synth, vars, instance)
+	scoped, err = ResolveInstanceTemplateVars(context.Background(), cli, synth, vars, instance)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +104,7 @@ func TestResolveFileTemplateVars(t *testing.T) {
 	}
 }
 
-func TestResolveFileTemplateVarsSelectors(t *testing.T) {
+func TestResolveInstanceTemplateVarsSelectors(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
 		ref       appsv1.ClusterObjectReference
@@ -129,7 +129,7 @@ func TestResolveFileTemplateVarsSelectors(t *testing.T) {
 				{Name: "CPU", ValueFrom: &appsv1.VarSource{ResourceVarRef: &appsv1.ResourceVarSelector{ClusterObjectReference: tc.ref, ResourceVars: appsv1.ResourceVars{CPU: ptr.To(appsv1.VarRequired)}}}},
 				{Name: "VERSION", ValueFrom: &appsv1.VarSource{ComponentVarRef: &appsv1.ComponentVarSelector{ClusterObjectReference: tc.ref, ComponentVars: appsv1.ComponentVars{ServiceVersion: ptr.To(appsv1.VarRequired)}}}},
 			}
-			got, err := ResolveFileTemplateVars(context.Background(), cli, synth, vars, instance)
+			got, err := ResolveInstanceTemplateVars(context.Background(), cli, synth, vars, instance)
 			if tc.wantError != "" {
 				if err == nil || !strings.Contains(err.Error(), tc.wantError) {
 					t.Fatalf("error = %v, want %q", err, tc.wantError)

@@ -28,10 +28,10 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
-// ResolveFileTemplateVars resolves file variables using the instance template's
-// resource and service version overrides for references to the current Component.
-// A nil instance resolves the Component's variables without overrides.
-func ResolveFileTemplateVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+// ResolveInstanceTemplateVars resolves variables for an InstanceTemplate.
+// References to the current Component use the template's effective resource,
+// storage, and service version values. A nil instance uses Component values.
+func ResolveInstanceTemplateVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	definedVars []appsv1.EnvVar, instance *appsv1.InstanceTemplate) (map[string]string, error) {
 	vars, _, err := resolveTemplateNEnvVars(ctx, cli, synthesizedComp, definedVars, instance)
 	return vars, err

@@ -134,7 +134,7 @@ func (t *componentFileTemplateTransformer) fileTemplateRenderContext(transCtx *c
 	reader := &varsReader{transCtx.Client, graphCli, dag}
 	vars := slices.Clone(transCtx.CompDef.Spec.Vars)
 	vars = append(vars, transCtx.SynthesizeComponent.SidecarVars...)
-	resolved, err := component.ResolveFileTemplateVars(transCtx.Context, reader, transCtx.SynthesizeComponent, vars, instance)
+	resolved, err := component.ResolveInstanceTemplateVars(transCtx.Context, reader, transCtx.SynthesizeComponent, vars, instance)
 	if err != nil {
 		return nil, err
 	}

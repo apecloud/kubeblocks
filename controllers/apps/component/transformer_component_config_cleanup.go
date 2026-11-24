@@ -25,13 +25,13 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -50,7 +50,7 @@ func collectInstanceConfigMaps(transCtx *componentTransformContext, cli client.C
 	candidates := make([]*corev1.ConfigMap, 0, len(configMaps.Items))
 	for i := range configMaps.Items {
 		cm := &configMaps.Items[i]
-		if !retained.Has(cm.Name) && model.IsOwnerOf(transCtx.Component, cm) {
+		if !retained.Has(cm.Name) && metav1.IsControlledBy(cm, transCtx.Component) {
 			candidates = append(candidates, cm)
 		}
 	}

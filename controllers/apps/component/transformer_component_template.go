@@ -220,7 +220,7 @@ func (t *componentFileTemplateTransformer) prepareSpecializedConfigMap(transCtx 
 			return nil, err
 		}
 		current = nil
-	} else if !model.IsOwnerOf(transCtx.Component, current) {
+	} else if !metav1.IsControlledBy(current, transCtx.Component) {
 		return nil, fmt.Errorf("the ConfigMap name for instance template %s config %s conflicts", instanceName, tpl.Name)
 	}
 	if current != nil {

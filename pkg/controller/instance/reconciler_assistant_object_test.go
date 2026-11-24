@@ -24,7 +24,6 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -114,49 +113,10 @@ func TestSharedAssistantObjectUpdatesExistingManagedObject(t *testing.T) {
 	}
 }
 
-func TestIsSharedAssistantConfigMap(t *testing.T) {
-	for _, tc := range []struct {
-		name   string
-		change func(*corev1.ConfigMap)
-		want   bool
-	}{
-		{"legacy shared", func(*corev1.ConfigMap) {}, true},
-		{"Component publisher", func(cm *corev1.ConfigMap) { cm.Labels[constant.KBAppConfigMapOwnerLabelKey] = "component-uid" }, false},
-		{"owner reference", func(cm *corev1.ConfigMap) { cm.OwnerReferences = []metav1.OwnerReference{{UID: "owner"}} }, false},
-		{"another cluster", func(cm *corev1.ConfigMap) { cm.Labels[constant.AppInstanceLabelKey] = "other" }, false},
-		{"another component", func(cm *corev1.ConfigMap) { cm.Labels[constant.KBAppComponentLabelKey] = "other" }, false},
-		{"unmarked", func(cm *corev1.ConfigMap) { cm.Annotations = nil }, false},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			cm := managedSharedConfigMap("config")
-			tc.change(cm)
-			if got := IsSharedAssistantConfigMap(cm, testCluster, testComponent); got != tc.want {
-				t.Fatalf("shared assistant = %v, want %v", got, tc.want)
-			}
-		})
-	}
-}
-
-func TestSharedAssistantObjectDoesNotCreateComponentConfigMap(t *testing.T) {
-	assistant := sharedConfigMapAssistantObject("config", "stale")
-	assistant.ConfigMap.Labels = map[string]string{constant.KBAppConfigMapOwnerLabelKey: "component-uid"}
-	inst := newTestInstance("cluster-component-0", assistant)
-	tree := newTestTree(inst)
-	if _, err := NewAssistantObjectReconciler().Reconcile(tree); err != nil {
-		t.Fatal(err)
-	}
-	if obj, err := tree.Get(assistant.ConfigMap); err != nil || obj != nil {
-		t.Fatalf("Instance planned a Component-managed ConfigMap: %v, %v", obj, err)
-	}
-}
-
 func TestDeletionReconcilerDeletesUnreferencedManagedSharedAssistantObject(t *testing.T) {
 	existing := managedSharedConfigMap("cluster-component-env")
 	inst := newTestInstance("cluster-component-0", sharedConfigMapAssistantObject("cluster-component-env", "v1"))
 	cli := newFakeClient(t, existing, inst)
-	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(existing), existing); err != nil {
-		t.Fatal(err)
-	}
 	tree := newTestTree(inst)
 	if err := tree.Add(existing); err != nil {
 		t.Fatalf("tree.Add() error = %v", err)
@@ -167,25 +127,12 @@ func TestDeletionReconcilerDeletesUnreferencedManagedSharedAssistantObject(t *te
 		t.Fatalf("deleteUnreferencedSharedAssistantObjects() error = %v", err)
 	}
 
-	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(existing), &corev1.ConfigMap{}); !apierrors.IsNotFound(err) {
-		t.Fatalf("unreferenced shared ConfigMap was not deleted: %v", err)
+	obj, err := tree.Get(sharedConfigMap("cluster-component-env", ""))
+	if err != nil {
+		t.Fatalf("tree.Get() error = %v", err)
 	}
-}
-
-func TestDeletionReconcilerKeepsComponentConfigMapAsSecondaryObject(t *testing.T) {
-	cm := managedSharedConfigMap("config")
-	cm.Labels[constant.KBAppConfigMapOwnerLabelKey] = "component-uid"
-	inst := newTestInstance("cluster-component-0")
-	tree := newTestTree(inst)
-	if err := tree.Add(cm); err != nil {
-		t.Fatal(err)
-	}
-	r := NewDeletionReconciler(newFakeClient(t, inst)).(*deletionReconciler)
-	if has, err := r.deleteSecondaryObjects(tree, inst, false); err != nil || has {
-		t.Fatalf("Component ConfigMap entered generic secondary deletion: %v, %v", has, err)
-	}
-	if obj, err := tree.Get(cm); err != nil || obj == nil {
-		t.Fatalf("Component ConfigMap was removed from desired tree: %v, %v", obj, err)
+	if obj != nil {
+		t.Fatalf("expected unreferenced shared ConfigMap to be removed from desired tree")
 	}
 }
 

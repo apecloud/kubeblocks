@@ -45,7 +45,6 @@ import (
 // componentWorkloadTransformer handles component workload generation
 type componentWorkloadTransformer struct {
 	client.Client
-	configProviders []string
 }
 
 var _ graph.Transformer = &componentWorkloadTransformer{}
@@ -77,9 +76,6 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 			if err := setCompOwnershipNFinalizer(comp, protoITS); err != nil {
 				return err
 			}
-			if err = t.prepareInstanceConfigMaps(transCtx, graphCli, dag, protoITS); err != nil {
-				return err
-			}
 			graphCli.Create(dag, protoITS)
 			dependOnInstanceConfigMaps(graphCli, dag, protoITS)
 		}
@@ -93,7 +89,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	if err != nil {
 		return err
 	}
-	return collectInstanceConfigMaps(transCtx, t.Client, protoITS, t.configProviders)
+	return collectInstanceConfigMaps(transCtx, t.Client, protoITS)
 }
 
 func (t *componentWorkloadTransformer) reconcileWorkload(ctx context.Context, cli client.Reader,
@@ -175,10 +171,7 @@ func (t *componentWorkloadTransformer) handleUpdate(transCtx *componentTransform
 		return err
 	}
 	if objCopy == nil {
-		return t.prepareInstanceConfigMaps(transCtx, cli, dag, runningITS)
-	}
-	if err = t.prepareInstanceConfigMaps(transCtx, cli, dag, objCopy); err != nil {
-		return err
+		return nil
 	}
 	cli.Update(dag, nil, objCopy, &model.ReplaceIfExistingOption{})
 	dependOnInstanceConfigMaps(cli, dag, objCopy)

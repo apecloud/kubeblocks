@@ -49,11 +49,12 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-const kubeBlockFileTemplateLabelKey = "apps.kubeblocks.io/file-template"
+const (
+	kubeBlockFileTemplateLabelKey = "apps.kubeblocks.io/file-template"
+	instanceConfigMapLabelKey     = "apps.kubeblocks.io/instance-config"
+)
 
-type componentFileTemplateTransformer struct {
-	configProviders []string
-}
+type componentFileTemplateTransformer struct{}
 
 var _ graph.Transformer = &componentFileTemplateTransformer{}
 
@@ -83,11 +84,7 @@ func (t *componentFileTemplateTransformer) Transform(ctx graph.TransformContext,
 			continue
 		}
 		name := fileTemplateObjectName(synth, tpl.Name)
-		current, desired := runningObjs[name], protoObjs[name]
-		if desired != nil {
-			t.recordConfigMapPlacements(transCtx, current, desired)
-		}
-		synth.Configs = append(synth.Configs, t.buildConfigTemplate(transCtx, tpl, current, desired))
+		synth.Configs = append(synth.Configs, t.buildConfigTemplate(transCtx, tpl, runningObjs[name], protoObjs[name]))
 	}
 	slices.SortFunc(synth.Configs, func(a, b workloads.ConfigTemplate) int {
 		return strings.Compare(a.Name, b.Name)
@@ -97,17 +94,14 @@ func (t *componentFileTemplateTransformer) Transform(ctx graph.TransformContext,
 		return err
 	}
 
-	for name := range toDelete {
-		if isCurrentComponentConfigMap(transCtx.Component, runningObjs[name]) {
-			// The workload may still mount this ConfigMap in a provider.
-			toDelete.Delete(name)
-		}
-	}
 	t.handleTemplateObjectChanges(transCtx, dag, runningObjs, protoObjs, toCreate, toDelete, toUpdate)
 	instanceCreate, _, instanceUpdate := mapDiff(instanceRunning, instanceDesired)
 	t.handleTemplateObjectChanges(transCtx, dag, instanceRunning, instanceDesired, instanceCreate, nil, instanceUpdate)
 
-	for _, tpl := range transCtx.SynthesizeComponent.FileTemplates {
+	for _, name := range slices.Sorted(maps.Keys(instanceDesired)) {
+		component.AddInstanceAssistantObject(synth, instanceDesired[name])
+	}
+	for _, tpl := range synth.FileTemplates {
 		if obj := t.instanceAssistantObject(transCtx, tpl, protoObjs); obj != nil {
 			component.AddInstanceAssistantObject(transCtx.SynthesizeComponent, obj)
 		}
@@ -226,13 +220,12 @@ func (t *componentFileTemplateTransformer) prepareSpecializedConfigMap(transCtx 
 			return nil, err
 		}
 		current = nil
-	} else if !isCurrentComponentConfigMap(transCtx.Component, current) {
+	} else if !model.IsOwnerOf(transCtx.Component, current) {
 		return nil, fmt.Errorf("the ConfigMap name for instance template %s config %s conflicts", instanceName, tpl.Name)
 	}
 	if current != nil {
 		desired.ResourceVersion = current.ResourceVersion
 	}
-	t.recordConfigMapPlacements(transCtx, current, desired)
 	if tpl.ConfigHash != nil {
 		hash, err := intctrlutil.ComputeHash(struct {
 			Version string
@@ -244,29 +237,6 @@ func (t *componentFileTemplateTransformer) prepareSpecializedConfigMap(transCtx 
 		desired.Annotations[constant.CMInsConfigurationHashLabelKey] = hash
 	}
 	return current, nil
-}
-
-func (t *componentFileTemplateTransformer) recordConfigMapPlacements(transCtx *componentTransformContext, current, desired *corev1.ConfigMap) {
-	requested := sets.New[string]()
-	if ptr.Deref(transCtx.SynthesizeComponent.EnableInstanceAPI, false) {
-		requested = configMapPlacements(transCtx.Component.Annotations[constant.KBAppMultiClusterPlacementKey])
-	}
-	if running := transCtx.RunningWorkload; running != nil && ptr.Deref(running.Spec.EnableInstanceAPI, false) {
-		requested = requested.Union(configMapPlacements(running.Annotations[constant.KBAppMultiClusterPlacementKey]))
-	}
-	managed := isCurrentComponentConfigMap(transCtx.Component, current)
-	// Unknown requests cannot have published a mirror. Keep recorded providers
-	// even if they have since been removed from the manager.
-	placements := requested.Intersection(sets.New(t.configProviders...))
-	if managed {
-		placements = placements.Union(configMapPlacements(current.Annotations[instanceConfigMapPlacementsAnnotationKey]))
-	}
-	if len(placements) > 0 {
-		desired.Annotations[instanceConfigMapPlacementsAnnotationKey] = strings.Join(sets.List(placements), ",")
-	}
-	if managed || len(requested) > 0 || desired.Labels[instanceConfigMapLabelKey] == "true" {
-		desired.Labels[constant.KBAppConfigMapOwnerLabelKey] = string(transCtx.Component.UID)
-	}
 }
 
 func instanceFileTemplateObjectName(synth *component.SynthesizedComponent, instance, config string) string {
@@ -294,11 +264,7 @@ func (t *componentFileTemplateTransformer) instanceAssistantObject(transCtx *com
 			},
 		}
 	}
-	objName := fileTemplateObjectName(transCtx.SynthesizeComponent, tpl.Name)
-	if obj := protoObjs[objName]; obj != nil && !isCurrentComponentConfigMap(transCtx.Component, obj) {
-		return obj
-	}
-	return nil
+	return protoObjs[fileTemplateObjectName(transCtx.SynthesizeComponent, tpl.Name)]
 }
 
 func (t *componentFileTemplateTransformer) precheck(transCtx *componentTransformContext) error {

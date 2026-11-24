@@ -34,15 +34,15 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-func NewDeletionReconciler(cli client.Client) kubebuilderx.Reconciler {
+func NewDeletionReconciler(reader client.Reader) kubebuilderx.Reconciler {
 	return &deletionReconciler{
-		client: cli,
+		reader: reader,
 	}
 }
 
 // deletionReconciler handles object and its secondary resources' deletion
 type deletionReconciler struct {
-	client client.Client
+	reader client.Reader
 }
 
 var _ kubebuilderx.Reconciler = &deletionReconciler{}
@@ -105,11 +105,6 @@ func (r *deletionReconciler) reconcileDeletingRuntime(tree *kubebuilderx.ObjectT
 func (r *deletionReconciler) deleteSecondaryObjects(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, retainPVC bool) (bool, error) {
 	// secondary objects to be deleted
 	secondaryObjects := maps.Clone(tree.GetSecondaryObjects())
-	for name, obj := range secondaryObjects {
-		if cm, ok := obj.(*corev1.ConfigMap); ok && cm.Labels[constant.KBAppConfigMapOwnerLabelKey] != "" {
-			delete(secondaryObjects, name)
-		}
-	}
 	for _, assistantObj := range inst.Spec.InstanceAssistantObjects {
 		obj, name, err := assistantObjectKey(assistantObj)
 		if err != nil {
@@ -173,7 +168,7 @@ func (r *deletionReconciler) deleteUnreferencedSharedAssistantObjects(tree *kube
 			constant.KBAppComponentLabelKey: inst.Labels[constant.KBAppComponentLabelKey],
 		},
 	}
-	if err := r.client.List(tree.Context, instList, listOpts...); err != nil {
+	if err := r.reader.List(tree.Context, instList, listOpts...); err != nil {
 		return err
 	}
 	for _, assistantObj := range inst.Spec.InstanceAssistantObjects {
@@ -199,14 +194,6 @@ func (r *deletionReconciler) deleteUnreferencedSharedAssistantObjects(tree *kube
 			continue
 		}
 		if !isSharedAssistantObject(existing, inst) {
-			continue
-		}
-		if cm, ok := existing.(*corev1.ConfigMap); ok {
-			if err := client.IgnoreNotFound(r.client.Delete(tree.Context, cm, client.Preconditions{UID: &cm.UID, ResourceVersion: &cm.ResourceVersion})); err != nil {
-				return err
-			}
-			// Keep the tree entry so commit cannot repeat an unguarded delete after
-			// the Component claims this shared ConfigMap.
 			continue
 		}
 		if err4 := tree.Delete(existing); err4 != nil {

@@ -20,33 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	"context"
-	"fmt"
-	"maps"
 	"reflect"
-	"strings"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/utils/ptr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	instancecontroller "github.com/apecloud/kubeblocks/pkg/controller/instance"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-)
-
-const (
-	instanceConfigMapLabelKey                = "apps.kubeblocks.io/instance-config"
-	instanceConfigMapPlacementsAnnotationKey = "apps.kubeblocks.io/instance-config-placements"
 )
 
 func dependOnInstanceConfigMaps(cli model.GraphClient, dag *graph.DAG, its *workloads.InstanceSet) {
@@ -54,18 +38,6 @@ func dependOnInstanceConfigMaps(cli model.GraphClient, dag *graph.DAG, its *work
 	for name := range referenced {
 		cli.DependOn(dag, its, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: its.Namespace, Name: name}})
 	}
-}
-
-func instanceConfigMapNames(its *workloads.InstanceSet) sets.Set[string] {
-	base := sets.New[string]()
-	retainPodConfigMaps(base, &its.Spec.Template.Spec)
-	names := sets.New[string]()
-	retainInstanceTemplateConfigMaps(names, its.Spec.Instances)
-	return names.Difference(base)
-}
-
-func configMapPlacements(value string) sets.Set[string] {
-	return sets.New(strings.FieldsFunc(value, func(r rune) bool { return r == ',' })...)
 }
 
 // Changed configuration must start with the runtime that produced it. Membership
@@ -192,146 +164,6 @@ func boundConfigMapNames(its *workloads.InstanceSet) sets.Set[string] {
 	}
 	retainInstanceTemplateConfigMaps(names, its.Spec.Instances)
 	return names
-}
-
-func isCurrentComponentConfigMap(comp *appsv1.Component, cm *corev1.ConfigMap) bool {
-	if cm == nil || comp.UID == "" || cm.Labels[constant.KBAppConfigMapOwnerLabelKey] != string(comp.UID) {
-		return false
-	}
-	owner := metav1.GetControllerOf(cm)
-	return owner != nil && owner.UID == comp.UID && owner.Name == comp.Name &&
-		owner.Kind == "Component" && owner.APIVersion == appsv1.GroupVersion.String()
-}
-
-func isComponentInstanceConfigMapMirror(comp *appsv1.Component, cm *corev1.ConfigMap) bool {
-	return comp.UID != "" && len(cm.OwnerReferences) == 0 &&
-		cm.Labels[constant.KBAppConfigMapOwnerLabelKey] == string(comp.UID)
-}
-
-func isLegacySharedConfigMapCopy(authority, candidate *corev1.ConfigMap) bool {
-	return authority.Labels[instanceConfigMapLabelKey] != "true" &&
-		instancecontroller.IsSharedAssistantConfigMap(candidate, authority.Labels[constant.AppInstanceLabelKey], authority.Labels[constant.KBAppComponentLabelKey])
-}
-
-func isManagedConfigMapCopy(comp *appsv1.Component, authority, candidate *corev1.ConfigMap) bool {
-	return candidate != nil && (isComponentInstanceConfigMapMirror(comp, candidate) || isLegacySharedConfigMapCopy(authority, candidate))
-}
-
-func (t *componentWorkloadTransformer) prepareInstanceConfigMaps(transCtx *componentTransformContext,
-	graphCli model.GraphClient, dag *graph.DAG, its *workloads.InstanceSet) error {
-	if !ptr.Deref(its.Spec.EnableInstanceAPI, false) || ptr.Deref(its.Spec.Stop, false) || !multicluster.Enabled4Object(its) {
-		return nil
-	}
-	placements := configMapPlacements(its.Annotations[constant.KBAppMultiClusterPlacementKey])
-	managed := instanceConfigMapNames(its)
-	for _, tpl := range transCtx.SynthesizeComponent.FileTemplates {
-		if tpl.Config && !isExternalManaged(tpl) {
-			managed.Insert(fileTemplateObjectName(transCtx.SynthesizeComponent, tpl.Name))
-		}
-	}
-	for _, name := range sets.List(boundConfigMapNames(its)) {
-		key := client.ObjectKey{Namespace: its.Namespace, Name: name}
-		cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: key.Namespace, Name: key.Name}}
-		pending, _ := graphCli.FindMatchedVertex(dag, cm).(*model.ObjectVertex)
-		if pending != nil && pending.Action != nil && (*pending.Action == model.CREATE || *pending.Action == model.UPDATE) {
-			cm = pending.Obj.(*corev1.ConfigMap)
-		} else {
-			pending = nil
-			if err := graphCli.Get(transCtx.Context, key, cm, multicluster.InControlContext()); err != nil {
-				if apierrors.IsNotFound(err) && !managed.Has(name) {
-					continue
-				}
-				return err
-			}
-		}
-		if !isCurrentComponentConfigMap(transCtx.Component, cm) {
-			if managed.Has(name) {
-				return fmt.Errorf("instance configuration ConfigMap %s is not owned by Component %s", key, transCtx.Component.Name)
-			}
-			continue
-		}
-		if missing := placements.Difference(sets.New(t.configProviders...)); len(missing) > 0 {
-			return fmt.Errorf("instance configuration providers are not configured: %v", sets.List(missing))
-		}
-		recorded := configMapPlacements(cm.Annotations[instanceConfigMapPlacementsAnnotationKey])
-		if !recorded.IsSuperset(placements) {
-			return intctrlutil.NewRequeueError(time.Second, "waiting for rendered instance configuration placement")
-		}
-		if pending != nil {
-			var err error
-			cm, err = t.publishConfigMapAuthority(transCtx.Context, dag, pending)
-			if err != nil {
-				return err
-			}
-		}
-		for _, placement := range sets.List(placements) {
-			if err := syncInstanceConfigMap(transCtx.Context, t.Client, transCtx.Component, cm, placement); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func (t *componentWorkloadTransformer) publishConfigMapAuthority(ctx context.Context, dag *graph.DAG, pending *model.ObjectVertex) (*corev1.ConfigMap, error) {
-	// Publish the current render before mirroring it. Rebuilding the plan first
-	// can produce a new render on every reconcile.
-	// Remove the planned write so it is not executed again if mirroring fails.
-	dag.RemoveVertex(pending)
-	cm := pending.Obj.(*corev1.ConfigMap).DeepCopy()
-	if *pending.Action == model.CREATE {
-		return cm, t.Client.Create(ctx, cm, multicluster.InControlContext())
-	}
-	old := pending.OriObj.(*corev1.ConfigMap)
-	cm.UID, cm.ResourceVersion = old.UID, old.ResourceVersion
-	return cm, t.Client.Update(ctx, cm, multicluster.InControlContext())
-}
-
-func syncInstanceConfigMap(ctx context.Context, cli client.Client, comp *appsv1.Component, config *corev1.ConfigMap, placement string) error {
-	ctx = multicluster.IntoContext(ctx, placement)
-	option := multicluster.InDataContext()
-	key := client.ObjectKeyFromObject(config)
-	current := &corev1.ConfigMap{}
-	err := cli.Get(ctx, key, current, option)
-	if err != nil && !apierrors.IsNotFound(err) {
-		return err
-	}
-	if err == nil {
-		if current.Name != key.Name || current.Namespace != key.Namespace {
-			return fmt.Errorf("cannot read instance configuration ConfigMap %s in placement %s", key, placement)
-		}
-		// A just-created authority may lack its assigned UID in the routed client's response.
-		if (config.UID == "" || current.UID == config.UID) && isCurrentComponentConfigMap(comp, current) {
-			return nil
-		}
-		if !isManagedConfigMapCopy(comp, config, current) {
-			return fmt.Errorf("instance configuration ConfigMap %s in placement %s is not owned by Component %s", key, placement, comp.Name)
-		}
-		if !current.DeletionTimestamp.IsZero() {
-			return intctrlutil.NewRequeueError(time.Second, "waiting for instance configuration mirror deletion")
-		}
-	}
-
-	desired := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{Namespace: key.Namespace, Name: key.Name, Labels: maps.Clone(config.Labels), Annotations: maps.Clone(config.Annotations)},
-		Data:       config.Data, BinaryData: config.BinaryData,
-	}
-	if desired.Annotations == nil {
-		desired.Annotations = make(map[string]string)
-	}
-	delete(desired.Annotations, instanceConfigMapPlacementsAnnotationKey)
-	desired.Annotations[constant.KBAppMultiClusterPlacementKey] = placement
-	if apierrors.IsNotFound(err) {
-		return cli.Create(ctx, desired, option)
-	}
-	if reflect.DeepEqual(current.Data, desired.Data) && reflect.DeepEqual(current.BinaryData, desired.BinaryData) &&
-		reflect.DeepEqual(current.Labels, desired.Labels) && reflect.DeepEqual(current.Annotations, desired.Annotations) {
-		return nil
-	}
-	updated := current.DeepCopy()
-	updated.Data, updated.BinaryData = desired.Data, desired.BinaryData
-	updated.Labels, updated.Annotations = desired.Labels, desired.Annotations
-	return cli.Update(ctx, updated, option)
 }
 
 func retainInstanceSetConfigMaps(retained sets.Set[string], its *workloads.InstanceSet) {

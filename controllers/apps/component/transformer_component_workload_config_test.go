@@ -43,7 +43,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -68,17 +67,11 @@ func instanceConfigFixture(t *testing.T) (*appsv1.Component, *component.Synthesi
 func managedInstanceConfig(comp *appsv1.Component, name string) *corev1.ConfigMap {
 	labels := constant.GetCompLabels("db", "mysql")
 	labels[instanceConfigMapLabelKey] = "true"
-	labels[constant.KBAppConfigMapOwnerLabelKey] = string(comp.UID)
 	return &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: comp.Namespace, UID: types.UID(name + "-uid"), Labels: labels,
 		OwnerReferences: []metav1.OwnerReference{{APIVersion: appsv1.GroupVersion.String(), Kind: "Component", Name: comp.Name, UID: comp.UID, Controller: ptr.To(true)}}}, Data: map[string]string{"config": "value"}}
 }
 
 func workloadConfigPlan(t *testing.T, cli client.Client, comp *appsv1.Component, synth *component.SynthesizedComponent, running *workloads.InstanceSet, maps ...*corev1.ConfigMap) (*componentPlan, error) {
-	t.Helper()
-	return workloadConfigPlanWithProviders(t, cli, comp, synth, running, nil, maps...)
-}
-
-func workloadConfigPlanWithProviders(t *testing.T, cli client.Client, comp *appsv1.Component, synth *component.SynthesizedComponent, running *workloads.InstanceSet, providers []string, maps ...*corev1.ConfigMap) (*componentPlan, error) {
 	t.Helper()
 	graphCli := model.NewGraphClient(cli)
 	dag := graph.NewDAG()
@@ -104,7 +97,7 @@ func workloadConfigPlanWithProviders(t *testing.T, cli client.Client, comp *apps
 		}
 		return builder.defaultWalkFunc(v)
 	}}
-	err := (&componentWorkloadTransformer{Client: cli, configProviders: providers}).Transform(transCtx, dag)
+	err := (&componentWorkloadTransformer{Client: cli}).Transform(transCtx, dag)
 	return plan, err
 }
 
@@ -187,7 +180,7 @@ func TestInstanceConfigPublicationPrecedesWorkload(t *testing.T) {
 }
 
 func TestInstanceConfigCollectionWaitsForReferences(t *testing.T) {
-	for _, reference := range []string{"published workload", "instance", "terminating pod", "none", "previous component"} {
+	for _, reference := range []string{"published workload", "instance", "assistant reference", "terminating pod", "none", "previous component"} {
 		t.Run(reference, func(t *testing.T) {
 			comp, synth, scheme := instanceConfigFixture(t)
 			cm := managedInstanceConfig(comp, "retired")
@@ -203,9 +196,13 @@ func TestInstanceConfigCollectionWaitsForReferences(t *testing.T) {
 			if reference == "published workload" {
 				running.Spec.Instances = []workloads.InstanceTemplate{{Name: "removed", Replicas: ptr.To(int32(0)), Configs: []workloads.ConfigTemplate{{Name: "main", Volume: &workloads.ConfigVolumeBinding{VolumeName: "old", ConfigMapName: cm.Name}}}}}
 			}
-			if reference == "instance" {
+			if reference == "instance" || reference == "assistant reference" {
 				inst := &workloads.Instance{ObjectMeta: metav1.ObjectMeta{Name: comp.Name + "-0", Namespace: comp.Namespace, Labels: constant.GetCompLabels("db", "mysql")}}
-				inst.Spec.Template.Spec = spec
+				if reference == "instance" {
+					inst.Spec.Template.Spec = spec
+				} else {
+					inst.Spec.InstanceAssistantObjects = []workloads.InstanceAssistantObject{{ConfigMap: cm}}
+				}
 				objects = append(objects, inst)
 			}
 			if reference == "terminating pod" {
@@ -232,83 +229,6 @@ func TestInstanceConfigCollectionWaitsForReferences(t *testing.T) {
 				t.Fatalf("unreferenced CM not collected: %v", err)
 			}
 		})
-	}
-}
-
-func TestInstanceConfigCollectionRetainsRemotePod(t *testing.T) {
-	comp, synth, scheme := instanceConfigFixture(t)
-	comp.Spec.EnableInstanceAPI = ptr.To(true)
-	comp.Annotations = map[string]string{constant.KBAppMultiClusterPlacementKey: "new-provider"}
-	authoritative := managedInstanceConfig(comp, "retired")
-	authoritative.Annotations = map[string]string{instanceConfigMapPlacementsAnnotationKey: "old-provider"}
-	mirrored := authoritative.DeepCopy()
-	mirrored.OwnerReferences = nil
-	mirrored.UID = "remote-copy"
-	mirrored.Annotations = map[string]string{constant.KBAppMultiClusterPlacementKey: "old-provider,new-provider"}
-	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: comp.Name + "-0", Namespace: comp.Namespace, Labels: constant.GetCompLabels("db", "mysql")}, Spec: corev1.PodSpec{Volumes: []corev1.Volume{{Name: "config", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: mirrored.Name}}}}}}}
-	controlPod := pod.DeepCopy()
-	controlPod.Name += "-terminating"
-	controlPod.DeletionTimestamp = ptr.To(metav1.Now())
-	controlPod.Finalizers = []string{"hold"}
-	control := fake.NewClientBuilder().WithScheme(scheme).WithObjects(authoritative, controlPod).Build()
-	oldProvider := fake.NewClientBuilder().WithScheme(scheme).WithObjects(mirrored, pod).Build()
-	newProvider := fake.NewClientBuilder().WithScheme(scheme).Build()
-	cli := multicluster.NewClient(control, map[string]client.Client{"old-provider": oldProvider, "new-provider": newProvider})
-	plan, err := workloadConfigPlanWithProviders(t, cli, comp, synth, nil, []string{"old-provider", "new-provider"})
-	if !intctrlutil.IsDelayedRequeueError(err) {
-		t.Fatalf("expected remote reference retry, got %v", err)
-	}
-	if err := plan.Execute(); err != nil {
-		t.Fatal(err)
-	}
-	if err := oldProvider.Delete(context.Background(), pod); err != nil {
-		t.Fatal(err)
-	}
-	current := &workloads.InstanceSet{}
-	if err := control.Get(context.Background(), client.ObjectKeyFromObject(comp), current); err != nil {
-		t.Fatal(err)
-	}
-	plan, err = workloadConfigPlanWithProviders(t, cli, comp, synth, current, []string{"old-provider", "new-provider"})
-	if err != nil && !intctrlutil.IsDelayedRequeueError(err) {
-		t.Fatal(err)
-	}
-	if err := plan.Execute(); err != nil {
-		t.Fatal(err)
-	}
-	if err := oldProvider.Get(context.Background(), client.ObjectKeyFromObject(mirrored), &corev1.ConfigMap{}); err != nil {
-		t.Fatalf("control-plane terminating Pod lost its reference: %v", err)
-	}
-	if err := control.Get(context.Background(), client.ObjectKeyFromObject(controlPod), controlPod); err != nil {
-		t.Fatal(err)
-	}
-	controlPod.Finalizers = nil
-	if err := control.Update(context.Background(), controlPod); err != nil {
-		t.Fatal(err)
-	}
-	if err := control.Get(context.Background(), client.ObjectKeyFromObject(comp), current); err != nil {
-		t.Fatal(err)
-	}
-	for pass := 0; pass < 2; pass++ {
-		plan, err = workloadConfigPlanWithProviders(t, cli, comp, synth, current, []string{"old-provider", "new-provider"})
-		if err != nil && !intctrlutil.IsDelayedRequeueError(err) {
-			t.Fatal(err)
-		}
-		if err := plan.Execute(); err != nil {
-			t.Fatal(err)
-		}
-		if pass == 0 {
-			if err := control.Get(context.Background(), client.ObjectKeyFromObject(authoritative), &corev1.ConfigMap{}); err != nil {
-				t.Fatalf("authority removed before mirror absence was observed: %v", err)
-			}
-		}
-		if err := control.Get(context.Background(), client.ObjectKeyFromObject(comp), current); err != nil {
-			t.Fatal(err)
-		}
-	}
-	for _, provider := range []client.Client{control, oldProvider} {
-		if err := provider.Get(context.Background(), client.ObjectKeyFromObject(authoritative), &corev1.ConfigMap{}); !apierrors.IsNotFound(err) {
-			t.Fatalf("retired provider CM remains: %v", err)
-		}
 	}
 }
 
@@ -625,7 +545,7 @@ func TestInstanceConfigDeletionRejectsSameNameReplacement(t *testing.T) {
 	replacement := stale.DeepCopy()
 	replacement.UID = "replacement-uid"
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(replacement).Build()
-	err := removeInstanceConfigMap(context.Background(), cli, stale, "")
+	err := removeInstanceConfigMap(context.Background(), cli, stale)
 	if err == nil {
 		t.Fatal("stale UID deletion succeeded")
 	}
@@ -636,23 +556,20 @@ func TestInstanceConfigDeletionRejectsSameNameReplacement(t *testing.T) {
 
 func TestInstanceConfigIncompleteObservationDoesNotBlockPublication(t *testing.T) {
 	comp, synth, scheme := instanceConfigFixture(t)
-	comp.Spec.EnableInstanceAPI = ptr.To(true)
-	comp.Annotations = map[string]string{constant.KBAppMultiClusterPlacementKey: "unavailable"}
 	cm := managedInstanceConfig(comp, "retired")
-	cm.Annotations = map[string]string{instanceConfigMapPlacementsAnnotationKey: "unavailable"}
 	running, err := component.BuildInstanceSet(synth, &appsv1.ComponentDefinition{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	synth.PodSpec.Containers[0].Resources.Requests = corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")}
 	base := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cm, running).Build()
-	cli := interceptor.NewClient(base, interceptor.Funcs{Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-		if placement, _ := multicluster.FromContext(ctx); placement == "unavailable" && key.Name == cm.Name {
-			return errors.New("provider unavailable")
+	cli := interceptor.NewClient(base, interceptor.Funcs{List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+		if _, ok := list.(*workloads.InstanceList); ok {
+			return errors.New("instance list unavailable")
 		}
-		return c.Get(ctx, key, obj, opts...)
+		return c.List(ctx, list, opts...)
 	}})
-	plan, err := workloadConfigPlanWithProviders(t, cli, comp, synth, running, []string{"unavailable"})
+	plan, err := workloadConfigPlan(t, cli, comp, synth, running)
 	if !intctrlutil.IsDelayedRequeueError(err) {
 		t.Fatalf("expected retry: %v", err)
 	}
@@ -724,337 +641,5 @@ func TestInstanceConfigCollectionResumesAfterFinalizerRemoval(t *testing.T) {
 		if attempt == 1 && !apierrors.IsNotFound(err) {
 			t.Fatalf("resumed cleanup did not delete CM: %v", err)
 		}
-	}
-}
-
-func TestInstanceConfigMirrorRejectsForeignOwnership(t *testing.T) {
-	comp, _, scheme := instanceConfigFixture(t)
-	desired := managedInstanceConfig(comp, "special")
-	foreign := desired.DeepCopy()
-	foreign.OwnerReferences = nil
-	foreign.Labels[constant.KBAppConfigMapOwnerLabelKey] = "previous-component"
-	foreign.Data["config"] = "foreign"
-	provider := fake.NewClientBuilder().WithScheme(scheme).WithObjects(foreign).Build()
-	cli := multicluster.NewClient(fake.NewClientBuilder().WithScheme(scheme).Build(), map[string]client.Client{"a": provider})
-	if err := syncInstanceConfigMap(context.Background(), cli, comp, desired, "a"); err == nil {
-		t.Fatal("mirror adopted a previous Component's ConfigMap")
-	}
-	current := &corev1.ConfigMap{}
-	if err := provider.Get(context.Background(), client.ObjectKeyFromObject(foreign), current); err != nil || current.Data["config"] != "foreign" {
-		t.Fatalf("foreign ConfigMap was changed: %#v, %v", current, err)
-	}
-}
-
-func TestInstanceConfigMirrorRetriesConcurrentUpdate(t *testing.T) {
-	comp, _, scheme := instanceConfigFixture(t)
-	desired := managedInstanceConfig(comp, "special")
-	mirror := desired.DeepCopy()
-	mirror.OwnerReferences = nil
-	mirror.Data["config"] = "old"
-	base := fake.NewClientBuilder().WithScheme(scheme).WithObjects(mirror).Build()
-	conflict := true
-	provider := interceptor.NewClient(base, interceptor.Funcs{Update: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
-		if conflict {
-			conflict = false
-			concurrent := &corev1.ConfigMap{}
-			if err := c.Get(ctx, client.ObjectKeyFromObject(obj), concurrent); err != nil {
-				return err
-			}
-			concurrent.Data["config"] = "concurrent"
-			if err := c.Update(ctx, concurrent); err != nil {
-				return err
-			}
-		}
-		return c.Update(ctx, obj, opts...)
-	}})
-	cli := multicluster.NewClient(fake.NewClientBuilder().WithScheme(scheme).Build(), map[string]client.Client{"a": provider})
-	if err := syncInstanceConfigMap(context.Background(), cli, comp, desired, "a"); !apierrors.IsConflict(err) {
-		t.Fatalf("concurrent update was not guarded: %v", err)
-	}
-	current := &corev1.ConfigMap{}
-	if err := base.Get(context.Background(), client.ObjectKeyFromObject(mirror), current); err != nil || current.Data["config"] != "concurrent" {
-		t.Fatalf("concurrent value was overwritten: %#v, %v", current, err)
-	}
-	if err := syncInstanceConfigMap(context.Background(), cli, comp, desired, "a"); err != nil {
-		t.Fatal(err)
-	}
-	if err := base.Get(context.Background(), client.ObjectKeyFromObject(mirror), current); err != nil || current.Data["config"] != "value" {
-		t.Fatalf("retry did not publish desired data: %#v, %v", current, err)
-	}
-}
-
-func TestInstanceConfigMirrorPublicationPrecedesWorkload(t *testing.T) {
-	for _, update := range []bool{false, true} {
-		t.Run(map[bool]string{false: "create", true: "update"}[update], func(t *testing.T) {
-			comp, synth, scheme := instanceConfigFixture(t)
-			synth.EnableInstanceAPI = ptr.To(true)
-			comp.Annotations = map[string]string{constant.KBAppMultiClusterPlacementKey: "a,b"}
-			synth.Annotations = comp.Annotations
-			synth.AnnotationsInjectedToWorkload = comp.Annotations
-			synth.Instances = []appsv1.InstanceTemplate{{Name: "canary", Replicas: ptr.To(int32(1))}}
-			cm := managedInstanceConfig(comp, "special")
-			cm.Annotations = map[string]string{instanceConfigMapPlacementsAnnotationKey: "a,b"}
-			shared := managedInstanceConfig(comp, "default-config")
-			delete(shared.Labels, instanceConfigMapLabelKey)
-			shared.Annotations = map[string]string{instanceConfigMapPlacementsAnnotationKey: "a,b"}
-			synth.InstanceConfigs = map[string][]workloads.ConfigTemplate{"canary": {{Name: "main", ConfigHash: ptr.To("special-hash"), Volume: &workloads.ConfigVolumeBinding{ConfigMapName: cm.Name}}}}
-			var running *workloads.InstanceSet
-			var objects []client.Object
-			if update {
-				var err error
-				running, err = component.BuildInstanceSet(synth, &appsv1.ComponentDefinition{})
-				if err != nil {
-					t.Fatal(err)
-				}
-				objects = append(objects, running)
-				running.Spec.Stop = ptr.To(true)
-				synth.InstanceConfigs["canary"][0].ConfigHash = ptr.To("new-special-hash")
-				synth.PodSpec.Containers[0].Image = "db:new"
-			}
-			legacy := shared.DeepCopy()
-			legacy.UID = "provider-a-legacy"
-			legacy.OwnerReferences = nil
-			delete(legacy.Labels, constant.KBAppConfigMapOwnerLabelKey)
-			legacy.Annotations = map[string]string{"workloads.kubeblocks.io/assistant-object": "true"}
-			legacy.Data["config"] = "stale assistant snapshot"
-			providerA := fake.NewClientBuilder().WithScheme(scheme).WithObjects(legacy).Build()
-			providerBBase := fake.NewClientBuilder().WithScheme(scheme).Build()
-			failMirror := true
-			mirrorUnavailable := errors.New("mirror unavailable")
-			providerB := interceptor.NewClient(providerBBase, interceptor.Funcs{Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
-				if failMirror {
-					return mirrorUnavailable
-				}
-				return c.Create(ctx, obj, opts...)
-			}})
-			writes := 0
-			checkMirrors := func() {
-				for _, provider := range []client.Client{providerA, providerB} {
-					for _, configMap := range []*corev1.ConfigMap{shared, cm} {
-						mirror := &corev1.ConfigMap{}
-						if err := provider.Get(context.Background(), client.ObjectKeyFromObject(configMap), mirror); err != nil || mirror.Data["config"] != "value" {
-							t.Fatalf("workload published before mirror: %#v, %v", mirror, err)
-						}
-						if len(mirror.OwnerReferences) != 0 || len(mirror.Finalizers) != 0 ||
-							mirror.Labels[constant.KBAppConfigMapOwnerLabelKey] != string(comp.UID) || mirror.Annotations["workloads.kubeblocks.io/assistant-object"] != "" {
-							t.Fatalf("mirror has invalid ownership: %#v", mirror.ObjectMeta)
-						}
-						if provider == providerA && configMap == shared && mirror.UID != legacy.UID {
-							t.Fatalf("legacy mirror was replaced instead of transferred in place: %#v", mirror.ObjectMeta)
-						}
-					}
-				}
-				writes++
-			}
-			controlBase := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
-			control := interceptor.NewClient(controlBase, interceptor.Funcs{
-				Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
-					if _, ok := obj.(*workloads.InstanceSet); ok {
-						checkMirrors()
-					}
-					return c.Create(ctx, obj, opts...)
-				},
-				Update: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
-					if _, ok := obj.(*workloads.InstanceSet); ok {
-						checkMirrors()
-					}
-					return c.Update(ctx, obj, opts...)
-				},
-			})
-			cli := multicluster.NewClient(control, map[string]client.Client{"a": providerA, "b": providerB})
-			providers := []string{"a", "b"}
-			plan, err := workloadConfigPlanWithProviders(t, cli, comp, synth, running, providers, shared, cm)
-			if !errors.Is(err, mirrorUnavailable) {
-				t.Fatalf("expected provider failure after publishing the authority: %v", err)
-			}
-			if err := plan.Execute(); err != nil || writes != 0 {
-				t.Fatalf("mirror failure allowed workload publication: writes=%d, error=%v", writes, err)
-			}
-			if err := control.Get(context.Background(), client.ObjectKeyFromObject(shared), &corev1.ConfigMap{}); err != nil {
-				t.Fatalf("shared authority was not persisted before mirroring: %v", err)
-			}
-
-			failMirror = false
-			plan, err = workloadConfigPlanWithProviders(t, cli, comp, synth, running, providers, shared, cm)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := plan.Execute(); err != nil {
-				t.Fatal(err)
-			}
-			if writes != 1 {
-				t.Fatalf("workload writes = %d, want one", writes)
-			}
-			if update {
-				return
-			}
-
-			// Reconcile a ConfigMap-only change against the published InstanceSet.
-			running = &workloads.InstanceSet{}
-			if err := control.Get(context.Background(), client.ObjectKeyFromObject(comp), running); err != nil {
-				t.Fatal(err)
-			}
-			cm.Data["config"] = "updated"
-			plan, err = workloadConfigPlanWithProviders(t, cli, comp, synth, running, providers, shared, cm)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := plan.Execute(); err != nil {
-				t.Fatal(err)
-			}
-			for _, provider := range []client.Client{providerA, providerB} {
-				mirror := &corev1.ConfigMap{}
-				if err := provider.Get(context.Background(), client.ObjectKeyFromObject(cm), mirror); err != nil || mirror.Data["config"] != "updated" {
-					t.Fatalf("mirror did not receive updated content: %v, %v", mirror.Data, err)
-				}
-			}
-			if writes != 1 {
-				t.Fatalf("ConfigMap-only change updated the workload: writes=%d", writes)
-			}
-		})
-	}
-}
-
-func TestInstanceConfigPublicationRequiresConfiguredProvider(t *testing.T) {
-	comp, synth, scheme := instanceConfigFixture(t)
-	placement := "worker"
-	comp.Annotations = map[string]string{constant.KBAppMultiClusterPlacementKey: placement}
-	synth.EnableInstanceAPI = ptr.To(true)
-	shared := managedInstanceConfig(comp, "default-config")
-	delete(shared.Labels, instanceConfigMapLabelKey)
-	shared.Annotations = map[string]string{instanceConfigMapPlacementsAnnotationKey: placement}
-	ctx := context.Background()
-	control := fake.NewClientBuilder().WithScheme(scheme).WithObjects(shared).Build()
-	original := &corev1.ConfigMap{}
-	if err := control.Get(ctx, client.ObjectKeyFromObject(shared), original); err != nil {
-		t.Fatal(err)
-	}
-
-	plan, err := workloadConfigPlanWithProviders(t, control, comp, synth, nil, nil)
-	if err == nil {
-		t.Fatal("missing provider allowed publication")
-	}
-	if err := plan.Execute(); err != nil {
-		t.Fatal(err)
-	}
-	if err := control.Get(ctx, client.ObjectKeyFromObject(comp), &workloads.InstanceSet{}); !apierrors.IsNotFound(err) {
-		t.Fatalf("published workload with no configured provider: %v", err)
-	}
-
-	cli := multicluster.NewClient(control, map[string]client.Client{placement: control})
-	plan, err = workloadConfigPlanWithProviders(t, cli, comp, synth, nil, []string{placement})
-	if err != nil {
-		t.Fatalf("rejected configured alias of the control cluster: %v", err)
-	}
-	if err := plan.Execute(); err != nil {
-		t.Fatal(err)
-	}
-	if err := control.Get(ctx, client.ObjectKeyFromObject(comp), &workloads.InstanceSet{}); err != nil {
-		t.Fatalf("workload was not published after the provider returned: %v", err)
-	}
-	current := &corev1.ConfigMap{}
-	if err := control.Get(ctx, client.ObjectKeyFromObject(shared), current); err != nil || current.ResourceVersion != original.ResourceVersion {
-		t.Fatalf("control alias rewrote the authority: %#v, %v", current.ObjectMeta, err)
-	}
-}
-
-func TestInstanceConfigPublishesWhenEachRenderChanges(t *testing.T) {
-	comp, synth, scheme := instanceConfigFixture(t)
-	comp.Annotations = map[string]string{constant.KBAppMultiClusterPlacementKey: "worker"}
-	synth.EnableInstanceAPI = ptr.To(true)
-	source := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{Namespace: comp.Namespace, Name: "source"},
-		Data:       map[string]string{"db.conf": "{{ randAlphaNum 64 }}"},
-	}
-	synth.FileTemplates = []component.SynthesizedFileTemplate{{
-		Config: true,
-		ComponentFileTemplate: appsv1.ComponentFileTemplate{
-			Name: "main", Template: source.Name, Namespace: source.Namespace, VolumeName: "config",
-		},
-	}}
-	synth.PodSpec.Volumes, synth.Configs = nil, nil
-	ctx := context.Background()
-	controlBase := fake.NewClientBuilder().WithScheme(scheme).WithObjects(source).Build()
-	rejected := errors.New("control CM write failed")
-	failAuthority := true
-	control := interceptor.NewClient(controlBase, interceptor.Funcs{Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
-		if _, ok := obj.(*corev1.ConfigMap); ok && failAuthority {
-			return rejected
-		}
-		return c.Create(ctx, obj, opts...)
-	}})
-	worker := fake.NewClientBuilder().WithScheme(scheme).Build()
-	unavailable := errors.New("provider rejected the mirror")
-	failMirror := true
-	mirrorAttempts := 0
-	provider := interceptor.NewClient(worker, interceptor.Funcs{Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
-		mirrorAttempts++
-		if failMirror {
-			return unavailable
-		}
-		return c.Create(ctx, obj, opts...)
-	}})
-	cli := multicluster.NewClient(control, map[string]client.Client{"worker": provider})
-	key := client.ObjectKey{Namespace: comp.Namespace, Name: fileTemplateObjectName(synth, "main")}
-	reconcile := func() error {
-		desired := *synth
-		desired.PodSpec = synth.PodSpec.DeepCopy()
-		transCtx := &componentTransformContext{
-			Context: ctx, Client: model.NewGraphClient(cli), Component: comp, ComponentOrig: comp.DeepCopy(),
-			SynthesizeComponent: &desired, CompDef: &appsv1.ComponentDefinition{},
-		}
-		dag := graph.NewDAG()
-		transCtx.Client.(model.GraphClient).Root(dag, comp, comp, model.ActionStatusPtr())
-		providers := []string{"worker"}
-		if err := (&componentFileTemplateTransformer{configProviders: providers}).Transform(transCtx, dag); err != nil {
-			t.Fatal(err)
-		}
-		err := (&componentWorkloadTransformer{Client: cli, configProviders: providers}).Transform(transCtx, dag)
-		builder := &componentPlanBuilder{cli: cli, transCtx: transCtx}
-		walkErr := dag.WalkReverseTopoOrder(func(v graph.Vertex) error {
-			if _, ok := v.(*model.ObjectVertex).Obj.(*appsv1.Component); ok {
-				return nil
-			}
-			return builder.defaultWalkFunc(v)
-		}, nil)
-		if walkErr != nil {
-			t.Fatal(walkErr)
-		}
-		return err
-	}
-	if err := reconcile(); !errors.Is(err, rejected) || mirrorAttempts != 0 {
-		t.Fatalf("provider publication started before the control write succeeded: attempts=%d, error=%v", mirrorAttempts, err)
-	}
-	failAuthority = false
-	if err := reconcile(); !errors.Is(err, unavailable) {
-		t.Fatalf("publish did not reach the provider after persisting the control CM: %v", err)
-	}
-	before := &corev1.ConfigMap{}
-	if err := control.Get(ctx, key, before); err != nil {
-		t.Fatal(err)
-	}
-	its := &workloads.InstanceSet{}
-	if err := control.Get(ctx, client.ObjectKeyFromObject(comp), its); !apierrors.IsNotFound(err) {
-		t.Fatalf("published the workload during provider failure: %v", err)
-	}
-	failMirror = false
-	if err := reconcile(); err != nil {
-		t.Fatalf("publish did not converge after the provider recovered: %v", err)
-	}
-	authority, mirror := &corev1.ConfigMap{}, &corev1.ConfigMap{}
-	for _, read := range []struct {
-		cli client.Client
-		cm  *corev1.ConfigMap
-	}{{control, authority}, {worker, mirror}} {
-		if err := read.cli.Get(ctx, key, read.cm); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := control.Get(ctx, client.ObjectKeyFromObject(comp), its); err != nil {
-		t.Fatal(err)
-	}
-	if authority.Data["db.conf"] == before.Data["db.conf"] || authority.Data["db.conf"] != mirror.Data["db.conf"] ||
-		ptr.Deref(its.Spec.Configs[0].ConfigHash, "") != authority.Annotations[constant.CMInsConfigurationHashLabelKey] {
-		t.Fatal("the new render did not reach the control CM, provider copy and workload together")
 	}
 }

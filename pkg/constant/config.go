@@ -17,9 +17,6 @@ limitations under the License.
 package constant
 
 const (
-	// KBAppConfigMapOwnerLabelKey records the Component UID that publishes a managed ConfigMap.
-	KBAppConfigMapOwnerLabelKey = "apps.kubeblocks.io/instance-config-owner"
-
 	ConfigurationConstraintsLabelPrefixKey = "config.kubeblocks.io/constraints"
 
 	// ConfigurationRevision defines the current revision

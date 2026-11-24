@@ -330,23 +330,24 @@ var _ = Describe("file templates transformer test", func() {
 			Expect(transCtx.SynthesizeComponent.TemplateVars["MEMORY"]).To(Equal("2147483648"))
 		})
 
-		It("publishes rendered configs independently of Instance assistants in a provider", func() {
-			transCtx.Component.UID = "component-uid"
-			transCtx.Component.Annotations = map[string]string{constant.KBAppMultiClusterPlacementKey: "a,missing"}
-			transCtx.SynthesizeComponent.EnableInstanceAPI = ptr.To(true)
+		It("exposes rendered ConfigMaps through the existing workload assistant references", func() {
 			transCtx.SynthesizeComponent.FileTemplates[0].Config = true
+			transCtx.SynthesizeComponent.FileTemplates[0].Variables = map[string]string{"PORT": "1000"}
+			logConfCM.Data["server.conf"] = "port={{.PORT}}"
+			transCtx.SynthesizeComponent.Instances = []appsv1.InstanceTemplate{{
+				Name: "canary",
+				Configs: []appsv1.ClusterComponentConfig{{
+					Name: ptr.To("logConf"), Variables: map[string]string{"PORT": "2000"},
+				}},
+			}}
 
-			Expect((&componentFileTemplateTransformer{configProviders: []string{"a"}}).Transform(transCtx, dag)).To(Succeed())
-			checkTemplateObject("logConf", func(obj *corev1.ConfigMap) {
-				Expect(obj.Labels[constant.KBAppConfigMapOwnerLabelKey]).To(Equal(string(transCtx.Component.UID)))
-				Expect(obj.Annotations[instanceConfigMapPlacementsAnnotationKey]).To(Equal("a"))
-				Expect(transCtx.SynthesizeComponent.Configs[0].Volume).To(Equal(&workloads.ConfigVolumeBinding{VolumeName: "logConf"}))
-				Expect(transCtx.SynthesizeComponent.PodSpec.Volumes).To(ContainElement(newVolume("logConf")))
-				Expect(transCtx.SynthesizeComponent.InstanceAssistantObjects).NotTo(ContainElement(corev1.ObjectReference{
-					Kind: "ConfigMap", Namespace: obj.Namespace, Name: obj.Name,
-				}))
-			})
-			checkAssistantObject("ConfigMap", transCtx.Component.Namespace, fileTemplateObjectName(transCtx.SynthesizeComponent, "serverConf"))
+			Expect((&componentFileTemplateTransformer{}).Transform(transCtx, dag)).To(Succeed())
+			baseName := fileTemplateObjectName(transCtx.SynthesizeComponent, "logConf")
+			Expect(instanceConfigMaps()).To(HaveLen(1))
+			specialized := instanceConfigMaps()[0]
+			Expect(transCtx.SynthesizeComponent.InstanceConfigs["canary"][0].Volume.ConfigMapName).To(Equal(specialized.Name))
+			checkAssistantObject("ConfigMap", transCtx.Component.Namespace, baseName)
+			checkAssistantObject("ConfigMap", transCtx.Component.Namespace, specialized.Name)
 		})
 
 		It("reuses the Component render when merged file variables match", func() {

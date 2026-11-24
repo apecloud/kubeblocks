@@ -38,7 +38,6 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -46,9 +45,8 @@ import (
 // ComponentReconciler reconciles a Component object
 type ComponentReconciler struct {
 	client.Client
-	Scheme          *runtime.Scheme
-	Recorder        record.EventRecorder
-	MultiClusterMgr multicluster.Manager
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components,verbs=get;list;watch;create;update;patch;delete
@@ -133,17 +131,12 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 
-	var configProviders []string
-	if r.MultiClusterMgr != nil {
-		configProviders = r.MultiClusterMgr.GetContexts()
-	}
-
 	plan, errBuild := planBuilder.
 		AddTransformer(
 			// handle component pre-terminate
 			&componentPreTerminateTransformer{},
 			// handle component deletion
-			&componentDeletionTransformer{Client: r.Client, configProviders: configProviders},
+			&componentDeletionTransformer{},
 			// handle finalizers and referenced definition labels
 			&componentMetaTransformer{},
 			// validate referenced componentDefinition objects, and build synthesized component
@@ -167,12 +160,12 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			// provision component system accounts, depend on vars
 			&componentAccountProvisionTransformer{},
 			// render config/script templates
-			&componentFileTemplateTransformer{configProviders: configProviders},
+			&componentFileTemplateTransformer{},
 			// handle RBAC for component workloads
 			// it should be put before workload transformer, because we modify podSpec's serviceaccount in it
 			&componentRBACTransformer{},
 			// handle the component workload
-			&componentWorkloadTransformer{Client: r.Client, configProviders: configProviders},
+			&componentWorkloadTransformer{Client: r.Client},
 			// handle component postProvision lifecycle action
 			&componentPostProvisionTransformer{},
 			// update component status

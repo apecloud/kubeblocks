@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"maps"
@@ -28,6 +29,7 @@ import (
 	"slices"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/Masterminds/sprig/v3"
 	corev1 "k8s.io/api/core/v1"
@@ -37,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -245,6 +248,112 @@ func instanceFileTemplateObjectName(synth *component.SynthesizedComponent, insta
 		len(instance), instance, len(config), config)))
 	prefix := strings.TrimRight(synth.FullCompName[:min(len(synth.FullCompName), 220)], ".-")
 	return fmt.Sprintf("%s-itcfg-%x", prefix, hash[:10])
+}
+
+func collectInstanceConfigMaps(transCtx *componentTransformContext, cli client.Client, desired *workloads.InstanceSet) error {
+	labels := constant.GetCompLabels(transCtx.SynthesizeComponent.ClusterName, transCtx.SynthesizeComponent.Name)
+	selector := maps.Clone(labels)
+	selector[instanceConfigMapLabelKey] = "true"
+	namespace := client.InNamespace(transCtx.Component.Namespace)
+	configMaps := &corev1.ConfigMapList{}
+	if err := cli.List(transCtx.Context, configMaps, namespace, client.MatchingLabels(selector)); err != nil {
+		return configMapCollectionWait(err)
+	}
+
+	retained := sets.New[string]()
+	retainInstanceSetConfigMaps(retained, desired)
+	candidates := make([]*corev1.ConfigMap, 0, len(configMaps.Items))
+	for i := range configMaps.Items {
+		cm := &configMaps.Items[i]
+		if !retained.Has(cm.Name) && metav1.IsControlledBy(cm, transCtx.Component) {
+			candidates = append(candidates, cm)
+		}
+	}
+	if len(candidates) == 0 {
+		return nil
+	}
+
+	running := transCtx.RunningWorkload
+	if running != nil && running.Status.ObservedGeneration != running.Generation {
+		return instanceConfigMapCleanupWait("waiting for workload to observe published instance configuration")
+	}
+	retainInstanceSetConfigMaps(retained, running)
+	instances := &workloads.InstanceList{}
+	if err := cli.List(transCtx.Context, instances, namespace, client.MatchingLabels(labels)); err != nil {
+		return configMapCollectionWait(err)
+	}
+	for _, instance := range instances.Items {
+		retainPodConfigMaps(retained, &instance.Spec.Template.Spec)
+		for _, assistant := range instance.Spec.InstanceAssistantObjects {
+			if cm := assistant.ConfigMap; cm != nil && cm.Namespace == transCtx.Component.Namespace {
+				retained.Insert(cm.Name)
+			}
+		}
+	}
+	pods := &corev1.PodList{}
+	if err := cli.List(transCtx.Context, pods, namespace, client.MatchingLabels(labels)); err != nil {
+		return configMapCollectionWait(err)
+	}
+	for _, pod := range pods.Items {
+		retainPodConfigMaps(retained, &pod.Spec)
+	}
+
+	for _, cm := range candidates {
+		if !retained.Has(cm.Name) {
+			if err := removeInstanceConfigMap(transCtx.Context, cli, cm); err != nil {
+				return configMapCollectionWait(err)
+			}
+		}
+	}
+	return instanceConfigMapCleanupWait("waiting for retired instance configuration collection")
+}
+
+func removeInstanceConfigMap(ctx context.Context, cli client.Client, cm *corev1.ConfigMap) error {
+	if controllerutil.RemoveFinalizer(cm, constant.DBComponentFinalizerName) {
+		return client.IgnoreNotFound(cli.Update(ctx, cm))
+	}
+	return client.IgnoreNotFound(cli.Delete(ctx, cm, client.Preconditions{UID: &cm.UID, ResourceVersion: &cm.ResourceVersion}))
+}
+
+func instanceConfigMapCleanupWait(reason string) error {
+	return intctrlutil.NewDelayedRequeueError(time.Second, reason)
+}
+
+func configMapCollectionWait(err error) error {
+	return instanceConfigMapCleanupWait("waiting for complete instance configuration observations: " + err.Error())
+}
+
+func retainInstanceSetConfigMaps(retained sets.Set[string], its *workloads.InstanceSet) {
+	if its == nil {
+		return
+	}
+	retainPodConfigMaps(retained, &its.Spec.Template.Spec)
+	retainInstanceTemplateConfigMaps(retained, its.Spec.Instances)
+}
+
+func retainInstanceTemplateConfigMaps(retained sets.Set[string], instances []workloads.InstanceTemplate) {
+	for _, instance := range instances {
+		for _, config := range instance.Configs {
+			if config.Volume != nil {
+				retained.Insert(config.Volume.ConfigMapName)
+			}
+		}
+	}
+}
+
+func retainPodConfigMaps(retained sets.Set[string], spec *corev1.PodSpec) {
+	for _, volume := range spec.Volumes {
+		if volume.ConfigMap != nil {
+			retained.Insert(volume.ConfigMap.Name)
+		}
+		if volume.Projected != nil {
+			for _, source := range volume.Projected.Sources {
+				if source.ConfigMap != nil {
+					retained.Insert(source.ConfigMap.Name)
+				}
+			}
+		}
+	}
 }
 
 func (t *componentFileTemplateTransformer) instanceAssistantObject(transCtx *componentTransformContext,

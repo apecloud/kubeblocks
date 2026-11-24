@@ -22,14 +22,17 @@ package component
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -533,6 +536,69 @@ func synthesizeFileTemplate(comp *appsv1.Component, tpl appsv1.ComponentFileTemp
 		return merge(stpl, appsv1.ClusterComponentConfig{})
 	}
 	return stpl // script
+}
+
+// InstanceFileTemplates derives managed configuration templates for an instance template.
+func InstanceFileTemplates(comp *SynthesizedComponent, instance *appsv1.InstanceTemplate) ([]SynthesizedFileTemplate, error) {
+	templates := make([]SynthesizedFileTemplate, 0)
+	byName := make(map[string]int)
+	for _, tpl := range comp.FileTemplates {
+		if !tpl.Config {
+			continue
+		}
+		byName[tpl.Name] = len(templates)
+		tpl.Variables = maps.Clone(tpl.Variables)
+		templates = append(templates, tpl)
+	}
+	if instance != nil {
+		seen := make(map[string]bool)
+		for _, config := range instance.Configs {
+			name := ptr.Deref(config.Name, "")
+			if name == "" {
+				return nil, fmt.Errorf("instance template %s: config name is required", instance.Name)
+			}
+			if seen[name] {
+				return nil, fmt.Errorf("instance template %s: duplicated config template %s", instance.Name, name)
+			}
+			seen[name] = true
+			i, ok := byName[name]
+			if !ok {
+				return nil, fmt.Errorf("instance template %s: config template %s is not defined", instance.Name, name)
+			}
+			tpl := &templates[i]
+			if ptr.Deref(tpl.ExternalManaged, false) {
+				return nil, fmt.Errorf("instance template %s: config template %s is externally managed", instance.Name, name)
+			}
+			if config.ExternalManaged != nil || config.ConfigHash != nil || config.Restart != nil ||
+				config.Reconfigure != nil || config.ReconfigureAction != nil || config.ReconfigureArgs != nil {
+				return nil, fmt.Errorf("instance template %s: config template %s accepts only name, variables and configMap.name", instance.Name, name)
+			}
+			if config.ConfigMap != nil {
+				source := config.ConfigMap
+				if source.Items != nil || source.DefaultMode != nil || source.Optional != nil {
+					return nil, fmt.Errorf("instance template %s: config template %s accepts only configMap.name", instance.Name, name)
+				}
+				if errs := validation.IsDNS1123Subdomain(source.Name); len(errs) > 0 {
+					return nil, fmt.Errorf("instance template %s: config template %s has invalid configMap.name %q: %s", instance.Name, name, source.Name, strings.Join(errs, "; "))
+				}
+				tpl.Template = source.Name
+				tpl.Namespace = comp.Namespace
+			}
+			if len(config.Variables) > 0 {
+				if tpl.Variables == nil {
+					tpl.Variables = make(map[string]string)
+				}
+				maps.Copy(tpl.Variables, config.Variables)
+			}
+		}
+	}
+	managed := templates[:0]
+	for _, tpl := range templates {
+		if !ptr.Deref(tpl.ExternalManaged, false) {
+			managed = append(managed, tpl)
+		}
+	}
+	return managed, nil
 }
 
 func buildRuntimeClassName(synthesizeComp *SynthesizedComponent, comp *appsv1.Component) {

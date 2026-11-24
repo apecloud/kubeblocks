@@ -20,18 +20,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"strings"
+	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -40,7 +46,139 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
+
+func TestInstanceConfigCollectionWaitsForReferences(t *testing.T) {
+	for _, reference := range []string{"published workload", "instance", "assistant reference", "terminating pod", "none", "previous component"} {
+		t.Run(reference, func(t *testing.T) {
+			comp, synth, scheme := instanceConfigFixture(t)
+			cm := managedInstanceConfig(comp, "retired")
+			if reference == "previous component" {
+				cm.OwnerReferences[0].UID = "previous-component"
+			}
+			running, err := component.BuildInstanceSet(synth, &appsv1.ComponentDefinition{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			objects := []client.Object{cm, running}
+			spec := corev1.PodSpec{Volumes: []corev1.Volume{{Name: "old", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: cm.Name}}}}}}
+			if reference == "published workload" {
+				running.Spec.Instances = []workloads.InstanceTemplate{{Name: "removed", Replicas: ptr.To(int32(0)), Configs: []workloads.ConfigTemplate{{Name: "main", Volume: &workloads.ConfigVolumeBinding{VolumeName: "old", ConfigMapName: cm.Name}}}}}
+			}
+			if reference == "instance" || reference == "assistant reference" {
+				inst := &workloads.Instance{ObjectMeta: metav1.ObjectMeta{Name: comp.Name + "-0", Namespace: comp.Namespace, Labels: constant.GetCompLabels("db", "mysql")}}
+				if reference == "instance" {
+					inst.Spec.Template.Spec = spec
+				} else {
+					inst.Spec.InstanceAssistantObjects = []workloads.InstanceAssistantObject{{ConfigMap: cm}}
+				}
+				objects = append(objects, inst)
+			}
+			if reference == "terminating pod" {
+				objects = append(objects, &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: comp.Name + "-0", Namespace: comp.Namespace, Labels: constant.GetCompLabels("db", "mysql"), DeletionTimestamp: ptr.To(metav1.Now()), Finalizers: []string{"hold"}}, Spec: spec})
+			}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
+			plan, err := workloadConfigPlan(t, cli, comp, synth, running)
+			retained := reference != "none" && reference != "previous component"
+			if err != nil && !intctrlutil.IsDelayedRequeueError(err) {
+				t.Fatal(err)
+			}
+			if retained && !intctrlutil.IsDelayedRequeueError(err) {
+				t.Fatalf("expected retry while old reference exists, got %v", err)
+			}
+			if err := plan.Execute(); err != nil {
+				t.Fatal(err)
+			}
+			err = cli.Get(context.Background(), client.ObjectKeyFromObject(cm), &corev1.ConfigMap{})
+			shouldExist := reference != "none"
+			if shouldExist && err != nil {
+				t.Fatalf("referenced or predecessor CM deleted: %v", err)
+			}
+			if !shouldExist && !apierrors.IsNotFound(err) {
+				t.Fatalf("unreferenced CM not collected: %v", err)
+			}
+		})
+	}
+}
+
+func TestInstanceConfigDeletionRejectsSameNameReplacement(t *testing.T) {
+	comp, _, scheme := instanceConfigFixture(t)
+	stale := managedInstanceConfig(comp, "retired")
+	replacement := stale.DeepCopy()
+	replacement.UID = "replacement-uid"
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(replacement).Build()
+	err := removeInstanceConfigMap(context.Background(), cli, stale)
+	if err == nil {
+		t.Fatal("stale UID deletion succeeded")
+	}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(replacement), &corev1.ConfigMap{}); err != nil {
+		t.Fatalf("same-name replacement deleted: %v", err)
+	}
+}
+
+func TestInstanceConfigIncompleteObservationDoesNotBlockPublication(t *testing.T) {
+	comp, synth, scheme := instanceConfigFixture(t)
+	cm := managedInstanceConfig(comp, "retired")
+	running, err := component.BuildInstanceSet(synth, &appsv1.ComponentDefinition{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	synth.PodSpec.Containers[0].Resources.Requests = corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")}
+	base := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cm, running).Build()
+	cli := interceptor.NewClient(base, interceptor.Funcs{List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+		if _, ok := list.(*workloads.InstanceList); ok {
+			return errors.New("instance list unavailable")
+		}
+		return c.List(ctx, list, opts...)
+	}})
+	plan, err := workloadConfigPlan(t, cli, comp, synth, running)
+	if !intctrlutil.IsDelayedRequeueError(err) {
+		t.Fatalf("expected retry: %v", err)
+	}
+	if err := plan.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	current := &workloads.InstanceSet{}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(running), current); err != nil {
+		t.Fatal(err)
+	}
+	if current.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().String() != "1" {
+		t.Fatal("unavailable GC observation blocked normal publication")
+	}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(cm), &corev1.ConfigMap{}); err != nil {
+		t.Fatalf("incomplete observation collected CM: %v", err)
+	}
+}
+
+func TestInstanceConfigCollectionResumesAfterFinalizerRemoval(t *testing.T) {
+	comp, synth, scheme := instanceConfigFixture(t)
+	cm := managedInstanceConfig(comp, "retired")
+	cm.Finalizers = []string{constant.DBComponentFinalizerName}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cm).Build()
+	var running *workloads.InstanceSet
+	for attempt := 0; attempt < 2; attempt++ {
+		plan, err := workloadConfigPlan(t, cli, comp, synth, running)
+		if !intctrlutil.IsDelayedRequeueError(err) {
+			t.Fatalf("expected collection retry: %v", err)
+		}
+		if err := plan.Execute(); err != nil {
+			t.Fatal(err)
+		}
+		running = &workloads.InstanceSet{}
+		if err := cli.Get(context.Background(), client.ObjectKeyFromObject(comp), running); err != nil {
+			t.Fatal(err)
+		}
+		current := &corev1.ConfigMap{}
+		err = cli.Get(context.Background(), client.ObjectKeyFromObject(cm), current)
+		if attempt == 0 && (err != nil || len(current.Finalizers) != 0) {
+			t.Fatalf("finalizer removal did not persist: %v", err)
+		}
+		if attempt == 1 && !apierrors.IsNotFound(err) {
+			t.Fatalf("resumed cleanup did not delete CM: %v", err)
+		}
+	}
+}
 
 var _ = Describe("file templates transformer test", func() {
 	const (

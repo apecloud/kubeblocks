@@ -348,6 +348,73 @@ func TestInstanceConfigStartClearsRemovedOverride(t *testing.T) {
 	}
 }
 
+func TestInstanceConfigStartDefersRuntimeChangesWhenFilesAreUnchanged(t *testing.T) {
+	for _, mode := range []struct {
+		name              string
+		enableInstanceAPI bool
+	}{{"direct Pod", false}, {"Instance", true}} {
+		t.Run(mode.name, func(t *testing.T) {
+			for _, scenario := range []string{"shared config", "specialized config", "shared files with template action parameters"} {
+				t.Run(scenario, func(t *testing.T) {
+					comp, synth, scheme := instanceConfigFixture(t)
+					synth.EnableInstanceAPI = ptr.To(mode.enableInstanceAPI)
+					synth.PodSpec.Containers[0].Resources.Requests = corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")}
+					config := *synth.Configs[0].DeepCopy()
+					if scenario != "shared config" {
+						synth.Instances = []appsv1.InstanceTemplate{{Name: "canary", Replicas: ptr.To(int32(1))}}
+					}
+					if scenario == "specialized config" {
+						config.ConfigHash = ptr.To("specialized-hash")
+						config.Volume = &workloads.ConfigVolumeBinding{ConfigMapName: "specialized-config"}
+						synth.InstanceConfigs = map[string][]workloads.ConfigTemplate{"canary": {config}}
+					}
+					running, err := component.BuildInstanceSet(synth, &appsv1.ComponentDefinition{})
+					if err != nil {
+						t.Fatal(err)
+					}
+					running = running.DeepCopy()
+					running.Spec.Stop = ptr.To(true)
+					previousReload := map[string]string{"KB_CONFIG_FILES_UPDATED": "/etc/db/server.conf:previous-checksum"}
+					switch scenario {
+					case "shared config":
+						running.Spec.Configs[0].Parameters = previousReload
+					case "specialized config":
+						running.Spec.Instances[0].Configs[0].Parameters = previousReload
+					case "shared files with template action parameters":
+						config.Volume = nil
+						config.Parameters = map[string]string{"ACTION_PARAM": "new-value"}
+						synth.InstanceConfigs = map[string][]workloads.ConfigTemplate{"canary": {config}}
+					}
+					synth.PodSpec.Containers[0].Resources.Requests = corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")}
+
+					cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(running).Build()
+					plan, err := workloadConfigPlan(t, cli, comp, synth, running)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if err := plan.Execute(); err != nil {
+						t.Fatal(err)
+					}
+					starting := &workloads.InstanceSet{}
+					if err := cli.Get(context.Background(), client.ObjectKeyFromObject(running), starting); err != nil {
+						t.Fatal(err)
+					}
+					if ptr.Deref(starting.Spec.Stop, false) {
+						t.Fatal("Start did not clear Stop")
+					}
+					if cpu := starting.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().String(); cpu != "1" {
+						t.Errorf("Start applied deferred CPU %s for unchanged config files", cpu)
+					}
+					if !reflect.DeepEqual(starting.Spec.Configs, running.Spec.Configs) ||
+						!reflect.DeepEqual(starting.Spec.Instances, running.Spec.Instances) {
+						t.Error("Start published deferred config action parameters")
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestInstanceConfigStartKeepsRenderInputsAndTopology(t *testing.T) {
 	for _, enableInstanceAPI := range []bool{false, true} {
 		t.Run(map[bool]string{false: "direct Pod", true: "Instance"}[enableInstanceAPI], func(t *testing.T) {

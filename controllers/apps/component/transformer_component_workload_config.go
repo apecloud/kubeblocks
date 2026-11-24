@@ -21,10 +21,12 @@ package component
 
 import (
 	"reflect"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -55,12 +57,19 @@ func publishStartingInstanceConfigs(target, desired *workloads.InstanceSet, lega
 		if next := templates[instance.Name]; next != nil {
 			configs = next.Configs
 		}
-		changed = changed || !reflect.DeepEqual(instance.Configs, configs)
+		changed = changed || !slices.EqualFunc(specializedConfigs(instance.Configs), specializedConfigs(configs), sameConfigContentAndVolume)
 	}
 	if !changed {
-		// Older workloads can adopt the binding for an existing mount without
-		// applying unrelated deferred runtime changes.
-		target.Spec.Configs = desired.Spec.Configs
+		// Older workloads can adopt the binding for an existing mount.
+		bindings := make(map[string]*workloads.ConfigVolumeBinding, len(desired.Spec.Configs))
+		for _, config := range desired.Spec.Configs {
+			bindings[config.Name] = config.Volume
+		}
+		for i := range target.Spec.Configs {
+			if config := &target.Spec.Configs[i]; config.Volume == nil {
+				config.Volume = bindings[config.Name]
+			}
+		}
 		return
 	}
 	snapshot := desired.DeepCopy()
@@ -107,7 +116,7 @@ func sameStartingConfigs(current, desired *workloads.InstanceSet, legacyPolicy l
 				old.Volume = next.Volume
 			}
 		}
-		if !reflect.DeepEqual(old, next) {
+		if !sameConfigContentAndVolume(old, next) {
 			return false
 		}
 	}
@@ -120,6 +129,23 @@ func sameStartingConfigs(current, desired *workloads.InstanceSet, legacyPolicy l
 		preserveLegacyConfigManagerPodSpec(current, desired, effective, legacyPolicy)
 	}
 	return reflect.DeepEqual(startingConfigMounts(&current.Spec.Template.Spec, volumes), startingConfigMounts(&effective.Spec.Template.Spec, volumes))
+}
+
+func specializedConfigs(configs []workloads.ConfigTemplate) []workloads.ConfigTemplate {
+	var specialized []workloads.ConfigTemplate
+	for _, config := range configs {
+		// Overrides without a ConfigMap binding share the Component's rendered files.
+		if config.Volume != nil {
+			specialized = append(specialized, config)
+		}
+	}
+	return specialized
+}
+
+func sameConfigContentAndVolume(current, desired workloads.ConfigTemplate) bool {
+	return current.Name == desired.Name &&
+		ptr.Equal(current.ConfigHash, desired.ConfigHash) &&
+		ptr.Equal(current.Volume, desired.Volume)
 }
 
 type configMounts struct {

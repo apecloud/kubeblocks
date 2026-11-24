@@ -57,7 +57,7 @@ func TestResolveInstanceTemplateVars(t *testing.T) {
 		{Name: "REFERENCE", Value: "$(CPU)/$(VERSION)"},
 		{Name: "LITERAL", Value: "unchanged"},
 	}
-	cli, synth, instance := fileTemplateVarsFixture(t)
+	cli, synth, instance := instanceTemplateVarsFixture(t)
 	original, env, err := ResolveTemplateNEnvVars(context.Background(), cli, synth, vars)
 	if err != nil {
 		t.Fatal(err)
@@ -88,7 +88,7 @@ func TestResolveInstanceTemplateVars(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(original, after) || !reflect.DeepEqual(env, afterEnv) {
-		t.Fatal("file resolution changed Component variables or environment")
+		t.Fatal("InstanceTemplate resolution changed Component variables or environment")
 	}
 	instance.Resources = &corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("0"), corev1.ResourceMemory: resource.MustParse("1536Mi")},
@@ -117,13 +117,24 @@ func TestResolveInstanceTemplateVarsSelectors(t *testing.T) {
 		{name: "other component", ref: appsv1.ClusterObjectReference{CompDef: "other-v1"}, want: map[string]string{"CPU": "7", "VERSION": "1.0.0"}},
 		{name: "individual components", ref: appsv1.ClusterObjectReference{CompDef: "db", MultipleClusterObjectOption: &appsv1.MultipleClusterObjectOption{Strategy: appsv1.MultipleClusterObjectStrategyIndividual}}, want: map[string]string{"CPU_DB": "2", "CPU_PEER": "5", "VERSION_DB": "1.0.0", "VERSION_PEER": "1.0.0"}},
 		{name: "combined components", ref: appsv1.ClusterObjectReference{CompDef: "db", MultipleClusterObjectOption: &appsv1.MultipleClusterObjectOption{Strategy: appsv1.MultipleClusterObjectStrategyCombined, CombinedOption: &appsv1.MultipleClusterObjectCombinedOption{ValueFormat: appsv1.FlattenFormat, FlattenFormat: &appsv1.MultipleClusterObjectValueFormatFlatten{Delimiter: ",", KeyValueDelimiter: ":"}}}}, want: map[string]string{"CPU": "db:2,peer:5", "VERSION": "db:1.0.0,peer:1.0.0"}},
+		{
+			name: "optional missing peer preserves multi-Component values",
+			ref: appsv1.ClusterObjectReference{
+				CompDef:  "^(db-v1|absent-v1)$",
+				Optional: ptr.To(true),
+				MultipleClusterObjectOption: &appsv1.MultipleClusterObjectOption{
+					Strategy: appsv1.MultipleClusterObjectStrategyIndividual,
+				},
+			},
+			want: map[string]string{"CPU_DB": "2", "VERSION_DB": "1.0.0"},
+		},
 		{name: "optional absent object", ref: appsv1.ClusterObjectReference{CompDef: "absent-v1", Optional: ptr.To(true)}, want: map[string]string{}},
 		{name: "required absent object", ref: appsv1.ClusterObjectReference{CompDef: "absent-v1"}, wantError: "has no Component object"},
 		{name: "no matching component", ref: appsv1.ClusterObjectReference{CompDef: "unknown"}, wantError: "has no Component object"},
 		{name: "ambiguous selector", ref: appsv1.ClusterObjectReference{CompDef: "shared"}, wantError: "more than one referent component"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			cli, synth, instance := fileTemplateVarsFixture(t)
+			cli, synth, instance := instanceTemplateVarsFixture(t)
 			synth.Comp2CompDefs = map[string]string{"db": "db-v1", "peer": "db-v2", "other": "other-v1", "absent": "absent-v1", "a": "shared-v1", "b": "shared-v2"}
 			vars := []appsv1.EnvVar{
 				{Name: "CPU", ValueFrom: &appsv1.VarSource{ResourceVarRef: &appsv1.ResourceVarSelector{ClusterObjectReference: tc.ref, ResourceVars: appsv1.ResourceVars{CPU: ptr.To(appsv1.VarRequired)}}}},
@@ -151,7 +162,7 @@ func TestResolveInstanceTemplateVarsSelectors(t *testing.T) {
 	}
 }
 
-func fileTemplateVarsFixture(t *testing.T) (client.Client, *SynthesizedComponent, *appsv1.InstanceTemplate) {
+func instanceTemplateVarsFixture(t *testing.T) (client.Client, *SynthesizedComponent, *appsv1.InstanceTemplate) {
 	t.Helper()
 	scheme := runtime.NewScheme()
 	if err := workloadsv1.AddToScheme(scheme); err != nil {

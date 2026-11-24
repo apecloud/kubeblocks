@@ -98,6 +98,7 @@ jobs:
         if: needs.cherry-pick-pre-check.result == 'failure' || needs.cherry-pick-pre-check.result == 'cancelled'
         run: |
           gh pr comment "${{ github.event.issue.number }}" \
+            --repo "${{ github.repository }}" \
             --body "🤖 says: ‼️ cherry-pick pre-check failed. See: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             || echo "failed to post comment"
           exit 1

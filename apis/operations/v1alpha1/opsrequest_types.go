@@ -617,6 +617,8 @@ type InstanceReplicasTemplate struct {
 }
 
 // Reconfigure defines the parameters for updating a Component's configuration.
+//
+// The Reconfiguring operation does not support deleting individual keys from configuration files.
 type Reconfigure struct {
 	// Specifies the name of the Component.
 	ComponentOps `json:",inline"`
@@ -708,8 +710,7 @@ type ParameterPair struct {
 	// +kubebuilder:validation:Required
 	Key string `json:"key"`
 
-	// Represents the parameter values that are to be updated.
-	// If set to nil, the parameter defined by the Key field will be removed from the configuration file.
+	// Specifies the string value to set for the parameter.
 	// +optional
 	Value *string `json:"value"`
 }

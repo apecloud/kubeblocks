@@ -3221,8 +3221,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents the parameter values that are to be updated.
-If set to nil, the parameter defined by the Key field will be removed from the configuration file.</p>
+<p>Specifies the string value to set for the parameter.</p>
 </td>
 </tr>
 </tbody>
@@ -3802,6 +3801,7 @@ during the restore process.</p>
 </p>
 <div>
 <p>Reconfigure defines the parameters for updating a Component&rsquo;s configuration.</p>
+<p>The Reconfiguring operation does not support deleting individual keys from configuration files.</p>
 </div>
 <table>
 <thead>

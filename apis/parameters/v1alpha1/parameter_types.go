@@ -99,6 +99,8 @@ type ComponentParametersSpec struct {
 	//
 	// Parameter updates do not support deleting individual keys from configuration files.
 	//
+	// Null parameter values are ignored. A valid request with no remaining parameter or template updates succeeds without changing configuration.
+	//
 	// +optional
 	Parameters ComponentParameters `json:"parameters,omitempty"`
 

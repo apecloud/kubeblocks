@@ -406,7 +406,9 @@ func ReloadStaticParameters(pd *parametersv1alpha1.ParametersDefinitionSpec) boo
 func TransformComponentParameters(params []opsv1alpha1.ParameterPair) parametersv1alpha1.ComponentParameters {
 	ret := make(parametersv1alpha1.ComponentParameters, len(params))
 	for _, param := range params {
-		ret[param.Key] = param.Value
+		if param.Value != nil {
+			ret[param.Key] = param.Value
+		}
 	}
 	return ret
 }

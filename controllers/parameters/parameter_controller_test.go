@@ -117,6 +117,74 @@ var _ = Describe("Parameter Controller", func() {
 			})).Should(Succeed())
 		})
 
+		It("ignores null parameter entries without discarding other updates", func() {
+			prepareTestEnv()
+
+			submit := func(entries []parametersv1alpha1.ComponentParametersSpec, phase parametersv1alpha1.ParameterPhase) {
+				GinkgoHelper()
+				key := testapps.GetRandomizedKey(comp.Namespace, comp.FullCompName)
+				request := testparameters.NewParameterFactory(key.Name, key.Namespace, comp.ClusterName, comp.Name).GetObject()
+				request.Spec.ComponentParameters = entries
+				Expect(testCtx.CreateObj(testCtx.Ctx, request)).To(Succeed())
+				Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, parameter *parametersv1alpha1.Parameter) {
+					g.Expect(parameter.Status.ObservedGeneration).To(Equal(parameter.Generation))
+					g.Expect(parameter.Status.Phase).To(Equal(phase), "parameter status: %s", parameter.Status.Message)
+				})).Should(Succeed())
+			}
+
+			const ignored = "default_time_zone"
+			const valid = "max_connections"
+			configMapKey := client.ObjectKey{
+				Namespace: comp.Namespace,
+				Name:      configcore.GetComponentCfgName(comp.ClusterName, comp.Name, configSpecName),
+			}
+			expectValues := func(maxConnections string) {
+				GinkgoHelper()
+				Eventually(testapps.CheckObj(&testCtx, configMapKey, func(g Gomega, configMap *corev1.ConfigMap) {
+					config, err := unstructured.LoadConfig(testparameters.MysqlConfigFile, configMap.Data[testparameters.MysqlConfigFile], parametersv1alpha1.Ini)
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(config.Get("mysqld." + ignored)).To(Equal("+08:00"))
+					g.Expect(config.Get("mysqld." + valid)).To(Equal(maxConnections))
+				})).Should(Succeed())
+			}
+
+			submit([]parametersv1alpha1.ComponentParametersSpec{{
+				ComponentName: comp.Name,
+				Parameters:    parametersv1alpha1.ComponentParameters{ignored: pointer.String("+08:00"), valid: pointer.String("100")},
+			}}, parametersv1alpha1.CFinishedPhase)
+			expectValues("100")
+
+			By("accepting an update that only supplies null")
+			before := &corev1.ConfigMap{}
+			Expect(k8sClient.Get(testCtx.Ctx, configMapKey, before)).To(Succeed())
+			nullOnly := parametersv1alpha1.ComponentParameters{ignored: nil}
+			submit([]parametersv1alpha1.ComponentParametersSpec{{ComponentName: comp.Name, Parameters: nullOnly}}, parametersv1alpha1.CFinishedPhase)
+			submit([]parametersv1alpha1.ComponentParametersSpec{{ComponentName: comp.Name}}, parametersv1alpha1.CFinishedPhase)
+			after := &corev1.ConfigMap{}
+			Expect(k8sClient.Get(testCtx.Ctx, configMapKey, after)).To(Succeed())
+			Expect(after.Data).To(Equal(before.Data))
+			Expect(after.Annotations[constant.ConfigurationRevision]).To(Equal(before.Annotations[constant.ConfigurationRevision]))
+
+			By("applying a valid update alongside null in the same component")
+			submit([]parametersv1alpha1.ComponentParametersSpec{{
+				ComponentName: comp.Name,
+				Parameters:    parametersv1alpha1.ComponentParameters{ignored: nil, valid: pointer.String("200")},
+			}}, parametersv1alpha1.CFinishedPhase)
+			expectValues("200")
+
+			By("applying an update for another component when one component only supplies null")
+			submit([]parametersv1alpha1.ComponentParametersSpec{
+				{ComponentName: shardingCompName, Parameters: nullOnly},
+				{ComponentName: comp.Name, Parameters: parametersv1alpha1.ComponentParameters{valid: pointer.String("300")}},
+			}, parametersv1alpha1.CFinishedPhase)
+			expectValues("300")
+
+			By("rejecting an unknown component even if it only supplies null")
+			submit([]parametersv1alpha1.ComponentParametersSpec{{
+				ComponentName: "unknown-component", Parameters: nullOnly,
+			}}, parametersv1alpha1.CMergeFailedPhase)
+		})
+
 		const stringParameter = "default_time_zone"
 		DescribeTable("applies explicit empty string values",
 			func(updates []map[string]string) {

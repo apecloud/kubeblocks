@@ -2583,8 +2583,10 @@ spec:
                               is to be updated.
                             type: string
                           value:
-                            description: Specifies the string value to set for the
-                              parameter.
+                            description: |-
+                              Specifies the string value to set for the parameter.
+
+                              Parameter entries with a null or omitted value are ignored. A valid operation with no remaining parameter updates succeeds without changing configuration.
                             type: string
                         required:
                         - key

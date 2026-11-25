@@ -961,7 +961,8 @@ ComponentParameters
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the user-defined configuration template or parameters.</p>
+<p>Specifies the parameter values to set for the Component.</p>
+<p>Parameter updates do not support deleting individual keys from configuration files.</p>
 </td>
 </tr>
 <tr>

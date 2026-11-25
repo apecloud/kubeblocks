@@ -95,7 +95,9 @@ type ComponentParametersSpec struct {
 	// +kubebuilder:validation:Required
 	ComponentName string `json:"componentName"`
 
-	// Specifies the user-defined configuration template or parameters.
+	// Specifies the parameter values to set for the Component.
+	//
+	// Parameter updates do not support deleting individual keys from configuration files.
 	//
 	// +optional
 	Parameters ComponentParameters `json:"parameters,omitempty"`

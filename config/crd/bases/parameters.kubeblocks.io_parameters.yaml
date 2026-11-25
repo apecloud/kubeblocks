@@ -72,8 +72,10 @@ spec:
                     parameters:
                       additionalProperties:
                         type: string
-                      description: Specifies the user-defined configuration template
-                        or parameters.
+                      description: |-
+                        Specifies the parameter values to set for the Component.
+
+                        Parameter updates do not support deleting individual keys from configuration files.
                       type: object
                     userConfigTemplates:
                       additionalProperties:

@@ -346,7 +346,6 @@ string
 </td>
 <td>
 <p>Lists ComponentParametersSpec objects, each specifying a Component and its parameters and template updates.</p>
-<p>Null parameter values are ignored. A valid request with no remaining parameter or template updates succeeds without changing configuration.</p>
 </td>
 </tr>
 </tbody>
@@ -963,6 +962,7 @@ ComponentParameters
 <td>
 <em>(Optional)</em>
 <p>Specifies the user-defined configuration template or parameters.</p>
+<p>Null parameter values are ignored. A valid request with no remaining parameter or template updates succeeds without changing configuration.</p>
 </td>
 </tr>
 <tr>
@@ -1877,7 +1877,6 @@ string
 </td>
 <td>
 <p>Lists ComponentParametersSpec objects, each specifying a Component and its parameters and template updates.</p>
-<p>Null parameter values are ignored. A valid request with no remaining parameter or template updates succeeds without changing configuration.</p>
 </td>
 </tr>
 </tbody>

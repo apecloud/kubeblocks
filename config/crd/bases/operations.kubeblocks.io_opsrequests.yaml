@@ -2566,8 +2566,6 @@ spec:
                     Reconfigure defines the parameters for updating a Component's configuration.
 
                     The Reconfiguring operation does not support deleting individual keys from configuration files.
-
-                    Parameter entries with a null or omitted value are ignored. A valid operation with no remaining parameter updates succeeds without changing configuration.
                   properties:
                     componentName:
                       description: Specifies the name of the Component as defined
@@ -2585,8 +2583,10 @@ spec:
                               is to be updated.
                             type: string
                           value:
-                            description: Specifies the string value to set for the
-                              parameter.
+                            description: |-
+                              Specifies the string value to set for the parameter.
+
+                              Parameter entries with a null or omitted value are ignored. A valid operation with no remaining parameter updates succeeds without changing configuration.
                             type: string
                         required:
                         - key

@@ -62,8 +62,10 @@ spec:
                 - message: forbidden to update spec.clusterName
                   rule: self == oldSelf
               componentParameters:
-                description: Lists ComponentParametersSpec objects, each specifying
-                  a Component and its parameters and template updates.
+                description: |-
+                  Lists ComponentParametersSpec objects, each specifying a Component and its parameters and template updates.
+
+                  Null parameter values are ignored. A valid request with no remaining parameter or template updates succeeds without changing configuration.
                 items:
                   properties:
                     componentName:

@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -251,3 +252,24 @@ var _ = Describe("Parameter Controller", func() {
 	})
 
 })
+
+func TestMergeExplicitEmptyParameter(t *testing.T) {
+	g := NewWithT(t)
+	item := parametersv1alpha1.ConfigTemplateItemDetail{
+		ConfigFileParams: map[string]parametersv1alpha1.ParametersInFile{
+			"settings.json": {Parameters: map[string]*string{
+				"value":    pointer.String("old"),
+				"other":    pointer.String("keep"),
+				"nullable": pointer.String("stored"),
+			}},
+		},
+	}
+	g.Expect(mergeWithOverride(&item, map[string]parametersv1alpha1.ParametersInFile{
+		"settings.json": {Parameters: map[string]*string{"value": pointer.String(""), "nullable": nil}},
+	})).To(Succeed())
+	g.Expect(item.ConfigFileParams["settings.json"].Parameters).To(Equal(map[string]*string{
+		"value":    pointer.String(""),
+		"other":    pointer.String("keep"),
+		"nullable": pointer.String("stored"),
+	}))
+}

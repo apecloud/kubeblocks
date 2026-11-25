@@ -964,8 +964,8 @@ ComponentParameters
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the parameter values to set for the Component.
-This field does not support deleting individual keys from the configuration file.</p>
+<p>Specifies the parameter values to set for the Component.</p>
+<p>Parameter updates do not support deleting individual keys from configuration files.</p>
 </td>
 </tr>
 <tr>

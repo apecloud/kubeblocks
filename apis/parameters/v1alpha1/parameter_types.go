@@ -96,7 +96,8 @@ type ComponentParametersSpec struct {
 	ComponentName string `json:"componentName"`
 
 	// Specifies the parameter values to set for the Component.
-	// This field does not support deleting individual keys from the configuration file.
+	//
+	// Parameter updates do not support deleting individual keys from configuration files.
 	//
 	// +optional
 	Parameters ComponentParameters `json:"parameters,omitempty"`

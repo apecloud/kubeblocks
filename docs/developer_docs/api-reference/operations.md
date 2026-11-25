@@ -3235,6 +3235,7 @@ string
 <td>
 <em>(Optional)</em>
 <p>Specifies the string value to set for the parameter.</p>
+<p>Parameter entries with a null or omitted value are ignored. A valid operation with no remaining parameter updates succeeds without changing configuration.</p>
 </td>
 </tr>
 </tbody>
@@ -3815,7 +3816,6 @@ during the restore process.</p>
 <div>
 <p>Reconfigure defines the parameters for updating a Component&rsquo;s configuration.</p>
 <p>The Reconfiguring operation does not support deleting individual keys from configuration files.</p>
-<p>Parameter entries with a null or omitted value are ignored. A valid operation with no remaining parameter updates succeeds without changing configuration.</p>
 </div>
 <table>
 <thead>

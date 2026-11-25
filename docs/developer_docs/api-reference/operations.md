@@ -3235,6 +3235,7 @@ string
 <td>
 <em>(Optional)</em>
 <p>Specifies the string value to set for the parameter.</p>
+<p>Parameter entries with a null or omitted value are ignored. A valid operation with no remaining parameter updates succeeds without changing configuration.</p>
 </td>
 </tr>
 </tbody>

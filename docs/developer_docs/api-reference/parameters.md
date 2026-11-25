@@ -966,6 +966,7 @@ ComponentParameters
 <em>(Optional)</em>
 <p>Specifies the parameter values to set for the Component.</p>
 <p>Parameter updates do not support deleting individual keys from configuration files.</p>
+<p>Null parameter values are ignored. A valid request with no remaining parameter or template updates succeeds without changing configuration.</p>
 </td>
 </tr>
 <tr>

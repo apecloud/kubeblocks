@@ -83,6 +83,8 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 						}, {
 							Key:   "key",
 							Value: pointer.String("abcd"),
+						}, {
+							Key: "max_connections",
 						}},
 				},
 			}
@@ -106,6 +108,14 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			var param = &parametersv1alpha1.Parameter{}
 			err = k8sClient.Get(testCtx.Ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), param)
 			Expect(err).Should(BeNil())
+
+			Expect(param.Spec.ComponentParameters).To(ConsistOf(parametersv1alpha1.ComponentParametersSpec{
+				ComponentName: defaultCompName,
+				Parameters: parametersv1alpha1.ComponentParameters{
+					"max_connections": pointer.String("200"),
+					"key":             pointer.String("abcd"),
+				},
+			}))
 
 			// mock parameter phase to reconfiguring
 			Expect(testapps.ChangeObjStatus(&testCtx, param, func() {

@@ -60,6 +60,8 @@ type ParameterSpec struct {
 
 	// Lists ComponentParametersSpec objects, each specifying a Component and its parameters and template updates.
 	//
+	// Null parameter values are ignored. A valid request with no remaining parameter or template updates succeeds without changing configuration.
+	//
 	// +kubebuilder:validation:Required
 	ComponentParameters []ComponentParametersSpec `json:"componentParameters"`
 }

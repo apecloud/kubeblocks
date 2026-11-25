@@ -129,7 +129,9 @@ func buildReconfigureParameter(ops *opsv1alpha1.OpsRequest) *parametersv1alpha1.
 func transformComponentParameters(params []opsv1alpha1.ParameterPair) parametersv1alpha1.ComponentParameters {
 	ret := make(parametersv1alpha1.ComponentParameters, len(params))
 	for _, param := range params {
-		ret[param.Key] = param.Value
+		if param.Value != nil {
+			ret[param.Key] = param.Value
+		}
 	}
 	return ret
 }

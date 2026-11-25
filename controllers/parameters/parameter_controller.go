@@ -145,6 +145,10 @@ func (r *ParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, parameter
 	if err != nil {
 		return r.fail(reqCtx, parameter, err)
 	}
+	if len(rctxs) == 0 {
+		parameter.Status = parametersv1alpha1.ParameterStatus{Phase: parametersv1alpha1.CFinishedPhase}
+		return updateParameterStatus(reqCtx, r.Client, parameter, patch, true)
+	}
 	for i, rctx := range rctxs {
 		if err := r.handleComponent(rctx, params[i], parameter); err != nil {
 			return r.fail(reqCtx, parameter, err)
@@ -164,6 +168,9 @@ func (r *ParameterReconciler) generateParameterTaskContext(
 		comps, err := resolveComponents(reqCtx.Ctx, r.Client, cluster, compParameter.ComponentName)
 		if err != nil {
 			return nil, nil, err
+		}
+		if len(compParameter.Parameters) == 0 && len(compParameter.CustomTemplates) == 0 {
+			continue
 		}
 		for _, compName := range comps {
 			params = append(params, compParameter.Parameters)
@@ -186,9 +193,6 @@ func (r *ParameterReconciler) validate(parameter *parametersv1alpha1.Parameter, 
 	}
 
 	for _, compParameter := range parameter.Spec.ComponentParameters {
-		if len(compParameter.Parameters) == 0 && len(compParameter.CustomTemplates) == 0 {
-			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "required parameters or custom templates for component[%s]", compParameter.ComponentName)
-		}
 		if err := validateCustomTemplate(ctx, r.Client, compParameter.CustomTemplates); err != nil {
 			return err
 		}

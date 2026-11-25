@@ -25,7 +25,7 @@ jobs:
 
   release-test:
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ (matrix.ops == 'test' && 15) || (matrix.ops == 'lint' && 6) || (matrix.ops == 'manifests' && 5) || 2 }}
+    timeout-minutes: ${{ (matrix.ops == 'test' && 15) || (matrix.ops == 'lint' && 6) || 5 }}
     strategy:
       fail-fast: true
       matrix:
@@ -164,7 +164,7 @@ jobs:
   release-version:
     needs: [ release-addons-version ]
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 5
     steps:
       - name: checkout branch ${{ github.ref_name }}
         uses: actions/checkout@v4

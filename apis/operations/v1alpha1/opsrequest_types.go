@@ -617,6 +617,8 @@ type InstanceReplicasTemplate struct {
 }
 
 // Reconfigure defines the parameters for updating a Component's configuration.
+//
+// The Reconfiguring operation does not support deleting individual keys from configuration files.
 type Reconfigure struct {
 	// Specifies the name of the Component.
 	ComponentOps `json:",inline"`
@@ -709,7 +711,6 @@ type ParameterPair struct {
 	Key string `json:"key"`
 
 	// Specifies the string value to set for the parameter.
-	// Omitting the value or setting it to null does not delete the key from the configuration file.
 	// +optional
 	Value *string `json:"value"`
 }

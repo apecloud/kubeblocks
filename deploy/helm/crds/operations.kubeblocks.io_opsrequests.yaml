@@ -2714,8 +2714,10 @@ spec:
                 description: Lists Reconfigure objects, each specifying a Component
                   and its configuration updates.
                 items:
-                  description: Reconfigure defines the parameters for updating a Component's
-                    configuration.
+                  description: |-
+                    Reconfigure defines the parameters for updating a Component's configuration.
+
+                    The Reconfiguring operation does not support deleting individual keys from configuration files.
                   properties:
                     componentName:
                       description: Specifies the name of the Component as defined
@@ -2733,9 +2735,8 @@ spec:
                               is to be updated.
                             type: string
                           value:
-                            description: |-
-                              Specifies the string value to set for the parameter.
-                              Omitting the value or setting it to null does not delete the key from the configuration file.
+                            description: Specifies the string value to set for the
+                              parameter.
                             type: string
                         required:
                         - key

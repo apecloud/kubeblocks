@@ -102,6 +102,12 @@ func mergeWithOverride(item *parametersv1alpha1.ConfigTemplateItemDetail, update
 		if err := mergo.Merge(&merged.Parameters, parameters.Parameters, mergo.WithOverride); err != nil {
 			return err
 		}
+		// A non-nil pointer to an empty string is an explicit value.
+		for name, value := range parameters.Parameters {
+			if value != nil && *value == "" {
+				merged.Parameters[name] = value
+			}
+		}
 		item.ConfigFileParams[key] = merged
 	}
 	return nil

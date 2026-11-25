@@ -185,6 +185,55 @@ var _ = Describe("Parameter Controller", func() {
 			}}, parametersv1alpha1.CMergeFailedPhase)
 		})
 
+		const stringParameter = "default_time_zone"
+		DescribeTable("applies explicit empty string values",
+			func(updates []map[string]string) {
+				prepareTestEnv()
+				file := testparameters.MysqlConfigFile
+				configMapKey := client.ObjectKey{
+					Namespace: comp.Namespace,
+					Name:      configcore.GetComponentCfgName(comp.ClusterName, comp.Name, configSpecName),
+				}
+				Eventually(testapps.CheckObj(&testCtx, configMapKey, func(g Gomega, configMap *corev1.ConfigMap) {
+					config, err := unstructured.LoadConfig(file, configMap.Data[file], parametersv1alpha1.Ini)
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(config.Get("mysqld." + stringParameter)).To(BeNil())
+				})).Should(Succeed())
+
+				expected := make(map[string]string)
+				for _, update := range updates {
+					key := testapps.GetRandomizedKey(comp.Namespace, comp.FullCompName)
+					request := testparameters.NewParameterFactory(key.Name, key.Namespace, comp.ClusterName, comp.Name)
+					for name, value := range update {
+						request.AddParameters(name, value)
+						expected[name] = value
+					}
+					request.Create(&testCtx)
+
+					Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, parameter *parametersv1alpha1.Parameter) {
+						g.Expect(parameter.Status.Phase).To(Equal(parametersv1alpha1.CFinishedPhase))
+					})).Should(Succeed())
+					Eventually(testapps.CheckObj(&testCtx, configMapKey, func(g Gomega, configMap *corev1.ConfigMap) {
+						config, err := unstructured.LoadConfig(file, configMap.Data[file], parametersv1alpha1.Ini)
+						g.Expect(err).NotTo(HaveOccurred())
+						for name, value := range expected {
+							g.Expect(config.Get("mysqld."+name)).To(Equal(value), "rendered value for %s", name)
+						}
+					})).Should(Succeed())
+				}
+			},
+			Entry("in standalone requests", []map[string]string{
+				{stringParameter: ""},
+				{stringParameter: "+08:00"},
+				{stringParameter: ""},
+			}),
+			Entry("with other parameter updates", []map[string]string{
+				{stringParameter: "", "max_connections": "100"},
+				{stringParameter: "+08:00"},
+				{stringParameter: "", "max_connections": "200"},
+			}),
+		)
+
 		It("parameters validate fails", func() {
 			prepareTestEnv()
 

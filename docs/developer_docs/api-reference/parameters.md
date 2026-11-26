@@ -1966,7 +1966,8 @@ map[string]*string
 <td>
 <em>(Optional)</em>
 <p>Assignments are flat managed parameter key/value assignments.</p>
-<p>Entries with a null value are ignored. Use an update of type Remove to delete a parameter.</p>
+<p>Entries with a null value are treated as absent. Replacing the assignments map can drop existing overrides
+for the affected configuration file. Use an update of type Remove to delete a key from the rendered configuration.</p>
 </td>
 </tr>
 <tr>

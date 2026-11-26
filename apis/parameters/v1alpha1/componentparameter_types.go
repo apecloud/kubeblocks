@@ -160,7 +160,8 @@ type ConfigTemplateItemDetail struct {
 type ParameterInputs struct {
 	// Assignments are flat managed parameter key/value assignments.
 	//
-	// Entries with a null value are ignored. Use an update of type Remove to delete a parameter.
+	// Entries with a null value are treated as absent. Replacing the assignments map can drop existing overrides
+	// for the affected configuration file. Use an update of type Remove to delete a key from the rendered configuration.
 	//
 	// +optional
 	Assignments map[string]*string `json:"assignments,omitempty"`

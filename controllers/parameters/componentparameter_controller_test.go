@@ -242,6 +242,59 @@ var _ = Describe("ComponentParameter Controller", func() {
 			})).Should(Succeed())
 		})
 
+		DescribeTable("restores the baseline when clearing the last desired assignment",
+			func(initial *parametersv1alpha1.ParameterInputs, baseline, override string) {
+				_, _, comp, _, its := mockReconcileResourceWithInitial(initial)
+				parameterKey := client.ObjectKey{Namespace: comp.Namespace, Name: core.GenerateComponentConfigurationName(clusterName, defaultCompName)}
+				configKey := client.ObjectKey{Namespace: comp.Namespace, Name: core.GetComponentCfgName(clusterName, defaultCompName, configSpecName)}
+				waitFinished := func() {
+					GinkgoHelper()
+					Eventually(testapps.CheckObj(&testCtx, parameterKey, func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+						g.Expect(cp.Status.ObservedGeneration).To(Equal(cp.Generation))
+						g.Expect(cp.Status.Phase).To(Equal(parametersv1alpha1.CFinishedPhase))
+					})).Should(Succeed())
+				}
+				waitForValue := func(value string) {
+					GinkgoHelper()
+					hash := waitRenderedConfigHash(comp.Namespace, clusterName, defaultCompName, configSpecName, "gtid_mode="+value)
+					mockReconfigureDone(its.Namespace, its.Name, configSpecName, hash)
+					waitFinished()
+				}
+				writeDesired := func(desired string) {
+					GinkgoHelper()
+					cp := &parametersv1alpha1.ComponentParameter{
+						ObjectMeta: metav1.ObjectMeta{Namespace: parameterKey.Namespace, Name: parameterKey.Name},
+					}
+					patch := []byte(`[{"op":"add","path":"/spec/desired","value":` + desired + `}]`)
+					Expect(k8sClient.Patch(ctx, cp, client.RawPatch(types.JSONPatchType, patch))).To(Succeed())
+				}
+				waitFinished()
+
+				for _, desired := range []string{`{"assignments":{}}`, `{}`, `{"assignments":{"gtid_mode":null}}`} {
+					By("setting a runtime override and clearing it with " + desired)
+					writeDesired(`{"assignments":{"gtid_mode":` + strconv.Quote(override) + `}}`)
+					waitForValue(override)
+					writeDesired(desired)
+					waitForValue(baseline)
+				}
+
+				By("applying explicit Set and Remove with empty assignments")
+				writeDesired(`{"assignments":{},"updates":[{"type":"Set","key":"gtid_mode","value":` + strconv.Quote(override) + `},{"type":"Set","key":"report_host","value":""},{"type":"Remove","key":"general_log"}]}`)
+				waitForValue(override)
+				Eventually(testapps.CheckObj(&testCtx, configKey, func(g Gomega, cm *corev1.ConfigMap) {
+					config, err := unstructured.LoadConfig(testparameters.MysqlConfigFile, cm.Data[testparameters.MysqlConfigFile], parametersv1alpha1.Ini)
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(config.Get("mysqld.gtid_mode")).To(Equal(override))
+					g.Expect(config.Get("mysqld.report_host")).To(Equal(""))
+					g.Expect(config.Get("mysqld.general_log")).To(BeNil())
+				})).Should(Succeed())
+			},
+			Entry("with a template value", (*parametersv1alpha1.ParameterInputs)(nil), "OFF", "ON"),
+			Entry("with an initial value", &parametersv1alpha1.ParameterInputs{
+				Assignments: map[string]*string{"gtid_mode": cfgutil.ToPointer("ON")},
+			}, "ON", "OFF"),
+		)
+
 		It("should let explicit desired remove override assignments", func() {
 			_, _, comp, _, _ := mockReconcileResource()
 
@@ -340,6 +393,18 @@ var _ = Describe("ComponentParameter Controller", func() {
 				g.Expect(config.Get("mysqld.gtid_mode")).Should(BeNil())
 				g.Expect(config.Get("mysqld.custom_local")).Should(Equal("on"))
 				g.Expect(config.Get("mysqld.max_connections")).Should(Equal("2000"))
+			})).Should(Succeed())
+
+			By("clearing managed assignments while retaining unmanaged updates")
+			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *parametersv1alpha1.ComponentParameter) {
+				cfg.Spec.Desired.Assignments = nil
+			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, configKey, func(g Gomega, cm *corev1.ConfigMap) {
+				config, err := unstructured.LoadConfig(testparameters.MysqlConfigFile, cm.Data[testparameters.MysqlConfigFile], parametersv1alpha1.Ini)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(config.Get("mysqld.max_connections")).Should(BeNil())
+				g.Expect(config.Get("mysqld.gtid_mode")).Should(BeNil())
+				g.Expect(config.Get("mysqld.custom_local")).Should(Equal("on"))
 			})).Should(Succeed())
 		})
 

@@ -758,8 +758,12 @@ spec:
                   assignments:
                     additionalProperties:
                       type: string
-                    description: Assignments are flat managed parameter key/value
-                      assignments.
+                    description: |-
+                      Assignments are flat managed parameter key/value assignments.
+
+                      Entries with a null value are treated as absent. Clearing the desired assignments removes their overrides.
+                      Files with no remaining desired parameter updates fall back to their initial or template values.
+                      Use an update of type Remove to delete a key from the rendered configuration.
                     type: object
                   unmanagedUpdates:
                     description: UnmanagedUpdates is the advanced path for parameters
@@ -878,8 +882,12 @@ spec:
                   assignments:
                     additionalProperties:
                       type: string
-                    description: Assignments are flat managed parameter key/value
-                      assignments.
+                    description: |-
+                      Assignments are flat managed parameter key/value assignments.
+
+                      Entries with a null value are treated as absent. Clearing the desired assignments removes their overrides.
+                      Files with no remaining desired parameter updates fall back to their initial or template values.
+                      Use an update of type Remove to delete a key from the rendered configuration.
                     type: object
                   unmanagedUpdates:
                     description: UnmanagedUpdates is the advanced path for parameters

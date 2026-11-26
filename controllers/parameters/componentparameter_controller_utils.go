@@ -107,6 +107,10 @@ func reconcileParameterValuesIntoSpec(ctx context.Context, cli client.Client, co
 	if err != nil {
 		return false, err
 	}
+	if specCopy.Desired != nil {
+		// Rebuild managed overlays so files with no remaining desired entries lose stale overrides.
+		clearManagedParameterOverlays(specCopy)
+	}
 	if err := applyParameterInputs(specCopy, compParam.Spec.Initial, initialParameters, false, ctx, cli, fetchTask, configmaps, configDescs, paramsDefs); err != nil {
 		return false, err
 	}
@@ -157,7 +161,8 @@ func applyParameterInputs(spec *parametersv1alpha1.ComponentParameterSpec,
 		if _, err := parameters.DoMerge(resolveBaseData(configmaps[templateName], paramsInFile), patch, initial, paramsDefs, configDescriptions); err != nil {
 			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "%s", err.Error())
 		}
-		mergeItemParameters(item, patch, override)
+		// Initialize the managed fields even if a file still has content or unmanaged updates.
+		mergeItemParameters(item, patch, override || spec.Desired != nil)
 	}
 	for templateName, templateExtension := range inputs.Templates {
 		item := parameters.GetConfigTemplateItem(spec, templateName)
@@ -349,38 +354,39 @@ func resolveComponentRefConfigMap(ctx context.Context, cli client.Client, namesp
 	return configmaps, nil
 }
 
+func clearManagedParameterOverlays(spec *parametersv1alpha1.ComponentParameterSpec) {
+	for i := range spec.ConfigItemDetails {
+		item := &spec.ConfigItemDetails[i]
+		for file, params := range item.ConfigFileParams {
+			if params.Content == nil && len(params.UnmanagedUpdates) == 0 {
+				delete(item.ConfigFileParams, file)
+				continue
+			}
+			params.Parameters = nil
+			item.ConfigFileParams[file] = params
+		}
+		if len(item.ConfigFileParams) == 0 {
+			item.ConfigFileParams = nil
+		}
+	}
+}
+
 func mergeItemParameters(item *parametersv1alpha1.ConfigTemplateItemDetail, updatedParameters map[string]parametersv1alpha1.ParametersInFile, override bool) {
-	if item.ConfigFileParams == nil {
-		item.ConfigFileParams = updatedParameters
+	if !override {
+		if len(item.ConfigFileParams) == 0 {
+			item.ConfigFileParams = updatedParameters
+		}
 		return
 	}
-	if !override && len(item.ConfigFileParams) != 0 {
-		return
+	if item.ConfigFileParams == nil {
+		item.ConfigFileParams = make(map[string]parametersv1alpha1.ParametersInFile, len(updatedParameters))
 	}
 	for key, parametersInFile := range updatedParameters {
 		merged := item.ConfigFileParams[key]
 		if parametersInFile.Content != nil {
 			merged.Content = parametersInFile.Content
 		}
-		if override {
-			encodedParameters := parameters.EncodeParameterOverlay(parametersInFile.Parameters)
-			if len(encodedParameters) == 0 {
-				merged.Parameters = nil
-			} else {
-				merged.Parameters = make(map[string]*string, len(encodedParameters))
-				for paramKey, paramValue := range encodedParameters {
-					merged.Parameters[paramKey] = paramValue
-				}
-			}
-		} else {
-			encodedParameters := parameters.EncodeParameterOverlay(parametersInFile.Parameters)
-			if merged.Parameters == nil && len(encodedParameters) > 0 {
-				merged.Parameters = map[string]*string{}
-			}
-			for paramKey, paramValue := range encodedParameters {
-				merged.Parameters[paramKey] = paramValue
-			}
-		}
+		merged.Parameters = parameters.EncodeParameterOverlay(parametersInFile.Parameters)
 		item.ConfigFileParams[key] = merged
 	}
 }

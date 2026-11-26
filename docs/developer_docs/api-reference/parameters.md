@@ -1966,6 +1966,7 @@ map[string]*string
 <td>
 <em>(Optional)</em>
 <p>Assignments are flat managed parameter key/value assignments.</p>
+<p>Entries with a null value are ignored. Use an update of type Remove to delete a parameter.</p>
 </td>
 </tr>
 <tr>

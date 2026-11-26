@@ -2760,7 +2760,7 @@ var _ = Describe("Component Controller", func() {
 				config := its.Spec.Instances[0].Configs[0]
 				g.Expect(config.Volume.ConfigMapName).To(Equal(specialKey.Name))
 				g.Expect(ptr.Deref(config.ConfigHash, "")).NotTo(BeElementOf("", firstHash))
-				g.Expect(config.Parameters).To(HaveKeyWithValue("KB_CONFIG_FILES_UPDATED", ContainSubstring("level:")))
+				g.Expect(config.Parameters).To(HaveKeyWithValue("LOG_LEVEL", "trace"))
 			})).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, specialKey, func(g Gomega, cm *corev1.ConfigMap) {
 				g.Expect(cm.Data).To(HaveKeyWithValue("level", "trace"))

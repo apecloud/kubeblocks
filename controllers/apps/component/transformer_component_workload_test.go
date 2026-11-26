@@ -19,7 +19,6 @@ import (
 	"context"
 	"errors"
 	"reflect"
-	"slices"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -114,7 +113,7 @@ func workloadConfigPlan(t *testing.T, cli client.Client, comp *appsv1.Component,
 
 func TestInstanceConfigPublicationPrecedesWorkload(t *testing.T) {
 	for _, update := range []bool{false, true} {
-		t.Run(map[bool]string{false: "create", true: "start update"}[update], func(t *testing.T) {
+		t.Run(map[bool]string{false: "create", true: "update"}[update], func(t *testing.T) {
 			comp, synth, scheme := instanceConfigFixture(t)
 			synth.Instances = []appsv1.InstanceTemplate{{Name: "canary", Replicas: ptr.To(int32(1))}}
 			synth.InstanceConfigs = map[string][]workloads.ConfigTemplate{"canary": {{Name: "main", ConfigHash: ptr.To("special-hash"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "special"}}}}
@@ -128,11 +127,8 @@ func TestInstanceConfigPublicationPrecedesWorkload(t *testing.T) {
 					t.Fatal(err)
 				}
 				running = running.DeepCopy()
-				running.Spec.Stop = ptr.To(true)
 				running.Spec.Instances[0].Configs = nil
-				running.Annotations[constant.KubeBlocksGenerationKey] = "1"
 				objects = append(objects, running)
-				synth.PodSpec.Containers[0].Image = "db:new"
 			}
 			failMap := true
 			workloadWrites := 0
@@ -178,397 +174,10 @@ func TestInstanceConfigPublicationPrecedesWorkload(t *testing.T) {
 			if err := cli.Get(context.Background(), client.ObjectKey{Namespace: comp.Namespace, Name: comp.Name}, its); err != nil {
 				t.Fatal(err)
 			}
-			if ptr.Deref(its.Spec.Stop, false) {
-				t.Fatal("Start barrier not released")
-			}
-			if its.Spec.Instances[0].Configs[0].Volume.ConfigMapName != "special" || *its.Spec.Instances[0].Configs[0].ConfigHash != "special-hash" {
-				t.Fatal("first running workload lacks desired config")
-			}
-			if update && (its.Spec.Template.Spec.Containers[0].Image != running.Spec.Template.Spec.Containers[0].Image ||
-				its.Annotations[constant.KubeBlocksGenerationKey] != "1") {
-				t.Fatal("Start applied a pending shared image or acknowledged the deferred generation")
-			}
-		})
-	}
-}
-
-func TestInstanceConfigStartPublishesOnlyConfigsWithExistingVolumes(t *testing.T) {
-	for _, mode := range []struct {
-		name              string
-		enableInstanceAPI bool
-	}{{"direct Pod", false}, {"Instance", true}} {
-		t.Run(mode.name, func(t *testing.T) {
-			comp, synth, scheme := instanceConfigFixture(t)
-			synth.EnableInstanceAPI = ptr.To(mode.enableInstanceAPI)
-			fileVolume := func(volume, source string) corev1.Volume {
-				return corev1.Volume{Name: volume, VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: source}}}}
-			}
-			config := func(name, volume, source, hash string) workloads.ConfigTemplate {
-				return workloads.ConfigTemplate{Name: name, Volume: &workloads.ConfigVolumeBinding{VolumeName: volume, ConfigMapName: source}, ConfigHash: ptr.To(hash)}
-			}
-			configRef := func(name string) corev1.ObjectReference {
-				return corev1.ObjectReference{Kind: "ConfigMap", Namespace: comp.Namespace, Name: name}
-			}
-			synth.Instances = []appsv1.InstanceTemplate{{Name: "canary", Replicas: ptr.To(int32(1))}}
-			synth.InstanceConfigs = map[string][]workloads.ConfigTemplate{
-				"canary": {config("main", "config", "special-config", "old")},
-			}
-			synth.PodSpec.Volumes = append(synth.PodSpec.Volumes, fileVolume("script", "old-script"))
-			synth.PodSpec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: "config", MountPath: "/config"}, {Name: "script", MountPath: "/extra"}}
-			synth.InstanceAssistantObjects = []corev1.ObjectReference{configRef("default-config"), configRef("old-script")}
-			running, err := component.BuildInstanceSet(synth, &appsv1.ComponentDefinition{})
-			if err != nil {
-				t.Fatal(err)
-			}
-			running = running.DeepCopy()
-			running.Spec.Stop = ptr.To(true)
-
-			synth.Configs = append(synth.Configs, config("extra", "extra", "extra-config", "extra-base"))
-			synth.InstanceConfigs["canary"] = []workloads.ConfigTemplate{
-				config("main", "config", "next-special", "latest"),
-				config("extra", "extra", "special-extra", "extra-latest"),
-			}
-			synth.PodSpec.Volumes[1] = fileVolume("script", "new-script")
-			synth.PodSpec.Volumes = append(synth.PodSpec.Volumes, fileVolume("extra", "extra-config"))
-			synth.PodSpec.Containers[0].Image = "db:new"
-			synth.PodSpec.Containers[0].VolumeMounts[1].MountPath = "/new-script"
-			synth.PodSpec.Containers[0].VolumeMounts = append(synth.PodSpec.Containers[0].VolumeMounts, corev1.VolumeMount{Name: "extra", MountPath: "/extra"})
-			synth.InstanceAssistantObjects = []corev1.ObjectReference{configRef("default-config"), configRef("extra-config"), configRef("new-script"), configRef("next-special")}
-
-			ctx := context.Background()
-			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(running).Build()
-			maps := []*corev1.ConfigMap{managedInstanceConfig(comp, "next-special"), managedInstanceConfig(comp, "special-extra")}
-			plan, err := workloadConfigPlan(t, cli, comp, synth, running, maps...)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := plan.Execute(); err != nil {
-				t.Fatal(err)
-			}
-
-			starting := &workloads.InstanceSet{}
-			if err := cli.Get(ctx, client.ObjectKeyFromObject(running), starting); err != nil {
-				t.Fatal(err)
-			}
-			configs := starting.Spec.Instances[0].Configs
-			if ptr.Deref(starting.Spec.Stop, false) || len(configs) != 1 || ptr.Deref(configs[0].ConfigHash, "") != "latest" {
-				t.Fatalf("Start did not publish the config for the existing volume: %#v", configs)
-			}
-			templates, err := instancetemplate.BuildInstanceTemplateExtMap(starting, nil)
-			if err != nil {
-				t.Fatal(err)
-			}
-			pod := templates[starting.Name+"-canary-0"].Spec
-			wantVolumes := []corev1.Volume{fileVolume("config", "next-special"), fileVolume("script", "old-script")}
-			if !reflect.DeepEqual(pod.Volumes, wantVolumes) {
-				t.Fatalf("Start did not publish coherent volumes: %#v", pod.Volumes)
-			}
-			container := pod.Containers[0]
-			wantMounts := []corev1.VolumeMount{{Name: "config", MountPath: "/config"}, {Name: "script", MountPath: "/extra"}}
-			if container.Image != running.Spec.Template.Spec.Containers[0].Image || !reflect.DeepEqual(container.VolumeMounts, wantMounts) {
-				t.Fatalf("Start mixed runtime versions: image=%s mounts=%#v", container.Image, container.VolumeMounts)
-			}
-			wantAssistants := []corev1.ObjectReference{configRef("default-config"), configRef("old-script"), configRef("next-special")}
-			if !reflect.DeepEqual(starting.Spec.InstanceAssistantObjects, wantAssistants) {
-				t.Fatalf("Start did not publish coherent assistant objects: %#v", starting.Spec.InstanceAssistantObjects)
-			}
-		})
-	}
-}
-
-func TestInstanceConfigStartRestoresSharedConfigForAffectedTemplate(t *testing.T) {
-	comp, synth, scheme := instanceConfigFixture(t)
-	synth.Instances = []appsv1.InstanceTemplate{{Name: "canary", Replicas: ptr.To(int32(1))}}
-	running, err := component.BuildInstanceSet(synth, &appsv1.ComponentDefinition{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	running = running.DeepCopy()
-	running.Spec.Stop = ptr.To(true)
-	running.Spec.Instances[0].Configs = []workloads.ConfigTemplate{{Name: "main", ConfigHash: ptr.To("old-special-hash"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "removed-special"}}}
-	running.Spec.Template.Spec.Volumes[0].ConfigMap.Name = "old-default"
-	running.Spec.InstanceAssistantObjects = []corev1.ObjectReference{{Kind: "Secret", Name: "kept"}, {Kind: "ConfigMap", Name: "removed-special"}}
-	synth.InstanceAssistantObjects = []corev1.ObjectReference{{Kind: "Secret", Name: "deferred"}, {Kind: "ConfigMap", Namespace: comp.Namespace, Name: "default-config"}}
-	synth.Configs[0].ConfigHash = ptr.To("new-default-hash")
-	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(running).Build()
-	plan, err := workloadConfigPlan(t, cli, comp, synth, running)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := plan.Execute(); err != nil {
-		t.Fatal(err)
-	}
-	current := &workloads.InstanceSet{}
-	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(running), current); err != nil {
-		t.Fatal(err)
-	}
-	templates, err := instancetemplate.BuildInstanceTemplateExtMap(current, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	canary := templates[current.Name+"-canary-0"]
-	if canary.Spec.Volumes[0].ConfigMap.Name != "default-config" || ptr.Deref(canary.Configs[0].ConfigHash, "") != "new-default-hash" {
-		t.Fatal("Start did not restore the latest shared configuration for the affected template")
-	}
-	if current.Spec.Template.Spec.Volumes[0].ConfigMap.Name != "old-default" || ptr.Deref(current.Spec.Configs[0].ConfigHash, "") != "default-hash" {
-		t.Fatal("Start applied pending changes to the shared configuration source")
-	}
-	wantAssistants := append(slices.Clone(running.Spec.InstanceAssistantObjects), corev1.ObjectReference{Kind: "ConfigMap", Namespace: comp.Namespace, Name: "default-config"})
-	if !reflect.DeepEqual(current.Spec.InstanceAssistantObjects, wantAssistants) {
-		t.Fatalf("Start changed unrelated assistant objects: %#v", current.Spec.InstanceAssistantObjects)
-	}
-}
-
-func TestInstanceConfigStartDefersRuntimeChangesWhenFilesAreUnchanged(t *testing.T) {
-	for _, mode := range []struct {
-		name              string
-		enableInstanceAPI bool
-	}{{"direct Pod", false}, {"Instance", true}} {
-		t.Run(mode.name, func(t *testing.T) {
-			for _, scenario := range []string{"shared config", "specialized config", "shared files with template action parameters"} {
-				t.Run(scenario, func(t *testing.T) {
-					comp, synth, scheme := instanceConfigFixture(t)
-					synth.EnableInstanceAPI = ptr.To(mode.enableInstanceAPI)
-					synth.PodSpec.Containers[0].Resources.Requests = corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")}
-					config := *synth.Configs[0].DeepCopy()
-					if scenario != "shared config" {
-						synth.Instances = []appsv1.InstanceTemplate{{Name: "canary", Replicas: ptr.To(int32(1))}}
-					}
-					if scenario == "specialized config" {
-						config.ConfigHash = ptr.To("specialized-hash")
-						config.Volume = &workloads.ConfigVolumeBinding{ConfigMapName: "specialized-config"}
-						synth.InstanceConfigs = map[string][]workloads.ConfigTemplate{"canary": {config}}
-					}
-					running, err := component.BuildInstanceSet(synth, &appsv1.ComponentDefinition{})
-					if err != nil {
-						t.Fatal(err)
-					}
-					running = running.DeepCopy()
-					running.Spec.Stop = ptr.To(true)
-					previousReload := map[string]string{"KB_CONFIG_FILES_UPDATED": "/etc/db/server.conf:previous-checksum"}
-					switch scenario {
-					case "shared config":
-						running.Spec.Configs[0].Parameters = previousReload
-					case "specialized config":
-						running.Spec.Instances[0].Configs[0].Parameters = previousReload
-					case "shared files with template action parameters":
-						config.Volume = nil
-						config.Parameters = map[string]string{"ACTION_PARAM": "new-value"}
-						synth.InstanceConfigs = map[string][]workloads.ConfigTemplate{"canary": {config}}
-					}
-					synth.PodSpec.Containers[0].Resources.Requests = corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")}
-
-					cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(running).Build()
-					plan, err := workloadConfigPlan(t, cli, comp, synth, running)
-					if err != nil {
-						t.Fatal(err)
-					}
-					if err := plan.Execute(); err != nil {
-						t.Fatal(err)
-					}
-					starting := &workloads.InstanceSet{}
-					if err := cli.Get(context.Background(), client.ObjectKeyFromObject(running), starting); err != nil {
-						t.Fatal(err)
-					}
-					if ptr.Deref(starting.Spec.Stop, false) {
-						t.Fatal("Start did not clear Stop")
-					}
-					if cpu := starting.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().String(); cpu != "1" {
-						t.Errorf("Start applied deferred CPU %s for unchanged config files", cpu)
-					}
-					if !reflect.DeepEqual(starting.Spec.Configs, running.Spec.Configs) ||
-						!reflect.DeepEqual(starting.Spec.Instances, running.Spec.Instances) {
-						t.Error("Start published deferred config action parameters")
-					}
-				})
-			}
-		})
-	}
-}
-
-func TestInstanceConfigStartKeepsRenderInputsAndTopology(t *testing.T) {
-	for _, enableInstanceAPI := range []bool{false, true} {
-		t.Run(map[bool]string{false: "direct Pod", true: "Instance"}[enableInstanceAPI], func(t *testing.T) {
-			comp, synth, scheme := instanceConfigFixture(t)
-			resources := func(memory string) corev1.ResourceRequirements {
-				return corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceMemory: resource.MustParse(memory)}}
-			}
-			claim := func(size string) appsv1.PersistentVolumeClaimTemplate {
-				return appsv1.PersistentVolumeClaimTemplate{Name: "data", Spec: corev1.PersistentVolumeClaimSpec{Resources: corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse(size)}}}}
-			}
-			comp.Spec.Resources, comp.Spec.ServiceVersion = resources("1Gi"), "1.0.0"
-			comp.Spec.VolumeClaimTemplates = []appsv1.PersistentVolumeClaimTemplate{claim("10Gi")}
-			synth.CompDefName, synth.ServiceVersion, synth.Generation = "mysql-v1", "1.0.0", "1"
-			synth.EnableInstanceAPI = ptr.To(enableInstanceAPI)
-			synth.PodSpec.Containers[0].Resources = comp.Spec.Resources
-			synth.PodSpec.Containers[0].Image = "db:1"
-			synth.PodSpec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: "config", MountPath: "/config"}}
-			synth.PodSpec.Volumes = nil
-			synth.Instances = []appsv1.InstanceTemplate{{Name: "canary", Replicas: ptr.To(int32(1)), ServiceVersion: "2.0.0", Resources: ptr.To(resources("2Gi")), VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{claim("20Gi")}}}
-			synth.InstanceImages = map[string]map[string]string{"canary": {"db": "db:2"}}
-			synth.FileTemplates = []component.SynthesizedFileTemplate{{ComponentFileTemplate: appsv1.ComponentFileTemplate{Name: "main", Template: "config-source", Namespace: comp.Namespace, VolumeName: "config"}, Config: true}}
-			source := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "config-source", Namespace: comp.Namespace}, Data: map[string]string{"server.conf": "{{ .MEMORY }}/{{ .VERSION }}/{{ .DATA }}"}}
-			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(comp, source).Build()
-			required := ptr.To(appsv1.VarRequired)
-			definition := &appsv1.ComponentDefinition{Spec: appsv1.ComponentDefinitionSpec{Vars: []appsv1.EnvVar{
-				{Name: "MEMORY", ValueFrom: &appsv1.VarSource{ResourceVarRef: &appsv1.ResourceVarSelector{ResourceVars: appsv1.ResourceVars{Memory: required}}}},
-				{Name: "VERSION", ValueFrom: &appsv1.VarSource{ComponentVarRef: &appsv1.ComponentVarSelector{ComponentVars: appsv1.ComponentVars{ServiceVersion: required}}}},
-				{Name: "DATA", ValueFrom: &appsv1.VarSource{ResourceVarRef: &appsv1.ResourceVarSelector{ResourceVars: appsv1.ResourceVars{Storage: &appsv1.NamedVar{Name: "data", Option: required}}}}},
-			}}}
-			render := func() []*corev1.ConfigMap {
-				t.Helper()
-				synth.Configs, synth.InstanceAssistantObjects = nil, nil
-				graphCli := model.NewGraphClient(cli)
-				dag := graph.NewDAG()
-				graphCli.Root(dag, comp, comp, model.ActionStatusPtr())
-				transCtx := &componentTransformContext{Context: context.Background(), Client: graphCli, Component: comp, ComponentOrig: comp.DeepCopy(), CompDef: definition, SynthesizeComponent: synth}
-				if err := (&componentVarsTransformer{}).Transform(transCtx, dag); err != nil {
-					t.Fatal(err)
-				}
-				if err := (&componentFileTemplateTransformer{}).Transform(transCtx, dag); err != nil {
-					t.Fatal(err)
-				}
-				var rendered []*corev1.ConfigMap
-				for _, vertex := range dag.Vertices() {
-					if obj, ok := vertex.(*model.ObjectVertex).Obj.(*corev1.ConfigMap); ok && obj.Labels[kubeBlockFileTemplateLabelKey] == "true" {
-						rendered = append(rendered, obj)
-					}
-				}
-				return rendered
-			}
-			render()
-			running, err := component.BuildInstanceSet(synth, definition)
-			if err != nil {
-				t.Fatal(err)
-			}
-			running.Spec.Stop = ptr.To(true)
-			if err := cli.Create(context.Background(), running); err != nil {
-				t.Fatal(err)
-			}
-			comp.Spec.Resources, comp.Spec.ServiceVersion = resources("2Gi"), "2.0.0"
-			comp.Spec.VolumeClaimTemplates = []appsv1.PersistentVolumeClaimTemplate{claim("20Gi")}
-			if err := cli.Update(context.Background(), comp); err != nil {
-				t.Fatal(err)
-			}
-			synth.ServiceVersion, synth.Generation = "2.0.0", "2"
-			synth.PodSpec.Containers[0].Resources, synth.PodSpec.Containers[0].Image = comp.Spec.Resources, "db:2"
-			synth.Instances[0].Resources, synth.Instances[0].ServiceVersion = ptr.To(resources("4Gi")), "3.0.0"
-			synth.Instances[0].VolumeClaimTemplates = []appsv1.PersistentVolumeClaimTemplate{claim("30Gi")}
-			synth.InstanceImages["canary"]["db"] = "db:3"
-			synth.Replicas, synth.FlatInstanceOrdinal = 3, true
-			synth.Instances[0].Replicas = ptr.To(int32(3))
-			synth.Instances[0].Ordinals = appsv1.Ordinals{Discrete: []int32{4, 5, 6}}
-			synth.OfflineInstances = []string{"db-mysql-9"}
-			rendered := render()
-			plan, err := workloadConfigPlan(t, cli, comp, synth, running, rendered...)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := plan.Execute(); err != nil {
-				t.Fatal(err)
-			}
-			starting := &workloads.InstanceSet{}
-			if err := cli.Get(context.Background(), client.ObjectKeyFromObject(running), starting); err != nil {
-				t.Fatal(err)
-			}
-			if ptr.Deref(starting.Spec.Stop, false) || starting.Annotations[constant.KubeBlocksGenerationKey] != "1" || !reflect.DeepEqual(starting.Spec.Replicas, running.Spec.Replicas) || starting.Spec.FlatInstanceOrdinal != running.Spec.FlatInstanceOrdinal || !reflect.DeepEqual(starting.Spec.OfflineInstances, running.Spec.OfflineInstances) || !reflect.DeepEqual(starting.Spec.Instances[0].Replicas, running.Spec.Instances[0].Replicas) || !reflect.DeepEqual(starting.Spec.Instances[0].Ordinals, running.Spec.Instances[0].Ordinals) {
-				t.Fatal("Start applied scaling topology or acknowledged it before the normal lifecycle")
-			}
-			templates, err := instancetemplate.BuildInstanceTemplateExtMap(starting, nil)
-			if err != nil {
-				t.Fatal(err)
-			}
-			template := templates[starting.Name+"-canary-0"]
-			if len(templates) != 1 || template == nil || template.Spec.Containers[0].Resources.Requests.Memory().Cmp(resource.MustParse("4Gi")) != 0 || template.Spec.Containers[0].Image != "db:3" || template.VolumeClaimTemplates[0].Spec.Resources.Requests.Storage().Cmp(resource.MustParse("30Gi")) != 0 {
-				t.Fatalf("Start did not keep the rendered resource, version and storage inputs: %#v", template)
-			}
-			cm := &corev1.ConfigMap{}
-			if err := cli.Get(context.Background(), client.ObjectKey{Namespace: comp.Namespace, Name: template.Configs[0].Volume.ConfigMapName}, cm); err != nil {
-				t.Fatal(err)
-			}
-			if cm.Data["server.conf"] != "4294967296/3.0.0/32212254720" || ptr.Deref(template.Configs[0].ConfigHash, "") != cm.Annotations[constant.CMInsConfigurationHashLabelKey] {
-				t.Fatalf("Start used files or hash from another runtime: %#v", cm)
-			}
-		})
-	}
-}
-
-func TestInstanceConfigStartDefersRetiringTemplate(t *testing.T) {
-	comp, synth, scheme := instanceConfigFixture(t)
-	synth.Instances = []appsv1.InstanceTemplate{{Name: "canary", Replicas: ptr.To(int32(1)), Resources: &corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("8Gi")}}}}
-	synth.InstanceImages = map[string]map[string]string{"canary": {"db": "db:old-canary"}}
-	synth.InstanceConfigs = map[string][]workloads.ConfigTemplate{"canary": {{Name: "main", ConfigHash: ptr.To("old"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "old-special"}}}}
-	running, err := component.BuildInstanceSet(synth, &appsv1.ComponentDefinition{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	running.Spec.Stop = ptr.To(true)
-	synth.Instances[0].Replicas = ptr.To(int32(0))
-	synth.InstanceConfigs = nil
-	synth.Configs[0].ConfigHash = ptr.To("latest-base")
-	synth.PodSpec.Containers[0].Resources.Requests = corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("2Gi")}
-	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(running).Build()
-	plan, err := workloadConfigPlan(t, cli, comp, synth, running)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := plan.Execute(); err != nil {
-		t.Fatal(err)
-	}
-	starting := &workloads.InstanceSet{}
-	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(running), starting); err != nil {
-		t.Fatal(err)
-	}
-	templates, err := instancetemplate.BuildInstanceTemplateExtMap(starting, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	template := templates[starting.Name+"-canary-0"]
-	if len(templates) != 1 || template == nil || ptr.Deref(starting.Spec.Instances[0].Replicas, 0) != 1 ||
-		template.Spec.Containers[0].Resources.Requests.Memory().Cmp(resource.MustParse("8Gi")) != 0 ||
-		template.Spec.Containers[0].Image != "db:old-canary" ||
-		template.Spec.Volumes[0].ConfigMap.Name != "old-special" || ptr.Deref(template.Configs[0].ConfigHash, "") != "old" {
-		t.Fatalf("Start changed the retiring instance before scale-in: %#v", template)
-	}
-}
-
-func TestInstanceConfigStartDefersSharedMountAndBindingChanges(t *testing.T) {
-	for _, moveMount := range []bool{false, true} {
-		t.Run(map[bool]string{false: "legacy binding", true: "mount changed"}[moveMount], func(t *testing.T) {
-			comp, synth, scheme := instanceConfigFixture(t)
-			synth.PodSpec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: "config", MountPath: "/old"}}
-			running, err := component.BuildInstanceSet(synth, &appsv1.ComponentDefinition{})
-			if err != nil {
-				t.Fatal(err)
-			}
-			running = running.DeepCopy()
-			running.Spec.Stop = ptr.To(true)
-			if moveMount {
-				synth.PodSpec.Containers[0].VolumeMounts[0].MountPath = "/new"
-			} else {
-				running.Spec.Configs[0].Volume = nil
-				running.Spec.Template.Spec.Containers = append(running.Spec.Template.Spec.Containers,
-					corev1.Container{Name: legacyConfigManagerContainerName, VolumeMounts: running.Spec.Template.Spec.Containers[0].VolumeMounts})
-			}
-			synth.PodSpec.Containers[0].Resources.Limits = corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("8Gi")}
-			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(running).Build()
-			plan, err := workloadConfigPlan(t, cli, comp, synth, running)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := plan.Execute(); err != nil {
-				t.Fatal(err)
-			}
-			current := &workloads.InstanceSet{}
-			if err := cli.Get(context.Background(), client.ObjectKeyFromObject(running), current); err != nil {
-				t.Fatal(err)
-			}
-			if ptr.Deref(current.Spec.Stop, false) || !reflect.DeepEqual(current.Spec.Configs, running.Spec.Configs) {
-				t.Fatalf("Start changed the shared config binding: Stop=%v, Configs=%v", ptr.Deref(current.Spec.Stop, false), current.Spec.Configs)
-			}
-			container := current.Spec.Template.Spec.Containers[0]
-			if container.VolumeMounts[0].MountPath != "/old" || container.Resources.Limits.Memory().Value() != 0 {
-				t.Fatalf("unexpected runtime on Start: %#v", container)
+			configs := its.Spec.Instances[0].Configs
+			if len(configs) != 1 || configs[0].Volume == nil || configs[0].Volume.ConfigMapName != "special" ||
+				ptr.Deref(configs[0].ConfigHash, "") != "special-hash" {
+				t.Fatalf("workload did not publish the desired config: %v", configs)
 			}
 		})
 	}
@@ -601,7 +210,7 @@ func TestInstanceConfigStopFreezesPublishedConfig(t *testing.T) {
 	}
 }
 
-func TestStartScopesConfigChangesToAffectedInstanceTemplate(t *testing.T) {
+func TestStartKeepsPublishedConfigsUntilNormalUpdate(t *testing.T) {
 	model.AddScheme(workloads.AddToScheme)
 	for _, viaInstance := range []bool{false, true} {
 		t.Run(map[bool]string{false: "direct Pod", true: "Instance"}[viaInstance], func(t *testing.T) {
@@ -663,8 +272,10 @@ func TestStartScopesConfigChangesToAffectedInstanceTemplate(t *testing.T) {
 					if err := cli.Get(ctx, key, starting); err != nil {
 						t.Fatal(err)
 					}
-					if ptr.Deref(starting.Spec.Stop, false) || !ptr.Equal(starting.Spec.Configs[0].ConfigHash, running.Spec.Configs[0].ConfigHash) {
-						t.Errorf("Start did not preserve shared config state: stop=%v, config hash=%q", starting.Spec.Stop, ptr.Deref(starting.Spec.Configs[0].ConfigHash, ""))
+					wantSpec := running.Spec.DeepCopy()
+					wantSpec.Stop = nil
+					if !reflect.DeepEqual(&starting.Spec, wantSpec) {
+						t.Error("Start changed the published workload beyond clearing Stop")
 					}
 					recorder := record.NewFakeRecorder(100)
 					for range 6 {
@@ -714,7 +325,7 @@ func TestStartScopesConfigChangesToAffectedInstanceTemplate(t *testing.T) {
 					}
 					checkPod("-0", "1", "", "default-config", shared.Data["server.conf"])
 					if specialized {
-						checkPod("-canary-0", "2", "12Gi", "specialized-config", "cpu=2 memory=12Gi")
+						checkPod("-canary-0", "1", "8Gi", "default-config", shared.Data["server.conf"])
 						checkPod("-other-0", "3", "", "default-config", "shared")
 					}
 
@@ -736,9 +347,12 @@ func TestStartScopesConfigChangesToAffectedInstanceTemplate(t *testing.T) {
 						!ptr.Equal(updated.Spec.Configs[0].ConfigHash, synth.Configs[0].ConfigHash) {
 						t.Error("normal reconciliation did not apply the deferred shared changes")
 					}
-					if specialized && (len(updated.Spec.Instances[0].Env) != 1 ||
-						updated.Spec.Instances[1].Resources.Requests.Cpu().String() != "4") {
-						t.Error("normal reconciliation did not apply the deferred template changes")
+					if specialized {
+						configs := updated.Spec.Instances[0].Configs
+						if len(configs) != 1 || configs[0].Volume == nil || configs[0].Volume.ConfigMapName != "specialized-config" ||
+							len(updated.Spec.Instances[0].Env) != 1 || updated.Spec.Instances[1].Resources.Requests.Cpu().String() != "4" {
+							t.Error("normal reconciliation did not apply the deferred template changes")
+						}
 					}
 				})
 			}
@@ -746,7 +360,7 @@ func TestStartScopesConfigChangesToAffectedInstanceTemplate(t *testing.T) {
 	}
 }
 
-func TestStartingManagedConfigurationWithLegacyConfigManager(t *testing.T) {
+func TestManagedConfigurationUpdateWithLegacyConfigManager(t *testing.T) {
 	for _, enableInstanceAPI := range []bool{false, true} {
 		t.Run(map[bool]string{false: "direct Pod", true: "Instance"}[enableInstanceAPI], func(t *testing.T) {
 			comp, synth, scheme := instanceConfigFixture(t)
@@ -757,7 +371,7 @@ func TestStartingManagedConfigurationWithLegacyConfigManager(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			running.Spec.Stop = ptr.To(true)
+			running = running.DeepCopy()
 			running.Spec.Configs = []workloads.ConfigTemplate{{Name: "old-config"}}
 			running.Spec.Template.Spec.Volumes[0].ConfigMap.Name = "old-config"
 			running.Spec.Template.Spec.Volumes = append(running.Spec.Template.Spec.Volumes, corev1.Volume{
@@ -783,19 +397,17 @@ func TestStartingManagedConfigurationWithLegacyConfigManager(t *testing.T) {
 			if err = cli.Get(context.Background(), client.ObjectKeyFromObject(running), current); err != nil {
 				t.Fatal(err)
 			}
-			if ptr.Deref(current.Spec.Stop, false) {
-				t.Fatal("workload is still stopped")
-			}
 			if _, err = instancetemplate.BuildInstanceTemplateExtMap(current, nil); err != nil {
-				t.Fatalf("Start published invalid managed config bindings: %v", err)
+				t.Fatalf("update published invalid managed config bindings: %v", err)
 			}
 			_, sidecar := intctrlutil.GetContainerByName(current.Spec.Template.Spec.Containers, "config-manager")
 			if sidecar == nil {
-				t.Fatal("Start removed the legacy sidecar")
+				t.Fatal("config update removed the legacy sidecar")
 			}
 			volumes := current.Spec.Template.Spec.Volumes
-			if len(volumes) != 2 || volumes[1].Name != "legacy-scripts" || volumes[1].ConfigMap == nil || volumes[1].ConfigMap.Name != "legacy-scripts" {
-				t.Fatalf("Start changed the legacy-only volume: %#v", volumes)
+			if len(volumes) != 2 || volumes[0].ConfigMap == nil || volumes[0].ConfigMap.Name != "default-config" ||
+				volumes[1].Name != "legacy-scripts" || volumes[1].ConfigMap == nil || volumes[1].ConfigMap.Name != "legacy-scripts" {
+				t.Fatalf("config update did not switch the managed volume and preserve the legacy-only volume: %#v", volumes)
 			}
 		})
 	}

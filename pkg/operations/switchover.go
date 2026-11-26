@@ -110,11 +110,11 @@ func switchoverPreCheck(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes
 	}
 
 	for _, switchover := range switchoverList {
+		compName := switchover.GetComponentName()
 		synthesizedComp, err := buildSynthesizedComp(reqCtx.Ctx, cli, opsRes, switchover)
 		if err != nil {
 			return err
 		}
-		compName := switchover.GetComponentName()
 		if synthesizedComp.LifecycleActions.ComponentLifecycleActions == nil || synthesizedComp.LifecycleActions.Switchover == nil {
 			return intctrlutil.NewFatalError(fmt.Sprintf(`the component "%s" does not define switchover lifecycle action`, compName))
 		}
@@ -229,11 +229,19 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 	if err != nil {
 		return err
 	}
-	compName := switchover.GetComponentName()
-	objectKey := getProgressObjectKey(KBSwitchoverKey, compName)
-	progressDetail := findStatusProgressDetail(opsRequest.Status.Components[compName].ProgressDetails, objectKey)
+	compName, err := getSwitchoverClusterComponentName(reqCtx.Ctx, cli, opsRes.Cluster, *switchover)
+	if err != nil {
+		return err
+	}
+	progressDetail, progressComponentName, legacyProgressKey := findSwitchoverProgressDetail(opsRequest, *switchover, compName)
 	if progressDetail == nil {
 		return fmt.Errorf("progress detail not found for component %s", compName)
+	}
+	if err := validateSwitchoverDispatchForReader(opsRequest, compName, *switchover, progressDetail, legacyProgressKey); err != nil {
+		progressDetail.Message = fmt.Sprintf("component %s switchover dispatch cannot be resumed: %v; lifecycle action will not be retried", compName, err)
+		progressDetail.Status = opsv1alpha1.FailedProgressStatus
+		handleProgressDetail(reqCtx, opsRequest, progressDetail, progressComponentName, completedCount, failedCount)
+		return nil
 	}
 	switch progressDetail.Status {
 	case opsv1alpha1.PendingProgressStatus:
@@ -264,8 +272,94 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 			progressDetail.Status = opsv1alpha1.SucceedProgressStatus
 		}
 	}
-	handleProgressDetail(reqCtx, opsRequest, progressDetail, compName, completedCount, failedCount)
+	handleProgressDetail(reqCtx, opsRequest, progressDetail, progressComponentName, completedCount, failedCount)
 	return nil
+}
+
+func validateSwitchoverDispatchForReader(
+	opsRequest *opsv1alpha1.OpsRequest,
+	compName string,
+	switchover opsv1alpha1.Switchover,
+	progressDetail *opsv1alpha1.ProgressStatusDetail,
+	legacyProgressKey bool) error {
+	dispatch := progressDetail.SwitchoverDispatch
+	if dispatch == nil {
+		return nil
+	}
+	if legacyProgressKey {
+		return errors.New("structured dispatch state is stored under the legacy component-object progress key")
+	}
+	if dispatch.Version != opsv1alpha1.SwitchoverDispatchProtocolVersionV1 {
+		return fmt.Errorf("unsupported protocol version %q", dispatch.Version)
+	}
+	if opsRequest.UID == "" {
+		return errors.New("OpsRequest UID is empty")
+	}
+	if dispatch.OpsRequestUID != string(opsRequest.UID) ||
+		dispatch.ComponentName != compName ||
+		dispatch.InstanceName != switchover.InstanceName ||
+		dispatch.CandidateName != switchover.CandidateName ||
+		dispatch.Token == "" {
+		return errors.New("protocol identity is incomplete or does not match the current request")
+	}
+	switch dispatch.State {
+	case opsv1alpha1.SwitchoverDispatchResolved:
+		if progressDetail.Status == opsv1alpha1.PendingProgressStatus {
+			return errors.New("resolved dispatch is paired with Pending progress")
+		}
+		return nil
+	case opsv1alpha1.SwitchoverDispatchClaimed, opsv1alpha1.SwitchoverDispatchOutcomeUnknown:
+		return fmt.Errorf("state %q has no committed outcome", dispatch.State)
+	default:
+		return fmt.Errorf("unknown state %q", dispatch.State)
+	}
+}
+
+func findSwitchoverProgressDetail(opsRequest *opsv1alpha1.OpsRequest, switchover opsv1alpha1.Switchover,
+	compName string) (*opsv1alpha1.ProgressStatusDetail, string, bool) {
+	if componentStatus, ok := opsRequest.Status.Components[compName]; ok {
+		return findStatusProgressDetail(componentStatus.ProgressDetails,
+			getProgressObjectKey(KBSwitchoverKey, compName)), compName, false
+	}
+
+	legacyCompName := switchover.ComponentObjectName
+	if legacyCompName == "" || legacyCompName == compName {
+		return nil, compName, false
+	}
+	legacyComponentStatus, ok := opsRequest.Status.Components[legacyCompName]
+	if !ok {
+		return nil, compName, false
+	}
+	return findStatusProgressDetail(legacyComponentStatus.ProgressDetails,
+		getProgressObjectKey(KBSwitchoverKey, legacyCompName)), legacyCompName, true
+}
+
+func getSwitchoverClusterComponentName(ctx context.Context, cli client.Client, cluster *appsv1.Cluster, switchover opsv1alpha1.Switchover) (string, error) {
+	if len(switchover.ComponentName) > 0 {
+		if cluster.Spec.GetComponentByName(switchover.ComponentName) != nil ||
+			cluster.Spec.GetShardingByName(switchover.ComponentName) != nil {
+			return switchover.ComponentName, nil
+		}
+		return "", fmt.Errorf(`component "%s" not found`, switchover.ComponentName)
+	}
+
+	compObj := &appsv1.Component{}
+	if err := cli.Get(ctx, client.ObjectKey{
+		Namespace: cluster.Namespace,
+		Name:      switchover.ComponentObjectName,
+	}, compObj); err != nil {
+		if apierrors.IsNotFound(err) {
+			return "", fmt.Errorf(`component object "%s" not found`, switchover.ComponentObjectName)
+		}
+		return "", err
+	}
+	if shardingName := compObj.Labels[constant.KBAppShardingNameLabelKey]; len(shardingName) > 0 {
+		return shardingName, nil
+	}
+	if compName := compObj.Labels[constant.KBAppComponentLabelKey]; len(compName) > 0 {
+		return compName, nil
+	}
+	return "", fmt.Errorf(`component object "%s" has no component label`, switchover.ComponentObjectName)
 }
 
 // We consider a switchover action succeeds if the action returns without error. We don't need to know if a switchover is actually executed.

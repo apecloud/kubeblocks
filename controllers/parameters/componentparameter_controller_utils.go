@@ -392,6 +392,12 @@ func mergeItemParameters(item *parametersv1alpha1.ConfigTemplateItemDetail, upda
 		if merged.Parameters == nil {
 			merged.Parameters = encoded
 		} else {
+			// A JSON-encoded array and a scalar or removal can address the same key.
+			for key := range encoded {
+				name := core.GetValidFieldName(key)
+				delete(merged.Parameters, name)
+				delete(merged.Parameters, core.ArrayFieldPrefix+name)
+			}
 			maps.Copy(merged.Parameters, encoded)
 		}
 		item.ConfigFileParams[key] = merged

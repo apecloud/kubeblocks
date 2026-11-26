@@ -269,6 +269,70 @@ var _ = Describe("ComponentParameter Controller", func() {
 			waitForConfig("ON", "my-host", nil)
 		})
 
+		It("should replace or remove an initial array without retaining its old value", func() {
+			const file = "config.json"
+			_, _, comp, _, its := mockReconcileResourceWithInitial(&parametersv1alpha1.ParameterInputs{
+				Assignments: map[string]*string{"@hosts": cfgutil.ToPointer(`["initial"]`)},
+			}, func(template *corev1.ConfigMap, compDef *appsv1.ComponentDefinition) {
+				Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(template), func(cm *corev1.ConfigMap) {
+					cm.Data = map[string]string{file: `{"hosts":["template"],"mode":"template"}`}
+				})).Should(Succeed())
+				definitionKey := client.ObjectKey{Name: paramsDefName}
+				Eventually(testapps.GetAndChangeObj(&testCtx, definitionKey, func(def *parametersv1alpha1.ParametersDefinition) {
+					def.Spec.ComponentDef = "unused-component-definition"
+				})).Should(Succeed())
+				jsonDefinition := testparameters.NewParametersDefinitionFactory("json-parameters").
+					SetComponentDefinition(compDef.Name).
+					SetTemplateName(configSpecName).
+					SetConfigFile(file).
+					SetFileFormatConfig(parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.JSON}).
+					Create(&testCtx).GetObject()
+				Eventually(func(g Gomega) {
+					_, definitions, err := parameters.ResolveCmpdParametersDefs(ctx, k8sClient, compDef)
+					g.Expect(err).ShouldNot(HaveOccurred())
+					g.Expect(definitions).Should(ConsistOf(HaveField("Name", jsonDefinition.Name)))
+				}).Should(Succeed())
+			})
+			parameterKey := client.ObjectKey{Namespace: comp.Namespace, Name: core.GenerateComponentConfigurationName(clusterName, defaultCompName)}
+			configKey := client.ObjectKey{Namespace: comp.Namespace, Name: core.GetComponentCfgName(clusterName, defaultCompName, configSpecName)}
+			waitForConfig := func(expected string) {
+				GinkgoHelper()
+				var hash *string
+				Eventually(testapps.CheckObj(&testCtx, configKey, func(g Gomega, cm *corev1.ConfigMap) {
+					g.Expect(cm.Data[file]).Should(MatchJSON(expected))
+					hash = computeTargetConfigHash(nil, cm.Data)
+					g.Expect(hash).ShouldNot(BeNil())
+				})).Should(Succeed())
+				mockReconfigureDone(its.Namespace, its.Name, configSpecName, *hash)
+				Eventually(testapps.CheckObj(&testCtx, parameterKey, func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+					g.Expect(cp.Status.ObservedGeneration).Should(Equal(cp.Generation))
+					g.Expect(cp.Status.Phase).Should(Equal(parametersv1alpha1.CFinishedPhase))
+				})).Should(Succeed())
+			}
+			waitForConfig(`{"hosts":["initial"],"mode":"template"}`)
+
+			setDesired := func(mode string, updates ...parametersv1alpha1.ParameterUpdate) {
+				GinkgoHelper()
+				Eventually(testapps.GetAndChangeObj(&testCtx, parameterKey, func(cp *parametersv1alpha1.ComponentParameter) {
+					cp.Spec.Desired = &parametersv1alpha1.ParameterInputs{
+						Assignments: map[string]*string{"mode": cfgutil.ToPointer(mode)},
+						Updates:     updates,
+					}
+				})).Should(Succeed())
+			}
+			By("removing the array through the unprefixed parameter name")
+			setDesired("removed", parametersv1alpha1.ParameterUpdate{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "hosts"})
+			waitForConfig(`{"mode":"removed"}`)
+
+			By("setting the array to an empty array")
+			setDesired("empty", parametersv1alpha1.ParameterUpdate{Type: parametersv1alpha1.ParameterUpdateSet, Key: "@hosts", Value: cfgutil.ToPointer(`[]`)})
+			waitForConfig(`{"hosts":[],"mode":"empty"}`)
+
+			By("withdrawing the array update while keeping other desired inputs")
+			setDesired("restored")
+			waitForConfig(`{"hosts":["initial"],"mode":"restored"}`)
+		})
+
 		DescribeTable("restores the baseline when clearing the last desired assignment",
 			func(initial *parametersv1alpha1.ParameterInputs, baseline, override string) {
 				_, _, comp, _, its := mockReconcileResourceWithInitial(initial)

@@ -176,7 +176,7 @@ func TestNormalizeManagedParameterInputs(t *testing.T) {
 }
 
 func TestMergeItemParameters(t *testing.T) {
-	t.Run("override replaces managed parameter overlay for a file", func(t *testing.T) {
+	t.Run("override replaces only the supplied keys", func(t *testing.T) {
 		item := &parametersv1alpha1.ConfigTemplateItemDetail{
 			ConfigFileParams: map[string]parametersv1alpha1.ParametersInFile{
 				"my.cnf": {
@@ -202,10 +202,10 @@ func TestMergeItemParameters(t *testing.T) {
 		if got.Content == nil || *got.Content != "[mysqld]\nmax_connections=1000\n" {
 			t.Fatalf("expected non-managed fields to be preserved, got %#v", got.Content)
 		}
-		if len(got.Parameters) != 1 {
-			t.Fatalf("expected managed overlay to be replaced, got %#v", got.Parameters)
-		}
 		decoded := parampkg.DecodeParameterOverlay(got.Parameters)
+		if value := decoded["sync_binlog"]; value == nil || *value != "1" {
+			t.Fatalf("expected the unrelated initial value to be preserved, got %v", value)
+		}
 		if _, ok := decoded["max_connections"]; !ok {
 			t.Fatalf("expected max_connections remove marker to be kept")
 		}

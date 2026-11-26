@@ -161,7 +161,7 @@ type ParameterInputs struct {
 	// Assignments are flat managed parameter key/value assignments.
 	//
 	// Entries with a null value are treated as absent. Clearing the desired assignments removes their overrides.
-	// Files with no remaining desired parameter updates fall back to their initial or template values.
+	// Each managed parameter with no desired override falls back to its initial or template value.
 	// Use an update of type Remove to delete a key from the rendered configuration.
 	//
 	// +optional

@@ -152,6 +152,14 @@ type HelmTypeInstallSpec struct {
 	// +kubebuilder:validation:Required
 	ChartLocationURL string `json:"chartLocationURL"`
 
+	// References a kubernetes.io/dockerconfigjson Secret for OCI registry authentication.
+	// Both name and namespace are required.
+	//
+	// +kubebuilder:validation:XValidation:rule="has(self.name) && self.name != ''",message="registrySecretRef.name is required"
+	// +kubebuilder:validation:XValidation:rule="has(self.__namespace__) && self.__namespace__ != ''",message="registrySecretRef.namespace is required"
+	// +optional
+	RegistrySecretRef *corev1.SecretReference `json:"registrySecretRef,omitempty"`
+
 	// Defines the options for Helm release installation.
 	//
 	// +optional

@@ -195,7 +195,8 @@ func normalizeManagedParameterInputs(inputs *parametersv1alpha1.ParameterInputs)
 	if len(inputs.Assignments) == 0 && len(inputs.Updates) == 0 {
 		return nil, nil
 	}
-	updates := make(map[string]parametersv1alpha1.ParameterUpdate, len(inputs.Updates))
+	normalized := make(map[string]*string, len(inputs.Assignments)+len(inputs.Updates))
+	maps.Copy(normalized, inputs.Assignments)
 	for _, update := range inputs.Updates {
 		switch update.Type {
 		case parametersv1alpha1.ParameterUpdateSet:
@@ -207,15 +208,7 @@ func normalizeManagedParameterInputs(inputs *parametersv1alpha1.ParameterInputs)
 		default:
 			return nil, fmt.Errorf("unsupported parameter update type %q for key %q", update.Type, update.Key)
 		}
-		updates[core.GetValidFieldName(update.Key)] = update
-	}
-	normalized := make(map[string]*string, len(inputs.Assignments)+len(updates))
-	for key, value := range inputs.Assignments {
-		if _, replaced := updates[core.GetValidFieldName(key)]; !replaced {
-			normalized[key] = value
-		}
-	}
-	for _, update := range updates {
+		core.DeleteParameterField(normalized, update.Key)
 		normalized[update.Key] = update.Value
 	}
 	return normalized, nil
@@ -366,11 +359,8 @@ func mergeItemParameters(item *parametersv1alpha1.ConfigTemplateItemDetail, upda
 		if merged.Parameters == nil {
 			merged.Parameters = encoded
 		} else {
-			// A JSON-encoded array and a scalar or removal can address the same key.
 			for key := range encoded {
-				name := core.GetValidFieldName(key)
-				delete(merged.Parameters, name)
-				delete(merged.Parameters, core.ArrayFieldPrefix+name)
+				core.DeleteParameterField(merged.Parameters, key)
 			}
 			maps.Copy(merged.Parameters, encoded)
 		}

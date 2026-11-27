@@ -494,3 +494,12 @@ func GetValidFieldName(key string) string {
 	}
 	return key
 }
+
+// DeleteParameterField clears the stored entries for the field addressed by key.
+func DeleteParameterField(values map[string]*string, key string) {
+	field := GetValidFieldName(key)
+	if !hasArrayField(field) {
+		delete(values, field)
+	}
+	delete(values, transArrayFieldName(field))
+}

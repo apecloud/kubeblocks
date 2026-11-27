@@ -44,12 +44,7 @@ func MergeManagedParameterInputs(inputs *parametersv1alpha1.ParameterInputs, pat
 	for key := range patch {
 		keys = append(keys, key)
 		updatedFields[core.GetValidFieldName(key)] = struct{}{}
-	}
-	// Match the rendered field while keeping the array encoding on new assignments.
-	for key := range merged.Assignments {
-		if _, touched := updatedFields[core.GetValidFieldName(key)]; touched {
-			delete(merged.Assignments, key)
-		}
+		core.DeleteParameterField(merged.Assignments, key)
 	}
 	updates := merged.Updates[:0]
 	for _, update := range merged.Updates {

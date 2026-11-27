@@ -22,6 +22,7 @@ package parameters
 import (
 	"context"
 	"encoding/json"
+	"reflect"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -176,7 +177,7 @@ func TestNormalizeManagedParameterInputs(t *testing.T) {
 }
 
 func TestMergeItemParameters(t *testing.T) {
-	t.Run("override replaces managed parameter overlay for a file", func(t *testing.T) {
+	t.Run("override replaces only the supplied keys", func(t *testing.T) {
 		item := &parametersv1alpha1.ConfigTemplateItemDetail{
 			ConfigFileParams: map[string]parametersv1alpha1.ParametersInFile{
 				"my.cnf": {
@@ -202,10 +203,10 @@ func TestMergeItemParameters(t *testing.T) {
 		if got.Content == nil || *got.Content != "[mysqld]\nmax_connections=1000\n" {
 			t.Fatalf("expected non-managed fields to be preserved, got %#v", got.Content)
 		}
-		if len(got.Parameters) != 1 {
-			t.Fatalf("expected managed overlay to be replaced, got %#v", got.Parameters)
-		}
 		decoded := parampkg.DecodeParameterOverlay(got.Parameters)
+		if value := decoded["sync_binlog"]; value == nil || *value != "1" {
+			t.Fatalf("expected the unrelated initial value to be preserved, got %v", value)
+		}
 		if _, ok := decoded["max_connections"]; !ok {
 			t.Fatalf("expected max_connections remove marker to be kept")
 		}
@@ -213,6 +214,42 @@ func TestMergeItemParameters(t *testing.T) {
 			t.Fatalf("expected max_connections to be overridden to nil remove marker, got %#v", decoded["max_connections"])
 		}
 	})
+}
+
+func TestMergeItemParametersReplacesArrayAliases(t *testing.T) {
+	const file = "config.json"
+	for _, tc := range []struct {
+		name         string
+		initialKey   string
+		initialValue *string
+		desiredKey   string
+		desiredValue *string
+	}{
+		{"remove an initial array", "@hosts", ptr.To(`["initial"]`), "hosts", nil},
+		{"replace an initial array with a scalar", "@hosts", ptr.To(`["initial"]`), "hosts", ptr.To("updated")},
+		{"replace an initial scalar with an array", "hosts", ptr.To("initial"), "@hosts", ptr.To(`["updated"]`)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			item := &parametersv1alpha1.ConfigTemplateItemDetail{
+				ConfigFileParams: map[string]parametersv1alpha1.ParametersInFile{
+					file: {Parameters: map[string]*string{tc.initialKey: tc.initialValue, "mode": ptr.To("initial")}},
+				},
+			}
+			mergeItemParameters(item, map[string]parametersv1alpha1.ParametersInFile{
+				file: {Parameters: map[string]*string{tc.desiredKey: tc.desiredValue}},
+			}, true)
+			got := parampkg.DecodeParameterOverlay(item.ConfigFileParams[file].Parameters)
+			if _, present := got[tc.initialKey]; present {
+				t.Fatalf("kept superseded alias %q in %v", tc.initialKey, got)
+			}
+			if value, present := got[tc.desiredKey]; !present || !reflect.DeepEqual(value, tc.desiredValue) {
+				t.Fatalf("desired alias %q = %v, present: %v, want: %v", tc.desiredKey, value, present, tc.desiredValue)
+			}
+			if value := got["mode"]; value == nil || *value != "initial" {
+				t.Fatalf("lost unrelated initial mode: %v", value)
+			}
+		})
+	}
 }
 
 func TestMergeMissingConfigFileParams(t *testing.T) {

@@ -157,6 +157,29 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	priorities := composeRolePriorityMap(its.Spec.Roles)
 	sortInstanceObjects(oldInstanceList, priorities, false)
 
+	// Treat an outdated Pending Instance within the rolling-update window as a special case,
+	// matching the direct-Pod path so the Instance controller can replace its Pending Pod.
+	windowPos := 0
+	for _, inst := range oldInstanceList {
+		if ptr.Deref(inst.Spec.Stop, false) {
+			continue
+		}
+		if windowPos >= replicas {
+			break
+		}
+		windowPos++
+		if !intctrlutil.IsInstancePending(inst) {
+			continue
+		}
+		if mergedInst := copyAndMergeInstance(inst, desiredInstanceMap[inst.Name]); mergedInst != nil {
+			if err = tree.Update(mergedInst); err != nil {
+				return kubebuilderx.Continue, err
+			}
+			// Wait for another reconciliation so the following update process won't be confused.
+			return kubebuilderx.Continue, nil
+		}
+	}
+
 	canBeUpdated := func(inst *workloads.Instance) bool {
 		if !intctrlutil.IsInstanceReady(inst) {
 			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the instance %s is not ready", its.Namespace, its.Name, inst.Name))

@@ -198,6 +198,151 @@ func TestInstanceSetPropagatesAvailabilityPolicy(t *testing.T) {
 	}
 }
 
+func TestInstanceSetRollsOutCorrectionToPendingPod(t *testing.T) {
+	ctx := context.Background()
+	setCM := func(tpl *corev1.PodTemplateSpec, name string) {
+		tpl.Spec.Volumes = []corev1.Volume{{
+			Name:         "config",
+			VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: name}}},
+		}}
+		tpl.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: "config", MountPath: "/etc/config"}}
+	}
+	reconcileAll := func(t *testing.T, parent, child client.Client, n int) {
+		t.Helper()
+		for range n {
+			if _, err := reconcileSetStopParent(parent); err != nil {
+				t.Fatal(err)
+			}
+			for _, inst := range listSetStopChildren(t, child) {
+				if _, err := (&InstanceReconciler{Client: child, Scheme: child.Scheme(), Recorder: record.NewFakeRecorder(1000)}).
+					Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(&inst)}); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+	}
+	setup := func(t *testing.T, replicas int32, rolling *workloads.RollingUpdate, initialCM string) (client.Client, client.Client) {
+		t.Helper()
+		its := setStopFixture()
+		its.Spec.Replicas = ptr.To(replicas)
+		its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{Type: kbappsv1.RollingUpdateStrategyType, RollingUpdate: rolling}
+		setCM(&its.Spec.Template, initialCM)
+		cli := newSetStopClient(t, its)
+		parent := &setStopClient{Client: interceptor.NewClient(cli.(*setStopClient).Client.(client.WithWatch), interceptor.Funcs{
+			Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				switch obj.(type) {
+				case *corev1.Pod, *corev1.PersistentVolumeClaim:
+					t.Fatalf("InstanceSet must not read %T", obj)
+				}
+				return c.Get(ctx, key, obj, opts...)
+			},
+			List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+				switch list.(type) {
+				case *corev1.PodList, *corev1.PersistentVolumeClaimList:
+					t.Fatalf("InstanceSet must not list %T", list)
+				}
+				return c.List(ctx, list, opts...)
+			},
+		})}
+		reconcileAll(t, parent, cli, 5)
+		return cli, parent
+	}
+	setPodPhase := func(t *testing.T, cli client.Client, name string, phase corev1.PodPhase, ready bool) {
+		t.Helper()
+		pod := &corev1.Pod{}
+		if err := cli.Get(ctx, client.ObjectKey{Namespace: "default", Name: name}, pod); err != nil {
+			t.Fatal(err)
+		}
+		pod.Status.Phase = phase
+		cond := corev1.PodCondition{Type: corev1.PodReady, Status: corev1.ConditionFalse}
+		if ready {
+			cond.Status = corev1.ConditionTrue
+			cond.LastTransitionTime = metav1.NewTime(time.Now().Add(-time.Hour))
+		}
+		pod.Status.Conditions = []corev1.PodCondition{cond}
+		if err := cli.Status().Update(ctx, pod); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cmName := func(t *testing.T, vols []corev1.Volume) string {
+		t.Helper()
+		for _, v := range vols {
+			if v.Name == "config" && v.ConfigMap != nil {
+				return v.ConfigMap.Name
+			}
+		}
+		t.Fatalf("config volume not found in %#v", vols)
+		return ""
+	}
+	assertChildCMs := func(t *testing.T, cli client.Client, want map[string]string) {
+		t.Helper()
+		byName := make(map[string]workloads.Instance)
+		for _, c := range listSetStopChildren(t, cli) {
+			byName[c.Name] = c
+		}
+		for name, wantCM := range want {
+			if got := cmName(t, byName[name].Spec.Template.Spec.Volumes); got != wantCM {
+				t.Fatalf("%s ConfigMap = %q, want %q", name, got, wantCM)
+			}
+		}
+	}
+
+	t.Run("replaces Pending Pod after template ConfigMap correction", func(t *testing.T) {
+		cli, parent := setup(t, 1, nil, "missing-cm")
+		bindSetStopClaims(t, cli)
+		setPodPhase(t, cli, "demo-0", corev1.PodPending, false)
+		reconcileAll(t, parent, cli, 2)
+		if children := listSetStopChildren(t, cli); len(children) != 1 || children[0].Status.Ready {
+			t.Fatalf("expected one unready Instance for Pending Pod, got %#v", children)
+		}
+		mutateSetStop(t, cli, func(its *workloads.InstanceSet) { setCM(&its.Spec.Template, "valid-cm") })
+		reconcileAll(t, parent, cli, 5)
+		assertChildCMs(t, cli, map[string]string{"demo-0": "valid-cm"})
+		if pods := listSetStopPods(t, cli); len(pods) != 1 || cmName(t, pods[0].Spec.Volumes) != "valid-cm" {
+			t.Fatalf("expected replacement Pod referencing valid-cm, got %#v", pods)
+		}
+		setPodPhase(t, cli, "demo-0", corev1.PodRunning, true)
+		reconcileAll(t, parent, cli, 3)
+		if its := readSetStop(t, cli); !meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceAvailable)) || its.Status.UpdatedReplicas != 1 {
+			t.Fatalf("InstanceSet did not converge after Pending Pod recovery: %#v", its.Status)
+		}
+	})
+
+	t.Run("does not replace Running unready Pod on template correction", func(t *testing.T) {
+		cli, parent := setup(t, 1, nil, "missing-cm")
+		setPodPhase(t, cli, "demo-0", corev1.PodRunning, false)
+		reconcileAll(t, parent, cli, 2)
+		mutateSetStop(t, cli, func(its *workloads.InstanceSet) { setCM(&its.Spec.Template, "valid-cm") })
+		reconcileAll(t, parent, cli, 5)
+		assertChildCMs(t, cli, map[string]string{"demo-0": "missing-cm"})
+		if pods := listSetStopPods(t, cli); len(pods) != 1 || cmName(t, pods[0].Spec.Volumes) != "missing-cm" {
+			t.Fatalf("Running unready Pod was unexpectedly replaced: %#v", pods)
+		}
+	})
+
+	t.Run("respects maxUnavailable when an already-updated Pod is Pending", func(t *testing.T) {
+		cli, parent := setup(t, 2, &workloads.RollingUpdate{MaxUnavailable: ptr.To(intstr.FromInt32(1))}, "old-cm")
+		markSetStopPodsReady(t, cli)
+		reconcileAll(t, parent, cli, 3)
+		mutateSetStop(t, cli, func(its *workloads.InstanceSet) { setCM(&its.Spec.Template, "new-cm") })
+		reconcileAll(t, parent, cli, 4)
+		setPodPhase(t, cli, "demo-1", corev1.PodPending, false)
+		reconcileAll(t, parent, cli, 4)
+		assertChildCMs(t, cli, map[string]string{"demo-1": "new-cm", "demo-0": "old-cm"})
+	})
+
+	t.Run("keeps Pending Pod outside the rolling-update window untouched", func(t *testing.T) {
+		cli, parent := setup(t, 3, &workloads.RollingUpdate{Replicas: ptr.To(intstr.FromInt32(1)), MaxUnavailable: ptr.To(intstr.FromInt32(2))}, "old-cm")
+		setPodPhase(t, cli, "demo-2", corev1.PodRunning, true)
+		setPodPhase(t, cli, "demo-1", corev1.PodRunning, true)
+		setPodPhase(t, cli, "demo-0", corev1.PodPending, false)
+		reconcileAll(t, parent, cli, 3)
+		mutateSetStop(t, cli, func(its *workloads.InstanceSet) { setCM(&its.Spec.Template, "new-cm") })
+		reconcileAll(t, parent, cli, 4)
+		assertChildCMs(t, cli, map[string]string{"demo-2": "new-cm", "demo-0": "old-cm"})
+	})
+}
+
 var _ = Describe("InstanceSet Controller 2", func() {
 	var (
 		itsName  = "test-cluster-its"

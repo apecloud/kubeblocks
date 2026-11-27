@@ -83,6 +83,43 @@ func TestInstanceStatusHelpers(t *testing.T) {
 	}
 }
 
+func TestIsInstancePending(t *testing.T) {
+	now := metav1.NewTime(time.Now())
+	makeInst := func(gen, obsGen int64, state workloads.InstanceCurrentState, status metav1.ConditionStatus, reason string, deleting bool) *workloads.Instance {
+		inst := &workloads.Instance{
+			ObjectMeta: metav1.ObjectMeta{Generation: gen},
+			Status: workloads.InstanceStatus2{
+				ObservedGeneration: obsGen,
+				CurrentState:       state,
+				Conditions:         []metav1.Condition{{Type: string(workloads.InstanceReady), Status: status, Reason: reason}},
+			},
+		}
+		if deleting {
+			inst.DeletionTimestamp = &now
+		}
+		return inst
+	}
+	tests := []struct {
+		name string
+		inst *workloads.Instance
+		want bool
+	}{
+		{"present pending pod", makeInst(2, 2, workloads.InstanceCurrentStatePresent, metav1.ConditionFalse, workloads.ReasonPodPending, false), true},
+		{"present running not ready pod", makeInst(2, 2, workloads.InstanceCurrentStatePresent, metav1.ConditionFalse, workloads.ReasonNotReady, false), false},
+		{"present ready pod", makeInst(2, 2, workloads.InstanceCurrentStatePresent, metav1.ConditionTrue, workloads.ReasonReady, false), false},
+		{"absent pod", makeInst(2, 2, workloads.InstanceCurrentStateAbsent, metav1.ConditionFalse, workloads.ReasonPodPending, false), false},
+		{"stale observed generation", makeInst(2, 1, workloads.InstanceCurrentStatePresent, metav1.ConditionFalse, workloads.ReasonPodPending, false), false},
+		{"terminating instance", makeInst(2, 2, workloads.InstanceCurrentStatePresent, metav1.ConditionFalse, workloads.ReasonPodPending, true), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsInstancePending(tt.inst); got != tt.want {
+				t.Fatalf("IsInstancePending() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestInstanceTerminatingAndConditionLookup(t *testing.T) {
 	now := metav1.NewTime(time.Now())
 	inst := &workloads.Instance{

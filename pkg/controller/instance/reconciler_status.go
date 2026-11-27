@@ -98,7 +98,11 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		inst.Status.CurrentRevision = inst.Status.UpdateRevision
 	}
 
-	readyCondition := buildReadyCondition(inst, ready, notReadyName)
+	notReadyReason := workloads.ReasonNotReady
+	if isPodPending(pod) {
+		notReadyReason = workloads.ReasonPodPending
+	}
+	readyCondition := buildReadyConditionWithReason(inst, ready, notReadyReason, notReadyName)
 	meta.SetStatusCondition(&inst.Status.Conditions, *readyCondition)
 
 	availableCondition := buildAvailableCondition(inst, available, notAvailableName)

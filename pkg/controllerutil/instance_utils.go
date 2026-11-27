@@ -45,6 +45,13 @@ func IsInstanceFailure(inst *workloads.Instance) bool {
 	return isInstanceStatusObserved(inst) && !IsInstanceTerminating(inst) && isInstanceFailure(inst)
 }
 
+// IsInstancePending returns whether the current observed runtime Pod is in Pending phase.
+func IsInstancePending(inst *workloads.Instance) bool {
+	return isInstanceStatusObserved(inst) && !IsInstanceTerminating(inst) &&
+		inst.Status.CurrentState == workloads.InstanceCurrentStatePresent &&
+		isInstancePending(inst)
+}
+
 // IsInstanceTerminating returns true if instance's DeletionTimestamp has been set
 func IsInstanceTerminating(inst *workloads.Instance) bool {
 	return inst.DeletionTimestamp != nil
@@ -73,6 +80,11 @@ func isInstanceAvailable(inst *workloads.Instance) bool {
 func isInstanceFailure(inst *workloads.Instance) bool {
 	_, condition := getInstanceCondition(inst, workloads.InstanceFailure)
 	return condition != nil && condition.Status == metav1.ConditionTrue
+}
+
+func isInstancePending(inst *workloads.Instance) bool {
+	_, condition := getInstanceCondition(inst, workloads.InstanceReady)
+	return condition != nil && condition.Status == metav1.ConditionFalse && condition.Reason == workloads.ReasonPodPending
 }
 
 // getInstanceCondition extracts the provided condition from the given status and returns that.

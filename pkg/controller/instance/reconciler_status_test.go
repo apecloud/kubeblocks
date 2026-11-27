@@ -42,6 +42,7 @@ func TestStatusReconcilerPublishesInstanceCurrentState(t *testing.T) {
 		want                 workloads.InstanceCurrentState
 		wantCurrentRevision  string
 		wantReady            bool
+		wantReadyReason      string
 		wantAvailable        bool
 		wantFailure          bool
 		wantReadyMessage     string
@@ -49,6 +50,7 @@ func TestStatusReconcilerPublishesInstanceCurrentState(t *testing.T) {
 	}{
 		{
 			name: "absent", want: workloads.InstanceCurrentStateAbsent,
+			wantReadyReason:  workloads.ReasonNotReady,
 			wantReadyMessage: "demo-0", wantAvailableMessage: "demo-0",
 		},
 		{
@@ -56,26 +58,49 @@ func TestStatusReconcilerPublishesInstanceCurrentState(t *testing.T) {
 			pod:                  terminatingPod("current"),
 			want:                 workloads.InstanceCurrentStateTerminating,
 			wantCurrentRevision:  "current",
+			wantReadyReason:      workloads.ReasonNotReady,
 			wantReadyMessage:     "demo-0",
 			wantAvailableMessage: "demo-0",
+		},
+		{
+			name: "terminating pending",
+			pod: func() *corev1.Pod {
+				pod := currentPod("current", corev1.PodPending)
+				pod.DeletionTimestamp = &metav1.Time{Time: metav1.Now().Time}
+				return pod
+			}(),
+			want:                 workloads.InstanceCurrentStateTerminating,
+			wantCurrentRevision:  "current",
+			wantReadyReason:      workloads.ReasonNotReady,
+			wantReadyMessage:     "demo-0",
+			wantAvailableMessage: "demo-0",
+		},
+		{
+			name: "present pending",
+			pod:  currentPod("current", corev1.PodPending),
+			want: workloads.InstanceCurrentStatePresent, wantCurrentRevision: "current",
+			wantReadyReason:  workloads.ReasonPodPending,
+			wantReadyMessage: "demo-0",
 		},
 		{
 			name: "present but not ready",
 			pod:  currentPod("current", corev1.PodRunning),
 			want: workloads.InstanceCurrentStatePresent, wantCurrentRevision: "current",
+			wantReadyReason:  workloads.ReasonNotReady,
 			wantReadyMessage: "demo-0",
 		},
 		{
 			name: "present ready and available",
 			pod:  readyPod("current"),
 			want: workloads.InstanceCurrentStatePresent, wantCurrentRevision: "current",
-			wantReady: true, wantAvailable: true,
+			wantReady: true, wantReadyReason: workloads.ReasonReady, wantAvailable: true,
 		},
 		{
 			name: "present failed",
 			pod:  currentPod("current", corev1.PodFailed),
 			want: workloads.InstanceCurrentStatePresent, wantCurrentRevision: "current",
-			wantFailure: true, wantReadyMessage: "demo-0",
+			wantReadyReason: workloads.ReasonNotReady,
+			wantFailure:     true, wantReadyMessage: "demo-0",
 		},
 	}
 	for _, tt := range tests {
@@ -124,6 +149,9 @@ func TestStatusReconcilerPublishesInstanceCurrentState(t *testing.T) {
 				t.Fatalf("instance retained stale runtime fields: %#v", inst.Status)
 			}
 			assertCondition(t, inst, workloads.InstanceReady, tt.wantReady, tt.wantReadyMessage)
+			if readyCond := meta.FindStatusCondition(inst.Status.Conditions, string(workloads.InstanceReady)); readyCond.Reason != tt.wantReadyReason {
+				t.Fatalf("expected ready reason %q, got %#v", tt.wantReadyReason, readyCond)
+			}
 			assertCondition(t, inst, workloads.InstanceAvailable, tt.wantAvailable, tt.wantAvailableMessage)
 			if meta.IsStatusConditionTrue(inst.Status.Conditions, string(workloads.InstanceFailure)) != tt.wantFailure {
 				t.Fatalf("unexpected failure condition: %#v", inst.Status.Conditions)

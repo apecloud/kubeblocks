@@ -194,9 +194,10 @@ func updateConfigParameter(paramKey string,
 		return v[fileName]
 	}
 
-	parameterMeta, ok := FindParameterSchema(parametersMap, paramKey)
+	field := core.GetValidFieldName(paramKey)
+	parameterMeta, ok := FindParameterSchema(parametersMap, field)
 	if !ok {
-		return fmt.Errorf("parameter %s not found in parameters schema", paramKey)
+		return fmt.Errorf("parameter %s not found in parameters schema", field)
 	}
 	deRefParamInFile(parameterMeta.ConfigTemplateName, parameterMeta.FileName).Parameters[paramKey] = paramValue
 	return nil

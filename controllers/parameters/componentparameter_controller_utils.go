@@ -232,22 +232,28 @@ func normalizeManagedParameterInputs(inputs *parametersv1alpha1.ParameterInputs)
 	if len(inputs.Assignments) == 0 && len(inputs.Updates) == 0 {
 		return nil, nil
 	}
-	normalized := make(map[string]*string, len(inputs.Assignments)+len(inputs.Updates))
-	for key, value := range inputs.Assignments {
-		normalized[key] = value
-	}
+	updates := make(map[string]parametersv1alpha1.ParameterUpdate, len(inputs.Updates))
 	for _, update := range inputs.Updates {
 		switch update.Type {
 		case parametersv1alpha1.ParameterUpdateSet:
 			if update.Value == nil {
 				return nil, fmt.Errorf("parameter update %q with type %q requires a value", update.Key, update.Type)
 			}
-			normalized[update.Key] = update.Value
 		case parametersv1alpha1.ParameterUpdateRemove:
-			normalized[update.Key] = nil
+			update.Value = nil
 		default:
 			return nil, fmt.Errorf("unsupported parameter update type %q for key %q", update.Type, update.Key)
 		}
+		updates[core.GetValidFieldName(update.Key)] = update
+	}
+	normalized := make(map[string]*string, len(inputs.Assignments)+len(updates))
+	for key, value := range inputs.Assignments {
+		if _, replaced := updates[core.GetValidFieldName(key)]; !replaced {
+			normalized[key] = value
+		}
+	}
+	for _, update := range updates {
+		normalized[update.Key] = update.Value
 	}
 	return normalized, nil
 }

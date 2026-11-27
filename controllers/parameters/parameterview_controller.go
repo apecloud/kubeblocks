@@ -22,6 +22,7 @@ package parameters
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -391,24 +392,12 @@ func syncBaseRevision(view *parametersv1alpha1.ParameterView, source *parameterV
 }
 
 func equalParameterValueMap(a, b map[string]*string) bool {
-	if len(a) != len(b) {
+	aValues, err := parameterscore.FromStringMap(a, nil)
+	if err != nil {
 		return false
 	}
-	for key, av := range a {
-		bv, ok := b[key]
-		if !ok {
-			return false
-		}
-		switch {
-		case av == nil && bv == nil:
-			continue
-		case av == nil || bv == nil:
-			return false
-		case *av != *bv:
-			return false
-		}
-	}
-	return true
+	bValues, err := parameterscore.FromStringMap(b, nil)
+	return err == nil && reflect.DeepEqual(aValues, bValues)
 }
 
 func updateLatestStatus(source *parameterViewSource) func(*parametersv1alpha1.ParameterViewStatus) {
@@ -798,18 +787,14 @@ func (r *ParameterViewReconciler) resolveDesiredParameterPatch(ctx context.Conte
 	if !patch.IsModify {
 		return nil, fmt.Errorf("%s: edited content cannot be represented as desired parameter updates", parameterViewReasonUnsupportedContentChanges)
 	}
-	desiredPatch := make(map[string]*string)
-	for _, filePatch := range parameterscore.GenerateVisualizedParamsList(patch, descs) {
-		if filePatch.Key != view.Spec.FileName {
-			continue
-		}
-		for _, param := range filePatch.Parameters {
-			desiredPatch[param.Key] = param.Value
-		}
+	fields, err := parameterscore.ParameterChangesForFile(patch, view.Spec.FileName, cfgCtx.fileConfig.FileFormatConfig)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", parameterViewReasonDiffFailed, err)
 	}
-	if len(desiredPatch) == 0 {
+	if len(fields) == 0 {
 		return nil, fmt.Errorf("%s: edited content does not contain any supported parameter updates", parameterViewReasonUnsupportedContentChanges)
 	}
+	desiredPatch := parameterscore.EncodeParameterChanges(fields)
 	if _, err := parameters.ClassifyComponentParameters(
 		parametersv1alpha1.ComponentParameters(desiredPatch),
 		cfgCtx.paramsDefs,
@@ -820,6 +805,7 @@ func (r *ParameterViewReconciler) resolveDesiredParameterPatch(ctx context.Conte
 		return nil, fmt.Errorf("%s: %w", parameterViewReasonSchemaValidationFailed, err)
 	}
 
+	// Preview how the stored changes will be decoded when the file is rendered.
 	valueManager := parameters.NewValueManager(cfgCtx.paramsDefs, descs)
 	updatedParams, err := parameterscore.FromStringMap(desiredPatch, valueManager.BuildValueTransformer(view.Spec.FileName))
 	if err != nil {
@@ -932,15 +918,16 @@ func desiredParametersContain(inputs *parametersv1alpha1.ParameterInputs, patch 
 	if err != nil || len(normalized) == 0 || len(patch) == 0 {
 		return false
 	}
-	for key, expected := range patch {
-		actual, ok := normalized[key]
-		if !ok {
-			return false
-		}
-		switch {
-		case expected == nil && actual == nil:
-		case expected != nil && actual != nil && *expected == *actual:
-		default:
+	actual, err := parameterscore.FromStringMap(normalized, nil)
+	if err != nil {
+		return false
+	}
+	expected, err := parameterscore.FromStringMap(patch, nil)
+	if err != nil {
+		return false
+	}
+	for key, value := range expected {
+		if configured, ok := actual[key]; !ok || !reflect.DeepEqual(configured, value) {
 			return false
 		}
 	}

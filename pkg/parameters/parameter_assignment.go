@@ -26,6 +26,7 @@ import (
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
+	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 	"github.com/apecloud/kubeblocks/pkg/parameters/openapi"
 )
 
@@ -37,9 +38,10 @@ func ValidateComponentParameterAssignments(assignments parametersv1alpha1.Compon
 		return nil
 	}
 	for key, value := range assignments {
-		paramSchema, ok := findParameterSchema(paramsDefs, key)
+		field := core.GetValidFieldName(key)
+		paramSchema, ok := findParameterSchema(paramsDefs, field)
 		if !ok {
-			return fmt.Errorf("parameter %s not found in parameters schema", key)
+			return fmt.Errorf("parameter %s not found in parameters schema", field)
 		}
 		if value == nil {
 			continue
@@ -47,15 +49,18 @@ func ValidateComponentParameterAssignments(assignments parametersv1alpha1.Compon
 		schema := &apiext.JSONSchemaProps{
 			Type: "object",
 			Properties: map[string]apiext.JSONSchemaProps{
-				key: paramSchema,
+				field: paramSchema,
 			},
 		}
-		typedValue, err := common.ConvertStringToInterfaceBySchemaType(schema, map[string]string{key: *value})
+		typedValue, err := core.DecodeParameterValue(key, value, core.ValueTransformerFunc(func(text, name string) (any, error) {
+			converted, err := common.ConvertStringToInterfaceBySchemaType(schema, map[string]string{name: text})
+			return converted[name], err
+		}))
 		if err != nil {
-			return fmt.Errorf("parameter %s value %q is invalid: %w", key, *value, err)
+			return fmt.Errorf("parameter %s value %q is invalid: %w", field, *value, err)
 		}
-		if err := common.ValidateDataWithSchema(schema, typedValue); err != nil {
-			return fmt.Errorf("parameter %s value %q is invalid: %w", key, *value, err)
+		if err := common.ValidateDataWithSchema(schema, map[string]any{field: typedValue}); err != nil {
+			return fmt.Errorf("parameter %s value %q is invalid: %w", field, *value, err)
 		}
 	}
 	return nil

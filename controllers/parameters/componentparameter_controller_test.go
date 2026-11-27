@@ -71,13 +71,10 @@ var _ = Describe("ComponentParameter Controller", func() {
 
 			By("update parameters")
 			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *parametersv1alpha1.ComponentParameter) {
-				item := parameters.GetConfigTemplateItem(&cfg.Spec, configSpecName)
-				item.ConfigFileParams = map[string]parametersv1alpha1.ParametersInFile{
-					"my.cnf": {
-						Parameters: map[string]*string{
-							"max_connections": cfgutil.ToPointer("1000"),
-							"gtid_mode":       cfgutil.ToPointer("ON"),
-						},
+				cfg.Spec.Desired = &parametersv1alpha1.ParameterInputs{
+					Assignments: map[string]*string{
+						"max_connections": cfgutil.ToPointer("1000"),
+						"gtid_mode":       cfgutil.ToPointer("ON"),
 					},
 				}
 			})).Should(Succeed())
@@ -86,7 +83,7 @@ var _ = Describe("ComponentParameter Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
 				status := parameters.GetItemStatus(&cfg.Status, configSpecName)
 				g.Expect(status).ShouldNot(BeNil())
-				g.Expect(status.UpdateRevision).Should(BeEquivalentTo("3"))
+				g.Expect(status.UpdateRevision).Should(Equal(strconv.FormatInt(cfg.Generation, 10)))
 				g.Expect(status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CUpgradingPhase))
 			})).Should(Succeed())
 
@@ -101,7 +98,7 @@ var _ = Describe("ComponentParameter Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
 				status := parameters.GetItemStatus(&cfg.Status, configSpecName)
 				g.Expect(status).ShouldNot(BeNil())
-				g.Expect(status.UpdateRevision).Should(BeEquivalentTo("3"))
+				g.Expect(status.UpdateRevision).Should(Equal(strconv.FormatInt(cfg.Generation, 10)))
 				g.Expect(status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
 			})).Should(Succeed())
 		})
@@ -242,9 +239,9 @@ var _ = Describe("ComponentParameter Controller", func() {
 			})).Should(Succeed())
 		})
 
-		DescribeTable("restores the baseline when clearing the last desired assignment",
+		DescribeTable("restores the baseline when clearing desired parameter updates",
 			func(initial *parametersv1alpha1.ParameterInputs, baseline, override string) {
-				_, _, comp, _, its := mockReconcileResourceWithInitial(initial)
+				_, cluster, comp, _, its := mockReconcileResourceWithInitial(initial)
 				parameterKey := client.ObjectKey{Namespace: comp.Namespace, Name: core.GenerateComponentConfigurationName(clusterName, defaultCompName)}
 				configKey := client.ObjectKey{Namespace: comp.Namespace, Name: core.GetComponentCfgName(clusterName, defaultCompName, configSpecName)}
 				waitFinished := func() {
@@ -260,17 +257,20 @@ var _ = Describe("ComponentParameter Controller", func() {
 					mockReconfigureDone(its.Namespace, its.Name, configSpecName, hash)
 					waitFinished()
 				}
-				writeDesired := func(desired string) {
+				patchDesired := func(patch string) {
 					GinkgoHelper()
 					cp := &parametersv1alpha1.ComponentParameter{
 						ObjectMeta: metav1.ObjectMeta{Namespace: parameterKey.Namespace, Name: parameterKey.Name},
 					}
-					patch := []byte(`[{"op":"add","path":"/spec/desired","value":` + desired + `}]`)
-					Expect(k8sClient.Patch(ctx, cp, client.RawPatch(types.JSONPatchType, patch))).To(Succeed())
+					Expect(k8sClient.Patch(ctx, cp, client.RawPatch(types.JSONPatchType, []byte(patch)))).To(Succeed())
+				}
+				writeDesired := func(desired string) {
+					GinkgoHelper()
+					patchDesired(`[{"op":"add","path":"/spec/desired","value":` + desired + `}]`)
 				}
 				waitFinished()
 
-				for _, desired := range []string{`{"assignments":{}}`, `{}`, `{"assignments":{"gtid_mode":null}}`} {
+				for _, desired := range []string{`{"assignments":{}}`, `{}`, `{"assignments":{"gtid_mode":null}}`, `null`} {
 					By("setting a runtime override and clearing it with " + desired)
 					writeDesired(`{"assignments":{"gtid_mode":` + strconv.Quote(override) + `}}`)
 					waitForValue(override)
@@ -287,6 +287,26 @@ var _ = Describe("ComponentParameter Controller", func() {
 					g.Expect(config.Get("mysqld.gtid_mode")).To(Equal(override))
 					g.Expect(config.Get("mysqld.report_host")).To(Equal(""))
 					g.Expect(config.Get("mysqld.general_log")).To(BeNil())
+				})).Should(Succeed())
+
+				By("deleting Desired and restoring parameters affected by Set and Remove")
+				patchDesired(`[{"op":"remove","path":"/spec/desired"}]`)
+				waitForValue(baseline)
+				By("re-rendering after a component change without reapplying the withdrawn overrides")
+				Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(cluster), func(obj *appsv1.Cluster) {
+					obj.Spec.ComponentSpecs[0].Replicas = 2
+				})).Should(Succeed())
+				Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(comp), func(obj *appsv1.Component) {
+					obj.Spec.Replicas = 2
+				})).Should(Succeed())
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(comp), comp)).To(Succeed())
+				Eventually(testapps.CheckObj(&testCtx, configKey, func(g Gomega, cm *corev1.ConfigMap) {
+					g.Expect(cm.Annotations[constant.ParametersAppliedComponentGenerationKey]).To(Equal(strconv.FormatInt(comp.Generation, 10)))
+					config, err := unstructured.LoadConfig(testparameters.MysqlConfigFile, cm.Data[testparameters.MysqlConfigFile], parametersv1alpha1.Ini)
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(config.Get("mysqld.gtid_mode")).To(Equal(baseline))
+					g.Expect(config.Get("mysqld.report_host")).To(BeNil())
+					g.Expect(config.Get("mysqld.general_log")).To(Equal("0"))
 				})).Should(Succeed())
 			},
 			Entry("with a template value", (*parametersv1alpha1.ParameterInputs)(nil), "OFF", "ON"),
@@ -343,8 +363,13 @@ var _ = Describe("ComponentParameter Controller", func() {
 			})).Should(Succeed())
 		})
 
-		It("should project desired unmanaged updates into file content", func() {
-			_, _, _, _, _ = mockReconcileResource()
+		It("should retain unmanaged updates and the custom template when deleting Desired", func() {
+			mockReconcileResourceWithInitial(&parametersv1alpha1.ParameterInputs{
+				Assignments: map[string]*string{"max_connections": cfgutil.ToPointer("1000")},
+			})
+			customTemplate := testparameters.NewComponentTemplateFactory("reset-custom-template", testCtx.DefaultNamespace).
+				AddConfigFile(testparameters.MysqlConfigFile, "[mysqld]\ngtid_mode=OFF\nreport_host=custom-template\n").
+				Create(&testCtx).GetObject()
 
 			cfgKey := client.ObjectKey{
 				Namespace: testCtx.DefaultNamespace,
@@ -354,6 +379,9 @@ var _ = Describe("ComponentParameter Controller", func() {
 				cfg.Spec.Desired = &parametersv1alpha1.ParameterInputs{
 					Assignments: map[string]*string{
 						"max_connections": cfgutil.ToPointer("2000"),
+					},
+					Templates: map[string]parametersv1alpha1.ConfigTemplateExtension{
+						configSpecName: {TemplateRef: customTemplate.Name, Namespace: customTemplate.Namespace, Policy: parametersv1alpha1.ReplacePolicy},
 					},
 					UnmanagedUpdates: []parametersv1alpha1.UnmanagedParameterUpdate{{
 						Template: configSpecName,
@@ -393,18 +421,20 @@ var _ = Describe("ComponentParameter Controller", func() {
 				g.Expect(config.Get("mysqld.gtid_mode")).Should(BeNil())
 				g.Expect(config.Get("mysqld.custom_local")).Should(Equal("on"))
 				g.Expect(config.Get("mysqld.max_connections")).Should(Equal("2000"))
+				g.Expect(config.Get("mysqld.report_host")).Should(Equal("custom-template"))
 			})).Should(Succeed())
 
-			By("clearing managed assignments while retaining unmanaged updates")
+			By("deleting Desired and restoring the initial managed value")
 			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *parametersv1alpha1.ComponentParameter) {
-				cfg.Spec.Desired.Assignments = nil
+				cfg.Spec.Desired = nil
 			})).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, configKey, func(g Gomega, cm *corev1.ConfigMap) {
 				config, err := unstructured.LoadConfig(testparameters.MysqlConfigFile, cm.Data[testparameters.MysqlConfigFile], parametersv1alpha1.Ini)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(config.Get("mysqld.max_connections")).Should(BeNil())
+				g.Expect(config.Get("mysqld.max_connections")).Should(Equal("1000"))
 				g.Expect(config.Get("mysqld.gtid_mode")).Should(BeNil())
 				g.Expect(config.Get("mysqld.custom_local")).Should(Equal("on"))
+				g.Expect(config.Get("mysqld.report_host")).Should(Equal("custom-template"))
 			})).Should(Succeed())
 		})
 

@@ -196,7 +196,7 @@ func TestMergeItemParameters(t *testing.T) {
 			},
 		}
 
-		mergeItemParameters(item, updated, true)
+		mergeItemParameters(item, updated)
 
 		got := item.ConfigFileParams["my.cnf"]
 		if got.Content == nil || *got.Content != "[mysqld]\nmax_connections=1000\n" {

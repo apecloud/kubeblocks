@@ -3289,7 +3289,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the parameter value to set. An empty string is an explicit value.
+<p>Specifies the parameter value to set.
 A null or omitted value withdraws the parameter&rsquo;s Desired assignment and updates.
 The parameter then uses the template value with any Initial override applied.</p>
 </td>
@@ -3907,7 +3907,8 @@ ComponentOps
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies parameter assignments and resets for the Component.</p>
+<p>Specifies parameter assignments and resets for the Component.
+A null or omitted value resets that parameter to its Initial or template value.</p>
 </td>
 </tr>
 <tr>

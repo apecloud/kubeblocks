@@ -624,6 +624,7 @@ type Reconfigure struct {
 	ComponentOps `json:",inline"`
 
 	// Specifies parameter assignments and resets for the Component.
+	// A null or omitted value resets that parameter to its Initial or template value.
 	//
 	// +optional
 	Parameters []ParameterPair `json:"parameters,omitempty"`
@@ -714,7 +715,7 @@ type ParameterPair struct {
 	// +kubebuilder:validation:Required
 	Key string `json:"key"`
 
-	// Specifies the parameter value to set. An empty string is an explicit value.
+	// Specifies the parameter value to set.
 	// A null or omitted value withdraws the parameter's Desired assignment and updates.
 	// The parameter then uses the template value with any Initial override applied.
 	// +optional

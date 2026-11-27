@@ -42,7 +42,7 @@ jobs:
     needs: [ trigger-mode ]
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[test]')
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ (matrix.ops == 'lint' && 6) || (matrix.ops == 'manifests' && 5) || 2 }}
+    timeout-minutes: ${{ (matrix.ops == 'lint' && 6) || 5 }}
     strategy:
       fail-fast: true
       matrix:
@@ -98,6 +98,7 @@ jobs:
         if: needs.cherry-pick-pre-check.result == 'failure' || needs.cherry-pick-pre-check.result == 'cancelled'
         run: |
           gh pr comment "${{ github.event.issue.number }}" \
+            --repo "${{ github.repository }}" \
             --body "🤖 says: ‼️ cherry-pick pre-check failed. See: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             || echo "failed to post comment"
           exit 1

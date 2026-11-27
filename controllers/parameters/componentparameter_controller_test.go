@@ -71,13 +71,10 @@ var _ = Describe("ComponentParameter Controller", func() {
 
 			By("update parameters")
 			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *parametersv1alpha1.ComponentParameter) {
-				item := parameters.GetConfigTemplateItem(&cfg.Spec, configSpecName)
-				item.ConfigFileParams = map[string]parametersv1alpha1.ParametersInFile{
-					"my.cnf": {
-						Parameters: map[string]*string{
-							"max_connections": cfgutil.ToPointer("1000"),
-							"gtid_mode":       cfgutil.ToPointer("ON"),
-						},
+				cfg.Spec.Desired = &parametersv1alpha1.ParameterInputs{
+					Assignments: map[string]*string{
+						"max_connections": cfgutil.ToPointer("1000"),
+						"gtid_mode":       cfgutil.ToPointer("ON"),
 					},
 				}
 			})).Should(Succeed())
@@ -86,7 +83,7 @@ var _ = Describe("ComponentParameter Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
 				status := parameters.GetItemStatus(&cfg.Status, configSpecName)
 				g.Expect(status).ShouldNot(BeNil())
-				g.Expect(status.UpdateRevision).Should(BeEquivalentTo("3"))
+				g.Expect(status.UpdateRevision).Should(Equal(strconv.FormatInt(cfg.Generation, 10)))
 				g.Expect(status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CUpgradingPhase))
 			})).Should(Succeed())
 
@@ -101,7 +98,7 @@ var _ = Describe("ComponentParameter Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
 				status := parameters.GetItemStatus(&cfg.Status, configSpecName)
 				g.Expect(status).ShouldNot(BeNil())
-				g.Expect(status.UpdateRevision).Should(BeEquivalentTo("3"))
+				g.Expect(status.UpdateRevision).Should(Equal(strconv.FormatInt(cfg.Generation, 10)))
 				g.Expect(status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
 			})).Should(Succeed())
 		})
@@ -215,32 +212,199 @@ var _ = Describe("ComponentParameter Controller", func() {
 			})).Should(Succeed())
 		})
 
-		It("should project init first and let desired override it", func() {
-			_, _, _, _, _ = mockReconcileResourceWithInitial(&parametersv1alpha1.ParameterInputs{
-				Assignments: map[string]*string{
-					"max_connections": cfgutil.ToPointer("1000"),
-				},
+		It("should apply desired updates per key over initial parameters in the same file", func() {
+			_, _, comp, _, its := mockReconcileResourceWithInitial(&parametersv1alpha1.ParameterInputs{
+				Assignments: map[string]*string{"gtid_mode": cfgutil.ToPointer("ON"), "general_log": cfgutil.ToPointer("1")},
 			})
-
-			cfgKey := client.ObjectKey{
-				Namespace: testCtx.DefaultNamespace,
-				Name:      core.GenerateComponentConfigurationName(clusterName, defaultCompName),
+			parameterKey := client.ObjectKey{Namespace: comp.Namespace, Name: core.GenerateComponentConfigurationName(clusterName, defaultCompName)}
+			configKey := client.ObjectKey{Namespace: comp.Namespace, Name: core.GetComponentCfgName(clusterName, defaultCompName, configSpecName)}
+			waitForConfig := func(gtidMode string, reportHost, generalLog any) {
+				GinkgoHelper()
+				var hash string
+				Eventually(testapps.CheckObj(&testCtx, configKey, func(g Gomega, cm *corev1.ConfigMap) {
+					config, err := unstructured.LoadConfig(testparameters.MysqlConfigFile, cm.Data[testparameters.MysqlConfigFile], parametersv1alpha1.Ini)
+					g.Expect(err).ShouldNot(HaveOccurred())
+					g.Expect(config.Get("mysqld.gtid_mode")).Should(Equal(gtidMode))
+					for key, value := range map[string]any{"report_host": reportHost, "general_log": generalLog} {
+						if value == nil {
+							g.Expect(config.Get("mysqld."+key)).Should(BeNil(), key)
+						} else {
+							g.Expect(config.Get("mysqld."+key)).Should(Equal(value), key)
+						}
+					}
+					configHash := computeTargetConfigHash(nil, cm.Data)
+					g.Expect(configHash).ShouldNot(BeNil())
+					hash = *configHash
+				})).Should(Succeed())
+				mockReconfigureDone(its.Namespace, its.Name, configSpecName, hash)
+				Eventually(testapps.CheckObj(&testCtx, parameterKey, func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+					g.Expect(cp.Status.ObservedGeneration).Should(Equal(cp.Generation))
+					g.Expect(cp.Status.Phase).Should(Equal(parametersv1alpha1.CFinishedPhase))
+				})).Should(Succeed())
 			}
-			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *parametersv1alpha1.ComponentParameter) {
-				cfg.Spec.Desired = &parametersv1alpha1.ParameterInputs{
-					Assignments: map[string]*string{
-						"max_connections": cfgutil.ToPointer("2000"),
-					},
+			waitForConfig("ON", nil, "1")
+
+			By("updating only report_host and keeping the other initial values")
+			Eventually(testapps.GetAndChangeObj(&testCtx, parameterKey, func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Spec.Desired = &parametersv1alpha1.ParameterInputs{Assignments: map[string]*string{"report_host": cfgutil.ToPointer("my-host")}}
+			})).Should(Succeed())
+			waitForConfig("ON", "my-host", "1")
+
+			By("setting one initial key and explicitly removing another")
+			Eventually(testapps.GetAndChangeObj(&testCtx, parameterKey, func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Spec.Desired.Updates = []parametersv1alpha1.ParameterUpdate{
+					{Type: parametersv1alpha1.ParameterUpdateSet, Key: "gtid_mode", Value: cfgutil.ToPointer("OFF")},
+					{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "general_log"},
 				}
 			})).Should(Succeed())
+			waitForConfig("OFF", "my-host", nil)
 
-			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
-				item := parameters.GetConfigTemplateItem(&cfg.Spec, configSpecName)
-				g.Expect(item).ShouldNot(BeNil())
-				g.Expect(item.ConfigFileParams).Should(HaveKey("my.cnf"))
-				g.Expect(item.ConfigFileParams["my.cnf"].Parameters).Should(HaveKeyWithValue("max_connections", cfgutil.ToPointer("2000")))
+			By("withdrawing the gtid_mode update while keeping the other desired inputs")
+			Eventually(testapps.GetAndChangeObj(&testCtx, parameterKey, func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Spec.Desired.Updates = []parametersv1alpha1.ParameterUpdate{{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "general_log"}}
 			})).Should(Succeed())
+			waitForConfig("ON", "my-host", nil)
 		})
+
+		It("should replace or remove an initial array without retaining its old value", func() {
+			const file = "config.json"
+			_, _, comp, _, its := mockReconcileResourceWithInitial(&parametersv1alpha1.ParameterInputs{
+				Assignments: map[string]*string{"@hosts": cfgutil.ToPointer(`["initial"]`)},
+			}, func(template *corev1.ConfigMap, compDef *appsv1.ComponentDefinition) {
+				Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(template), func(cm *corev1.ConfigMap) {
+					cm.Data = map[string]string{file: `{"hosts":["template"],"mode":"template"}`}
+				})).Should(Succeed())
+				definitionKey := client.ObjectKey{Name: paramsDefName}
+				Eventually(testapps.GetAndChangeObj(&testCtx, definitionKey, func(def *parametersv1alpha1.ParametersDefinition) {
+					def.Spec.ComponentDef = "unused-component-definition"
+				})).Should(Succeed())
+				jsonDefinition := testparameters.NewParametersDefinitionFactory("json-parameters").
+					SetComponentDefinition(compDef.Name).
+					SetTemplateName(configSpecName).
+					SetConfigFile(file).
+					SetFileFormatConfig(parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.JSON}).
+					Create(&testCtx).GetObject()
+				Eventually(func(g Gomega) {
+					_, definitions, err := parameters.ResolveCmpdParametersDefs(ctx, k8sClient, compDef)
+					g.Expect(err).ShouldNot(HaveOccurred())
+					g.Expect(definitions).Should(ConsistOf(HaveField("Name", jsonDefinition.Name)))
+				}).Should(Succeed())
+			})
+			parameterKey := client.ObjectKey{Namespace: comp.Namespace, Name: core.GenerateComponentConfigurationName(clusterName, defaultCompName)}
+			configKey := client.ObjectKey{Namespace: comp.Namespace, Name: core.GetComponentCfgName(clusterName, defaultCompName, configSpecName)}
+			waitForConfig := func(expected string) {
+				GinkgoHelper()
+				var hash *string
+				Eventually(testapps.CheckObj(&testCtx, configKey, func(g Gomega, cm *corev1.ConfigMap) {
+					g.Expect(cm.Data[file]).Should(MatchJSON(expected))
+					hash = computeTargetConfigHash(nil, cm.Data)
+					g.Expect(hash).ShouldNot(BeNil())
+				})).Should(Succeed())
+				mockReconfigureDone(its.Namespace, its.Name, configSpecName, *hash)
+				Eventually(testapps.CheckObj(&testCtx, parameterKey, func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+					g.Expect(cp.Status.ObservedGeneration).Should(Equal(cp.Generation))
+					g.Expect(cp.Status.Phase).Should(Equal(parametersv1alpha1.CFinishedPhase))
+				})).Should(Succeed())
+			}
+			waitForConfig(`{"hosts":["initial"],"mode":"template"}`)
+
+			setDesired := func(mode string, updates ...parametersv1alpha1.ParameterUpdate) {
+				GinkgoHelper()
+				Eventually(testapps.GetAndChangeObj(&testCtx, parameterKey, func(cp *parametersv1alpha1.ComponentParameter) {
+					cp.Spec.Desired = &parametersv1alpha1.ParameterInputs{
+						Assignments: map[string]*string{"mode": cfgutil.ToPointer(mode)},
+						Updates:     updates,
+					}
+				})).Should(Succeed())
+			}
+			By("removing the array through the unprefixed parameter name")
+			setDesired("removed", parametersv1alpha1.ParameterUpdate{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "hosts"})
+			waitForConfig(`{"mode":"removed"}`)
+
+			By("setting the array to an empty array")
+			setDesired("empty", parametersv1alpha1.ParameterUpdate{Type: parametersv1alpha1.ParameterUpdateSet, Key: "@hosts", Value: cfgutil.ToPointer(`[]`)})
+			waitForConfig(`{"hosts":[],"mode":"empty"}`)
+
+			By("withdrawing the array update while keeping other desired inputs")
+			setDesired("restored")
+			waitForConfig(`{"hosts":["initial"],"mode":"restored"}`)
+		})
+
+		DescribeTable("restores the baseline when clearing desired parameter updates",
+			func(initial *parametersv1alpha1.ParameterInputs, baseline, override string) {
+				_, cluster, comp, _, its := mockReconcileResourceWithInitial(initial)
+				parameterKey := client.ObjectKey{Namespace: comp.Namespace, Name: core.GenerateComponentConfigurationName(clusterName, defaultCompName)}
+				configKey := client.ObjectKey{Namespace: comp.Namespace, Name: core.GetComponentCfgName(clusterName, defaultCompName, configSpecName)}
+				waitFinished := func() {
+					GinkgoHelper()
+					Eventually(testapps.CheckObj(&testCtx, parameterKey, func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+						g.Expect(cp.Status.ObservedGeneration).To(Equal(cp.Generation))
+						g.Expect(cp.Status.Phase).To(Equal(parametersv1alpha1.CFinishedPhase))
+					})).Should(Succeed())
+				}
+				waitForValue := func(value string) {
+					GinkgoHelper()
+					hash := waitRenderedConfigHash(comp.Namespace, clusterName, defaultCompName, configSpecName, "gtid_mode="+value)
+					mockReconfigureDone(its.Namespace, its.Name, configSpecName, hash)
+					waitFinished()
+				}
+				patchDesired := func(patch string) {
+					GinkgoHelper()
+					cp := &parametersv1alpha1.ComponentParameter{
+						ObjectMeta: metav1.ObjectMeta{Namespace: parameterKey.Namespace, Name: parameterKey.Name},
+					}
+					Expect(k8sClient.Patch(ctx, cp, client.RawPatch(types.JSONPatchType, []byte(patch)))).To(Succeed())
+				}
+				writeDesired := func(desired string) {
+					GinkgoHelper()
+					patchDesired(`[{"op":"add","path":"/spec/desired","value":` + desired + `}]`)
+				}
+				waitFinished()
+
+				for _, desired := range []string{`{"assignments":{}}`, `{}`, `{"assignments":{"gtid_mode":null}}`, `null`} {
+					By("setting a runtime override and clearing it with " + desired)
+					writeDesired(`{"assignments":{"gtid_mode":` + strconv.Quote(override) + `}}`)
+					waitForValue(override)
+					writeDesired(desired)
+					waitForValue(baseline)
+				}
+
+				By("applying explicit Set and Remove with empty assignments")
+				writeDesired(`{"assignments":{},"updates":[{"type":"Set","key":"gtid_mode","value":` + strconv.Quote(override) + `},{"type":"Set","key":"report_host","value":""},{"type":"Remove","key":"general_log"}]}`)
+				waitForValue(override)
+				Eventually(testapps.CheckObj(&testCtx, configKey, func(g Gomega, cm *corev1.ConfigMap) {
+					config, err := unstructured.LoadConfig(testparameters.MysqlConfigFile, cm.Data[testparameters.MysqlConfigFile], parametersv1alpha1.Ini)
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(config.Get("mysqld.gtid_mode")).To(Equal(override))
+					g.Expect(config.Get("mysqld.report_host")).To(Equal(""))
+					g.Expect(config.Get("mysqld.general_log")).To(BeNil())
+				})).Should(Succeed())
+
+				By("deleting Desired and restoring parameters affected by Set and Remove")
+				patchDesired(`[{"op":"remove","path":"/spec/desired"}]`)
+				waitForValue(baseline)
+				By("re-rendering after a component change without reapplying the withdrawn overrides")
+				Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(cluster), func(obj *appsv1.Cluster) {
+					obj.Spec.ComponentSpecs[0].Replicas = 2
+				})).Should(Succeed())
+				Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(comp), func(obj *appsv1.Component) {
+					obj.Spec.Replicas = 2
+				})).Should(Succeed())
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(comp), comp)).To(Succeed())
+				Eventually(testapps.CheckObj(&testCtx, configKey, func(g Gomega, cm *corev1.ConfigMap) {
+					g.Expect(cm.Annotations[constant.ParametersAppliedComponentGenerationKey]).To(Equal(strconv.FormatInt(comp.Generation, 10)))
+					config, err := unstructured.LoadConfig(testparameters.MysqlConfigFile, cm.Data[testparameters.MysqlConfigFile], parametersv1alpha1.Ini)
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(config.Get("mysqld.gtid_mode")).To(Equal(baseline))
+					g.Expect(config.Get("mysqld.report_host")).To(BeNil())
+					g.Expect(config.Get("mysqld.general_log")).To(Equal("0"))
+				})).Should(Succeed())
+			},
+			Entry("with a template value", (*parametersv1alpha1.ParameterInputs)(nil), "OFF", "ON"),
+			Entry("with an initial value", &parametersv1alpha1.ParameterInputs{
+				Assignments: map[string]*string{"gtid_mode": cfgutil.ToPointer("ON")},
+			}, "ON", "OFF"),
+		)
 
 		It("should let explicit desired remove override assignments", func() {
 			_, _, comp, _, _ := mockReconcileResource()
@@ -290,8 +454,13 @@ var _ = Describe("ComponentParameter Controller", func() {
 			})).Should(Succeed())
 		})
 
-		It("should project desired unmanaged updates into file content", func() {
-			_, _, _, _, _ = mockReconcileResource()
+		It("should retain unmanaged updates and the custom template when deleting Desired", func() {
+			mockReconcileResourceWithInitial(&parametersv1alpha1.ParameterInputs{
+				Assignments: map[string]*string{"max_connections": cfgutil.ToPointer("1000")},
+			})
+			customTemplate := testparameters.NewComponentTemplateFactory("reset-custom-template", testCtx.DefaultNamespace).
+				AddConfigFile(testparameters.MysqlConfigFile, "[mysqld]\ngtid_mode=OFF\nreport_host=custom-template\n").
+				Create(&testCtx).GetObject()
 
 			cfgKey := client.ObjectKey{
 				Namespace: testCtx.DefaultNamespace,
@@ -301,6 +470,9 @@ var _ = Describe("ComponentParameter Controller", func() {
 				cfg.Spec.Desired = &parametersv1alpha1.ParameterInputs{
 					Assignments: map[string]*string{
 						"max_connections": cfgutil.ToPointer("2000"),
+					},
+					Templates: map[string]parametersv1alpha1.ConfigTemplateExtension{
+						configSpecName: {TemplateRef: customTemplate.Name, Namespace: customTemplate.Namespace, Policy: parametersv1alpha1.ReplacePolicy},
 					},
 					UnmanagedUpdates: []parametersv1alpha1.UnmanagedParameterUpdate{{
 						Template: configSpecName,
@@ -340,6 +512,20 @@ var _ = Describe("ComponentParameter Controller", func() {
 				g.Expect(config.Get("mysqld.gtid_mode")).Should(BeNil())
 				g.Expect(config.Get("mysqld.custom_local")).Should(Equal("on"))
 				g.Expect(config.Get("mysqld.max_connections")).Should(Equal("2000"))
+				g.Expect(config.Get("mysqld.report_host")).Should(Equal("custom-template"))
+			})).Should(Succeed())
+
+			By("deleting Desired and restoring the initial managed value")
+			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *parametersv1alpha1.ComponentParameter) {
+				cfg.Spec.Desired = nil
+			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, configKey, func(g Gomega, cm *corev1.ConfigMap) {
+				config, err := unstructured.LoadConfig(testparameters.MysqlConfigFile, cm.Data[testparameters.MysqlConfigFile], parametersv1alpha1.Ini)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(config.Get("mysqld.max_connections")).Should(Equal("1000"))
+				g.Expect(config.Get("mysqld.gtid_mode")).Should(BeNil())
+				g.Expect(config.Get("mysqld.custom_local")).Should(Equal("on"))
+				g.Expect(config.Get("mysqld.report_host")).Should(Equal("custom-template"))
 			})).Should(Succeed())
 		})
 

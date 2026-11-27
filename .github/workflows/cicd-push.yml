@@ -102,7 +102,7 @@ jobs:
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[test]')
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ (matrix.ops == 'test' && 15) || (matrix.ops == 'lint' && 6) || (matrix.ops == 'manifests' && 5) || 2 }}
+    timeout-minutes: ${{ (matrix.ops == 'test' && 15) || (matrix.ops == 'lint' && 6) || 5 }}
     strategy:
       fail-fast: true
       matrix:
@@ -232,7 +232,7 @@ jobs:
   apis-doc:
     needs: [ trigger-mode ]
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 5
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[apis]') }}
     steps:
       - uses: actions/checkout@v4

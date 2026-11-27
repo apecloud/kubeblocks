@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"reflect"
 	"slices"
 	"strconv"
@@ -107,16 +108,16 @@ func reconcileParameterValuesIntoSpec(ctx context.Context, cli client.Client, co
 	if err != nil {
 		return false, err
 	}
+
+	// Rebuild managed overlays even when Desired has been removed.
+	clearManagedParameterOverlays(specCopy)
+
 	if err := applyParameterInputs(specCopy, compParam.Spec.Initial, initialParameters, false, ctx, cli, fetchTask, configmaps, configDescs, paramsDefs); err != nil {
 		return false, err
 	}
 	if err := applyParameterInputs(specCopy, compParam.Spec.Desired, nil, true, ctx, cli, fetchTask, configmaps, configDescs, paramsDefs); err != nil {
 		return false, err
 	}
-
-	// Desired replaces the managed overlay for each file it updates. Preserve the
-	// immutable Initial entries that must survive that replacement.
-	restoreInitialImmutableParameters(specCopy, initialParameters, paramsDefs)
 
 	if reflect.DeepEqual(compParam.Spec, *specCopy) {
 		return false, nil
@@ -157,7 +158,7 @@ func applyParameterInputs(spec *parametersv1alpha1.ComponentParameterSpec,
 		if _, err := parameters.DoMerge(resolveBaseData(configmaps[templateName], paramsInFile), patch, initial, paramsDefs, configDescriptions); err != nil {
 			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "%s", err.Error())
 		}
-		mergeItemParameters(item, patch, override)
+		mergeItemParameters(item, patch)
 	}
 	for templateName, templateExtension := range inputs.Templates {
 		item := parameters.GetConfigTemplateItem(spec, templateName)
@@ -185,37 +186,6 @@ func classifyManagedParameterInputs(inputs *parametersv1alpha1.ParameterInputs,
 	}
 	return parameters.ClassifyComponentParameters(parametersv1alpha1.ComponentParameters(managedInputs),
 		paramsDefs, compDef.Spec.Configs, configmaps, configDescs)
-}
-
-func restoreInitialImmutableParameters(spec *parametersv1alpha1.ComponentParameterSpec,
-	initial map[string]map[string]*parametersv1alpha1.ParametersInFile,
-	paramsDefs []*parametersv1alpha1.ParametersDefinition) {
-	for templateName, files := range initial {
-		item := parameters.GetConfigTemplateItem(spec, templateName)
-		for file, initialParams := range files {
-			paramsDef := resolveParameterDefinition(paramsDefs, file)
-			if paramsDef == nil || len(paramsDef.Spec.ImmutableParameters) == 0 {
-				continue
-			}
-			merged := item.ConfigFileParams[file]
-			for key, value := range parameters.EncodeParameterOverlay(initialParams.Parameters) {
-				if !slices.Contains(paramsDef.Spec.ImmutableParameters, core.GetValidFieldName(key)) {
-					continue
-				}
-				if merged.Parameters == nil {
-					merged.Parameters = map[string]*string{}
-				}
-				merged.Parameters[key] = value
-			}
-			if merged.Parameters == nil {
-				continue
-			}
-			if item.ConfigFileParams == nil {
-				item.ConfigFileParams = map[string]parametersv1alpha1.ParametersInFile{}
-			}
-			item.ConfigFileParams[file] = merged
-		}
-	}
 }
 
 func normalizeManagedParameterInputs(inputs *parametersv1alpha1.ParameterInputs) (map[string]*string, error) {
@@ -349,37 +319,54 @@ func resolveComponentRefConfigMap(ctx context.Context, cli client.Client, namesp
 	return configmaps, nil
 }
 
-func mergeItemParameters(item *parametersv1alpha1.ConfigTemplateItemDetail, updatedParameters map[string]parametersv1alpha1.ParametersInFile, override bool) {
-	if item.ConfigFileParams == nil {
-		item.ConfigFileParams = updatedParameters
-		return
+func hasManagedParameterOverlays(spec *parametersv1alpha1.ComponentParameterSpec) bool {
+	for _, item := range spec.ConfigItemDetails {
+		for _, file := range item.ConfigFileParams {
+			if len(file.Parameters) > 0 {
+				return true
+			}
+		}
 	}
-	if !override && len(item.ConfigFileParams) != 0 {
-		return
+	return false
+}
+
+func clearManagedParameterOverlays(spec *parametersv1alpha1.ComponentParameterSpec) {
+	for i := range spec.ConfigItemDetails {
+		item := &spec.ConfigItemDetails[i]
+		for file, params := range item.ConfigFileParams {
+			if params.Content == nil && len(params.UnmanagedUpdates) == 0 {
+				delete(item.ConfigFileParams, file)
+				continue
+			}
+			params.Parameters = nil
+			item.ConfigFileParams[file] = params
+		}
+		if len(item.ConfigFileParams) == 0 {
+			item.ConfigFileParams = nil
+		}
+	}
+}
+
+func mergeItemParameters(item *parametersv1alpha1.ConfigTemplateItemDetail, updatedParameters map[string]parametersv1alpha1.ParametersInFile) {
+	if item.ConfigFileParams == nil {
+		item.ConfigFileParams = make(map[string]parametersv1alpha1.ParametersInFile, len(updatedParameters))
 	}
 	for key, parametersInFile := range updatedParameters {
 		merged := item.ConfigFileParams[key]
 		if parametersInFile.Content != nil {
 			merged.Content = parametersInFile.Content
 		}
-		if override {
-			encodedParameters := parameters.EncodeParameterOverlay(parametersInFile.Parameters)
-			if len(encodedParameters) == 0 {
-				merged.Parameters = nil
-			} else {
-				merged.Parameters = make(map[string]*string, len(encodedParameters))
-				for paramKey, paramValue := range encodedParameters {
-					merged.Parameters[paramKey] = paramValue
-				}
-			}
+		encoded := parameters.EncodeParameterOverlay(parametersInFile.Parameters)
+		if merged.Parameters == nil {
+			merged.Parameters = encoded
 		} else {
-			encodedParameters := parameters.EncodeParameterOverlay(parametersInFile.Parameters)
-			if merged.Parameters == nil && len(encodedParameters) > 0 {
-				merged.Parameters = map[string]*string{}
+			// A JSON-encoded array and a scalar or removal can address the same key.
+			for key := range encoded {
+				name := core.GetValidFieldName(key)
+				delete(merged.Parameters, name)
+				delete(merged.Parameters, core.ArrayFieldPrefix+name)
 			}
-			for paramKey, paramValue := range encodedParameters {
-				merged.Parameters[paramKey] = paramValue
-			}
+			maps.Copy(merged.Parameters, encoded)
 		}
 		item.ConfigFileParams[key] = merged
 	}

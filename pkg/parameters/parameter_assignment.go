@@ -26,7 +26,7 @@ import (
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
-	"github.com/apecloud/kubeblocks/pkg/parameters/core"
+	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 	"github.com/apecloud/kubeblocks/pkg/parameters/openapi"
 )
 
@@ -38,7 +38,7 @@ func ValidateComponentParameterAssignments(assignments parametersv1alpha1.Compon
 		return nil
 	}
 	for key, value := range assignments {
-		field := core.GetValidFieldName(key)
+		field := parameterscore.GetValidFieldName(key)
 		paramSchema, ok := findParameterSchema(paramsDefs, field)
 		if !ok {
 			return fmt.Errorf("parameter %s not found in parameters schema", field)
@@ -52,7 +52,7 @@ func ValidateComponentParameterAssignments(assignments parametersv1alpha1.Compon
 				field: paramSchema,
 			},
 		}
-		typedValue, err := core.DecodeParameterValue(key, value, core.ValueTransformerFunc(func(text, name string) (any, error) {
+		typedValue, err := parameterscore.DecodeParameterValue(key, value, parameterscore.ValueTransformerFunc(func(text, name string) (any, error) {
 			converted, err := common.ConvertStringToInterfaceBySchemaType(schema, map[string]string{name: text})
 			return converted[name], err
 		}))

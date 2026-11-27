@@ -30,7 +30,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/generics"
-	"github.com/apecloud/kubeblocks/pkg/parameters/core"
+	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 	"github.com/apecloud/kubeblocks/pkg/parameters/openapi"
 )
 
@@ -43,12 +43,12 @@ func MergeManagedParameterInputs(inputs *parametersv1alpha1.ParameterInputs, pat
 	updatedFields := make(map[string]struct{}, len(patch))
 	for key := range patch {
 		keys = append(keys, key)
-		updatedFields[core.GetValidFieldName(key)] = struct{}{}
-		core.DeleteParameterField(merged.Assignments, key)
+		updatedFields[parameterscore.GetValidFieldName(key)] = struct{}{}
+		parameterscore.DeleteParameterField(merged.Assignments, key)
 	}
 	updates := merged.Updates[:0]
 	for _, update := range merged.Updates {
-		if _, touched := updatedFields[core.GetValidFieldName(update.Key)]; !touched {
+		if _, touched := updatedFields[parameterscore.GetValidFieldName(update.Key)]; !touched {
 			updates = append(updates, update)
 		}
 	}
@@ -189,7 +189,7 @@ func updateConfigParameter(paramKey string,
 		return v[fileName]
 	}
 
-	field := core.GetValidFieldName(paramKey)
+	field := parameterscore.GetValidFieldName(paramKey)
 	parameterMeta, ok := FindParameterSchema(parametersMap, field)
 	if !ok {
 		return fmt.Errorf("parameter %s not found in parameters schema", field)

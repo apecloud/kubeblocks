@@ -717,8 +717,7 @@ type ParameterPair struct {
 	Key string `json:"key"`
 
 	// Specifies the parameter value to set.
-	// A null or omitted value restores the parameter's initial setting.
-	// If no initial setting applies, it restores the template default.
+	// A null or omitted value restores the parameter's initial setting or template default.
 	// +optional
 	Value *string `json:"value"`
 }

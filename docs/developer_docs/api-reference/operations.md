@@ -3290,8 +3290,7 @@ string
 <td>
 <em>(Optional)</em>
 <p>Specifies the parameter value to set.
-A null or omitted value restores the parameter&rsquo;s initial setting.
-If no initial setting applies, it restores the template default.</p>
+A null or omitted value restores the parameter&rsquo;s initial setting or template default.</p>
 </td>
 </tr>
 </tbody>

@@ -300,6 +300,15 @@ func TestReconfigurePersistsRemoveAndReplacesStaleUpdates(t *testing.T) {
 				Assignments: map[string]*string{"keep": pointer.String("1"), "mode": pointer.String("new")},
 				Updates:     []parametersv1alpha1.ParameterUpdate{{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "other"}},
 			},
+		}, {
+			name: "set replaces an array assignment with a scalar",
+			initial: &parametersv1alpha1.ParameterInputs{
+				Assignments: map[string]*string{"@hosts": pointer.String(`["old"]`)},
+			},
+			pairs: []opsv1alpha1.ParameterPair{{Key: "hosts", Value: pointer.String("single")}},
+			want: &parametersv1alpha1.ParameterInputs{
+				Assignments: map[string]*string{"hosts": pointer.String("single")},
+			},
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

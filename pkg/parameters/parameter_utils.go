@@ -30,6 +30,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 	"github.com/apecloud/kubeblocks/pkg/parameters/openapi"
 )
 
@@ -38,22 +39,24 @@ func MergeManagedParameterInputs(inputs *parametersv1alpha1.ParameterInputs, pat
 	if merged == nil {
 		merged = &parametersv1alpha1.ParameterInputs{}
 	}
+	keys := make([]string, 0, len(patch))
+	updatedFields := make(map[string]struct{}, len(patch))
+	for key := range patch {
+		keys = append(keys, key)
+		updatedFields[parameterscore.GetValidFieldName(key)] = struct{}{}
+		parameterscore.DeleteParameterField(merged.Assignments, key)
+	}
 	updates := merged.Updates[:0]
 	for _, update := range merged.Updates {
-		if _, touched := patch[update.Key]; !touched {
+		if _, touched := updatedFields[parameterscore.GetValidFieldName(update.Key)]; !touched {
 			updates = append(updates, update)
 		}
 	}
 	merged.Updates = updates
-	keys := make([]string, 0, len(patch))
-	for key := range patch {
-		keys = append(keys, key)
-	}
 	slices.Sort(keys)
 	for _, key := range keys {
 		value := patch[key]
 		if value == nil {
-			delete(merged.Assignments, key)
 			merged.Updates = append(merged.Updates, parametersv1alpha1.ParameterUpdate{Type: parametersv1alpha1.ParameterUpdateRemove, Key: key})
 			continue
 		}
@@ -186,9 +189,10 @@ func updateConfigParameter(paramKey string,
 		return v[fileName]
 	}
 
-	parameterMeta, ok := FindParameterSchema(parametersMap, paramKey)
+	field := parameterscore.GetValidFieldName(paramKey)
+	parameterMeta, ok := FindParameterSchema(parametersMap, field)
 	if !ok {
-		return fmt.Errorf("parameter %s not found in parameters schema", paramKey)
+		return fmt.Errorf("parameter %s not found in parameters schema", field)
 	}
 	deRefParamInFile(parameterMeta.ConfigTemplateName, parameterMeta.FileName).Parameters[paramKey] = paramValue
 	return nil

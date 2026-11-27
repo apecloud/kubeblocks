@@ -1968,7 +1968,7 @@ map[string]*string
 <td>
 <em>(Optional)</em>
 <p>Assignments are flat managed parameter key/value assignments.</p>
-<p>Entries with a null value are treated as absent.</p>
+<p>Entries with a null value are treated as absent from this map, so other parameter inputs and the rendered template still apply.</p>
 </td>
 </tr>
 <tr>
@@ -2244,7 +2244,8 @@ string
 <td><p>ParameterUpdateRemove deletes the key from the rendered configuration.</p>
 </td>
 </tr><tr><td><p>&#34;Set&#34;</p></td>
-<td></td>
+<td><p>ParameterUpdateSet assigns the supplied value to the key in the rendered configuration. A value is required.</p>
+</td>
 </tr></tbody>
 </table>
 <h3 id="parameters.kubeblocks.io/v1alpha1.ParameterViewContent">ParameterViewContent

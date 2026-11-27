@@ -162,7 +162,7 @@ type ConfigTemplateItemDetail struct {
 type ParameterInputs struct {
 	// Assignments are flat managed parameter key/value assignments.
 	//
-	// Entries with a null value are treated as absent.
+	// Entries with a null value are treated as absent from this map, so other parameter inputs and the rendered template still apply.
 	//
 	// +optional
 	Assignments map[string]*string `json:"assignments,omitempty"`
@@ -190,6 +190,7 @@ type ParameterInputs struct {
 type ParameterUpdateType string
 
 const (
+	// ParameterUpdateSet assigns the supplied value to the key in the rendered configuration. A value is required.
 	ParameterUpdateSet ParameterUpdateType = "Set"
 
 	// ParameterUpdateRemove deletes the key from the rendered configuration.

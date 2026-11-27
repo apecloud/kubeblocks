@@ -148,6 +148,7 @@ ParameterInputs
 <td>
 <em>(Optional)</em>
 <p>Desired provides the current desired parameter inputs.</p>
+<p>To restore a parameter&rsquo;s initial setting or template default, remove its assignment and any updates for that parameter from Desired.</p>
 </td>
 </tr>
 </tbody>
@@ -1081,6 +1082,7 @@ ParameterInputs
 <td>
 <em>(Optional)</em>
 <p>Desired provides the current desired parameter inputs.</p>
+<p>To restore a parameter&rsquo;s initial setting or template default, remove its assignment and any updates for that parameter from Desired.</p>
 </td>
 </tr>
 </tbody>
@@ -1965,10 +1967,8 @@ map[string]*string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Assignments are flat managed parameter key/value assignments.</p>
-<p>Entries with a null value are treated as absent. Clearing the desired assignments removes their overrides.
-Files with no remaining desired parameter updates fall back to their initial or template values.
-Use an update of type Remove to delete a key from the rendered configuration.</p>
+<p>Specifies the values to set for the component&rsquo;s parameters.</p>
+<p>A null value lets the parameter use its default when there is no explicit update for it.</p>
 </td>
 </tr>
 <tr>
@@ -1982,7 +1982,9 @@ Use an update of type Remove to delete a key from the rendered configuration.</p
 </td>
 <td>
 <em>(Optional)</em>
-<p>Updates is the advanced path for schema-managed parameter changes with explicit update semantics.</p>
+<p>Lists the parameters to set or remove.</p>
+<p>If a parameter has both an assignment and an update, the update takes precedence.
+If it has multiple updates, the last one takes precedence.</p>
 </td>
 </tr>
 <tr>
@@ -2240,9 +2242,11 @@ string
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;Remove&#34;</p></td>
-<td></td>
+<td><p>ParameterUpdateRemove deletes the key from the rendered configuration.</p>
+</td>
 </tr><tr><td><p>&#34;Set&#34;</p></td>
-<td></td>
+<td><p>ParameterUpdateSet assigns the supplied value to the key in the rendered configuration. A value is required.</p>
+</td>
 </tr></tbody>
 </table>
 <h3 id="parameters.kubeblocks.io/v1alpha1.ParameterViewContent">ParameterViewContent

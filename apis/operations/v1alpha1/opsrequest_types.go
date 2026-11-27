@@ -24,6 +24,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 )
 
 // OpsRequestSpec defines the desired state of OpsRequest
@@ -622,12 +623,18 @@ type Reconfigure struct {
 	// Specifies the name of the Component.
 	ComponentOps `json:",inline"`
 
-	// Specifies a list of key-value pairs representing parameters and their corresponding values
-	// within a single configuration file.
-	// This field is used to override or set the values of parameters without modifying the entire configuration file.
+	// Sets or resets the named parameters for the component.
+	// Use a null or omitted value to reset a parameter.
 	//
 	// +optional
 	Parameters []ParameterPair `json:"parameters,omitempty"`
+
+	// Lists the parameters to set or remove.
+	// If a parameter also appears in `parameters`, the update takes precedence.
+	// If it has multiple updates, the last one takes precedence.
+	//
+	// +optional
+	Updates []parametersv1alpha1.ParameterUpdate `json:"updates,omitempty"`
 }
 
 type CustomOps struct {
@@ -709,8 +716,8 @@ type ParameterPair struct {
 	// +kubebuilder:validation:Required
 	Key string `json:"key"`
 
-	// Represents the parameter values that are to be updated.
-	// If set to nil, the parameter defined by the Key field will be removed from the configuration file.
+	// Specifies the parameter value to set.
+	// A null or omitted value restores the parameter's initial setting or template default.
 	// +optional
 	Value *string `json:"value"`
 }

@@ -753,17 +753,18 @@ spec:
                 - name
                 x-kubernetes-list-type: map
               desired:
-                description: Desired provides the current desired parameter inputs.
+                description: |-
+                  Desired provides the current desired parameter inputs.
+
+                  To restore a parameter's initial setting or template default, remove its assignment and any updates for that parameter from Desired.
                 properties:
                   assignments:
                     additionalProperties:
                       type: string
                     description: |-
-                      Assignments are flat managed parameter key/value assignments.
+                      Specifies the values to set for the component's parameters.
 
-                      Entries with a null value are treated as absent. Clearing the desired assignments removes their overrides.
-                      Files with no remaining desired parameter updates fall back to their initial or template values.
-                      Use an update of type Remove to delete a key from the rendered configuration.
+                      A null value lets the parameter use its default when there is no explicit update for it.
                     type: object
                   unmanagedUpdates:
                     description: UnmanagedUpdates is the advanced path for parameters
@@ -822,8 +823,11 @@ spec:
                       type: object
                     type: array
                   updates:
-                    description: Updates is the advanced path for schema-managed parameter
-                      changes with explicit update semantics.
+                    description: |-
+                      Lists the parameters to set or remove.
+
+                      If a parameter has both an assignment and an update, the update takes precedence.
+                      If it has multiple updates, the last one takes precedence.
                     items:
                       description: ParameterUpdate is an explicit parameter update.
                       properties:
@@ -883,11 +887,9 @@ spec:
                     additionalProperties:
                       type: string
                     description: |-
-                      Assignments are flat managed parameter key/value assignments.
+                      Specifies the values to set for the component's parameters.
 
-                      Entries with a null value are treated as absent. Clearing the desired assignments removes their overrides.
-                      Files with no remaining desired parameter updates fall back to their initial or template values.
-                      Use an update of type Remove to delete a key from the rendered configuration.
+                      A null value lets the parameter use its default when there is no explicit update for it.
                     type: object
                   unmanagedUpdates:
                     description: UnmanagedUpdates is the advanced path for parameters
@@ -946,8 +948,11 @@ spec:
                       type: object
                     type: array
                   updates:
-                    description: Updates is the advanced path for schema-managed parameter
-                      changes with explicit update semantics.
+                    description: |-
+                      Lists the parameters to set or remove.
+
+                      If a parameter has both an assignment and an update, the update takes precedence.
+                      If it has multiple updates, the last one takes precedence.
                     items:
                       description: ParameterUpdate is an explicit parameter update.
                       properties:

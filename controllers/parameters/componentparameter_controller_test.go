@@ -32,14 +32,18 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apiunstructured "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	opscontroller "github.com/apecloud/kubeblocks/controllers/operations"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
@@ -405,6 +409,122 @@ var _ = Describe("ComponentParameter Controller", func() {
 				Assignments: map[string]*string{"gtid_mode": cfgutil.ToPointer("ON")},
 			}, "ON", "OFF"),
 		)
+
+		It("applies Set, Remove and Reset through Reconfiguring OpsRequests", func() {
+			_, cluster, _, _, its := mockReconcileResourceWithInitial(&parametersv1alpha1.ParameterInputs{
+				Assignments: map[string]*string{"gtid_mode": cfgutil.ToPointer("ON")},
+			})
+			clusterKey := client.ObjectKeyFromObject(cluster)
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, clusterKey, func(cluster *appsv1.Cluster) {
+				cluster.Status.Phase = appsv1.RunningClusterPhase
+			})).Should(Succeed())
+			configKey := client.ObjectKey{Namespace: cluster.Namespace, Name: core.GetComponentCfgName(cluster.Name, defaultCompName, configSpecName)}
+			parameterKey := client.ObjectKey{Namespace: cluster.Namespace, Name: core.GenerateComponentConfigurationName(cluster.Name, defaultCompName)}
+			reconciler := &opscontroller.OpsRequestReconciler{
+				Client: k8sClient, Scheme: k8sClient.Scheme(), Recorder: record.NewFakeRecorder(100),
+			}
+
+			newRequest := func(name, changes string) client.ObjectKey {
+				GinkgoHelper()
+				var reconfigure map[string]any
+				Expect(json.Unmarshal([]byte(changes), &reconfigure)).To(Succeed())
+				reconfigure["componentName"] = defaultCompName
+				request := &apiunstructured.Unstructured{Object: map[string]any{
+					"apiVersion": opsv1alpha1.GroupVersion.String(),
+					"kind":       "OpsRequest",
+					"spec": map[string]any{
+						"clusterName":  cluster.Name,
+						"type":         string(opsv1alpha1.ReconfiguringType),
+						"reconfigures": []any{reconfigure},
+					},
+				}}
+				request.SetNamespace(cluster.Namespace)
+				request.SetName(name)
+				Expect(k8sClient.Create(ctx, request)).To(Succeed())
+				key := client.ObjectKeyFromObject(request)
+				DeferCleanup(func() {
+					fetched := &opsv1alpha1.OpsRequest{}
+					Expect(k8sClient.Get(ctx, key, fetched)).To(Succeed())
+					fetched.Finalizers = nil
+					Expect(k8sClient.Update(ctx, fetched)).To(Succeed())
+					Expect(k8sClient.Delete(ctx, fetched)).To(Succeed())
+				})
+				return key
+			}
+			advance := func(key client.ObjectKey, phase opsv1alpha1.OpsPhase) {
+				GinkgoHelper()
+				Eventually(func(g Gomega) {
+					_, err := reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: key})
+					g.Expect(err).NotTo(HaveOccurred())
+					request := &opsv1alpha1.OpsRequest{}
+					g.Expect(k8sClient.Get(ctx, key, request)).To(Succeed())
+					g.Expect(request.Status.Phase).To(Equal(phase), "conditions: %v", request.Status.Conditions)
+				}).Should(Succeed())
+			}
+			waitForValues := func(expected map[string]any) string {
+				GinkgoHelper()
+				var hash *string
+				Eventually(testapps.CheckObj(&testCtx, configKey, func(g Gomega, cm *corev1.ConfigMap) {
+					config, err := unstructured.LoadConfig(testparameters.MysqlConfigFile, cm.Data[testparameters.MysqlConfigFile], parametersv1alpha1.Ini)
+					g.Expect(err).NotTo(HaveOccurred())
+					for key, value := range expected {
+						if value == nil {
+							g.Expect(config.Get("mysqld."+key)).To(BeNil(), "parameter %s", key)
+						} else {
+							g.Expect(config.Get("mysqld."+key)).To(Equal(value), "parameter %s", key)
+						}
+					}
+					hash = computeTargetConfigHash(nil, cm.Data)
+					g.Expect(hash).NotTo(BeNil())
+				})).Should(Succeed())
+				return *hash
+			}
+			apply := func(name, changes string, expected map[string]any) {
+				GinkgoHelper()
+				key := newRequest(name, changes)
+				advance(key, opsv1alpha1.OpsRunningPhase)
+				hash := waitForValues(expected)
+				advance(key, opsv1alpha1.OpsRunningPhase)
+				mockReconfigureDone(its.Namespace, its.Name, configSpecName, hash)
+				advance(key, opsv1alpha1.OpsSucceedPhase)
+			}
+			baseline := waitForValues(map[string]any{"gtid_mode": "ON", "general_log": "0", "report_host": nil})
+			mockReconfigureDone(its.Namespace, its.Name, configSpecName, baseline)
+			Eventually(testapps.CheckObj(&testCtx, parameterKey, func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+				g.Expect(cp.Status.Phase).To(Equal(parametersv1alpha1.CFinishedPhase))
+			})).Should(Succeed())
+
+			By("setting values, including an empty string")
+			apply("set-parameters", `{"parameters":[{"key":"gtid_mode","value":"OFF"},{"key":"general_log","value":"1"},{"key":"report_host","value":""}]}`,
+				map[string]any{"gtid_mode": "OFF", "general_log": "1", "report_host": ""})
+
+			By("removing a key with an updates-only request")
+			apply("remove-parameter", `{"updates":[{"type":"Remove","key":"general_log"}]}`,
+				map[string]any{"gtid_mode": "OFF", "general_log": nil, "report_host": ""})
+
+			By("resetting to Initial and template values with null and omitted values")
+			apply("reset-parameters", `{"parameters":[{"key":"gtid_mode","value":null},{"key":"general_log"}]}`,
+				map[string]any{"gtid_mode": "ON", "general_log": "0", "report_host": ""})
+
+			By("mixing Reset, Set and Remove and using the last explicit update")
+			apply("mixed-parameters", `{"parameters":[{"key":"report_host"},{"key":"gtid_mode"}],"updates":[{"type":"Remove","key":"gtid_mode"},{"type":"Set","key":"gtid_mode","value":"OFF"},{"type":"Remove","key":"slow_query_log"}]}`,
+				map[string]any{"gtid_mode": "OFF", "report_host": nil, "slow_query_log": nil, "general_log": "0"})
+
+			By("succeeding without rewriting Desired when the reset parameter is already at its default")
+			before := &parametersv1alpha1.ComponentParameter{}
+			Expect(k8sClient.Get(ctx, parameterKey, before)).To(Succeed())
+			key := newRequest("repeat-reset", `{"parameters":[{"key":"report_host","value":null}]}`)
+			advance(key, opsv1alpha1.OpsSucceedPhase)
+
+			By("rejecting Set without a value before applying other parameters in the request")
+			key = newRequest("invalid-set", `{"parameters":[{"key":"gtid_mode"}],"updates":[{"type":"Set","key":"general_log"}]}`)
+			advance(key, opsv1alpha1.OpsFailedPhase)
+			after := &parametersv1alpha1.ComponentParameter{}
+			Expect(k8sClient.Get(ctx, parameterKey, after)).To(Succeed())
+			Expect(after.Spec.Desired).To(Equal(before.Spec.Desired))
+			Expect(after.Generation).To(Equal(before.Generation))
+			waitForValues(map[string]any{"gtid_mode": "OFF", "report_host": nil, "slow_query_log": nil, "general_log": "0"})
+		})
 
 		It("should let explicit desired remove override assignments", func() {
 			_, _, comp, _, _ := mockReconcileResource()

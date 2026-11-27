@@ -2353,7 +2353,8 @@ var _ = Describe("ParameterView Controller", func() {
 		}
 		request.Spec.Reconfigures = []opsv1alpha1.Reconfigure{{
 			ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
-			Parameters:   []opsv1alpha1.ParameterPair{{Key: "hosts"}, {Key: "mode", Value: ptr.To("8")}},
+			Parameters:   []opsv1alpha1.ParameterPair{{Key: "mode", Value: ptr.To("8")}},
+			Updates:      []parametersv1alpha1.ParameterUpdate{{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "hosts"}},
 		}}
 		Expect(opsClient.Create(ctx, request)).To(Succeed())
 		DeferCleanup(func() { Expect(opsClient.Delete(ctx, request)).To(Succeed()) })

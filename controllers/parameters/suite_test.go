@@ -41,6 +41,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -90,6 +91,7 @@ var _ = BeforeSuite(func() {
 
 	err = parametersv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
+	Expect(opsv1alpha1.AddToScheme(scheme.Scheme)).To(Succeed())
 	model.AddScheme(parametersv1alpha1.AddToScheme)
 	err = appsv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())

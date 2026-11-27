@@ -34,15 +34,22 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/parameters/openapi"
 )
 
-func MergeManagedParameterInputs(inputs *parametersv1alpha1.ParameterInputs, patch map[string]*string) *parametersv1alpha1.ParameterInputs {
+func MergeManagedParameterInputs(inputs *parametersv1alpha1.ParameterInputs, patch map[string]*string, resetKeys ...string) *parametersv1alpha1.ParameterInputs {
+	if inputs == nil && len(resetKeys) > 0 && len(patch) == 0 {
+		return nil
+	}
 	merged := inputs.DeepCopy()
 	if merged == nil {
 		merged = &parametersv1alpha1.ParameterInputs{}
 	}
 	keys := make([]string, 0, len(patch))
-	updatedFields := make(map[string]struct{}, len(patch))
+	updatedFields := make(map[string]struct{}, len(patch)+len(resetKeys))
 	for key := range patch {
 		keys = append(keys, key)
+		updatedFields[parameterscore.GetValidFieldName(key)] = struct{}{}
+		parameterscore.DeleteParameterField(merged.Assignments, key)
+	}
+	for _, key := range resetKeys {
 		updatedFields[parameterscore.GetValidFieldName(key)] = struct{}{}
 		parameterscore.DeleteParameterField(merged.Assignments, key)
 	}

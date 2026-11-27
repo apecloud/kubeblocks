@@ -77,7 +77,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 				return err
 			}
 			graphCli.Create(dag, protoITS)
-			return nil
+			dependOnInstanceConfigMaps(graphCli, dag, protoITS)
 		}
 	} else {
 		if protoITS == nil {
@@ -86,7 +86,10 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 			err = t.handleUpdate(transCtx, graphCli, dag, synthesizeComp, comp, runningITS, protoITS)
 		}
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	return collectInstanceConfigMaps(transCtx, t.Client, protoITS)
 }
 
 func (t *componentWorkloadTransformer) reconcileWorkload(ctx context.Context, cli client.Reader,
@@ -167,17 +170,43 @@ func (t *componentWorkloadTransformer) handleUpdate(transCtx *componentTransform
 	if err != nil {
 		return err
 	}
-	if objCopy != nil {
-		cli.Update(dag, nil, objCopy, &model.ReplaceIfExistingOption{})
-		// make sure the workload is updated after the env CM
-		cli.DependOn(dag, &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: synthesizedComp.Namespace,
-				Name:      constant.GenerateClusterComponentEnvPattern(synthesizedComp.ClusterName, synthesizedComp.Name),
-			},
-		})
+	if objCopy == nil {
+		return nil
 	}
+	cli.Update(dag, nil, objCopy, &model.ReplaceIfExistingOption{})
+	dependOnInstanceConfigMaps(cli, dag, objCopy)
+	// make sure the workload is updated after the env CM
+	cli.DependOn(dag, &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: synthesizedComp.Namespace,
+			Name:      constant.GenerateClusterComponentEnvPattern(synthesizedComp.ClusterName, synthesizedComp.Name),
+		},
+	})
 	return nil
+}
+
+func dependOnInstanceConfigMaps(cli model.GraphClient, dag *graph.DAG, its *workloads.InstanceSet) {
+	referenced := boundConfigMapNames(its)
+	for name := range referenced {
+		cli.DependOn(dag, its, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: its.Namespace, Name: name}})
+	}
+}
+
+func boundConfigMapNames(its *workloads.InstanceSet) sets.Set[string] {
+	names := sets.New[string]()
+	volumes := sets.New[string]()
+	for _, config := range its.Spec.Configs {
+		if config.Volume != nil {
+			volumes.Insert(config.Volume.VolumeName)
+		}
+	}
+	for _, volume := range its.Spec.Template.Spec.Volumes {
+		if volume.ConfigMap != nil && volume.ConfigMap.Name != "" && volumes.Has(volume.Name) {
+			names.Insert(volume.ConfigMap.Name)
+		}
+	}
+	retainInstanceTemplateConfigMaps(names, its.Spec.Instances)
+	return names
 }
 
 func (t *componentWorkloadTransformer) handleWorkloadStartNStop(transCtx *componentTransformContext, synthesizedComp *component.SynthesizedComponent,
@@ -340,6 +369,11 @@ func preserveLegacyConfigManagerPodSpec(oldITS, desiredITS, mergedITS *workloads
 	}
 
 	volumeNames := collectVolumeNamesFromContainers(oldCfg, oldInit)
+	for _, config := range desiredITS.Spec.Configs {
+		if config.Volume != nil {
+			delete(volumeNames, config.Volume.VolumeName)
+		}
+	}
 	newSpec.Volumes = preserveLegacyVolumeOrder(oldSpec.Volumes, newSpec.Volumes, volumeNames)
 	if _, ok := volumeNames[legacyConfigManagerToolsVolumeName]; ok {
 		mergeVolumeMountsByVolumeName(oldSpec.Containers, &newSpec.Containers, legacyConfigManagerToolsVolumeName)

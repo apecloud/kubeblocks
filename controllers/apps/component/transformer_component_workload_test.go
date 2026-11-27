@@ -18,24 +18,36 @@ package component
 import (
 	"context"
 	"errors"
+	"reflect"
+	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"github.com/golang/mock/gomock"
+	k8sappsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
+	workloadctrl "github.com/apecloud/kubeblocks/controllers/workloads"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
@@ -43,6 +55,363 @@ import (
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
+
+func instanceConfigFixture(t *testing.T) (*appsv1.Component, *component.SynthesizedComponent, *runtime.Scheme) {
+	t.Helper()
+	scheme := runtime.NewScheme()
+	for _, add := range []func(*runtime.Scheme) error{corev1.AddToScheme, appsv1.AddToScheme, workloads.AddToScheme} {
+		if err := add(scheme); err != nil {
+			t.Fatal(err)
+		}
+	}
+	comp := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{Name: "db-mysql", Namespace: "default", UID: types.UID("current-component"), Labels: constant.GetCompLabels("db", "mysql")}}
+	synth := &component.SynthesizedComponent{
+		Namespace: comp.Namespace, ClusterName: "db", Name: "mysql", FullCompName: comp.Name, Generation: "2", Replicas: 1,
+		PodSpec:          &corev1.PodSpec{Containers: []corev1.Container{{Name: "db", Image: "db:old"}}, Volumes: []corev1.Volume{{Name: "config", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "default-config"}}}}}},
+		Configs:          []workloads.ConfigTemplate{{Name: "main", ConfigHash: ptr.To("default-hash"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config"}}},
+		LifecycleActions: component.SynthesizedLifecycleActions{ComponentLifecycleActions: &appsv1.ComponentLifecycleActions{}},
+	}
+	return comp, synth, scheme
+}
+
+func managedInstanceConfig(comp *appsv1.Component, name string) *corev1.ConfigMap {
+	labels := constant.GetCompLabels("db", "mysql")
+	labels[instanceConfigMapLabelKey] = "true"
+	return &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: comp.Namespace, UID: types.UID(name + "-uid"), Labels: labels,
+		OwnerReferences: []metav1.OwnerReference{{APIVersion: appsv1.GroupVersion.String(), Kind: "Component", Name: comp.Name, UID: comp.UID, Controller: ptr.To(true)}}}, Data: map[string]string{"config": "value"}}
+}
+
+func workloadConfigPlan(t *testing.T, cli client.Client, comp *appsv1.Component, synth *component.SynthesizedComponent, running *workloads.InstanceSet, maps ...*corev1.ConfigMap) (*componentPlan, error) {
+	t.Helper()
+	graphCli := model.NewGraphClient(cli)
+	dag := graph.NewDAG()
+	graphCli.Root(dag, comp, comp, model.ActionStatusPtr())
+	transCtx := &componentTransformContext{Context: context.Background(), Client: graphCli, Component: comp, ComponentOrig: comp.DeepCopy(), CompDef: &appsv1.ComponentDefinition{}, SynthesizeComponent: synth, RunningWorkload: running}
+	for _, cm := range maps {
+		old := &corev1.ConfigMap{}
+		if err := cli.Get(transCtx.Context, client.ObjectKeyFromObject(cm), old); apierrors.IsNotFound(err) {
+			graphCli.Create(dag, cm)
+		} else if err != nil {
+			t.Fatal(err)
+		} else if !reflect.DeepEqual(old.Data, cm.Data) || !reflect.DeepEqual(old.Annotations, cm.Annotations) {
+			updated := old.DeepCopy()
+			updated.Data = cm.Data
+			updated.Annotations = cm.Annotations
+			graphCli.Update(dag, old, updated)
+		}
+	}
+	builder := &componentPlanBuilder{cli: cli, transCtx: transCtx}
+	plan := &componentPlan{dag: dag, transCtx: transCtx, walkFunc: func(v graph.Vertex) error {
+		if _, ok := v.(*model.ObjectVertex).Obj.(*appsv1.Component); ok {
+			return nil
+		}
+		return builder.defaultWalkFunc(v)
+	}}
+	err := (&componentWorkloadTransformer{Client: cli}).Transform(transCtx, dag)
+	return plan, err
+}
+
+func TestInstanceConfigPublicationPrecedesWorkload(t *testing.T) {
+	for _, update := range []bool{false, true} {
+		t.Run(map[bool]string{false: "create", true: "update"}[update], func(t *testing.T) {
+			comp, synth, scheme := instanceConfigFixture(t)
+			synth.Instances = []appsv1.InstanceTemplate{{Name: "canary", Replicas: ptr.To(int32(1))}}
+			synth.InstanceConfigs = map[string][]workloads.ConfigTemplate{"canary": {{Name: "main", ConfigHash: ptr.To("special-hash"), Volume: &workloads.ConfigVolumeBinding{VolumeName: "config", ConfigMapName: "special"}}}}
+			cm := managedInstanceConfig(comp, "special")
+			var running *workloads.InstanceSet
+			var objects []client.Object
+			if update {
+				var err error
+				running, err = component.BuildInstanceSet(synth, &appsv1.ComponentDefinition{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				running = running.DeepCopy()
+				running.Spec.Instances[0].Configs = nil
+				objects = append(objects, running)
+			}
+			failMap := true
+			workloadWrites := 0
+			base := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
+			cli := interceptor.NewClient(base, interceptor.Funcs{
+				Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+					if _, ok := obj.(*corev1.ConfigMap); ok && failMap {
+						return errors.New("config persistence failed")
+					}
+					if _, ok := obj.(*workloads.InstanceSet); ok {
+						workloadWrites++
+						if err := c.Get(ctx, client.ObjectKeyFromObject(cm), &corev1.ConfigMap{}); err != nil {
+							t.Fatal("workload published before config")
+						}
+					}
+					return c.Create(ctx, obj, opts...)
+				},
+				Update: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
+					if _, ok := obj.(*workloads.InstanceSet); ok {
+						workloadWrites++
+						if err := c.Get(ctx, client.ObjectKeyFromObject(cm), &corev1.ConfigMap{}); err != nil {
+							t.Fatal("workload published before config")
+						}
+					}
+					return c.Update(ctx, obj, opts...)
+				},
+			})
+			plan, err := workloadConfigPlan(t, cli, comp, synth, running, cm)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := plan.Execute(); err == nil {
+				t.Fatal("expected CM failure")
+			}
+			if workloadWrites != 0 {
+				t.Fatal("workload written despite prerequisite failure")
+			}
+			failMap = false
+			if err := plan.Execute(); err != nil {
+				t.Fatal(err)
+			}
+			its := &workloads.InstanceSet{}
+			if err := cli.Get(context.Background(), client.ObjectKey{Namespace: comp.Namespace, Name: comp.Name}, its); err != nil {
+				t.Fatal(err)
+			}
+			configs := its.Spec.Instances[0].Configs
+			if len(configs) != 1 || configs[0].Volume == nil || configs[0].Volume.ConfigMapName != "special" ||
+				ptr.Deref(configs[0].ConfigHash, "") != "special-hash" {
+				t.Fatalf("workload did not publish the desired config: %v", configs)
+			}
+		})
+	}
+}
+
+func TestInstanceConfigStopFreezesPublishedConfig(t *testing.T) {
+	comp, synth, scheme := instanceConfigFixture(t)
+	running, err := component.BuildInstanceSet(synth, &appsv1.ComponentDefinition{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	running = running.DeepCopy()
+	synth.Stop = ptr.To(true)
+	synth.Configs[0].ConfigHash = ptr.To("deferred-hash")
+	synth.PodSpec.Volumes[0].ConfigMap.Name = "deferred-map"
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(running).Build()
+	plan, err := workloadConfigPlan(t, cli, comp, synth, running)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := plan.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	current := &workloads.InstanceSet{}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(running), current); err != nil {
+		t.Fatal(err)
+	}
+	if !ptr.Deref(current.Spec.Stop, false) || current.Spec.Template.Spec.Volumes[0].ConfigMap.Name != "default-config" || *current.Spec.Configs[0].ConfigHash != "default-hash" {
+		t.Fatal("Stop did not preserve published config")
+	}
+}
+
+func TestStartKeepsPublishedConfigsUntilNormalUpdate(t *testing.T) {
+	model.AddScheme(workloads.AddToScheme)
+	for _, viaInstance := range []bool{false, true} {
+		t.Run(map[bool]string{false: "direct Pod", true: "Instance"}[viaInstance], func(t *testing.T) {
+			for _, specialized := range []bool{false, true} {
+				t.Run(map[bool]string{false: "shared config update", true: "specialized config update"}[specialized], func(t *testing.T) {
+					ctx := context.Background()
+					comp, synth, scheme := instanceConfigFixture(t)
+					if err := clientgoscheme.AddToScheme(scheme); err != nil {
+						t.Fatal(err)
+					}
+					synth.EnableInstanceAPI = ptr.To(viaInstance)
+					synth.PodManagementPolicy = ptr.To(k8sappsv1.ParallelPodManagement)
+					synth.PodSpec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: "config", MountPath: "/etc/db"}}
+					synth.PodSpec.Containers[0].Resources.Requests = corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")}
+					if specialized {
+						synth.Replicas = 3
+						synth.Instances = []appsv1.InstanceTemplate{
+							{Name: "canary", Resources: &corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("8Gi")}}},
+							{Name: "other", Resources: &corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("3")}}},
+						}
+					}
+					running, err := component.BuildInstanceSet(synth, &appsv1.ComponentDefinition{})
+					if err != nil {
+						t.Fatal(err)
+					}
+					running = running.DeepCopy()
+					running.UID = "running-its"
+					running.Spec.Stop = ptr.To(true)
+					synth.PodSpec.Containers[0].Resources.Requests = corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")}
+					shared := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "default-config", Namespace: comp.Namespace}, Data: map[string]string{"server.conf": "shared"}}
+					previousShared := shared.DeepCopy()
+					maps := []*corev1.ConfigMap{shared}
+					if specialized {
+						synth.Instances[0].Resources.Requests[corev1.ResourceMemory] = resource.MustParse("12Gi")
+						synth.Instances[0].Env = []corev1.EnvVar{{Name: "PENDING_ENV", Value: "deferred"}}
+						synth.Instances[1].Resources.Requests[corev1.ResourceCPU] = resource.MustParse("4")
+						synth.InstanceConfigs = map[string][]workloads.ConfigTemplate{"canary": {{
+							Name: "main", ConfigHash: ptr.To("specialized-hash"), Volume: &workloads.ConfigVolumeBinding{ConfigMapName: "specialized-config"},
+						}}}
+						cm := managedInstanceConfig(comp, "specialized-config")
+						cm.Data["server.conf"] = "cpu=2 memory=12Gi"
+						maps = append(maps, cm)
+					} else {
+						synth.Configs[0].ConfigHash = ptr.To("new-shared-hash")
+						shared.Data["server.conf"] = "updated shared config"
+					}
+					cli := fake.NewClientBuilder().WithScheme(scheme).
+						WithStatusSubresource(&workloads.InstanceSet{}, &workloads.Instance{}, &corev1.Pod{}).
+						WithObjects(running, previousShared).Build()
+					plan, err := workloadConfigPlan(t, cli, comp, synth, running, maps...)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if err := plan.Execute(); err != nil {
+						t.Fatal(err)
+					}
+					starting := &workloads.InstanceSet{}
+					key := client.ObjectKeyFromObject(running)
+					if err := cli.Get(ctx, key, starting); err != nil {
+						t.Fatal(err)
+					}
+					wantSpec := running.Spec.DeepCopy()
+					wantSpec.Stop = nil
+					if !reflect.DeepEqual(&starting.Spec, wantSpec) {
+						t.Error("Start changed the published workload beyond clearing Stop")
+					}
+					recorder := record.NewFakeRecorder(100)
+					for range 6 {
+						if viaInstance {
+							if _, err := (&workloadctrl.InstanceSetReconciler2{Client: cli, Scheme: scheme, Recorder: recorder}).Reconcile(ctx, ctrl.Request{NamespacedName: key}); err != nil {
+								t.Fatal(err)
+							}
+							children := &workloads.InstanceList{}
+							if err := cli.List(ctx, children); err != nil {
+								t.Fatal(err)
+							}
+							for _, child := range children.Items {
+								if _, err := (&workloadctrl.InstanceReconciler{Client: cli, Scheme: scheme, Recorder: recorder}).Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(&child)}); err != nil {
+									t.Fatal(err)
+								}
+							}
+						} else if _, err := (&workloadctrl.InstanceSetReconciler{Client: cli, Scheme: scheme, Recorder: recorder}).Reconcile(ctx, ctrl.Request{NamespacedName: key}); err != nil {
+							t.Fatal(err)
+						}
+					}
+					checkPod := func(name, cpu, memory, configMap, configContents string) {
+						t.Helper()
+						pod := &corev1.Pod{}
+						if err := cli.Get(ctx, client.ObjectKey{Namespace: comp.Namespace, Name: running.Name + name}, pod); err != nil {
+							t.Fatal(err)
+						}
+						container := pod.Spec.Containers[0]
+						if container.Resources.Requests.Cpu().String() != cpu ||
+							(memory != "" && container.Resources.Requests.Memory().String() != memory) ||
+							len(container.Env) != 0 || container.VolumeMounts[0].MountPath != "/etc/db" {
+							t.Errorf("unexpected config runtime for %s: %+v", pod.Name, container)
+						}
+						for _, volume := range pod.Spec.Volumes {
+							if volume.Name != "config" {
+								continue
+							}
+							if volume.ConfigMap == nil || volume.ConfigMap.Name != configMap {
+								t.Fatalf("%s mounts the wrong configuration: %+v", pod.Name, volume)
+							}
+							cm := &corev1.ConfigMap{}
+							if err := cli.Get(ctx, client.ObjectKey{Namespace: pod.Namespace, Name: configMap}, cm); err != nil || cm.Data["server.conf"] != configContents {
+								t.Fatalf("%s did not mount the expected config contents: %v, %v", pod.Name, cm.Data, err)
+							}
+							return
+						}
+						t.Fatalf("%s has no config volume", pod.Name)
+					}
+					checkPod("-0", "1", "", "default-config", shared.Data["server.conf"])
+					if specialized {
+						checkPod("-canary-0", "1", "8Gi", "default-config", shared.Data["server.conf"])
+						checkPod("-other-0", "3", "", "default-config", "shared")
+					}
+
+					if err := cli.Get(ctx, key, starting); err != nil {
+						t.Fatal(err)
+					}
+					plan, err = workloadConfigPlan(t, cli, comp, synth, starting, maps...)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if err := plan.Execute(); err != nil {
+						t.Fatal(err)
+					}
+					updated := &workloads.InstanceSet{}
+					if err := cli.Get(ctx, key, updated); err != nil {
+						t.Fatal(err)
+					}
+					if updated.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().String() != "2" ||
+						!ptr.Equal(updated.Spec.Configs[0].ConfigHash, synth.Configs[0].ConfigHash) {
+						t.Error("normal reconciliation did not apply the deferred shared changes")
+					}
+					if specialized {
+						configs := updated.Spec.Instances[0].Configs
+						if len(configs) != 1 || configs[0].Volume == nil || configs[0].Volume.ConfigMapName != "specialized-config" ||
+							len(updated.Spec.Instances[0].Env) != 1 || updated.Spec.Instances[1].Resources.Requests.Cpu().String() != "4" {
+							t.Error("normal reconciliation did not apply the deferred template changes")
+						}
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestManagedConfigurationUpdateWithLegacyConfigManager(t *testing.T) {
+	for _, enableInstanceAPI := range []bool{false, true} {
+		t.Run(map[bool]string{false: "direct Pod", true: "Instance"}[enableInstanceAPI], func(t *testing.T) {
+			comp, synth, scheme := instanceConfigFixture(t)
+			synth.EnableInstanceAPI = ptr.To(enableInstanceAPI)
+			mount := corev1.VolumeMount{Name: "config", MountPath: "/opt/db"}
+			synth.PodSpec.Containers[0].VolumeMounts = []corev1.VolumeMount{mount}
+			running, err := component.BuildInstanceSet(synth, &appsv1.ComponentDefinition{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			running = running.DeepCopy()
+			running.Spec.Configs = []workloads.ConfigTemplate{{Name: "old-config"}}
+			running.Spec.Template.Spec.Volumes[0].ConfigMap.Name = "old-config"
+			running.Spec.Template.Spec.Volumes = append(running.Spec.Template.Spec.Volumes, corev1.Volume{
+				Name: "legacy-scripts", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "legacy-scripts"},
+				}},
+			})
+			running.Spec.Template.Spec.Containers = append(running.Spec.Template.Spec.Containers, corev1.Container{
+				Name: "config-manager", Image: "kb:old", VolumeMounts: []corev1.VolumeMount{
+					mount, {Name: "legacy-scripts", MountPath: "/opt/scripts"},
+				},
+			})
+
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(running).Build()
+			plan, err := workloadConfigPlan(t, cli, comp, synth, running)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = plan.Execute(); err != nil {
+				t.Fatal(err)
+			}
+			current := &workloads.InstanceSet{}
+			if err = cli.Get(context.Background(), client.ObjectKeyFromObject(running), current); err != nil {
+				t.Fatal(err)
+			}
+			if _, err = instancetemplate.BuildInstanceTemplateExtMap(current, nil); err != nil {
+				t.Fatalf("update published invalid managed config bindings: %v", err)
+			}
+			_, sidecar := intctrlutil.GetContainerByName(current.Spec.Template.Spec.Containers, "config-manager")
+			if sidecar == nil {
+				t.Fatal("config update removed the legacy sidecar")
+			}
+			volumes := current.Spec.Template.Spec.Volumes
+			if len(volumes) != 2 || volumes[0].ConfigMap == nil || volumes[0].ConfigMap.Name != "default-config" ||
+				volumes[1].Name != "legacy-scripts" || volumes[1].ConfigMap == nil || volumes[1].ConfigMap.Name != "legacy-scripts" {
+				t.Fatalf("config update did not switch the managed volume and preserve the legacy-only volume: %#v", volumes)
+			}
+		})
+	}
+}
 
 var _ = Describe("Component Workload Operations Test", func() {
 	const (

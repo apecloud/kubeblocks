@@ -2701,6 +2701,97 @@ var _ = Describe("Component Controller", func() {
 			Entry("Instance API", true),
 		)
 
+		It("publishes and retires a specialized InstanceTemplate configuration", func() {
+			createCompObj(defaultCompName, compDefObj.Name, func(f *testapps.MockComponentFactory) {
+				f.SetReplicas(2).AddInstances(kbappsv1.InstanceTemplate{
+					Name: "canary",
+					Configs: []kbappsv1.ClusterComponentConfig{{
+						Name:      ptr.To(fileTemplate),
+						Variables: map[string]string{"LOG_LEVEL": "debug"},
+					}},
+				})
+			})
+
+			var specialKey client.ObjectKey
+			var firstHash string
+			baseKey := client.ObjectKey{Namespace: compKey.Namespace, Name: compKey.Name + "-" + fileTemplate}
+			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, its *workloads.InstanceSet) {
+				templates, err := instancetemplate.BuildInstanceTemplateExtMap(its, nil)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(templates).To(HaveLen(2))
+				for _, tmpl := range templates {
+					g.Expect(tmpl.Configs).To(HaveLen(1))
+					config := tmpl.Configs[0]
+					g.Expect(config.Volume).NotTo(BeNil())
+					if tmpl.Name == "canary" {
+						g.Expect(config.Volume.ConfigMapName).NotTo(Equal(baseKey.Name))
+						specialKey = client.ObjectKey{Namespace: its.Namespace, Name: config.Volume.ConfigMapName}
+						firstHash = ptr.Deref(config.ConfigHash, "")
+					} else {
+						g.Expect(config.Volume.ConfigMapName).To(Equal(baseKey.Name))
+					}
+				}
+				g.Expect(specialKey.Name).NotTo(BeEmpty())
+				g.Expect(firstHash).NotTo(BeEmpty())
+			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, baseKey, func(g Gomega, cm *corev1.ConfigMap) {
+				g.Expect(cm.Data).To(HaveKeyWithValue("level", "info"))
+			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, specialKey, func(g Gomega, cm *corev1.ConfigMap) {
+				g.Expect(cm.Data).To(HaveKeyWithValue("level", "debug"))
+				owner := metav1.GetControllerOf(cm)
+				g.Expect(owner).NotTo(BeNil())
+				g.Expect(owner.UID).To(Equal(compObj.UID))
+			})).Should(Succeed())
+
+			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+				comp.Spec.Stop = ptr.To(true)
+			})()).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(ptr.Deref(its.Spec.Stop, false)).To(BeTrue())
+			})).Should(Succeed())
+			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+				comp.Spec.Instances[0].Configs[0].Variables["LOG_LEVEL"] = "trace"
+				comp.Spec.Stop = nil
+			})()).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(ptr.Deref(its.Spec.Stop, false)).To(BeFalse())
+				g.Expect(its.Spec.Instances[0].Configs).To(HaveLen(1))
+				config := its.Spec.Instances[0].Configs[0]
+				g.Expect(config.Volume.ConfigMapName).To(Equal(specialKey.Name))
+				g.Expect(ptr.Deref(config.ConfigHash, "")).NotTo(BeElementOf("", firstHash))
+				g.Expect(config.Parameters).To(HaveKeyWithValue("LOG_LEVEL", "trace"))
+			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, specialKey, func(g Gomega, cm *corev1.ConfigMap) {
+				g.Expect(cm.Data).To(HaveKeyWithValue("level", "trace"))
+			})).Should(Succeed())
+
+			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+				comp.Spec.Instances[0].Configs = nil
+			})()).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Spec.Instances[0].Configs).To(BeEmpty())
+				templates, err := instancetemplate.BuildInstanceTemplateExtMap(its, nil)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(templates).To(HaveLen(2))
+				for _, tmpl := range templates {
+					g.Expect(tmpl.Configs[0].Volume.ConfigMapName).To(Equal(baseKey.Name))
+				}
+			})).Should(Succeed())
+			// This suite runs the Component controller. Acknowledge the new
+			// InstanceSet generation as its controller would in the absence of Pods.
+			Eventually(func() error {
+				its := &workloads.InstanceSet{}
+				if err := testCtx.Cli.Get(testCtx.Ctx, compKey, its); err != nil {
+					return err
+				}
+				its.Status.ObservedGeneration = its.Generation
+				return testCtx.Cli.Status().Update(testCtx.Ctx, its)
+			}).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, specialKey, &corev1.ConfigMap{}, false), 8*time.Second).Should(Succeed())
+			Expect(testCtx.Cli.Get(testCtx.Ctx, baseKey, &corev1.ConfigMap{})).Should(Succeed())
+		})
+
 		It("reconfigure - action udf", func() {
 			testReconfigureActionUDF(defaultCompName, compDefObj.Name, fileTemplate)
 		})

@@ -148,7 +148,7 @@ ParameterInputs
 <td>
 <em>(Optional)</em>
 <p>Desired provides the current desired parameter inputs.</p>
-<p>A parameter absent from both assignments and updates falls back to the rendered template with its Initial inputs applied.</p>
+<p>To restore a parameter&rsquo;s initial setting or template default, remove its assignment and any updates for that parameter from Desired.</p>
 </td>
 </tr>
 </tbody>
@@ -1082,7 +1082,7 @@ ParameterInputs
 <td>
 <em>(Optional)</em>
 <p>Desired provides the current desired parameter inputs.</p>
-<p>A parameter absent from both assignments and updates falls back to the rendered template with its Initial inputs applied.</p>
+<p>To restore a parameter&rsquo;s initial setting or template default, remove its assignment and any updates for that parameter from Desired.</p>
 </td>
 </tr>
 </tbody>
@@ -1967,8 +1967,8 @@ map[string]*string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Assignments are flat managed parameter key/value assignments.</p>
-<p>Entries with a null value are treated as absent from this map, so other parameter inputs and the rendered template still apply.</p>
+<p>Specifies the values to set for the component&rsquo;s parameters.</p>
+<p>A null value lets the parameter use its default when there is no explicit update for it.</p>
 </td>
 </tr>
 <tr>
@@ -1982,8 +1982,9 @@ map[string]*string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Updates is the advanced path for schema-managed parameter changes with explicit update semantics.</p>
-<p>Updates are applied in list order and override assignments for the same parameter.</p>
+<p>Lists the parameters to set or remove.</p>
+<p>If a parameter has both an assignment and an update, the update takes precedence.
+If it has multiple updates, the last one takes precedence.</p>
 </td>
 </tr>
 <tr>

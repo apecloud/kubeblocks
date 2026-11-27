@@ -356,12 +356,13 @@ func TestReconfigurePersistsSetRemoveAndReset(t *testing.T) {
 			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cp).Build()
 			cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster", Namespace: "default"}}
 			action := &reconfigureAction{}
-			changes, err := resolveReconfigureChanges(opsv1alpha1.Reconfigure{Parameters: tt.pairs, Updates: tt.updates})
-			if err != nil {
+			reconfigure := opsv1alpha1.Reconfigure{Parameters: tt.pairs, Updates: tt.updates}
+			if err := validateReconfigure(reconfigure); err != nil {
 				t.Fatal(err)
 			}
+			assignments, resetKeys := reconfigureParameterInputs(reconfigure)
 			for range 2 {
-				if err := action.applyReconfigureToParameters(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, cluster, "component", changes); err != nil {
+				if err := action.applyReconfigureToParameters(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, cluster, "component", assignments, resetKeys); err != nil {
 					t.Fatal(err)
 				}
 				if err := cli.Get(context.Background(), client.ObjectKeyFromObject(cp), cp); err != nil {

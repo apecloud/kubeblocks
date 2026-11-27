@@ -3290,8 +3290,8 @@ string
 <td>
 <em>(Optional)</em>
 <p>Specifies the parameter value to set.
-A null or omitted value withdraws the parameter&rsquo;s Desired assignment and updates.
-The parameter then uses the template value with any Initial override applied.</p>
+A null or omitted value restores the parameter&rsquo;s initial setting.
+If no initial setting applies, it restores the template default.</p>
 </td>
 </tr>
 </tbody>
@@ -3907,8 +3907,8 @@ ComponentOps
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies parameter assignments and resets for the Component.
-A null or omitted value resets that parameter to its Initial or template value.</p>
+<p>Sets or resets the named parameters for the component.
+Use a null or omitted value to reset a parameter.</p>
 </td>
 </tr>
 <tr>
@@ -3922,8 +3922,9 @@ A null or omitted value resets that parameter to its Initial or template value.<
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies explicit Set and Remove operations for the Component&rsquo;s parameters.
-Updates are applied in list order and take precedence over Parameters for the same key.</p>
+<p>Lists the parameters to set or remove.
+If a parameter also appears in <code>parameters</code>, the update takes precedence.
+If it has multiple updates, the last one takes precedence.</p>
 </td>
 </tr>
 </tbody>

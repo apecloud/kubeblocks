@@ -86,21 +86,19 @@ func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Cli
 		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, `invalid reconfigure request: %s`, resource.OpsRequest.GetName())
 	}
 	reconfigures := resource.OpsRequest.Spec.Reconfigures
-	changes := make([]reconfigureChanges, len(reconfigures))
-	for i, reconfigure := range reconfigures {
-		resolved, err := resolveReconfigureChanges(reconfigure)
-		if err != nil {
+	for _, reconfigure := range reconfigures {
+		if err := validateReconfigure(reconfigure); err != nil {
 			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "invalid reconfigure request for component %s: %v", reconfigure.ComponentName, err)
 		}
-		changes[i] = resolved
 	}
-	for i, reconfigure := range reconfigures {
+	for _, reconfigure := range reconfigures {
 		compNames, err := r.resolveReconfigureComponents(reqCtx.Ctx, cli, resource.Cluster, reconfigure.ComponentName)
 		if err != nil {
 			return err
 		}
+		assignments, resetKeys := reconfigureParameterInputs(reconfigure)
 		for _, compName := range compNames {
-			if err := r.applyReconfigureToParameters(reqCtx, cli, resource.Cluster, compName, changes[i]); err != nil {
+			if err := r.applyReconfigureToParameters(reqCtx, cli, resource.Cluster, compName, assignments, resetKeys); err != nil {
 				return err
 			}
 		}
@@ -142,61 +140,64 @@ func (r *reconfigureAction) aggregatePhase(reqCtx intctrlutil.RequestCtx, cli cl
 	return opsv1alpha1.OpsSucceedPhase, "", nil
 }
 
-type reconfigureChanges struct {
-	patch     map[string]*string
-	resetKeys []string
-}
-
-func resolveReconfigureChanges(reconfigure opsv1alpha1.Reconfigure) (reconfigureChanges, error) {
+func validateReconfigure(reconfigure opsv1alpha1.Reconfigure) error {
 	if len(reconfigure.Parameters) == 0 && len(reconfigure.Updates) == 0 {
-		return reconfigureChanges{}, fmt.Errorf("no parameter assignments or updates")
+		return fmt.Errorf("no parameter assignments or updates")
 	}
-
-	pairs := make(map[string]opsv1alpha1.ParameterPair, len(reconfigure.Parameters))
 	for _, pair := range reconfigure.Parameters {
-		field := parameterscore.GetValidFieldName(pair.Key)
-		if field == "" {
-			return reconfigureChanges{}, fmt.Errorf("parameter key must not be empty")
+		if parameterscore.GetValidFieldName(pair.Key) == "" {
+			return fmt.Errorf("parameter key must not be empty")
 		}
-		pairs[field] = pair
 	}
-	changes := reconfigureChanges{patch: make(map[string]*string, len(pairs)+len(reconfigure.Updates))}
 	for _, update := range reconfigure.Updates {
-		field := parameterscore.GetValidFieldName(update.Key)
-		if field == "" {
-			return reconfigureChanges{}, fmt.Errorf("parameter update key must not be empty")
+		if parameterscore.GetValidFieldName(update.Key) == "" {
+			return fmt.Errorf("parameter update key must not be empty")
 		}
 		switch update.Type {
 		case parametersv1alpha1.ParameterUpdateSet:
 			if update.Value == nil {
-				return reconfigureChanges{}, fmt.Errorf("parameter update %q with type %q requires a value", update.Key, update.Type)
+				return fmt.Errorf("parameter update %q with type %q requires a value", update.Key, update.Type)
 			}
 		case parametersv1alpha1.ParameterUpdateRemove:
-			update.Value = nil
 		default:
-			return reconfigureChanges{}, fmt.Errorf("unsupported parameter update type %q for key %q", update.Type, update.Key)
+			return fmt.Errorf("unsupported parameter update type %q for key %q", update.Type, update.Key)
 		}
-		delete(pairs, field)
-		parameterscore.DeleteParameterField(changes.patch, update.Key)
-		changes.patch[update.Key] = update.Value
 	}
+	return nil
+}
+
+func reconfigureParameterInputs(reconfigure opsv1alpha1.Reconfigure) (map[string]*string, []string) {
+	pairs := make(map[string]opsv1alpha1.ParameterPair, len(reconfigure.Parameters))
+	for _, pair := range reconfigure.Parameters {
+		pairs[parameterscore.GetValidFieldName(pair.Key)] = pair
+	}
+	assignments := make(map[string]*string, len(pairs)+len(reconfigure.Updates))
+	for _, update := range reconfigure.Updates {
+		delete(pairs, parameterscore.GetValidFieldName(update.Key))
+		parameterscore.DeleteParameterField(assignments, update.Key)
+		if update.Type == parametersv1alpha1.ParameterUpdateRemove {
+			update.Value = nil
+		}
+		assignments[update.Key] = update.Value
+	}
+	var resetKeys []string
 	for _, pair := range pairs {
 		if pair.Value == nil {
-			changes.resetKeys = append(changes.resetKeys, pair.Key)
+			resetKeys = append(resetKeys, pair.Key)
 			continue
 		}
-		changes.patch[pair.Key] = pair.Value
+		assignments[pair.Key] = pair.Value
 	}
-	return changes, nil
+	return assignments, resetKeys
 }
 
 func (r *reconfigureAction) applyReconfigureToParameters(reqCtx intctrlutil.RequestCtx, cli client.Client,
-	cluster *appsv1.Cluster, compName string, changes reconfigureChanges) error {
+	cluster *appsv1.Cluster, compName string, assignments map[string]*string, resetKeys []string) error {
 	compParam, err := r.getRunningComponentParameter(reqCtx.Ctx, cli, cluster.Namespace, cluster.Name, compName)
 	if err != nil {
 		return err
 	}
-	desired := parameters.MergeManagedParameterInputs(compParam.Spec.Desired, changes.patch, changes.resetKeys...)
+	desired := parameters.MergeManagedParameterInputs(compParam.Spec.Desired, assignments, resetKeys...)
 	if reflect.DeepEqual(compParam.Spec.Desired, desired) {
 		return nil
 	}

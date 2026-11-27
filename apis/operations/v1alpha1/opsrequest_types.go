@@ -623,14 +623,15 @@ type Reconfigure struct {
 	// Specifies the name of the Component.
 	ComponentOps `json:",inline"`
 
-	// Specifies parameter assignments and resets for the Component.
-	// A null or omitted value resets that parameter to its Initial or template value.
+	// Sets or resets the named parameters for the component.
+	// Use a null or omitted value to reset a parameter.
 	//
 	// +optional
 	Parameters []ParameterPair `json:"parameters,omitempty"`
 
-	// Specifies explicit Set and Remove operations for the Component's parameters.
-	// Updates are applied in list order and take precedence over Parameters for the same key.
+	// Lists the parameters to set or remove.
+	// If a parameter also appears in `parameters`, the update takes precedence.
+	// If it has multiple updates, the last one takes precedence.
 	//
 	// +optional
 	Updates []parametersv1alpha1.ParameterUpdate `json:"updates,omitempty"`
@@ -716,8 +717,8 @@ type ParameterPair struct {
 	Key string `json:"key"`
 
 	// Specifies the parameter value to set.
-	// A null or omitted value withdraws the parameter's Desired assignment and updates.
-	// The parameter then uses the template value with any Initial override applied.
+	// A null or omitted value restores the parameter's initial setting.
+	// If no initial setting applies, it restores the template default.
 	// +optional
 	Value *string `json:"value"`
 }

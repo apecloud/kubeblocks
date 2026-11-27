@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"reflect"
 	"slices"
 	"strconv"
@@ -118,9 +119,10 @@ func reconcileParameterValuesIntoSpec(ctx context.Context, cli client.Client, co
 		return false, err
 	}
 
-	// Desired replaces the managed overlay for each file it updates. Preserve the
-	// immutable Initial entries that must survive that replacement.
-	restoreInitialImmutableParameters(specCopy, initialParameters, paramsDefs)
+	if specCopy.Desired == nil {
+		// With no Desired inputs, existing file overrides may already be present.
+		restoreInitialImmutableParameters(specCopy, initialParameters, paramsDefs)
+	}
 
 	if reflect.DeepEqual(compParam.Spec, *specCopy) {
 		return false, nil
@@ -390,7 +392,18 @@ func mergeItemParameters(item *parametersv1alpha1.ConfigTemplateItemDetail, upda
 		if parametersInFile.Content != nil {
 			merged.Content = parametersInFile.Content
 		}
-		merged.Parameters = parameters.EncodeParameterOverlay(parametersInFile.Parameters)
+		encoded := parameters.EncodeParameterOverlay(parametersInFile.Parameters)
+		if merged.Parameters == nil {
+			merged.Parameters = encoded
+		} else {
+			// A JSON-encoded array and a scalar or removal can address the same key.
+			for key := range encoded {
+				name := core.GetValidFieldName(key)
+				delete(merged.Parameters, name)
+				delete(merged.Parameters, core.ArrayFieldPrefix+name)
+			}
+			maps.Copy(merged.Parameters, encoded)
+		}
 		item.ConfigFileParams[key] = merged
 	}
 }

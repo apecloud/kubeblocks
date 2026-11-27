@@ -165,7 +165,10 @@ parameter: {
 					Parameters: []opsv1alpha1.ParameterPair{
 						{
 							Key: "max_connections", Value: pointer.String("200"),
-						}, {Key: "gtid_mode", Value: nil},
+						},
+					},
+					Updates: []parametersv1alpha1.ParameterUpdate{
+						{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "gtid_mode"},
 					},
 				},
 			}

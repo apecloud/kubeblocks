@@ -39,8 +39,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/operations"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 	"github.com/apecloud/kubeblocks/pkg/parameters/unstructured"
@@ -360,6 +363,33 @@ var _ = Describe("ComponentParameter Controller", func() {
 					patchDesired(`[{"op":"add","path":"/spec/desired","value":` + desired + `}]`)
 				}
 				waitFinished()
+
+				By("resetting assignments and removals through Ops while preserving other overrides")
+				writeDesired(`{"assignments":{"gtid_mode":` + strconv.Quote(override) + `,"report_host":"keep"},"updates":[{"type":"Remove","key":"general_log"}]}`)
+				waitForValue(override)
+				opsScheme := runtime.NewScheme()
+				Expect(opsv1alpha1.AddToScheme(opsScheme)).To(Succeed())
+				opsClient, err := client.New(cfg, client.Options{Scheme: opsScheme})
+				Expect(err).NotTo(HaveOccurred())
+				request := &opsv1alpha1.OpsRequest{}
+				Expect(json.Unmarshal([]byte(`{"spec":{"type":"Reconfiguring","reconfigures":[{"parameters":[{"key":"gtid_mode","value":null},{"key":"general_log"}],"updates":[{"type":"Remove","key":"slow_query_log"}]}]}}`), request)).To(Succeed())
+				request.Name = "reset-parameters"
+				request.Namespace = comp.Namespace
+				request.Spec.ClusterName = cluster.Name
+				request.Spec.Reconfigures[0].ComponentName = defaultCompName
+				Expect(opsClient.Create(ctx, request)).To(Succeed())
+				DeferCleanup(func() { Expect(opsClient.Delete(ctx, request)).To(Succeed()) })
+				Expect(opsClient.Get(ctx, client.ObjectKeyFromObject(request), request)).To(Succeed())
+				handler := operations.GetOpsManager().OpsMap[opsv1alpha1.ReconfiguringType].OpsHandler
+				Expect(handler.Action(intctrlutil.RequestCtx{Ctx: ctx}, k8sClient, &operations.OpsResource{Cluster: cluster, OpsRequest: request})).To(Succeed())
+				waitForValue(baseline)
+				Eventually(testapps.CheckObj(&testCtx, configKey, func(g Gomega, cm *corev1.ConfigMap) {
+					config, err := unstructured.LoadConfig(testparameters.MysqlConfigFile, cm.Data[testparameters.MysqlConfigFile], parametersv1alpha1.Ini)
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(config.Get("mysqld.general_log")).To(Equal("0"))
+					g.Expect(config.Get("mysqld.report_host")).To(Equal("keep"))
+					g.Expect(config.Get("mysqld.slow_query_log")).To(BeNil())
+				})).Should(Succeed())
 
 				for _, desired := range []string{`{"assignments":{}}`, `{}`, `{"assignments":{"gtid_mode":null}}`, `null`} {
 					By("setting a runtime override and clearing it with " + desired)

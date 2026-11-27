@@ -17,7 +17,7 @@ spec:
       # Represents the name of the parameter that is to be updated.
     - key: maxclients
       # Represents the parameter values that are to be updated.
-      # If set to nil, the parameter defined by the Key field will be removed from the configuration file.
+      # A null or omitted value resets the parameter to its Initial or template value.
       value: '10001'
   # Specifies the maximum number of seconds the OpsRequest will wait for its start conditions to be met before aborting. If set to 0 (default), the start conditions must be met immediately for the OpsRequest to proceed.
   preConditionDeadlineSeconds: 0

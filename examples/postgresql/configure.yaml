@@ -19,5 +19,5 @@ spec:
       # `max_connections` is a dyamic parameter in PostgreSQL that can be changed or updated at runtime without requiring a restart of the database
     - key: max_connections
       # Represents the parameter values that are to be updated.
-      # If set to nil, the parameter defined by the Key field will be removed from the configuration file.
+      # A null or omitted value resets the parameter to its Initial or template value.
       value: '200'

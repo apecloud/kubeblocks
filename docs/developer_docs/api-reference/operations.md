@@ -3289,8 +3289,9 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents the parameter values that are to be updated.
-If set to nil, the parameter defined by the Key field will be removed from the configuration file.</p>
+<p>Specifies the parameter value to set. An empty string is an explicit value.
+A null or omitted value withdraws the parameter&rsquo;s Desired assignment and updates.
+The parameter then uses the template value with any Initial override applied.</p>
 </td>
 </tr>
 </tbody>
@@ -3906,9 +3907,23 @@ ComponentOps
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies a list of key-value pairs representing parameters and their corresponding values
-within a single configuration file.
-This field is used to override or set the values of parameters without modifying the entire configuration file.</p>
+<p>Specifies parameter assignments and resets for the Component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updates</code><br/>
+<em>
+<a href="parameters.md#parameters.kubeblocks.io/v1alpha1.ParameterUpdate">
+[]github.com/apecloud/kubeblocks/apis/parameters/v1alpha1.ParameterUpdate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies explicit Set and Remove operations for the Component&rsquo;s parameters.
+Updates are applied in list order and take precedence over Parameters for the same key.
+Use Remove to delete a key from the rendered configuration.</p>
 </td>
 </tr>
 </tbody>

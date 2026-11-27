@@ -160,14 +160,16 @@ type ConfigTemplateItemDetail struct {
 type ParameterInputs struct {
 	// Assignments are flat managed parameter key/value assignments.
 	//
-	// Entries with a null value are treated as absent. Clearing the desired assignments removes their overrides.
-	// Files with no remaining desired parameter updates fall back to their initial or template values.
-	// Use an update of type Remove to delete a key from the rendered configuration.
+	// Entries with a null value are treated as absent. An empty string is an explicit value.
+	// A parameter with no assignment or update in Desired uses the template value with any Initial override applied.
 	//
 	// +optional
 	Assignments map[string]*string `json:"assignments,omitempty"`
 
 	// Updates is the advanced path for schema-managed parameter changes with explicit update semantics.
+	//
+	// Updates are applied in list order and override assignments for the same parameter.
+	// Use an update of type Remove to delete a key from the rendered configuration.
 	//
 	// +optional
 	Updates []ParameterUpdate `json:"updates,omitempty"`

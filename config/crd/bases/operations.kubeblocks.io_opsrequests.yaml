@@ -3308,10 +3308,8 @@ spec:
                         in the cluster.spec
                       type: string
                     parameters:
-                      description: |-
-                        Specifies a list of key-value pairs representing parameters and their corresponding values
-                        within a single configuration file.
-                        This field is used to override or set the values of parameters without modifying the entire configuration file.
+                      description: Specifies parameter assignments and resets for
+                        the Component.
                       items:
                         properties:
                           key:
@@ -3320,11 +3318,35 @@ spec:
                             type: string
                           value:
                             description: |-
-                              Represents the parameter values that are to be updated.
-                              If set to nil, the parameter defined by the Key field will be removed from the configuration file.
+                              Specifies the parameter value to set. An empty string is an explicit value.
+                              A null or omitted value withdraws the parameter's Desired assignment and updates.
+                              The parameter then uses the template value with any Initial override applied.
                             type: string
                         required:
                         - key
+                        type: object
+                      type: array
+                    updates:
+                      description: |-
+                        Specifies explicit Set and Remove operations for the Component's parameters.
+                        Updates are applied in list order and take precedence over Parameters for the same key.
+                        Use Remove to delete a key from the rendered configuration.
+                      items:
+                        description: ParameterUpdate is an explicit parameter update.
+                        properties:
+                          key:
+                            description: Key is the logical parameter key defined
+                              in ParametersDefinition.
+                            type: string
+                          type:
+                            description: Type defines the update type.
+                            type: string
+                          value:
+                            description: Value is used by set/update style operations.
+                            type: string
+                        required:
+                        - key
+                        - type
                         type: object
                       type: array
                   required:

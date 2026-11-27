@@ -761,9 +761,8 @@ spec:
                     description: |-
                       Assignments are flat managed parameter key/value assignments.
 
-                      Entries with a null value are treated as absent. Clearing the desired assignments removes their overrides.
-                      Files with no remaining desired parameter updates fall back to their initial or template values.
-                      Use an update of type Remove to delete a key from the rendered configuration.
+                      Entries with a null value are treated as absent. An empty string is an explicit value.
+                      A parameter with no assignment or update in Desired uses the template value with any Initial override applied.
                     type: object
                   unmanagedUpdates:
                     description: UnmanagedUpdates is the advanced path for parameters
@@ -822,8 +821,11 @@ spec:
                       type: object
                     type: array
                   updates:
-                    description: Updates is the advanced path for schema-managed parameter
-                      changes with explicit update semantics.
+                    description: |-
+                      Updates is the advanced path for schema-managed parameter changes with explicit update semantics.
+
+                      Updates are applied in list order and override assignments for the same parameter.
+                      Use an update of type Remove to delete a key from the rendered configuration.
                     items:
                       description: ParameterUpdate is an explicit parameter update.
                       properties:
@@ -885,9 +887,8 @@ spec:
                     description: |-
                       Assignments are flat managed parameter key/value assignments.
 
-                      Entries with a null value are treated as absent. Clearing the desired assignments removes their overrides.
-                      Files with no remaining desired parameter updates fall back to their initial or template values.
-                      Use an update of type Remove to delete a key from the rendered configuration.
+                      Entries with a null value are treated as absent. An empty string is an explicit value.
+                      A parameter with no assignment or update in Desired uses the template value with any Initial override applied.
                     type: object
                   unmanagedUpdates:
                     description: UnmanagedUpdates is the advanced path for parameters
@@ -946,8 +947,11 @@ spec:
                       type: object
                     type: array
                   updates:
-                    description: Updates is the advanced path for schema-managed parameter
-                      changes with explicit update semantics.
+                    description: |-
+                      Updates is the advanced path for schema-managed parameter changes with explicit update semantics.
+
+                      Updates are applied in list order and override assignments for the same parameter.
+                      Use an update of type Remove to delete a key from the rendered configuration.
                     items:
                       description: ParameterUpdate is an explicit parameter update.
                       properties:

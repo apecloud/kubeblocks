@@ -274,17 +274,18 @@ parameter: {
 	})
 })
 
-func TestReconfigurePersistsRemoveAndReplacesStaleUpdates(t *testing.T) {
+func TestReconfigurePersistsSetRemoveAndReset(t *testing.T) {
 	for _, tt := range []struct {
 		name    string
 		initial *parametersv1alpha1.ParameterInputs
 		pairs   []opsv1alpha1.ParameterPair
+		updates []parametersv1alpha1.ParameterUpdate
 		want    *parametersv1alpha1.ParameterInputs
 	}{
 		{
-			name:  "remove",
-			pairs: []opsv1alpha1.ParameterPair{{Key: "mode", Value: nil}},
-			want:  &parametersv1alpha1.ParameterInputs{Updates: []parametersv1alpha1.ParameterUpdate{{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "mode"}}},
+			name:    "remove",
+			updates: []parametersv1alpha1.ParameterUpdate{{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "mode"}},
+			want:    &parametersv1alpha1.ParameterInputs{Updates: []parametersv1alpha1.ParameterUpdate{{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "mode"}}},
 		}, {
 			name: "set replaces remove",
 			initial: &parametersv1alpha1.ParameterInputs{
@@ -309,6 +310,35 @@ func TestReconfigurePersistsRemoveAndReplacesStaleUpdates(t *testing.T) {
 			want: &parametersv1alpha1.ParameterInputs{
 				Assignments: map[string]*string{"hosts": pointer.String("single")},
 			},
+		}, {
+			name: "reset clears array assignment and explicit updates",
+			initial: &parametersv1alpha1.ParameterInputs{
+				Assignments: map[string]*string{"@hosts": pointer.String(`["old"]`), "keep": pointer.String("1")},
+				Updates: []parametersv1alpha1.ParameterUpdate{
+					{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "hosts"},
+					{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "other"},
+				},
+			},
+			pairs: []opsv1alpha1.ParameterPair{{Key: "hosts"}},
+			want: &parametersv1alpha1.ParameterInputs{
+				Assignments: map[string]*string{"keep": pointer.String("1")},
+				Updates:     []parametersv1alpha1.ParameterUpdate{{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "other"}},
+			},
+		}, {
+			name:  "reset without desired input",
+			pairs: []opsv1alpha1.ParameterPair{{Key: "mode"}},
+		}, {
+			name:  "explicit updates override resets and preserve list order",
+			pairs: []opsv1alpha1.ParameterPair{{Key: "hosts"}, {Key: "mode", Value: pointer.String("legacy")}},
+			updates: []parametersv1alpha1.ParameterUpdate{
+				{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "hosts"},
+				{Type: parametersv1alpha1.ParameterUpdateSet, Key: "@hosts", Value: pointer.String(`[]`)},
+				{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "mode"},
+			},
+			want: &parametersv1alpha1.ParameterInputs{
+				Assignments: map[string]*string{"@hosts": pointer.String(`[]`)},
+				Updates:     []parametersv1alpha1.ParameterUpdate{{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "mode"}},
+			},
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -323,8 +353,12 @@ func TestReconfigurePersistsRemoveAndReplacesStaleUpdates(t *testing.T) {
 			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cp).Build()
 			cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster", Namespace: "default"}}
 			action := &reconfigureAction{}
+			changes, err := resolveReconfigureChanges(opsv1alpha1.Reconfigure{Parameters: tt.pairs, Updates: tt.updates})
+			if err != nil {
+				t.Fatal(err)
+			}
 			for range 2 {
-				if err := action.applyReconfigureToParameters(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, cluster, "component", opsv1alpha1.Reconfigure{Parameters: tt.pairs}); err != nil {
+				if err := action.applyReconfigureToParameters(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, cluster, "component", changes); err != nil {
 					t.Fatal(err)
 				}
 				if err := cli.Get(context.Background(), client.ObjectKeyFromObject(cp), cp); err != nil {

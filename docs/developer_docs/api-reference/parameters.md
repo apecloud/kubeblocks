@@ -1966,9 +1966,8 @@ map[string]*string
 <td>
 <em>(Optional)</em>
 <p>Assignments are flat managed parameter key/value assignments.</p>
-<p>Entries with a null value are treated as absent. Clearing the desired assignments removes their overrides.
-Files with no remaining desired parameter updates fall back to their initial or template values.
-Use an update of type Remove to delete a key from the rendered configuration.</p>
+<p>Entries with a null value are treated as absent. An empty string is an explicit value.
+A parameter with no assignment or update in Desired uses the template value with any Initial override applied.</p>
 </td>
 </tr>
 <tr>
@@ -1983,6 +1982,8 @@ Use an update of type Remove to delete a key from the rendered configuration.</p
 <td>
 <em>(Optional)</em>
 <p>Updates is the advanced path for schema-managed parameter changes with explicit update semantics.</p>
+<p>Updates are applied in list order and override assignments for the same parameter.
+Use an update of type Remove to delete a key from the rendered configuration.</p>
 </td>
 </tr>
 <tr>

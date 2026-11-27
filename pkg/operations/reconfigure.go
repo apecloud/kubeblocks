@@ -22,6 +22,7 @@ package operations
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -84,16 +85,22 @@ func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Cli
 	if len(resource.OpsRequest.Spec.Reconfigures) == 0 {
 		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, `invalid reconfigure request: %s`, resource.OpsRequest.GetName())
 	}
-	for _, reconfigure := range resource.OpsRequest.Spec.Reconfigures {
-		if len(reconfigure.Parameters) == 0 {
-			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "invalid reconfigure request for component %s: no parameters", reconfigure.ComponentName)
+	reconfigures := resource.OpsRequest.Spec.Reconfigures
+	changes := make([]reconfigureChanges, len(reconfigures))
+	for i, reconfigure := range reconfigures {
+		resolved, err := resolveReconfigureChanges(reconfigure)
+		if err != nil {
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "invalid reconfigure request for component %s: %v", reconfigure.ComponentName, err)
 		}
+		changes[i] = resolved
+	}
+	for i, reconfigure := range reconfigures {
 		compNames, err := r.resolveReconfigureComponents(reqCtx.Ctx, cli, resource.Cluster, reconfigure.ComponentName)
 		if err != nil {
 			return err
 		}
 		for _, compName := range compNames {
-			if err := r.applyReconfigureToParameters(reqCtx, cli, resource.Cluster, compName, reconfigure); err != nil {
+			if err := r.applyReconfigureToParameters(reqCtx, cli, resource.Cluster, compName, changes[i]); err != nil {
 				return err
 			}
 		}
@@ -135,18 +142,66 @@ func (r *reconfigureAction) aggregatePhase(reqCtx intctrlutil.RequestCtx, cli cl
 	return opsv1alpha1.OpsSucceedPhase, "", nil
 }
 
+type reconfigureChanges struct {
+	patch     map[string]*string
+	resetKeys []string
+}
+
+func resolveReconfigureChanges(reconfigure opsv1alpha1.Reconfigure) (reconfigureChanges, error) {
+	if len(reconfigure.Parameters) == 0 && len(reconfigure.Updates) == 0 {
+		return reconfigureChanges{}, fmt.Errorf("no parameter assignments or updates")
+	}
+
+	pairs := make(map[string]opsv1alpha1.ParameterPair, len(reconfigure.Parameters))
+	for _, pair := range reconfigure.Parameters {
+		field := parameterscore.GetValidFieldName(pair.Key)
+		if field == "" {
+			return reconfigureChanges{}, fmt.Errorf("parameter key must not be empty")
+		}
+		pairs[field] = pair
+	}
+	changes := reconfigureChanges{patch: make(map[string]*string, len(pairs)+len(reconfigure.Updates))}
+	for _, update := range reconfigure.Updates {
+		field := parameterscore.GetValidFieldName(update.Key)
+		if field == "" {
+			return reconfigureChanges{}, fmt.Errorf("parameter update key must not be empty")
+		}
+		switch update.Type {
+		case parametersv1alpha1.ParameterUpdateSet:
+			if update.Value == nil {
+				return reconfigureChanges{}, fmt.Errorf("parameter update %q with type %q requires a value", update.Key, update.Type)
+			}
+		case parametersv1alpha1.ParameterUpdateRemove:
+			update.Value = nil
+		default:
+			return reconfigureChanges{}, fmt.Errorf("unsupported parameter update type %q for key %q", update.Type, update.Key)
+		}
+		delete(pairs, field)
+		parameterscore.DeleteParameterField(changes.patch, update.Key)
+		changes.patch[update.Key] = update.Value
+	}
+	for _, pair := range pairs {
+		if pair.Value == nil {
+			changes.resetKeys = append(changes.resetKeys, pair.Key)
+			continue
+		}
+		changes.patch[pair.Key] = pair.Value
+	}
+	return changes, nil
+}
+
 func (r *reconfigureAction) applyReconfigureToParameters(reqCtx intctrlutil.RequestCtx, cli client.Client,
-	cluster *appsv1.Cluster, compName string, reconfigure opsv1alpha1.Reconfigure) error {
+	cluster *appsv1.Cluster, compName string, changes reconfigureChanges) error {
 	compParam, err := r.getRunningComponentParameter(reqCtx.Ctx, cli, cluster.Namespace, cluster.Name, compName)
 	if err != nil {
 		return err
 	}
-	patch := client.MergeFromWithOptions(compParam.DeepCopy(), client.MergeFromWithOptimisticLock{})
-	assignments := make(map[string]*string, len(reconfigure.Parameters))
-	for _, param := range reconfigure.Parameters {
-		assignments[param.Key] = param.Value
+	desired := parameters.MergeManagedParameterInputs(compParam.Spec.Desired, changes.patch, changes.resetKeys...)
+	if reflect.DeepEqual(compParam.Spec.Desired, desired) {
+		return nil
 	}
-	compParam.Spec.Desired = parameters.MergeManagedParameterInputs(compParam.Spec.Desired, assignments)
+	patch := client.MergeFromWithOptions(compParam.DeepCopy(), client.MergeFromWithOptimisticLock{})
+	compParam.Spec.Desired = desired
 	return cli.Patch(reqCtx.Ctx, compParam, patch)
 }
 

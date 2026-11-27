@@ -51,33 +51,27 @@ func MergeUpdatedConfig(baseMap, updatedMap map[string]string) map[string]string
 func FromStringMap(m map[string]*string, valueTransformer ValueTransformer) (map[string]interface{}, error) {
 	result := make(map[string]interface{}, len(m))
 	for key, v := range m {
-		switch {
-		case hasArrayField(key):
-			result[GetValidFieldName(key)] = fromJSONString(v)
-		case v != nil:
-			if err := wrapValue(result, *v, key, valueTransformer); err != nil {
-				return nil, err
-			}
-		default:
-			result[key] = nil
+		value, err := DecodeParameterValue(key, v, valueTransformer)
+		if err != nil {
+			return nil, err
 		}
+		result[GetValidFieldName(key)] = value
 	}
 	return result, nil
 }
 
-func wrapValue(result map[string]interface{}, paramValue string, paramName string, transformer ValueTransformer) error {
-	value := interface{}(paramValue)
-
-	if transformer != nil {
-		transformedValue, err := transformer.TransformValue(paramValue, paramName)
-		if err != nil {
-			return err
-		}
-		value = transformedValue
+// DecodeParameterValue reads a parameter value from the existing string representation.
+func DecodeParameterValue(key string, value *string, transformer ValueTransformer) (any, error) {
+	if value == nil {
+		return nil, nil
 	}
-
-	result[paramName] = value
-	return nil
+	if hasArrayField(key) {
+		return fromJSONString(value), nil
+	}
+	if transformer != nil {
+		return transformer.TransformValue(*value, key)
+	}
+	return *value, nil
 }
 
 func ApplyConfigPatch(baseCfg []byte,

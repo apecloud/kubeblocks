@@ -42,7 +42,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
-	"github.com/apecloud/kubeblocks/pkg/parameters/core"
+	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
 func reconcileConfigItemDetailsIntoSpec(ctx context.Context, cli client.Client, compParam *parametersv1alpha1.ComponentParameter, fetchTask *Task) (bool, error) {
@@ -196,21 +196,20 @@ func normalizeManagedParameterInputs(inputs *parametersv1alpha1.ParameterInputs)
 		return nil, nil
 	}
 	normalized := make(map[string]*string, len(inputs.Assignments)+len(inputs.Updates))
-	for key, value := range inputs.Assignments {
-		normalized[key] = value
-	}
+	maps.Copy(normalized, inputs.Assignments)
 	for _, update := range inputs.Updates {
 		switch update.Type {
 		case parametersv1alpha1.ParameterUpdateSet:
 			if update.Value == nil {
 				return nil, fmt.Errorf("parameter update %q with type %q requires a value", update.Key, update.Type)
 			}
-			normalized[update.Key] = update.Value
 		case parametersv1alpha1.ParameterUpdateRemove:
-			normalized[update.Key] = nil
+			update.Value = nil
 		default:
 			return nil, fmt.Errorf("unsupported parameter update type %q for key %q", update.Type, update.Key)
 		}
+		parameterscore.DeleteParameterField(normalized, update.Key)
+		normalized[update.Key] = update.Value
 	}
 	return normalized, nil
 }
@@ -360,11 +359,8 @@ func mergeItemParameters(item *parametersv1alpha1.ConfigTemplateItemDetail, upda
 		if merged.Parameters == nil {
 			merged.Parameters = encoded
 		} else {
-			// A JSON-encoded array and a scalar or removal can address the same key.
 			for key := range encoded {
-				name := core.GetValidFieldName(key)
-				delete(merged.Parameters, name)
-				delete(merged.Parameters, core.ArrayFieldPrefix+name)
+				parameterscore.DeleteParameterField(merged.Parameters, key)
 			}
 			maps.Copy(merged.Parameters, encoded)
 		}
@@ -504,7 +500,7 @@ func newTask(item parametersv1alpha1.ConfigTemplateItemDetail,
 		Name: item.Name,
 		Do: func(resource *Task, taskCtx *taskContext, revision string) error {
 			if item.ConfigSpec == nil {
-				return core.MakeError("not found config spec: %s", item.Name)
+				return parameterscore.MakeError("not found config spec: %s", item.Name)
 			}
 			if err := resource.ConfigMap(item.Name).Complete(); err != nil {
 				if apierrors.IsNotFound(err) {

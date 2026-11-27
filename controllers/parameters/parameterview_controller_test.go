@@ -46,8 +46,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/operations"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
 	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 	"github.com/apecloud/kubeblocks/pkg/parameters/openapi"
@@ -2202,6 +2205,10 @@ var _ = Describe("ParameterView Controller", func() {
 		Expect(equalParameterValueMap(source, map[string]*string{"keep": ptr.To("1")})).Should(BeFalse())
 		Expect(equalParameterValueMap(source, map[string]*string{"keep": ptr.To("2"), "delete": nil})).Should(BeFalse())
 		Expect(equalParameterValueMap(source, map[string]*string{"keep": nil, "delete": nil})).Should(BeFalse())
+		Expect(equalParameterValueMap(map[string]*string{"@hosts": ptr.To(`[ "db1" ]`)},
+			map[string]*string{"@hosts": ptr.To(`["db1"]`)})).Should(BeTrue())
+		Expect(equalParameterValueMap(map[string]*string{"@hosts": ptr.To(`[]`)},
+			map[string]*string{"hosts": nil})).Should(BeFalse())
 
 		By("checking desired parameter containment")
 		Expect(desiredParametersContain(nil, source)).Should(BeFalse())
@@ -2226,6 +2233,160 @@ var _ = Describe("ParameterView Controller", func() {
 		Expect(configItemFailureMessage(&parametersv1alpha1.ConfigTemplateItemDetailStatus{
 			Message: ptr.To(""),
 		}, "fallback")).Should(Equal("fallback"))
+	})
+
+	It("updates a JSON array through ParameterView, OpsRequest, and ComponentParameter", func() {
+		const (
+			file = "config.json"
+			base = `{"peer_hosts":["peer-default"],"mode":7}`
+		)
+		_, cluster, comp, _, its := mockReconcileResource(
+			func(template *corev1.ConfigMap, compDef *appsv1.ComponentDefinition) {
+				Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(template), func(cm *corev1.ConfigMap) {
+					cm.Data = map[string]string{file: base}
+				})).Should(Succeed())
+				definitionKey := client.ObjectKey{Name: paramsDefName}
+				Eventually(testapps.GetAndChangeObj(&testCtx, definitionKey, func(def *parametersv1alpha1.ParametersDefinition) {
+					def.Spec.ComponentDef = "unused-component-definition"
+				})).Should(Succeed())
+				jsonDefinition := testparameters.NewParametersDefinitionFactory("json-parameters").
+					SetComponentDefinition(compDef.Name).
+					SetTemplateName(configSpecName).
+					SetConfigFile(file).
+					SetFileFormatConfig(parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.JSON}).
+					Schema(`#Config: { hosts?: [...string], peer_hosts?: [...string], mode?: int }`).
+					Create(&testCtx).GetObject()
+				Eventually(func(g Gomega) {
+					_, definitions, err := parameters.ResolveCmpdParametersDefs(ctx, k8sClient, compDef)
+					g.Expect(err).ShouldNot(HaveOccurred())
+					g.Expect(definitions).Should(ConsistOf(HaveField("Name", jsonDefinition.Name)))
+				}).Should(Succeed())
+			})
+		cpKey := client.ObjectKey{Namespace: comp.Namespace, Name: parameterscore.GenerateComponentConfigurationName(cluster.Name, defaultCompName)}
+		cmKey := client.ObjectKey{Namespace: comp.Namespace, Name: parameterscore.GetComponentCfgName(cluster.Name, defaultCompName, configSpecName)}
+		checkRendered := func(expected string) {
+			GinkgoHelper()
+			var hash *string
+			Eventually(testapps.CheckObj(&testCtx, cmKey, func(g Gomega, cm *corev1.ConfigMap) {
+				g.Expect(cm.Data[file]).To(MatchJSON(expected))
+				hash = computeTargetConfigHash(nil, cm.Data)
+				g.Expect(hash).NotTo(BeNil())
+			})).Should(Succeed())
+			mockReconfigureDone(its.Namespace, its.Name, configSpecName, *hash)
+			Eventually(testapps.CheckObj(&testCtx, cpKey, func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+				g.Expect(cp.Status.Phase).To(Equal(parametersv1alpha1.CFinishedPhase))
+				g.Expect(cp.Status.ObservedGeneration).To(Equal(cp.Generation))
+			})).Should(Succeed())
+		}
+		checkRendered(base)
+
+		view := &parametersv1alpha1.ParameterView{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: comp.Namespace, Name: "schema-array",
+				Labels: map[string]string{testCtx.TestObjLabelKey: "true"},
+			},
+			Spec: parametersv1alpha1.ParameterViewSpec{
+				ParameterRef: corev1.LocalObjectReference{Name: cpKey.Name},
+				TemplateName: configSpecName,
+				FileName:     file,
+			},
+		}
+		Expect(k8sClient.Create(ctx, view)).To(Succeed())
+		viewKey := client.ObjectKeyFromObject(view)
+		checkView := func(expected string) {
+			GinkgoHelper()
+			Eventually(testapps.CheckObj(&testCtx, viewKey, func(g Gomega, fetched *parametersv1alpha1.ParameterView) {
+				g.Expect(fetched.Status.Phase).To(Equal(parametersv1alpha1.ParameterViewSyncedPhase))
+				g.Expect(fetched.Spec.Content.Text).To(MatchJSON(expected))
+			})).Should(Succeed())
+		}
+		editView := func(content string) {
+			GinkgoHelper()
+			Eventually(testapps.GetAndChangeObj(&testCtx, viewKey, func(fetched *parametersv1alpha1.ParameterView) {
+				fetched.Spec.Content.Text = content
+			})).Should(Succeed())
+		}
+		checkView(base)
+
+		By("rejecting an array whose element violates the schema")
+		editView(`{"hosts":[1],"peer_hosts":["peer-default"],"mode":7}`)
+		Eventually(testapps.CheckObj(&testCtx, viewKey, func(g Gomega, fetched *parametersv1alpha1.ParameterView) {
+			g.Expect(fetched.Status.Phase).To(Equal(parametersv1alpha1.ParameterViewInvalidPhase))
+			g.Expect(fetched.Status.Message).To(ContainSubstring("hosts"))
+			g.Expect(fetched.Status.Message).To(ContainSubstring("string"))
+		})).Should(Succeed())
+		checkRendered(base)
+
+		By("adding an array through ParameterView")
+		const assigned = `{"hosts":["db1","db2,tag"],"peer_hosts":["peer-default"],"mode":7}`
+		editView(assigned)
+		checkRendered(assigned)
+		checkView(assigned)
+
+		updateComponentParameter := func(update parametersv1alpha1.ParameterUpdate) {
+			GinkgoHelper()
+			Eventually(testapps.GetAndChangeObj(&testCtx, cpKey, func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Spec.Desired.Updates = append(cp.Spec.Desired.Updates, update)
+			})).Should(Succeed())
+		}
+		By("replacing the ParameterView assignment with an explicit ComponentParameter update")
+		updateComponentParameter(parametersv1alpha1.ParameterUpdate{
+			Type: parametersv1alpha1.ParameterUpdateSet, Key: "@hosts", Value: ptr.To(`["db3"]`),
+		})
+		const replaced = `{"hosts":["db3"],"peer_hosts":["peer-default"],"mode":7}`
+		checkRendered(replaced)
+		checkView(replaced)
+
+		By("replacing the existing array through ParameterView")
+		editView(assigned)
+		checkRendered(assigned)
+		checkView(assigned)
+
+		By("removing the array through Ops while updating a numeric parameter")
+		scheme := runtime.NewScheme()
+		Expect(opsv1alpha1.AddToScheme(scheme)).To(Succeed())
+		opsClient, err := client.New(cfg, client.Options{Scheme: scheme})
+		Expect(err).NotTo(HaveOccurred())
+		request := &opsv1alpha1.OpsRequest{
+			ObjectMeta: metav1.ObjectMeta{Name: "array-remove", Namespace: comp.Namespace},
+			Spec:       opsv1alpha1.OpsRequestSpec{ClusterName: cluster.Name, Type: opsv1alpha1.ReconfiguringType},
+		}
+		request.Spec.Reconfigures = []opsv1alpha1.Reconfigure{{
+			ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+			Parameters:   []opsv1alpha1.ParameterPair{{Key: "hosts"}, {Key: "mode", Value: ptr.To("8")}},
+		}}
+		Expect(opsClient.Create(ctx, request)).To(Succeed())
+		DeferCleanup(func() { Expect(opsClient.Delete(ctx, request)).To(Succeed()) })
+		Expect(opsClient.Get(ctx, client.ObjectKeyFromObject(request), request)).To(Succeed())
+		handler := operations.GetOpsManager().OpsMap[opsv1alpha1.ReconfiguringType].OpsHandler
+		Expect(handler.Action(intctrlutil.RequestCtx{Ctx: ctx}, k8sClient, &operations.OpsResource{Cluster: cluster, OpsRequest: request})).To(Succeed())
+		const removed = `{"peer_hosts":["peer-default"],"mode":8}`
+		checkRendered(removed)
+		checkView(removed)
+		Eventually(testapps.CheckObj(&testCtx, cpKey, func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+			g.Expect(cp.Spec.Desired.Assignments).NotTo(HaveKey("@hosts"))
+		})).Should(Succeed())
+
+		By("adding an empty array through ParameterView after the Ops removal")
+		const empty = `{"hosts":[],"peer_hosts":["peer-default"],"mode":8}`
+		editView(empty)
+		checkRendered(empty)
+		checkView(empty)
+
+		By("removing the array and setting it back to empty through ComponentParameter")
+		updateComponentParameter(parametersv1alpha1.ParameterUpdate{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "hosts"})
+		checkRendered(removed)
+		checkView(removed)
+		updateComponentParameter(parametersv1alpha1.ParameterUpdate{
+			Type: parametersv1alpha1.ParameterUpdateSet, Key: "@hosts", Value: ptr.To(`[]`),
+		})
+		checkRendered(empty)
+		checkView(empty)
+
+		By("removing the empty array through ParameterView")
+		editView(removed)
+		checkRendered(removed)
+		checkView(removed)
 	})
 
 	It("writes PlainText content back to ComponentParameter desired parameters", func() {

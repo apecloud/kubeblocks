@@ -148,6 +148,7 @@ ParameterInputs
 <td>
 <em>(Optional)</em>
 <p>Desired provides the current desired parameter inputs.</p>
+<p>A parameter absent from both assignments and updates falls back to the rendered template with its Initial inputs applied.</p>
 </td>
 </tr>
 </tbody>
@@ -1081,6 +1082,7 @@ ParameterInputs
 <td>
 <em>(Optional)</em>
 <p>Desired provides the current desired parameter inputs.</p>
+<p>A parameter absent from both assignments and updates falls back to the rendered template with its Initial inputs applied.</p>
 </td>
 </tr>
 </tbody>
@@ -1966,8 +1968,7 @@ map[string]*string
 <td>
 <em>(Optional)</em>
 <p>Assignments are flat managed parameter key/value assignments.</p>
-<p>Entries with a null value are treated as absent. An empty string is an explicit value.
-A parameter with no assignment or update in Desired uses the template value with any Initial override applied.</p>
+<p>Entries with a null value are treated as absent.</p>
 </td>
 </tr>
 <tr>
@@ -1982,8 +1983,7 @@ A parameter with no assignment or update in Desired uses the template value with
 <td>
 <em>(Optional)</em>
 <p>Updates is the advanced path for schema-managed parameter changes with explicit update semantics.</p>
-<p>Updates are applied in list order and override assignments for the same parameter.
-Use an update of type Remove to delete a key from the rendered configuration.</p>
+<p>Updates are applied in list order and override assignments for the same parameter.</p>
 </td>
 </tr>
 <tr>
@@ -2241,7 +2241,8 @@ string
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;Remove&#34;</p></td>
-<td></td>
+<td><p>ParameterUpdateRemove deletes the key from the rendered configuration.</p>
+</td>
 </tr><tr><td><p>&#34;Set&#34;</p></td>
 <td></td>
 </tr></tbody>

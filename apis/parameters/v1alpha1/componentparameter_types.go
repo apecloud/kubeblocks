@@ -95,6 +95,8 @@ type ComponentParameterSpec struct {
 
 	// Desired provides the current desired parameter inputs.
 	//
+	// A parameter absent from both assignments and updates falls back to the rendered template with its Initial inputs applied.
+	//
 	// +optional
 	Desired *ParameterInputs `json:"desired,omitempty"`
 }
@@ -160,8 +162,7 @@ type ConfigTemplateItemDetail struct {
 type ParameterInputs struct {
 	// Assignments are flat managed parameter key/value assignments.
 	//
-	// Entries with a null value are treated as absent. An empty string is an explicit value.
-	// A parameter with no assignment or update in Desired uses the template value with any Initial override applied.
+	// Entries with a null value are treated as absent.
 	//
 	// +optional
 	Assignments map[string]*string `json:"assignments,omitempty"`
@@ -169,7 +170,6 @@ type ParameterInputs struct {
 	// Updates is the advanced path for schema-managed parameter changes with explicit update semantics.
 	//
 	// Updates are applied in list order and override assignments for the same parameter.
-	// Use an update of type Remove to delete a key from the rendered configuration.
 	//
 	// +optional
 	Updates []ParameterUpdate `json:"updates,omitempty"`
@@ -190,7 +190,9 @@ type ParameterInputs struct {
 type ParameterUpdateType string
 
 const (
-	ParameterUpdateSet    ParameterUpdateType = "Set"
+	ParameterUpdateSet ParameterUpdateType = "Set"
+
+	// ParameterUpdateRemove deletes the key from the rendered configuration.
 	ParameterUpdateRemove ParameterUpdateType = "Remove"
 )
 

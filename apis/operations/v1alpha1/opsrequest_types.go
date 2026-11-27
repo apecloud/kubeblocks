@@ -630,7 +630,6 @@ type Reconfigure struct {
 
 	// Specifies explicit Set and Remove operations for the Component's parameters.
 	// Updates are applied in list order and take precedence over Parameters for the same key.
-	// Use Remove to delete a key from the rendered configuration.
 	//
 	// +optional
 	Updates []parametersv1alpha1.ParameterUpdate `json:"updates,omitempty"`

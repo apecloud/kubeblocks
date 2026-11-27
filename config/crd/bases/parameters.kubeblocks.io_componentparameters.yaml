@@ -753,7 +753,10 @@ spec:
                 - name
                 x-kubernetes-list-type: map
               desired:
-                description: Desired provides the current desired parameter inputs.
+                description: |-
+                  Desired provides the current desired parameter inputs.
+
+                  A parameter absent from both assignments and updates falls back to the rendered template with its Initial inputs applied.
                 properties:
                   assignments:
                     additionalProperties:
@@ -761,8 +764,7 @@ spec:
                     description: |-
                       Assignments are flat managed parameter key/value assignments.
 
-                      Entries with a null value are treated as absent. An empty string is an explicit value.
-                      A parameter with no assignment or update in Desired uses the template value with any Initial override applied.
+                      Entries with a null value are treated as absent.
                     type: object
                   unmanagedUpdates:
                     description: UnmanagedUpdates is the advanced path for parameters
@@ -825,7 +827,6 @@ spec:
                       Updates is the advanced path for schema-managed parameter changes with explicit update semantics.
 
                       Updates are applied in list order and override assignments for the same parameter.
-                      Use an update of type Remove to delete a key from the rendered configuration.
                     items:
                       description: ParameterUpdate is an explicit parameter update.
                       properties:
@@ -887,8 +888,7 @@ spec:
                     description: |-
                       Assignments are flat managed parameter key/value assignments.
 
-                      Entries with a null value are treated as absent. An empty string is an explicit value.
-                      A parameter with no assignment or update in Desired uses the template value with any Initial override applied.
+                      Entries with a null value are treated as absent.
                     type: object
                   unmanagedUpdates:
                     description: UnmanagedUpdates is the advanced path for parameters
@@ -951,7 +951,6 @@ spec:
                       Updates is the advanced path for schema-managed parameter changes with explicit update semantics.
 
                       Updates are applied in list order and override assignments for the same parameter.
-                      Use an update of type Remove to delete a key from the rendered configuration.
                     items:
                       description: ParameterUpdate is an explicit parameter update.
                       properties:

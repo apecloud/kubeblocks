@@ -3922,8 +3922,7 @@ ComponentOps
 <td>
 <em>(Optional)</em>
 <p>Specifies explicit Set and Remove operations for the Component&rsquo;s parameters.
-Updates are applied in list order and take precedence over Parameters for the same key.
-Use Remove to delete a key from the rendered configuration.</p>
+Updates are applied in list order and take precedence over Parameters for the same key.</p>
 </td>
 </tr>
 </tbody>

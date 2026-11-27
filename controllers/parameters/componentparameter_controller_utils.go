@@ -107,8 +107,10 @@ func reconcileParameterValuesIntoSpec(ctx context.Context, cli client.Client, co
 	if err != nil {
 		return false, err
 	}
+
 	// Rebuild managed overlays even when Desired has been removed.
 	clearManagedParameterOverlays(specCopy)
+
 	if err := applyParameterInputs(specCopy, compParam.Spec.Initial, initialParameters, false, ctx, cli, fetchTask, configmaps, configDescs, paramsDefs); err != nil {
 		return false, err
 	}

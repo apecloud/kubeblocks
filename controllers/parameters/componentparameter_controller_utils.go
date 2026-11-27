@@ -119,11 +119,6 @@ func reconcileParameterValuesIntoSpec(ctx context.Context, cli client.Client, co
 		return false, err
 	}
 
-	if specCopy.Desired == nil {
-		// With no Desired inputs, existing file overrides may already be present.
-		restoreInitialImmutableParameters(specCopy, initialParameters, paramsDefs)
-	}
-
 	if reflect.DeepEqual(compParam.Spec, *specCopy) {
 		return false, nil
 	}
@@ -191,37 +186,6 @@ func classifyManagedParameterInputs(inputs *parametersv1alpha1.ParameterInputs,
 	}
 	return parameters.ClassifyComponentParameters(parametersv1alpha1.ComponentParameters(managedInputs),
 		paramsDefs, compDef.Spec.Configs, configmaps, configDescs)
-}
-
-func restoreInitialImmutableParameters(spec *parametersv1alpha1.ComponentParameterSpec,
-	initial map[string]map[string]*parametersv1alpha1.ParametersInFile,
-	paramsDefs []*parametersv1alpha1.ParametersDefinition) {
-	for templateName, files := range initial {
-		item := parameters.GetConfigTemplateItem(spec, templateName)
-		for file, initialParams := range files {
-			paramsDef := resolveParameterDefinition(paramsDefs, file)
-			if paramsDef == nil || len(paramsDef.Spec.ImmutableParameters) == 0 {
-				continue
-			}
-			merged := item.ConfigFileParams[file]
-			for key, value := range parameters.EncodeParameterOverlay(initialParams.Parameters) {
-				if !slices.Contains(paramsDef.Spec.ImmutableParameters, core.GetValidFieldName(key)) {
-					continue
-				}
-				if merged.Parameters == nil {
-					merged.Parameters = map[string]*string{}
-				}
-				merged.Parameters[key] = value
-			}
-			if merged.Parameters == nil {
-				continue
-			}
-			if item.ConfigFileParams == nil {
-				item.ConfigFileParams = map[string]parametersv1alpha1.ParametersInFile{}
-			}
-			item.ConfigFileParams[file] = merged
-		}
-	}
 }
 
 func normalizeManagedParameterInputs(inputs *parametersv1alpha1.ParameterInputs) (map[string]*string, error) {

@@ -237,7 +237,7 @@ func TestMergeItemParametersReplacesArrayAliases(t *testing.T) {
 			}
 			mergeItemParameters(item, map[string]parametersv1alpha1.ParametersInFile{
 				file: {Parameters: map[string]*string{tc.desiredKey: tc.desiredValue}},
-			}, true)
+			})
 			got := parampkg.DecodeParameterOverlay(item.ConfigFileParams[file].Parameters)
 			if _, present := got[tc.initialKey]; present {
 				t.Fatalf("kept superseded alias %q in %v", tc.initialKey, got)

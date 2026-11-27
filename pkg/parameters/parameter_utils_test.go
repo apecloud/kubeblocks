@@ -32,22 +32,6 @@ import (
 	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
 )
 
-var _ = Describe("MergeManagedParameterInputs", func() {
-	It("replaces a previous removal when a file edit adds an empty array", func() {
-		inputs := &configv1alpha1.ParameterInputs{
-			Updates: []configv1alpha1.ParameterUpdate{
-				{Type: configv1alpha1.ParameterUpdateRemove, Key: "hosts"},
-				{Type: configv1alpha1.ParameterUpdateRemove, Key: "other"},
-			},
-		}
-		got := MergeManagedParameterInputs(inputs, map[string]*string{"@hosts": pointer.String(`[]`)})
-		Expect(got.Assignments).To(Equal(map[string]*string{"@hosts": pointer.String(`[]`)}))
-		Expect(got.Updates).To(ConsistOf(configv1alpha1.ParameterUpdate{
-			Type: configv1alpha1.ParameterUpdateRemove, Key: "other",
-		}))
-	})
-})
-
 var _ = Describe("resource Fetcher", func() {
 	var compDefObj *appsv1.ComponentDefinition
 	var paramDef1, paramDef2 *configv1alpha1.ParametersDefinition

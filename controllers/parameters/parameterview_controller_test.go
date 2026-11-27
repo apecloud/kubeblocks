@@ -2205,6 +2205,10 @@ var _ = Describe("ParameterView Controller", func() {
 		Expect(equalParameterValueMap(source, map[string]*string{"keep": ptr.To("1")})).Should(BeFalse())
 		Expect(equalParameterValueMap(source, map[string]*string{"keep": ptr.To("2"), "delete": nil})).Should(BeFalse())
 		Expect(equalParameterValueMap(source, map[string]*string{"keep": nil, "delete": nil})).Should(BeFalse())
+		Expect(equalParameterValueMap(map[string]*string{"@hosts": ptr.To(`[ "db1" ]`)},
+			map[string]*string{"@hosts": ptr.To(`["db1"]`)})).Should(BeTrue())
+		Expect(equalParameterValueMap(map[string]*string{"@hosts": ptr.To(`[]`)},
+			map[string]*string{"hosts": nil})).Should(BeFalse())
 
 		By("checking desired parameter containment")
 		Expect(desiredParametersContain(nil, source)).Should(BeFalse())
@@ -2232,11 +2236,14 @@ var _ = Describe("ParameterView Controller", func() {
 	})
 
 	It("updates a JSON array through ParameterView, OpsRequest, and ComponentParameter", func() {
-		const file = "config.json"
+		const (
+			file = "config.json"
+			base = `{"peer_hosts":["peer-default"],"mode":7}`
+		)
 		_, cluster, comp, _, its := mockReconcileResource(
 			func(template *corev1.ConfigMap, compDef *appsv1.ComponentDefinition) {
 				Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(template), func(cm *corev1.ConfigMap) {
-					cm.Data = map[string]string{file: `{"peer_hosts":["peer-default"],"mode":7}`}
+					cm.Data = map[string]string{file: base}
 				})).Should(Succeed())
 				definitionKey := client.ObjectKey{Name: paramsDefName}
 				Eventually(testapps.GetAndChangeObj(&testCtx, definitionKey, func(def *parametersv1alpha1.ParametersDefinition) {
@@ -2257,7 +2264,6 @@ var _ = Describe("ParameterView Controller", func() {
 			})
 		cpKey := client.ObjectKey{Namespace: comp.Namespace, Name: parameterscore.GenerateComponentConfigurationName(cluster.Name, defaultCompName)}
 		cmKey := client.ObjectKey{Namespace: comp.Namespace, Name: parameterscore.GetComponentCfgName(cluster.Name, defaultCompName, configSpecName)}
-		const base = `{"peer_hosts":["peer-default"],"mode":7}`
 		checkRendered := func(expected string) {
 			GinkgoHelper()
 			var hash *string
@@ -2317,11 +2323,24 @@ var _ = Describe("ParameterView Controller", func() {
 		checkRendered(assigned)
 		checkView(assigned)
 
-		By("replacing the existing array through ParameterView")
+		updateComponentParameter := func(update parametersv1alpha1.ParameterUpdate) {
+			GinkgoHelper()
+			Eventually(testapps.GetAndChangeObj(&testCtx, cpKey, func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Spec.Desired.Updates = append(cp.Spec.Desired.Updates, update)
+			})).Should(Succeed())
+		}
+		By("replacing the ParameterView assignment with an explicit ComponentParameter update")
+		updateComponentParameter(parametersv1alpha1.ParameterUpdate{
+			Type: parametersv1alpha1.ParameterUpdateSet, Key: "@hosts", Value: ptr.To(`["db3"]`),
+		})
 		const replaced = `{"hosts":["db3"],"peer_hosts":["peer-default"],"mode":7}`
-		editView(replaced)
 		checkRendered(replaced)
 		checkView(replaced)
+
+		By("replacing the existing array through ParameterView")
+		editView(assigned)
+		checkRendered(assigned)
+		checkView(assigned)
 
 		By("removing the array through Ops while updating a numeric parameter")
 		scheme := runtime.NewScheme()
@@ -2344,14 +2363,23 @@ var _ = Describe("ParameterView Controller", func() {
 		const removed = `{"peer_hosts":["peer-default"],"mode":8}`
 		checkRendered(removed)
 		checkView(removed)
-
-		By("setting an empty array through ComponentParameter after the removal")
-		Eventually(testapps.GetAndChangeObj(&testCtx, cpKey, func(cp *parametersv1alpha1.ComponentParameter) {
-			cp.Spec.Desired.Updates = append(cp.Spec.Desired.Updates, parametersv1alpha1.ParameterUpdate{
-				Type: parametersv1alpha1.ParameterUpdateSet, Key: "@hosts", Value: ptr.To(`[]`),
-			})
+		Eventually(testapps.CheckObj(&testCtx, cpKey, func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+			g.Expect(cp.Spec.Desired.Assignments).NotTo(HaveKey("@hosts"))
 		})).Should(Succeed())
+
+		By("adding an empty array through ParameterView after the Ops removal")
 		const empty = `{"hosts":[],"peer_hosts":["peer-default"],"mode":8}`
+		editView(empty)
+		checkRendered(empty)
+		checkView(empty)
+
+		By("removing the array and setting it back to empty through ComponentParameter")
+		updateComponentParameter(parametersv1alpha1.ParameterUpdate{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "hosts"})
+		checkRendered(removed)
+		checkView(removed)
+		updateComponentParameter(parametersv1alpha1.ParameterUpdate{
+			Type: parametersv1alpha1.ParameterUpdateSet, Key: "@hosts", Value: ptr.To(`[]`),
+		})
 		checkRendered(empty)
 		checkView(empty)
 

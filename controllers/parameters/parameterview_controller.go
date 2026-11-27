@@ -787,14 +787,18 @@ func (r *ParameterViewReconciler) resolveDesiredParameterPatch(ctx context.Conte
 	if !patch.IsModify {
 		return nil, fmt.Errorf("%s: edited content cannot be represented as desired parameter updates", parameterViewReasonUnsupportedContentChanges)
 	}
-	fields, err := parameterscore.ParameterChangesForFile(patch, view.Spec.FileName, cfgCtx.fileConfig.FileFormatConfig)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", parameterViewReasonDiffFailed, err)
+	desiredPatch := make(map[string]*string)
+	for _, filePatch := range parameterscore.GenerateVisualizedParamsList(patch, descs) {
+		if filePatch.Key != view.Spec.FileName {
+			continue
+		}
+		for _, param := range filePatch.Parameters {
+			desiredPatch[param.Key] = param.Value
+		}
 	}
-	if len(fields) == 0 {
+	if len(desiredPatch) == 0 {
 		return nil, fmt.Errorf("%s: edited content does not contain any supported parameter updates", parameterViewReasonUnsupportedContentChanges)
 	}
-	desiredPatch := parameterscore.EncodeParameterChanges(fields)
 	if _, err := parameters.ClassifyComponentParameters(
 		parametersv1alpha1.ComponentParameters(desiredPatch),
 		cfgCtx.paramsDefs,

@@ -363,81 +363,44 @@ func generateUpdateParam(updatedParams map[string][]byte, trimPrefix func(string
 }
 
 func checkAndFlattenMap(v any, trim string) []ParameterPair {
-	fields := parameterFieldsMap(v, trim)
-	if fields == nil {
-		return nil
-	}
-	pairs := make([]ParameterPair, 0, len(fields))
-	flattenMap(fields, "", func(key string, value any) {
-		pairs = append(pairs, encodeParameterPair(key, value))
-	})
-	return pairs
-}
-
-// ParameterChangesForFile extracts the typed field changes for one configuration file.
-func ParameterChangesForFile(patch *ConfigPatchInfo, file string, format *parametersv1alpha1.FileFormatConfig) (map[string]any, error) {
-	var data any
-	if updated, ok := patch.UpdateConfig[file]; ok {
-		if err := json.Unmarshal(updated, &data); err != nil {
-			return nil, err
-		}
-	} else if added, ok := patch.AddConfig[file]; ok {
-		data = added
-	} else {
-		data = patch.DeleteConfig[file]
-	}
-	var trim string
-	if format != nil {
-		trim = NestedPrefixField(format)
-	}
-	fields := make(map[string]any)
-	flattenMap(parameterFieldsMap(data, trim), "", func(key string, value any) {
-		fields[key] = value
-	})
-	return fields, nil
-}
-
-// EncodeParameterChanges writes typed field changes in the existing string representation.
-func EncodeParameterChanges(fields map[string]any) map[string]*string {
-	encoded := make(map[string]*string, len(fields))
-	for key, value := range fields {
-		pair := encodeParameterPair(key, value)
-		encoded[pair.Key] = pair.Value
-	}
-	return encoded
-}
-
-func parameterFieldsMap(v any, trim string) map[string]any {
 	m := cast.ToStringMap(v)
 	if m != nil && trim != "" {
 		m = cast.ToStringMap(m[trim])
 	}
-	return m
+	if m != nil {
+		return flattenMap(m, "")
+	}
+	return nil
 }
 
-func flattenMap(m map[string]interface{}, prefix string, visit func(string, any)) {
+func flattenMap(m map[string]interface{}, prefix string) []ParameterPair {
 	if prefix != "" {
 		prefix += unstructured.DelimiterDot
 	}
+
+	r := make([]ParameterPair, 0)
 	for k, val := range m {
 		fullKey := prefix + k
-		if nested, ok := val.(map[string]interface{}); ok {
-			flattenMap(nested, fullKey, visit)
-		} else {
-			visit(fullKey, val)
+		switch m2 := val.(type) {
+		case map[string]interface{}:
+			r = append(r, flattenMap(m2, fullKey)...)
+		case []interface{}:
+			r = append(r, ParameterPair{
+				Key:   transArrayFieldName(fullKey),
+				Value: util.ToPointer(transJSONString(val)),
+			})
+		default:
+			var v *string = nil
+			if val != nil {
+				v = util.ToPointer(cast.ToString(val))
+			}
+			r = append(r, ParameterPair{
+				Key:   fullKey,
+				Value: v,
+			})
 		}
 	}
-}
-
-func encodeParameterPair(key string, value any) ParameterPair {
-	switch value.(type) {
-	case []any:
-		return ParameterPair{Key: transArrayFieldName(key), Value: util.ToPointer(transJSONString(value))}
-	case nil:
-		return ParameterPair{Key: key}
-	default:
-		return ParameterPair{Key: key, Value: util.ToPointer(cast.ToString(value))}
-	}
+	return r
 }
 
 func generateUpdateKeyParam(files map[string]interface{}, trimPrefix func(string) string, updatedType ParameterUpdateType, sets *set.LinkedHashSetString) []VisualizedParam {

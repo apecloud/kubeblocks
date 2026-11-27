@@ -314,13 +314,10 @@ var _ = Describe("Reconfigure Controller", func() {
 		It("submit changes to cluster", func() {
 			By("submit changes through component parameter")
 			Eventually(testapps.GetAndChangeObj(&testCtx, compParameterKey, func(compParameter *parametersv1alpha1.ComponentParameter) {
-				item := parameters.GetConfigTemplateItem(&compParameter.Spec, configSpecName)
-				item.ConfigFileParams = map[string]parametersv1alpha1.ParametersInFile{
-					testparameters.MysqlConfigFile: {
-						Parameters: map[string]*string{
-							"innodb_buffer_pool_size": ptr.To("1024M"),
-							"max_connections":         ptr.To("100"),
-						},
+				compParameter.Spec.Desired = &parametersv1alpha1.ParameterInputs{
+					Assignments: map[string]*string{
+						"innodb_buffer_pool_size": ptr.To("1024M"),
+						"max_connections":         ptr.To("100"),
 					},
 				}
 			})).Should(Succeed())
@@ -362,13 +359,10 @@ var _ = Describe("Reconfigure Controller", func() {
 
 			By("submit changes through component parameter")
 			Eventually(testapps.GetAndChangeObj(&testCtx, compParameterKey, func(compParameter *parametersv1alpha1.ComponentParameter) {
-				item := parameters.GetConfigTemplateItem(&compParameter.Spec, configSpecName)
-				item.ConfigFileParams = map[string]parametersv1alpha1.ParametersInFile{
-					testparameters.MysqlConfigFile: {
-						Parameters: map[string]*string{
-							"innodb_buffer_pool_size": ptr.To("1024M"),
-							"max_connections":         ptr.To("100"),
-						},
+				compParameter.Spec.Desired = &parametersv1alpha1.ParameterInputs{
+					Assignments: map[string]*string{
+						"innodb_buffer_pool_size": ptr.To("1024M"),
+						"max_connections":         ptr.To("100"),
 					},
 				}
 			})).Should(Succeed())

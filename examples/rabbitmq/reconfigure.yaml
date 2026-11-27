@@ -19,5 +19,5 @@ spec:
       # `channel_max` is a static parameter in rabbitmq
     - key: ssl_handshake_timeout
       # Represents the parameter values that are to be updated.
-      # A null or omitted value resets the parameter to its Initial or template value.
+      # If set to nil, the parameter defined by the Key field will be removed from the configuration file.
       value: "2000"

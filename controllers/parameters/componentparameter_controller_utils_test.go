@@ -197,7 +197,7 @@ func TestMergeItemParameters(t *testing.T) {
 			},
 		}
 
-		mergeItemParameters(item, updated, true)
+		mergeItemParameters(item, updated)
 
 		got := item.ConfigFileParams["my.cnf"]
 		if got.Content == nil || *got.Content != "[mysqld]\nmax_connections=1000\n" {
@@ -237,7 +237,7 @@ func TestMergeItemParametersReplacesArrayAliases(t *testing.T) {
 			}
 			mergeItemParameters(item, map[string]parametersv1alpha1.ParametersInFile{
 				file: {Parameters: map[string]*string{tc.desiredKey: tc.desiredValue}},
-			}, true)
+			})
 			got := parampkg.DecodeParameterOverlay(item.ConfigFileParams[file].Parameters)
 			if _, present := got[tc.initialKey]; present {
 				t.Fatalf("kept superseded alias %q in %v", tc.initialKey, got)

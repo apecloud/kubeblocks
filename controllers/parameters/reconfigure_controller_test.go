@@ -316,7 +316,7 @@ var _ = Describe("Reconfigure Controller", func() {
 			Eventually(testapps.GetAndChangeObj(&testCtx, compParameterKey, func(compParameter *parametersv1alpha1.ComponentParameter) {
 				compParameter.Spec.Desired = &parametersv1alpha1.ParameterInputs{
 					Assignments: map[string]*string{
-						"innodb_buffer_pool_size": ptr.To("1024M"),
+						"innodb_buffer_pool_size": ptr.To("1073741824"),
 						"max_connections":         ptr.To("100"),
 					},
 				}
@@ -324,7 +324,7 @@ var _ = Describe("Reconfigure Controller", func() {
 
 			expectedHash := waitRenderedConfigHash(
 				testCtx.DefaultNamespace, synthesizedComp.ClusterName, synthesizedComp.Name, configSpecName,
-				"innodb_buffer_pool_size=1024M", "max_connections=100",
+				"innodb_buffer_pool_size=1073741824", "max_connections=100",
 			)
 
 			By("verify changes submit to cluster")
@@ -332,8 +332,6 @@ var _ = Describe("Reconfigure Controller", func() {
 				g.Expect(cluster.Spec.GetComponentByName(defaultCompName).Configs).Should(HaveLen(1))
 				for _, comp := range cluster.Spec.ComponentSpecs {
 					for _, config := range comp.Configs {
-						// g.Expect(config.Variables).Should(HaveKeyWithValue("innodb_buffer_pool_size", "1024M"))
-						// g.Expect(config.Variables).Should(HaveKeyWithValue("max_connections", "100"))
 						g.Expect(config.Variables).Should(BeNil())
 						g.Expect(config.ConfigHash).ShouldNot(BeNil())
 						g.Expect(*config.ConfigHash).Should(Equal(expectedHash))
@@ -361,7 +359,7 @@ var _ = Describe("Reconfigure Controller", func() {
 			Eventually(testapps.GetAndChangeObj(&testCtx, compParameterKey, func(compParameter *parametersv1alpha1.ComponentParameter) {
 				compParameter.Spec.Desired = &parametersv1alpha1.ParameterInputs{
 					Assignments: map[string]*string{
-						"innodb_buffer_pool_size": ptr.To("1024M"),
+						"innodb_buffer_pool_size": ptr.To("1073741824"),
 						"max_connections":         ptr.To("100"),
 					},
 				}
@@ -369,7 +367,7 @@ var _ = Describe("Reconfigure Controller", func() {
 
 			expectedHash := waitRenderedConfigHash(
 				testCtx.DefaultNamespace, synthesizedComp.ClusterName, synthesizedComp.Name, configSpecName,
-				"innodb_buffer_pool_size=1024M", "max_connections=100",
+				"innodb_buffer_pool_size=1073741824", "max_connections=100",
 			)
 
 			By("verify changes submit to cluster")
@@ -377,8 +375,6 @@ var _ = Describe("Reconfigure Controller", func() {
 				g.Expect(cluster.Spec.GetComponentByName(defaultCompName).Configs).Should(HaveLen(1))
 				for _, comp := range cluster.Spec.ComponentSpecs {
 					for _, config := range comp.Configs {
-						// g.Expect(config.Variables).Should(HaveKeyWithValue("innodb_buffer_pool_size", "1024M"))
-						// g.Expect(config.Variables).Should(HaveKeyWithValue("max_connections", "100"))
 						g.Expect(config.Variables).Should(BeNil())
 						g.Expect(config.ConfigHash).ShouldNot(BeNil())
 						g.Expect(*config.ConfigHash).Should(Equal(expectedHash))

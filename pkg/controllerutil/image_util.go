@@ -86,7 +86,7 @@ func LoadRegistryConfig() error {
 		return err
 	}
 
-	for _, registry := range registriesConfigInstance.RegistryConfig {
+	for _, registry := range newRegistriesConfig.RegistryConfig {
 		if len(registry.From) == 0 {
 			return errors.New("registries config invalid: from can't be empty")
 		}

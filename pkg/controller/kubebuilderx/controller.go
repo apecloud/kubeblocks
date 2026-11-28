@@ -21,6 +21,7 @@ package kubebuilderx
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/go-logr/logr"
@@ -120,25 +121,40 @@ func (c *controller) Do(reconciler Reconciler) Controller {
 func (c *controller) Commit() (ctrl.Result, error) {
 	defer c.emitFailureEvent()
 
-	if c.err != nil {
+	if c.err != nil && !c.res.CommitOnError {
 		return ctrl.Result{}, c.err
 	}
-	if c.oldTree.GetRoot() == nil {
-		return ctrl.Result{}, nil
+	if c.oldTree == nil || c.oldTree.GetRoot() == nil {
+		return ctrl.Result{}, c.err
 	}
+	reconcileErr := c.err
 	builder := NewPlanBuilder(c.ctx, c.cli, c.oldTree, c.tree, c.recorder, c.logger)
 	if c.err = builder.Init(); c.err != nil {
+		if reconcileErr != nil {
+			c.err = errors.Join(reconcileErr, c.err)
+		}
 		return ctrl.Result{}, c.err
 	}
 	var plan graph.Plan
 	plan, c.err = builder.Build()
 	if c.err != nil {
+		if reconcileErr != nil {
+			c.err = errors.Join(reconcileErr, c.err)
+		}
 		return ctrl.Result{}, c.err
 	}
 	if c.err = plan.Execute(); c.err != nil {
+		if reconcileErr != nil {
+			c.err = errors.Join(reconcileErr, c.err)
+			return ctrl.Result{}, c.err
+		}
 		if apierrors.IsConflict(c.err) {
 			return ctrl.Result{Requeue: true}, nil
 		}
+		return ctrl.Result{}, c.err
+	}
+	if reconcileErr != nil {
+		c.err = reconcileErr
 		return ctrl.Result{}, c.err
 	}
 	if c.res.Next == rtry || c.res.RetryAfter > 0 {

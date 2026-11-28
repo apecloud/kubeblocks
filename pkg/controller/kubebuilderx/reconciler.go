@@ -116,6 +116,9 @@ type Result struct {
 	// RetryAfter requests a delayed reconciliation independently of Next.
 	// The earliest positive delay wins; an immediate Retry takes precedence.
 	RetryAfter time.Duration
+	// CommitOnError tells Commit to persist the current tree diff before
+	// returning a non-nil reconciliation error.
+	CommitOnError bool
 }
 
 var (
@@ -124,6 +127,10 @@ var (
 
 	// Commit tells the control flow to stop and jump to the commit phase
 	Commit = Result{Next: cmmt}
+
+	// CommitOnError tells the control flow to stop and persist the current tree
+	// diff in Commit even when Reconcile returns a non-nil error.
+	CommitOnError = Result{Next: cmmt, CommitOnError: true}
 
 	// RetryAfter tells the control flow to stop, jump to the commit phase
 	// and retry from the beginning with a delay specified by `after`.

@@ -21,6 +21,7 @@ package kubebuilderx
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -28,10 +29,13 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/go-logr/logr"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -157,6 +161,70 @@ var _ = Describe("controller test", func() {
 			Expect(res.Requeue).Should(BeTrue())
 			Expect(res.RequeueAfter).Should(Equal(time.Second))
 			Expect(newTree).Should(Equal(tree))
+		})
+
+		It("persists tree changes on error only when CommitOnError is returned", func() {
+			reconcileErr := errors.New("later action failed")
+
+			By("normal error skips Commit")
+			root := builder.NewPodBuilder(namespace, name).GetObject()
+			cli := fake.NewClientBuilder().WithObjects(root).Build()
+			tree := NewObjectTree()
+			tree.SetRoot(root)
+			tree.EventRecorder = record.NewFakeRecorder(10)
+			res, err := NewController(ctx, cli, ctrl.Request{}, tree.EventRecorder, logger).
+				Prepare(&dummyLoader{tree: tree}).
+				Do(&dummyReconciler{res: Continue}).
+				Do(&dummyReconciler{res: Commit, err: reconcileErr}).
+				Commit()
+			Expect(err).To(Equal(reconcileErr))
+			Expect(res).To(BeZero())
+			cm := builder.NewConfigMapBuilder("hello", "world").GetObject()
+			Expect(apierrors.IsNotFound(cli.Get(ctx, client.ObjectKeyFromObject(cm), cm))).To(BeTrue())
+
+			By("CommitOnError persists tree changes, skips later steps, emits failure event, and returns error")
+			root = builder.NewPodBuilder(namespace, name).GetObject()
+			cli = fake.NewClientBuilder().WithObjects(root).Build()
+			tree = NewObjectTree()
+			tree.SetRoot(root)
+			recorder := record.NewFakeRecorder(10)
+			tree.EventRecorder = recorder
+			res, err = NewController(ctx, cli, ctrl.Request{}, recorder, logger).
+				Prepare(&dummyLoader{tree: tree}).
+				Do(&dummyReconciler{res: Continue}).
+				Do(&dummyReconciler{res: CommitOnError, err: reconcileErr}).
+				Do(&dummyReconciler{err: errors.New("step after CommitOnError must not run")}).
+				Commit()
+			Expect(err).To(Equal(reconcileErr))
+			Expect(res).To(BeZero())
+			cm = builder.NewConfigMapBuilder("hello", "world").GetObject()
+			Expect(cli.Get(ctx, client.ObjectKeyFromObject(cm), cm)).To(Succeed())
+			var events []string
+			for len(recorder.Events) > 0 {
+				events = append(events, <-recorder.Events)
+			}
+			Expect(events).To(ContainElement(ContainSubstring("FailedReconcile")))
+
+			By("CommitOnError joins plan execution errors with the reconcile error")
+			conflictErr := apierrors.NewConflict(schema.GroupResource{Resource: "configmaps"}, "world", errors.New("conflict"))
+			root = builder.NewPodBuilder(namespace, name).GetObject()
+			baseCli := fake.NewClientBuilder().WithObjects(root).Build()
+			faultyCli := interceptor.NewClient(baseCli, interceptor.Funcs{
+				Create: func(ctx context.Context, cli client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+					return conflictErr
+				},
+			})
+			tree = NewObjectTree()
+			tree.SetRoot(root)
+			tree.EventRecorder = record.NewFakeRecorder(10)
+			res, err = NewController(ctx, faultyCli, ctrl.Request{}, tree.EventRecorder, logger).
+				Prepare(&dummyLoader{tree: tree}).
+				Do(&dummyReconciler{res: Continue}).
+				Do(&dummyReconciler{res: CommitOnError, err: reconcileErr}).
+				Commit()
+			Expect(errors.Is(err, reconcileErr)).To(BeTrue())
+			Expect(apierrors.IsConflict(err)).To(BeTrue())
+			Expect(res).To(BeZero())
 		})
 	})
 })
